@@ -104,6 +104,13 @@ class Settings(BaseSettings):
     #: barato para eles.
     agendador_liquipedia_minutos: int = Field(default=720, ge=5)
 
+    #: Intervalo entre leituras das paginas de equipe da Liquipedia, em minutos.
+    #:
+    #: Uma vez por dia. Equipe nao nasce e nao muda de regiao de hora em hora -
+    #: o que muda e a lista, quando um time novo ganha pagina na wiki. Uma
+    #: rodada sao ~23 chamadas e ~70 segundos, entao diario e barato para eles.
+    agendador_equipes_minutos: int = Field(default=1440, ge=60)
+
     #: Quantas partidas pedir por rodada do agendador.
     agendador_opendota_limite: int = Field(default=100, ge=1, le=500)
 

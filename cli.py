@@ -17,7 +17,7 @@ from dataclasses import asdict
 from config import BASE_DIR, get_settings
 from logging_config import configurar_logging
 
-FONTES = ("steam", "opendota", "liquipedia")
+FONTES = ("steam", "opendota", "liquipedia", "liquipedia-times")
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -72,6 +72,14 @@ def _parser() -> argparse.ArgumentParser:
         default=0,
         metavar="N",
         help="limita o total de apps a coletar (0 = sem limite; util para testes)",
+    )
+
+    equipes = coletar.add_argument_group("liquipedia-times")
+    equipes.add_argument(
+        "--limite-equipes",
+        type=int,
+        metavar="N",
+        help="le so as N primeiras equipes da categoria (util para testar)",
     )
 
     opendota = coletar.add_argument_group("opendota")
@@ -150,6 +158,15 @@ def _construir_coletor(args: argparse.Namespace, storage):
 
         return LiquipediaCollector(raw_storage=storage, settings=settings)
 
+    if args.fonte == "liquipedia-times":
+        from collectors.liquipedia_wiki_collector import LiquipediaWikiCollector
+
+        return LiquipediaWikiCollector(
+            raw_storage=storage,
+            settings=settings,
+            limite_equipes=args.limite_equipes,
+        )
+
     from collectors.opendota_collector import OpenDotaCollector
 
     return OpenDotaCollector(
@@ -167,6 +184,10 @@ def _carregador(fonte: str):
         return carregar
     if fonte == "liquipedia":
         from etl.load_liquipedia import carregar
+
+        return carregar
+    if fonte == "liquipedia-times":
+        from etl.load_liquipedia_wiki import carregar
 
         return carregar
     from etl.load_dota import carregar

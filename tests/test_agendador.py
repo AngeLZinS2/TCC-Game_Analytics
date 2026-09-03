@@ -137,13 +137,19 @@ def test_intervalos_vem_da_configuracao():
         agendador_steam_minutos = 15
         agendador_opendota_minutos = 30
         agendador_liquipedia_minutos = 45
+        agendador_equipes_minutos = 60
         agendador_opendota_limite = 10
 
     tarefas = {t.nome: t.intervalo_segundos for t in montar_tarefas(FakeSettings())}
-    assert tarefas == {"steam": 900, "opendota": 1800, "liquipedia": 2700}
+    assert tarefas == {
+        "steam": 900,
+        "opendota": 1800,
+        "liquipedia": 2700,
+        "equipes": 3600,
+    }
 
 
-@pytest.mark.parametrize("fonte", ["steam", "opendota", "liquipedia"])
+@pytest.mark.parametrize("fonte", ["steam", "opendota", "liquipedia", "equipes"])
 def test_as_tres_fontes_estao_agendadas(fonte: str):
     from config import get_settings
 

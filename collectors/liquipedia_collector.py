@@ -97,7 +97,11 @@ class LiquipediaCollector(BaseCollector[ResultadoAgenda]):
     def parse(self, registros: Sequence[RawRecord]) -> ResultadoAgenda:
         agenda = ResultadoAgenda()
         for registro in registros:
-            if registro.fonte != self.fonte:
+            # Filtra por endpoint tambem: a mesma fonte grava dois tipos de
+            # payload (`matches` e `equipes`), e `ler_ultima_coleta` devolve os
+            # dois juntos. Sem isto, `--from-raw liquipedia` entregaria o
+            # wikitexto das equipes a este parser de HTML.
+            if registro.fonte != self.fonte or registro.endpoint != ENDPOINT_AGENDA:
                 continue
             agenda.partidas.extend(transformar(registro.payload).partidas)
         return agenda

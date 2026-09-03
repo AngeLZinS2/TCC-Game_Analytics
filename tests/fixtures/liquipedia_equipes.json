@@ -1,0 +1,58 @@
+{
+ "query": {
+  "pages": {
+   "6440": {
+    "pageid": 6440,
+    "title": "1st.VN",
+    "revisions": [
+     {
+      "slots": {
+       "main": {
+        "*": "{{team-stub}}\n{{Infobox team\n|name=1st.VN  \n|location=Vietnam\n|region=sea\n|image=1stVN.png\n|manager=Luu '''\"BeTac\"''' Huynh Minh Nhut\n|captain=\n|sponsor=[http://www.kingston.com Kingston]\n|facebook=1stvn\n|teamid=605246\n|created=2010-11-17\n|disbanded=2014-??-??\n}}"
+       }
+      }
+     }
+    ]
+   },
+   "101213": {
+    "pageid": 101213,
+    "title": "2Be Continued Esports",
+    "revisions": [
+     {
+      "slots": {
+       "main": {
+        "*": "{{DISPLAYTITLE:2Be Continued Esports}}\n{{TeamTabs}}\n{{Infobox team\n|name=2Be Continued Esports\n|image=2BE Continue lightmode.png\n|imagedark=2BE Continue darkmode.png\n|location=Thailand\n|region=SEA\n|website=https://2be-esports.com/\n|facebook=2BeContinued.Official\n|teamid=7136618\n|created=2019-05-19\n|disbanded=2019-10-04\n}}"
+       }
+      }
+     }
+    ]
+   },
+   "881": {
+    "pageid": 881,
+    "title": "Absolute Legends",
+    "revisions": [
+     {
+      "slots": {
+       "main": {
+        "*": "{{team-stub}}\n{{Liquipedia links|starcraft2=Absolute Legends|counterstrike=Absolute Legends}}\n{{TeamTabs}}\n{{Infobox team\n|name=Absolute Legends\n|location=Belgium\n|region=eu\n|image=Absolute Legends-logo.png\n|website=https://absolutelegends.gg/\n|twitter=AbsoluteLegends\n|created=2012-01-21\n|disbanded=2013\n}}"
+       }
+      }
+     }
+    ]
+   },
+   "37747": {
+    "pageid": 37747,
+    "title": "Team Spirit",
+    "revisions": [
+     {
+      "slots": {
+       "main": {
+        "*": "{{Infobox team\n|name=Team Spirit\n|image=Team Spirit 2022 full lightmode.png\n|imagedark=Team Spirit 2022 full darkmode.png\n|location=Serbia\n|location2=Russia\n|region=cis\n|website=https://teamspirit.gg/\n|bilibili=3546657450887496\n|facebook=teamspiritpage\n|instagram=team__spirit\n|telegram=Team_Spirit_Official\n|linkedin=team-spirit-esports\n|tiktok=teamspirit\n|twitch=team/spirit\n|twitter=TSpirit_Dota2\n|twitter2=Team__Spirit\n|vk=team_spirit\n|youtube=spirit\n|weibo=7912736021\n|fanclub=https://tl.net/forum/dota-2-players-and-teams/501774-team-spirit-discussion\n|faceit=aa625c32-758c-4097-a110-4c43ebd67848\n|teamid=7119388\n|created=2015-12-06\n|disbanded=\n}}"
+       }
+      }
+     }
+    ]
+   }
+  }
+ }
+}

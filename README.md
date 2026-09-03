@@ -768,6 +768,93 @@ O detalhe é **um componente montado em dois lugares** (o modal do kanban e a se
 confronto hipotético). Duas implementações do mesmo "por quê" divergiriam na primeira vez
 que uma delas mudasse.
 
+### Fase 11 — Equipes pela API MediaWiki da Liquipedia
+
+A Fase 10 trouxe a agenda, mas com um buraco: **um terço dos confrontos não conseguia
+previsão** porque o nome que a Liquipedia exibe não casava com nenhuma linha de
+`dim_equipe`. Eram 89 confrontos, 25 sem a equipe A ligada e 33 sem a B.
+
+#### O que a API oferece de verdade, medido antes de escrever código
+
+| Tentativa | Resultado |
+|---|---|
+| `action=cargoquery` (tabelas estruturadas) | **não existe** — `Unrecognized value for parameter "action"`; a extensão Cargo não está instalada |
+| `action=query&prop=revisions` na página da agenda | **inútil** — `Liquipedia:Matches` tem 234 caracteres de wikitexto, só um `{{#invoke:Lua ... Match/Ticker/Container}}` |
+| `action=query&prop=revisions` nas páginas de equipe | **funciona** — o `{{Infobox team}}` está no fonte |
+| `action=query&list=categorymembers` | **funciona** — `Category:Teams` lista as 962 equipes |
+
+A primeira linha derrubou o plano original. A segunda é a mais informativa: a página da
+agenda é montada por Lua a partir da base interna deles, então **ler HTML renderizado ali
+não era atalho nosso — é a única via pelo MediaWiki**. A Fase 10 já estava certa.
+
+#### O que muda: identificador em vez de semelhança
+
+O `{{Infobox team}}` traz `|teamid=7119388`, e esse é **o mesmo número que a OpenDota
+publica** em `radiant_team.team_id`, já gravado em `dim_equipe.id_externo`. O vínculo deixa
+de ser casamento de texto e vira `WHERE id_externo = :teamid`.
+
+Isso é o oposto do que `load_liquipedia.py` faz com os nomes da agenda, e de propósito: lá
+a fonte não publica identificador, e por isso aquele módulo recusa casamento difuso. Aqui a
+fonte publica. **Quando a fonte dá a chave, usar a chave é a única coisa sensata.**
+
+```powershell
+.\.venv\Scripts\python.exe cli.py collect liquipedia-times
+.\.venv\Scripts\python.exe cli.py collect liquipedia-times --limite-equipes 30  # teste
+```
+
+Resultado medido de uma rodada completa: 962 títulos no índice → **633 equipes com
+`teamid`** → 593 inseridas e 11 enriquecidas (essas já vinham da OpenDota), em 66,8 s.
+
+E o efeito na agenda, reprocessando do disco sem rede:
+
+| Confrontos com **as duas** equipes resolvidas, sobre 89 | |
+|---|---|
+| só com a dimensão da OpenDota | 37 (42%) |
+| com as equipes da Liquipedia | **52 (58%)** |
+
+#### Decisões que valem menção
+
+- **`rvsection=0`, não a página inteira.** Medido: 20 páginas de equipe completas pesam
+  126,6 KB; só a seção inicial, 13,3 KB. São 10% do tráfego para 100% do dado que
+  interessa — o resto é histórico de line-up e referências.
+- **A categoria, não uma lista escrita à mão.** `Category:Teams` é mantida pelos editores
+  da wiki; uma lista nossa nasceria desatualizada e a primeira equipe nova ficaria de fora
+  sem ninguém notar.
+- **Um parser por profundidade, não um regex.** A primeira tentativa foi
+  `\|\s*disbanded\s*=\s*([^\n|]*)`, e ela devolveu `}}` para uma equipe **ativa**: o campo
+  vazio faz o padrão engolir o fechamento do template. Valores de infobox também contêm
+  `[[links|com pipe]]` e `{{templates|aninhados}}`, que um regex parte ao meio. O parser
+  caminha contando profundidade de `{{}}` e `[[]]` e só corta em `|` do nível de cima.
+- **O nome vindo da OpenDota não é sobrescrito.** As duas fontes nomeiam a mesma equipe de
+  formas diferentes, e trocar o nome faria a tela de partidas mostrar um rótulo e o ranking
+  outro, para a mesma linha. A wiki entra com o que a OpenDota não tem.
+- **`ativa` é anulável de propósito.** `NULL` significa "a wiki nunca falou desta equipe";
+  `False` significa "a wiki diz que foi dissolvida". Colapsar os dois em `False` afirmaria
+  algo que ninguém verificou sobre 42 equipes.
+- **Data parcial vira `NULL`.** A wiki aceita `2014-??-??` — o editor sabia o ano e não o
+  dia. Completar o `??` com `01` inventaria precisão que a fonte não tem.
+
+#### Um defeito que isto expôs
+
+Reprocessar a agenda com `--from-raw` passou a estourar
+`CardinalityViolation: ON CONFLICT DO UPDATE command cannot affect row a second time`. A
+causa não era o código novo: desde que o **agendador** passou a coletar a agenda de hora em
+hora, `ler_ultima_coleta` devolve vários payloads da mesma janela, e o mesmo confronto
+aparece em mais de um com o mesmo `id_externo`. O Postgres recusa duas linhas com a mesma
+chave no mesmo `INSERT ... ON CONFLICT`. `load_liquipedia.py` agora deduplica por
+`id_externo` antes do upsert, ficando com a leitura mais recente.
+
+#### O que ficou de fora, e por quê
+
+O **tier do torneio** seria o complemento natural — é a informação que diria quais das
+nossas 100 partidas são de fato de alto nível (a OpenDota rotula todas como
+`professional`, o que não discrimina nada: as ligas coletadas são qualificatórias e eventos
+regionais). Mas as páginas de torneio da Liquipedia usam subpáginas (`BLAST/Slam/8/Europe`)
+e `action=opensearch` não resolve o nome que a OpenDota nos dá — buscar "BLAST Slam VII"
+devolve lista vazia. Resolver isso exige um mapeamento de nomes que é exatamente o tipo de
+casamento difuso que este projeto recusa em outros lugares. Fica registrado como próximo
+passo, não como algo meio-feito.
+
 ### Fase 3 — Riot API (LoL)
 
 Próxima fase. O star schema já tem o discriminador (`dim_jogo.codigo`), as rotas de partidas
@@ -865,7 +952,9 @@ gaming-analytics/
 │   ├── base.py          # BaseCollector, RawRecord, CollectionResult
 │   ├── http_client.py   # rate limiting + backoff exponencial
 │   ├── seeds/           # listas semente de coleta
-│   └── steam_collector.py
+│   ├── steam_collector.py
+│   ├── steam_loja.py    # consulta pontual a loja, sem gravar nada
+│   └── liquipedia_wiki_collector.py
 ├── etl/
 │   ├── raw_storage.py   # grava/relê os payloads brutos
 │   ├── transform_*.py   # funções puras: payload → modelo validado
@@ -906,5 +995,6 @@ Todas as variáveis estão documentadas em `.env.example`. As mais relevantes:
 | `AGENDADOR_STEAM_MINUTOS` | `60` | intervalo da coleta automática da Steam (acompanha a janela do snapshot) |
 | `AGENDADOR_OPENDOTA_MINUTOS` | `360` | intervalo da coleta automática de partidas |
 | `AGENDADOR_LIQUIPEDIA_MINUTOS` | `720` | intervalo da leitura da agenda futura |
+| `AGENDADOR_EQUIPES_MINUTOS` | `1440` | intervalo da leitura das páginas de equipe da wiki |
 | `DASHBOARD_PORT` | `3000` | porta publicada pelo dashboard no compose |
 | `RIOT_API_KEY` | — | Fase 3 (LoL) |

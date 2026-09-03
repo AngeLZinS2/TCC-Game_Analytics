@@ -187,7 +187,19 @@ def carregar(resultado: ResultadoAgenda) -> int:
                 }
             )
 
-        for lote in em_lotes(linhas):
+        # Dedup por `id_externo` ANTES do upsert.
+        #
+        # `ON CONFLICT DO UPDATE` recusa dois registros com a mesma chave no
+        # MESMO comando (`CardinalityViolation`), e isso acontece de verdade:
+        # a agenda e coletada de hora em hora, `ler_ultima_coleta` devolve
+        # todos os payloads da janela, e o mesmo confronto aparece em varios
+        # deles com o mesmo id (sha1 de times+horario). Fica a ultima
+        # ocorrencia, que e a leitura mais recente do mesmo confronto.
+        unicas: dict[str, dict] = {}
+        for linha in linhas:
+            unicas[linha["id_externo"]] = linha
+
+        for lote in em_lotes(list(unicas.values())):
             stmt = pg_insert(AgendaPartida).values(lote)
             atualizaveis = {
                 coluna: stmt.excluded[coluna]

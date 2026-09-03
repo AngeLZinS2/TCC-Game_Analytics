@@ -149,6 +149,17 @@ def _coletar_liquipedia(settings: Settings, storage: RawStorage) -> CollectionRe
         coletor.close()
 
 
+def _coletar_equipes(settings: Settings, storage: RawStorage) -> CollectionResult:
+    """As paginas de equipe da wiki - quem sao os times, nao o que jogaram."""
+    from collectors.liquipedia_wiki_collector import LiquipediaWikiCollector
+
+    coletor = LiquipediaWikiCollector(raw_storage=storage, settings=settings)
+    try:
+        return coletor.run(carregar=True)
+    finally:
+        coletor.close()
+
+
 def montar_tarefas(settings: Settings) -> list[Tarefa]:
     """As tarefas do agendador, na ordem em que rodam quando empatam."""
     return [
@@ -166,6 +177,11 @@ def montar_tarefas(settings: Settings) -> list[Tarefa]:
             nome="liquipedia",
             intervalo_segundos=settings.agendador_liquipedia_minutos * 60,
             executar=_coletar_liquipedia,
+        ),
+        Tarefa(
+            nome="equipes",
+            intervalo_segundos=settings.agendador_equipes_minutos * 60,
+            executar=_coletar_equipes,
         ),
     ]
 

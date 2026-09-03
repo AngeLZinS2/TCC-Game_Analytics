@@ -17,6 +17,7 @@ from decimal import Decimal
 from sqlalchemy import (
     ARRAY,
     BigInteger,
+    Boolean,
     Date,
     DateTime,
     ForeignKey,
@@ -266,6 +267,18 @@ class DimEquipe(Base):
     nome: Mapped[str] = mapped_column(String(120), nullable=False)
     tag: Mapped[str | None] = mapped_column(String(32))
     logo_url: Mapped[str | None] = mapped_column(Text)
+
+    #: Metadados do `{{Infobox team}}` da Liquipedia, ligados por `teamid`, que
+    #: e o mesmo numero de `id_externo`. Nulos enquanto a equipe nao aparecer
+    #: na wiki - o que e a regra para times de qualificatoria aberta.
+    regiao: Mapped[str | None] = mapped_column(String(40))
+    pais: Mapped[str | None] = mapped_column(String(80))
+    #: Nulo = a wiki nunca falou desta equipe. Nao confundir com `False`, que
+    #: seria a wiki dizendo que ela foi dissolvida.
+    ativa: Mapped[bool | None] = mapped_column(Boolean)
+    criada_em: Mapped[date | None] = mapped_column(Date)
+    #: A pagina de onde os campos acima vieram - procedencia conferivel.
+    pagina_liquipedia: Mapped[str | None] = mapped_column(String(200))
 
     __table_args__ = (
         UniqueConstraint("id_jogo", "id_externo", name="uq_equipe_jogo_externo"),
