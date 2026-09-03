@@ -770,7 +770,69 @@ que uma delas mudasse.
 
 ### Fase 3 — Riot API (LoL)
 
-Próxima fase. Reaproveita o mesmo star schema, populando com `codigo = 'lol'` em `dim_jogo`.
+Próxima fase. O star schema já tem o discriminador (`dim_jogo.codigo`), as rotas de partidas
+aceitam `?jogo=`, e a barra superior tem os chips de Dota 2 / LoL / Valorant.
+
+**O que isso prova e o que não prova, para ser preciso:** está provado que os endpoints leem
+o discriminador, porque é o mesmo código que serve Dota 2 hoje. **Não** está provado que
+"as mesmas telas passam a servir LoL sem mudança de código" — isso só se sabe quando houver
+uma linha de LoL no banco, e hoje há zero. As entidades do LoL não são as do Dota (não há
+Radiant/Dire, e o equivalente de "herói" tem outra estrutura de atributos), então a
+expectativa honesta é de *alguma* mudança, não de nenhuma. Selecionar LoL nos chips hoje
+mostra telas vazias — que é o comportamento correto para um domínio sem dado, mas não é
+evidência de portabilidade.
+
+## Ingestão periódica
+
+Até a Fase 10 a coleta só acontecia quando alguém digitava `cli.py collect`. O efeito disso
+estava medido no próprio banco: **3 janelas de coleta da Steam cobrindo 16 horas**, com dois
+snapshots por jogo. Um `fato_snapshot_jogo_steam` desenhado para série temporal, com uma
+série que não existia — e por consequência a ordenação por *trending* desabilitada, o KPI
+"vs. coleta anterior" em travessão e a tela de detalhe dizendo *"só existe uma coleta até
+agora"*.
+
+O serviço `agendador` (`agendador.py`, no `docker-compose.yml`) resolve isso:
+
+| Fonte | Intervalo | Por quê |
+|---|---|---|
+| Steam | 60 min | acompanha `SNAPSHOT_BUCKET_MINUTES`: coletar mais rápido cairia na mesma janela e viraria `UPDATE` da linha anterior, não um ponto novo |
+| OpenDota | 6 h | partidas terminam ao longo do dia e só são publicadas depois de encerradas; o limite aqui é cortesia com a API pública |
+| Liquipedia | 12 h | o calendário de campeonato muda em dias, e eles bloqueiam por IP quem abusa |
+
+```powershell
+docker compose up -d agendador
+docker compose logs -f agendador
+```
+
+Decisões que valem menção:
+
+- **Serviço separado, não um `APScheduler` dentro da API.** Coleta é trabalho de lote:
+  demorada, dependente de rede alheia, e que não deve nada ao ciclo de vida de um servidor
+  HTTP. Junto da API, uma coleta longa competiria com o dashboard e um deploy interromperia
+  a ingestão.
+- **Laço próprio, não `cron` do sistema.** O cron seria menos código, mas viveria fora do
+  projeto: não apareceria no compose, não seria versionado junto, e dependeria de
+  configuração manual em cada máquina.
+- **Ele monitora o que está no banco, não a semente.** O `SteamCollector` sem `app_ids` cai
+  na lista fixa de `collectors/seeds/`. Para o agendador isso seria um bug silencioso: todo
+  jogo trazido pela busca da tela ficaria com o único snapshot do dia em que entrou, e a
+  série dele nunca cresceria — sem nada parecer quebrado. Foi o primeiro defeito que
+  apareceu ao subir o serviço: 12 apps coletados com 20 no banco.
+- **Uma fonte fora do ar não derruba as outras.** Cada tarefa roda dentro de um `try`, e a
+  que falha é reagendada para 5 minutos em vez do intervalo cheio — sem isso, um timeout de
+  dez segundos na Liquipedia custaria meio dia de agenda. Isso foi exercitado sem querer na
+  primeira execução: a OpenDota respondeu **HTTP 522** (Cloudflare, origem fora do ar,
+  confirmado com `curl` direto), a Steam seguiu normal e o laço sobreviveu.
+- **Repetir é seguro.** `(app_id, janela_coleta)` é único com a janela truncada por hora, e
+  a coleta da OpenDota pula partidas já no banco. Por isso o agendador pode coletar assim
+  que sobe (`AGENDADOR_RODAR_AO_INICIAR`) sem que um ciclo de restart suje o dado.
+- **O desligamento é limpo entre tarefas, não dentro de uma.** O SIGTERM acorda a espera na
+  hora (`Event.wait`, não `sleep`), mas uma coleta em curso vai até o fim. Medido: com os
+  10s padrão do Docker, parar durante uma coleta dava **exit 137** (SIGKILL). Daí o
+  `stop_grace_period: 180s` — uma passada leva ~3s por jogo monitorado. Se o prazo estourar
+  mesmo assim, o dano é zero: os payloads já estão em `data/raw/` e a carga é transacional.
+
+Primeira execução real: **60 payloads, 1.953 linhas carregadas, 60,3 s** para 20 jogos.
 
 ## Testes
 
@@ -815,17 +877,18 @@ gaming-analytics/
 ├── api/                 # FastAPI
 │   ├── main.py          # app, CORS e montagem dos routers
 │   ├── schemas.py       # contrato de resposta (Pydantic)
-│   └── routers/         # meta.py, steam.py, dota.py
+│   └── routers/         # meta, steam, catalogo, dota, sentimento, confronto, assistente
 ├── dashboard/           # frontend React (Vite + TypeScript)
 │   ├── src/api/         # cliente HTTP, tipos e hooks de consulta
 │   ├── src/componentes/ # blocos de UI e os gráficos
 │   ├── src/paginas/     # uma tela por rota
-│   ├── src/tema.tsx     # tema claro/escuro e as cores dos gráficos
+│   ├── src/tema.ts      # a paleta, em hex resolvido (o painel é escuro e só escuro)
 │   ├── Dockerfile       # build + nginx
 │   └── nginx.conf       # fallback de SPA e proxy para a API
-├── ml/                  # módulo preditivo (Fase 8, opcional)
+├── ml/                  # sentimento (Fase 7), confronto (Fase 9), assistente (Fase 8)
 ├── tests/
-├── cli.py               # ponto de entrada: init-db, collect, stats
+├── agendador.py         # laço de ingestão periódica (serviço do compose)
+├── cli.py               # init-db, collect, stats, train-sentimento, train-confronto
 └── docker-compose.yml
 ```
 
@@ -840,5 +903,8 @@ Todas as variáveis estão documentadas em `.env.example`. As mais relevantes:
 | `SNAPSHOT_BUCKET_MINUTES` | `60` | janela de deduplicação dos snapshots |
 | `LOG_FORMAT` | `json` | `json` para ingestão, `text` para desenvolvimento |
 | `CORS_ORIGINS` | `localhost:5173,4173` | origens liberadas para o dashboard em desenvolvimento |
+| `AGENDADOR_STEAM_MINUTOS` | `60` | intervalo da coleta automática da Steam (acompanha a janela do snapshot) |
+| `AGENDADOR_OPENDOTA_MINUTOS` | `360` | intervalo da coleta automática de partidas |
+| `AGENDADOR_LIQUIPEDIA_MINUTOS` | `720` | intervalo da leitura da agenda futura |
 | `DASHBOARD_PORT` | `3000` | porta publicada pelo dashboard no compose |
 | `RIOT_API_KEY` | — | Fase 3 (LoL) |
