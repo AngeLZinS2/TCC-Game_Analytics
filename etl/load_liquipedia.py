@@ -192,6 +192,9 @@ def carregar(resultado: ResultadoAgenda, jogo: str = JOGO) -> int:
                     "torneio": partida.torneio,
                     "formato": partida.formato,
                     "coletado_em": agora,
+                    "vitoria_a": partida.vitoria_a,
+                    "placar_a": partida.placar_a,
+                    "placar_b": partida.placar_b,
                 }
             )
 

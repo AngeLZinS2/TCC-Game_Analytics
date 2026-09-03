@@ -42,10 +42,12 @@ def _relatorio(jogo: str) -> dict[str, Any]:
         raise HTTPException(
             status_code=503,
             detail=(
-                f"As forças das equipes de {jogo} não foram ajustadas. O ajuste "
-                f"precisa de partidas COM RESULTADO, e hoje só o Dota 2 tem "
-                f"(a coleta de resultados vem da OpenDota). Para {jogo} existem "
-                "a agenda e as equipes, vindas da Liquipedia."
+                f"As forças das equipes de {jogo} não foram ajustadas. Rode "
+                f"`python cli.py train-confronto --jogo {jogo}` depois de coletar "
+                "partidas COM RESULTADO: para Dota 2 elas vêm da OpenDota; para "
+                "os demais jogos vêm do ticker da Liquipedia "
+                f"(`cli.py collect liquipedia --wiki {jogo}`, coletado ao longo "
+                "do tempo, já que o ticker só guarda uma janela recente)."
             ),
         )
     return relatorio

@@ -1,11 +1,22 @@
-"""Testes do parser da agenda e da reconciliacao de nomes de equipe.
+"""Testes do parser da agenda/resultado e da reconciliacao de nomes de equipe.
 
-A fixture sao dois blocos reais da pagina `Liquipedia:Matches`. Ela funciona
-como contrato com o markup: este e o unico ponto do projeto que le HTML, e HTML
-de wiki muda sem aviso. Se a Liquipedia renomear `match-info-header-opponent`,
-o parser passa a devolver lista vazia - e sem estes testes isso apareceria
-como "nenhum confronto agendado" na tela, que parece um fim de semana sem
-jogos e nao um parser quebrado.
+Duas fixtures, as duas reais:
+
+* `liquipedia_matches` - dois blocos futuros, sem resultado (o contrato
+  original da Fase 10).
+* `liquipedia_matches_resultado` - tres blocos concluidos-ou-nao da wiki de
+  counterstrike (Fase 13): A venceu, B venceu, e um ainda sem decisao. Existe
+  separada da primeira para nao acoplar o teste do resultado ao teste da
+  agenda pura - a fronteira entre "decidido" e "nao decidido" e a parte que
+  mais importa acertar aqui, porque errar o lado do vencedor produziria uma
+  base de treino com o rotulo TROCADO, sem nenhum erro visivel na tela.
+
+As fixtures funcionam como contrato com o markup: este e o unico ponto do
+projeto que le HTML, e HTML de wiki muda sem aviso. Se a Liquipedia renomear
+`match-info-header-opponent` ou `match-info-header-winner`, o parser passa a
+devolver lista vazia (ou vitoria_a sempre None) - e sem estes testes isso
+apareceria como "nenhum confronto agendado" ou "nunca ha resultado", que
+parece um fim de semana parado e nao um parser quebrado.
 """
 
 from __future__ import annotations
@@ -133,3 +144,95 @@ def test_sufixo_nao_e_removido_quando_sobraria_quase_nada():
     """Sem o piso de tamanho, um time chamado "Esports" viraria string vazia."""
     assert _sem_enfeites("Esports") == "esports"
     assert _sem_enfeites("Team") == "team"
+
+
+# ---------------------------------------------------------------------------
+# Resultado (Fase 13)
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture(scope="module")
+def payload_resultado(carregar_fixture):
+    return carregar_fixture("liquipedia_matches_resultado")
+
+
+@pytest.fixture(scope="module")
+def confrontos_resultado(payload_resultado):
+    return {p.equipe_a_nome: p for p in transformar(payload_resultado).partidas}
+
+
+def test_confronto_decidido_com_a_vencendo(confrontos_resultado):
+    """3DMAX (lado A) venceu HOTU 2:1 - o bloco real capturado da wiki."""
+    partida = confrontos_resultado["3DMAX"]
+    assert partida.equipe_b_nome == "HOTU"
+    assert partida.vitoria_a is True
+    assert (partida.placar_a, partida.placar_b) == (2, 1)
+
+
+def test_confronto_decidido_com_b_vencendo(confrontos_resultado):
+    """Galorys (lado A, esquerda) perdeu 0:2 para a Imperial Esports (lado B).
+
+    Sem este caso, um parser que so soubesse ler "o da esquerda venceu"
+    passaria despercebido - e produziria o rotulo invertido para toda partida
+    em que o time da direita e quem ganha.
+    """
+    partida = confrontos_resultado["Galorys"]
+    assert partida.equipe_b_nome == "Imperial Esports"
+    assert partida.vitoria_a is False
+    assert (partida.placar_a, partida.placar_b) == (0, 2)
+
+
+def test_confronto_ainda_nao_decidido_fica_none(confrontos_resultado):
+    """Team Falcons vs G2 Esports: agendado, sem vencedor marcado na wiki."""
+    partida = confrontos_resultado["Team Falcons"]
+    assert partida.equipe_b_nome == "G2 Esports"
+    assert partida.vitoria_a is None
+    assert (partida.placar_a, partida.placar_b) == (None, None)
+
+
+def test_confronto_indecidido_nao_tem_placar_mesmo_com_scoreholder():
+    """Bloco com scoreholder mas sem classe de vencedor em nenhum lado."""
+    html = (
+        '<div class="match-info"><span data-timestamp="1788436800"></span>'
+        '<div class="match-info-header-opponent"><a title="A"></a></div>'
+        '<div class="match-info-header-scoreholder">'
+        '<span class="match-info-header-scoreholder-score">0</span>'
+        '<span class="match-info-header-scoreholder-score">0</span>'
+        "</div>"
+        '<div class="match-info-header-opponent"><a title="B"></a></div></div>'
+    )
+    partidas = parse_agenda(html)
+    assert len(partidas) == 1
+    assert partidas[0].vitoria_a is None
+
+
+def test_os_dois_lados_marcados_como_vencedor_vira_indecidido():
+    """Contradicao da propria fonte: nenhum dos dois e mais confiavel que o outro."""
+    html = (
+        '<div class="match-info"><span data-timestamp="1788436800"></span>'
+        '<div class="match-info-header-opponent match-info-header-winner">'
+        '<a title="A"></a></div>'
+        '<div class="match-info-header-opponent match-info-header-winner">'
+        '<a title="B"></a></div></div>'
+    )
+    partidas = parse_agenda(html)
+    assert len(partidas) == 1
+    assert partidas[0].vitoria_a is None
+
+
+def test_placar_nao_numerico_vira_none():
+    """Um placar tipo "W" (walkover) nao e um inteiro - vira None, nao erro."""
+    html = (
+        '<div class="match-info"><span data-timestamp="1788436800"></span>'
+        '<div class="match-info-header-opponent match-info-header-winner">'
+        '<a title="A"></a></div>'
+        '<div class="match-info-header-scoreholder">'
+        '<span class="match-info-header-scoreholder-score">W</span>'
+        '<span class="match-info-header-scoreholder-score">FF</span>'
+        "</div>"
+        '<div class="match-info-header-opponent match-info-header-loser">'
+        '<a title="B"></a></div></div>'
+    )
+    partidas = parse_agenda(html)
+    assert partidas[0].vitoria_a is True
+    assert (partidas[0].placar_a, partidas[0].placar_b) == (None, None)

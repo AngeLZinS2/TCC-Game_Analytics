@@ -52,6 +52,21 @@ import {
 /** Quantos dias o kanban mostra. Além disso a agenda vira especulação. */
 const DIAS_NO_KANBAN = 5;
 
+/**
+ * O rótulo de um lado do confronto.
+ *
+ * "(Radiant)"/"(Dire)" só faz sentido em Dota 2 — é a nomenclatura da própria
+ * OpenDota para os dois lados do mapa. Antes de a Previsão de Confronto
+ * atender outros jogos, o rótulo vinha fixo com o parêntese; numa tela de
+ * Counter-Strike ele apareceria do mesmo jeito, como se a partida tivesse
+ * lados chamados Radiant e Dire — o que não existe fora do Dota.
+ */
+function rotuloDoLado(jogo: string, lado: "a" | "b"): string {
+  const base = lado === "a" ? "Lado A" : "Lado B";
+  if (jogo !== "dota2") return base;
+  return lado === "a" ? `${base} (Radiant)` : `${base} (Dire)`;
+}
+
 /** O aviso de confiabilidade. Aparece sempre, com o tom que os números pedem. */
 function AvisoValidacao({ validacao }: { validacao: ValidacaoConfronto }) {
   if (!validacao.suficiente) {
@@ -163,7 +178,13 @@ function LadoDoConfronto({
  * Montado no modal do kanban e na secao de confronto hipotetico - por isso e um
  * componente, e nao um trecho inline.
  */
-function DetalheConfronto({ previsao }: { previsao: TipoPrevisao }) {
+function DetalheConfronto({
+  previsao,
+  jogo,
+}: {
+  previsao: TipoPrevisao;
+  jogo: string;
+}) {
   return (
     <div className="space-y-space-lg">
       <div className="space-y-space-lg rounded-lg bg-surface-container-lowest p-space-lg">
@@ -172,14 +193,14 @@ function DetalheConfronto({ previsao }: { previsao: TipoPrevisao }) {
             equipe={previsao.equipe_a}
             probabilidade={previsao.probabilidade_a}
             cor={PALETA_POLOS.positivo}
-            rotuloLado="Lado A (Radiant)"
+            rotuloLado={rotuloDoLado(jogo, "a")}
           />
           <span className="font-headline-md text-headline-md text-outline">VS</span>
           <LadoDoConfronto
             equipe={previsao.equipe_b}
             probabilidade={previsao.probabilidade_b}
             cor={PALETA_POLOS.negativo}
-            rotuloLado="Lado B (Dire)"
+            rotuloLado={rotuloDoLado(jogo, "b")}
           />
         </div>
 
@@ -495,14 +516,25 @@ export function PrevisaoConfrontoPagina() {
 
   // Assim que o ranking chega, escolhe o primeiro contra o ultimo: a secao de
   // confronto hipotetico abre com um par de verdade em vez de seletores vazios.
+  //
+  // `if (aberto) return`: sem essa guarda, este efeito criava um loop com
+  // `abrir()`. O ranking e filtrado por `min_partidas` (padrao 3), e um card
+  // do kanban pode envolver um time com menos partidas que isso - ele tem
+  // previsao (o endpoint /agenda so exige `partidas > 0`), mas nao esta no
+  // array `equipes` filtrado. `abrir()` selecionava o par certo, e no MESMO
+  // ciclo este efeito via que ele "nao e valido" (nao esta em `equipes`) e
+  // desfazia para o par padrao - o modal nunca via a previsao do confronto
+  // que a pessoa clicou, so o esqueleto de carregamento, para sempre. Uma
+  // selecao vinda de um clique no kanban e explicita e vence o default.
   useEffect(() => {
+    if (aberto) return;
     if (equipes.length < 2) return;
     const validos = new Set(equipes.map((e) => e.id_equipe));
     if (equipeA === null || !validos.has(equipeA)) setEquipeA(equipes[0].id_equipe);
     if (equipeB === null || !validos.has(equipeB)) {
       setEquipeB(equipes[equipes.length - 1].id_equipe);
     }
-  }, [equipes, equipeA, equipeB]);
+  }, [equipes, equipeA, equipeB, aberto]);
 
   /** A agenda agrupada por dia - as colunas do kanban. */
   const colunas = useMemo(() => {
@@ -768,7 +800,7 @@ export function PrevisaoConfrontoPagina() {
             ) : previsao.isError ? (
               <MensagemErro erro={previsao.error} />
             ) : previsaoDoModal ? (
-              <DetalheConfronto previsao={previsaoDoModal} />
+              <DetalheConfronto previsao={previsaoDoModal} jogo={jogo} />
             ) : (
               <div className="h-48 animate-pulse rounded bg-surface-container-high/60" />
             )}
@@ -803,8 +835,8 @@ export function PrevisaoConfrontoPagina() {
             <div className="flex flex-col gap-space-sm sm:flex-row">
               {(
                 [
-                  ["Lado A (Radiant)", equipeA, setEquipeA],
-                  ["Lado B (Dire)", equipeB, setEquipeB],
+                  [rotuloDoLado(jogo, "a"), equipeA, setEquipeA],
+                  [rotuloDoLado(jogo, "b"), equipeB, setEquipeB],
                 ] as const
               ).map(([rotulo, valor, definir]) => (
                 <label key={rotulo} className="flex flex-1 flex-col gap-space-xs">
@@ -829,7 +861,9 @@ export function PrevisaoConfrontoPagina() {
             {previsao.isError && <MensagemErro erro={previsao.error} />}
 
             <Consulta estado={previsao} altura={260} vazio="Escolha dois times diferentes.">
-              {(resultado: TipoPrevisao) => <DetalheConfronto previsao={resultado} />}
+              {(resultado: TipoPrevisao) => (
+                <DetalheConfronto previsao={resultado} jogo={jogo} />
+              )}
             </Consulta>
           </Painel>
 

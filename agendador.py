@@ -166,7 +166,8 @@ def _coletar_liquipedia(settings: Settings, storage: RawStorage) -> CollectionRe
     from etl.wikis import com_agenda
 
     parciais: list[CollectionResult] = []
-    for wiki in com_agenda():
+    wikis = com_agenda()
+    for posicao, wiki in enumerate(wikis):
         coletor = LiquipediaCollector(
             raw_storage=storage, settings=settings, wiki=wiki.codigo
         )
@@ -180,6 +181,15 @@ def _coletar_liquipedia(settings: Settings, storage: RawStorage) -> CollectionRe
             parciais.append(CollectionResult(fonte="liquipedia", sucesso=False))
         finally:
             coletor.close()
+
+        # Cada `LiquipediaCollector` cria o proprio `RateLimitedClient` do
+        # zero - o intervalo minimo entre chamadas so vale DENTRO de uma
+        # instancia, nunca ENTRE wikis deste laco. Sem este sleep, 66 wikis
+        # saiam a ~1 chamada/segundo, e foi exatamente isso que aconteceu:
+        # a Liquipedia bloqueou o IP com 429 por mais de uma hora depois de
+        # uma varredura sem pausa nenhuma entre wikis.
+        if posicao < len(wikis) - 1:
+            time.sleep(settings.liquipedia_rate_limit_seconds)
 
     return _somar(parciais, "liquipedia")
 
@@ -215,7 +225,7 @@ def _coletar_equipes(settings: Settings, storage: RawStorage) -> CollectionResul
     )
 
     parciais: list[CollectionResult] = []
-    for wiki in lote:
+    for posicao, wiki in enumerate(lote):
         coletor = LiquipediaWikiCollector(
             raw_storage=storage, settings=settings, wiki=wiki.codigo
         )
@@ -229,6 +239,12 @@ def _coletar_equipes(settings: Settings, storage: RawStorage) -> CollectionResul
             parciais.append(CollectionResult(fonte="liquipedia", sucesso=False))
         finally:
             coletor.close()
+
+        # Mesmo motivo do sleep em `_coletar_liquipedia`: o cliente e novo a
+        # cada wiki, entao o intervalo minimo nao sobrevive entre iteracoes
+        # deste laco sem um sleep explicito aqui.
+        if posicao < len(lote) - 1:
+            time.sleep(settings.liquipedia_rate_limit_seconds)
 
     return _somar(parciais, "liquipedia")
 

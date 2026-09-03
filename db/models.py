@@ -296,11 +296,24 @@ class DimEquipe(Base):
 
 
 class AgendaPartida(Base):
-    """Confrontos que ainda vao acontecer, vindos da Liquipedia.
+    """Confrontos que a Liquipedia listou - futuros OU ja concluidos.
 
-    Nao e um fato: nada foi medido ainda. E o calendario que permite a tela de
-    previsao falar de partidas futuras em vez de so simular confrontos
-    hipoteticos.
+    O nome e um resquicio da Fase 10, quando so o futuro importava. A pagina
+    que alimenta esta tabela (`Liquipedia:Matches`) e um TICKER, nao uma
+    agenda pura: ela mostra uma janela recente que inclui confrontos ja
+    decididos, e a Fase 13 passou a capturar o resultado deles em vez de
+    descarta-lo. Por isso a tabela guarda os dois tipos de linha juntos, e o
+    que os separa e `vitoria_a`: `NULL` = ainda sem resultado (e e o que a
+    tela "Proximos Confrontos" filtra por `inicio_previsto >= agora`); `True`
+    ou `False` = confronto decidido, e e ESSA a fonte que alimenta o ajuste de
+    forcas (Bradley-Terry) para todo jogo que nao e Dota 2 - a OpenDota so
+    cobre Dota, e sem esta tabela os outros 72 jogos do catalogo nunca
+    teriam uma partida COM RESULTADO para treinar em cima.
+
+    Nao e um fato no sentido classico (a granularidade e "o que a Liquipedia
+    afirmou", nao "o que aconteceu na partida minuto a minuto" - isso a
+    OpenDota da, so para Dota). Mas para Bradley-Terry, que so precisa de
+    quem venceu, esse grao basta.
 
     `id_equipe_a/b` sao nulas ate a reconciliacao encontrar o time na dimensao.
     A Liquipedia escreve "Power Rangers" e a OpenDota cadastra "_PowerRangers";
@@ -332,6 +345,12 @@ class AgendaPartida(Base):
     coletado_em: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False
     )
+
+    #: `NULL` = sem resultado publicado ainda (e o estado normal de um
+    #: confronto futuro). Ver o docstring da classe.
+    vitoria_a: Mapped[bool | None] = mapped_column(Boolean)
+    placar_a: Mapped[int | None] = mapped_column(Integer)
+    placar_b: Mapped[int | None] = mapped_column(Integer)
 
     __table_args__ = (
         UniqueConstraint("id_jogo", "id_externo", name="uq_agenda_jogo_externo"),

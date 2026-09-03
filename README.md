@@ -929,10 +929,15 @@ de OpenDota e Liquipedia, e a diferença de grafia entre as duas cobra o seu pre
 
 #### O que 73 jogos **não** significa
 
-`dim_jogo` tem 73 linhas, mas **só o Dota 2 tem partidas**. A coleta de resultados vem da
+`dim_jogo` tem 73 linhas, mas **só o Dota 2 tem partidas no star schema**
+(`dim_partida`/`fato_partida_jogador`). A coleta de resultado JOGADOR A JOGADOR vem da
 OpenDota, que é específica de Dota — as outras 72 wikis entram com agenda e equipes, não
-com histórico. As telas de Partidas, Heróis e Jogadores continuam vazias para elas, e isso
-é o estado correto, não um bug.
+com esse nível de detalhe. As telas de Partidas, Heróis e Jogadores continuam vazias para
+elas, e isso é o estado correto, não um bug.
+
+(A Fase 13 abre uma trilha diferente — `agenda_partida` com vencedor e placar, também da
+Liquipedia — que basta para o Bradley-Terry da Previsão de Confronto, mas não é o star
+schema completo: não tem GPM, XPM, KDA nem qualquer dado por jogador.)
 
 Por isso `GET /api/partidas/jogos` ganhou `apenas_com_dados`, ligado por padrão: devolver as
 73 faria o seletor de jogo listar 73 opções, a maioria levando a telas vazias — ele
@@ -984,6 +989,123 @@ coletado" — porque ali não falta o histórico *daquele time*, falta o ajuste 
 
 O endpoint `/agenda` deixou de exigir relatório pelo mesmo motivo: o calendário existe para
 os 66 jogos com agenda, o ajuste só para os que têm partidas com resultado.
+
+### Fase 13 — Previsão de confronto para os outros 72 jogos
+
+A Fase 12 abriu as 73 wikis, mas só resolveu agenda e equipes. A previsão continuava
+Dota-only: `ml/confronto.py` só sabia ler `dim_partida`/`fato_partida_jogador`, que é
+star schema da OpenDota — e a OpenDota só cobre Dota 2. Selecionar Counter-Strike na tela
+mostrava o calendário certo (Fase 12 já resolvia isso) e nenhuma previsão.
+
+#### A fonte já estava ali, sendo descartada
+
+`Liquipedia:Matches` não é uma agenda pura — é um **ticker**. Medido em counterstrike: de
+57 blocos numa consulta, 42 já tinham vencedor marcado. O parser da Fase 10 já capturava
+qualquer bloco com horário válido, passado ou futuro (nunca filtrou por tempo) — só não
+lia a parte do resultado, porque na época só a agenda importava.
+
+O markup do vencedor é explícito, não precisa ser inferido do placar:
+
+```html
+<div class="match-info-header-opponent match-info-header-opponent-left match-info-header-winner">
+  ...3DMAX...
+</div>
+...
+<div class="match-info-header-opponent match-info-header-loser">...HOTU...</div>
+```
+
+`etl/transform_liquipedia.py` ganhou `_vencedor()` (lê a classe `match-info-header-winner`
+no bloco do adversário — nenhum marcado ou os dois marcados viram `None`, nunca um chute) e
+`_placar()`. Três colunas novas em `agenda_partida` (migration `0009`): `vitoria_a`,
+`placar_a`, `placar_b`, todas nulas até o confronto acontecer.
+
+#### Duas fontes de confronto, uma por jogo
+
+`ml/confronto.py::_carregar_confrontos` bifurca por `jogo`: Dota 2 continua na OpenDota
+(mais rica — dá GPM/XPM/KDA por time); todo outro jogo lê `agenda_partida` filtrando
+`vitoria_a IS NOT NULL`. O Bradley-Terry não vê diferença — só precisa de quem venceu. O
+que muda é o "por quê": para os outros jogos, `gpm_medio`/`xpm_medio`/`kda_medio` ficam
+`None` (a Liquipedia dá o placar final, não telemetria por jogador), e a tela já tratava
+isso como travessão — nenhuma mudança de schema foi necessária ali.
+
+Uma consequência não óbvia: sem stats de jogador, `Equipe.partidas` não tinha de onde vir
+para os jogos novos. A contagem para Dota sai como efeito colateral do laço que soma
+GPM/XPM (`_carregar_equipes`); sem esse laço, toda equipe ficaria com `partidas=0` — e
+`estado()` descarta equipe com `partidas=0` (`if equipe.partidas`), o que zeraria o
+ranking inteiro mesmo com confrontos reais no banco. `_preencher_partidas_liquipedia`
+conta as duas pontas (`id_equipe_a`, `id_equipe_b`) direto de `agenda_partida`.
+
+#### Backfill sem rede
+
+O ticker só guarda uma janela de ~5-9 dias — mas o projeto grava o payload bruto de toda
+coleta. Uma partida "sem resultado" numa coleta de manhã pode aparecer "decidida" numa de
+tarde. Reprocessar os arquivos em `data/raw/liquipedia/matches-*/` em ordem cronológica (é
+a ordem que `RawStorage.ler()` já devolve) e deixar o upsert atualizar cada linha recuperou
+**1.195 linhas em 24 arquivos, sem chamar a API** — puro reaproveitamento do raw-first.
+
+#### Resultado medido: primeira previsão real fora do Dota
+
+```powershell
+.\.venv\Scripts\python.exe cli.py train-confronto --jogo counterstrike
+```
+
+```
+34 confrontos entre 31 equipes (C=0.08, escolhido por CV no treino)
+vantagem do lado A: +0.1176 log-odds = 52.9% entre times de forca igual
+
+validacao walk-forward em 6 partidas:
+  acuracia 50.0% +/- 40.0%  (taxa base 33.3%)
+
+forcas mais altas:
+  Imperial Esports    +0.112  4/6 (67%)
+  MOUZ                +0.110  3/3 (100%)
+  3DMAX               +0.105  3/4 (75%)
+  Team Vitality       +0.080  3/4 (75%)
+  Team Spirit         +0.074  2/2 (100%)
+```
+
+O ranking reconhece times reais do circuito (MOUZ, Vitality, Spirit, G2) — um sinal de que
+a reconciliação de nomes (Fase 10) e o Bradley-Terry estão produzindo algo sensato, não só
+rodando sem erro. Pela API, `/api/ml/confronto/agenda?jogo=counterstrike` devolveu
+previsão real para partidas reais: Team Falcons 52,7% × G2 Esports 47,3%; FURIA 51,8% ×
+Team Vitality 48,2%. A validação com 6 partidas de teste é honesta sobre ser pouca amostra
+— mesmo espírito da validação de Dota, que também não esconde a incerteza.
+
+#### Um efeito colateral sério: rate limit da própria Liquipedia
+
+Escrever esta fase expôs um bug de pacing que já existia desde a Fase 12 e piorou tudo: os
+laços que varrem várias wikis (`_coletar_liquipedia`, `_coletar_equipes` em `agendador.py`)
+criam um `LiquipediaCollector`/`LiquipediaWikiCollector` **novo a cada wiki**, e cada um
+constrói o próprio `RateLimitedClient` do zero. O intervalo mínimo entre chamadas
+(`liquipedia_rate_limit_seconds`) só vale *dentro* de uma instância — nunca *entre* wikis
+do mesmo laço. Sem throttle nenhum, uma varredura de 66 wikis saía a ~1 chamada/segundo, e
+foi exatamente isso que aconteceu: a Liquipedia bloqueou o IP com **HTTP 429 por mais de
+uma hora**, visível nos logs do agendador em toda tentativa subsequente — inclusive nas do
+rodízio de equipes, que é o que ainda falta rodar para popular `dim_equipe` de VALORANT,
+Chess e os demais.
+
+A correção foi um `time.sleep(settings.liquipedia_rate_limit_seconds)` explícito entre
+iterações dos dois laços — não resolve um bloqueio já em curso (isso só passa com o tempo,
+fora do nosso controle), mas impede o agendador de piorá-lo a cada rodada. Dado que o
+rodízio já cobre `AGENDADOR_EQUIPES_POR_RODADA` wikis por dia, os demais jogos do catálogo
+devem ganhar `dim_equipe` — e portanto previsão — ao longo dos próximos dias, sem
+intervenção manual.
+
+#### Dois defeitos de tela que só apareciam fora do Dota
+
+Testar a Previsão de Confronto para Counter-Strike no navegador revelou dois bugs que a
+tela nunca tinha exercitado, porque nunca tinha existido um segundo jogo com modelo:
+
+- **"Lado A (Radiant)" / "Lado B (Dire)" apareciam em toda previsão**, inclusive de
+  Counter-Strike — nomenclatura que só existe no mapa de Dota. Virou
+  `rotuloDoLado(jogo, lado)`: o parêntese só aparece quando `jogo === "dota2"`.
+- **O modal de um confronto do kanban podia travar no esqueleto de carregamento para
+  sempre.** O ranking é filtrado por `min_partidas` (padrão 3); um card pode envolver um
+  time com menos partidas que isso — ele tem previsão (`/agenda` só exige `partidas > 0`),
+  mas não está no array `equipes` filtrado. O efeito que escolhe um par padrão via
+  `useEffect` desfazia a seleção do clique no mesmo ciclo, porque validava contra esse
+  array filtrado. A correção foi uma guarda (`if (aberto) return`): uma seleção explícita
+  do kanban vence o par padrão, que só se aplica quando nada foi escolhido ainda.
 
 ### Fase 3 — Riot API (LoL)
 

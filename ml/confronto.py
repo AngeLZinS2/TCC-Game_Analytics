@@ -33,6 +33,14 @@ A validacao e temporal (walk-forward): para cada partida do periodo de teste,
 as forcas sao reajustadas so com o que aconteceu ANTES dela. Um split
 aleatorio deixaria o modelo estimar a forca de um time usando partidas
 posteriores a que ele esta prevendo.
+
+**Duas fontes de confronto, uma por jogo.** Dota 2 usa `dim_partida` /
+`fato_partida_jogador`, que vem da OpenDota e so cobre Dota. Todo outro jogo
+usa `agenda_partida`, que vem do ticker da Liquipedia (Fase 13) e cobre as 73
+wikis do catalogo - mas so da o placar final, sem stats de jogador. O metodo
+(Bradley-Terry) nao muda com a fonte; o que muda e o volume de historico e o
+"por que" que da para mostrar (GPM/XPM/KDA existem so onde a OpenDota chega).
+Ver `_carregar_confrontos` e `_carregar_equipes`, que fazem essa bifurcacao.
 """
 
 from __future__ import annotations
@@ -159,6 +167,19 @@ class Previsao:
 
 
 def _carregar_confrontos(sessao, jogo: str = "dota2") -> list[Confronto]:
+    """Confrontos com resultado, na fonte que existe para aquele jogo.
+
+    **Dota 2 e os outros 72 usam fontes diferentes, e isso e proposital.** A
+    OpenDota so cobre Dota - e da uma partida rica, com placar por jogador
+    (GPM, XPM, KDA), que vira o "por que" na tela. A Liquipedia cobre todo o
+    catalogo, mas so da o placar final: quem venceu, nada sobre como. Para
+    Bradley-Terry os dois bastam igual - o metodo so precisa de quem venceu -
+    entao Dota fica na fonte mais rica que ja tinha, e os demais ganham a
+    fonte que os cobre.
+    """
+    if jogo != "dota2":
+        return _carregar_confrontos_liquipedia(sessao, jogo)
+
     vencedor_radiant = (
         select(FatoPartidaJogador.id_partida, FatoPartidaJogador.vitoria)
         .where(FatoPartidaJogador.equipe == "radiant")
@@ -199,11 +220,82 @@ def _carregar_confrontos(sessao, jogo: str = "dota2") -> list[Confronto]:
     ]
 
 
-def _carregar_equipes(sessao, jogo: str = "dota2") -> dict[int, Equipe]:
-    """As equipes e as medias de desempenho dos jogadores delas.
+def _carregar_confrontos_liquipedia(sessao, jogo: str) -> list[Confronto]:
+    """Confrontos com resultado vindos do ticker da Liquipedia.
 
-    As medias saem do fato de jogador: o time nao tem GPM proprio, tem o GPM
-    dos cinco que jogaram por ele. E o que a tela mostra como "por que".
+    Mesma forma de saida que a versao da OpenDota (`Confronto`) - o
+    Bradley-Terry le a lista sem saber de qual fonte ela veio. `liga` aqui e o
+    nome do torneio da Liquipedia, nao a liga da OpenDota, mas cumpre o mesmo
+    papel (agrupar `ligas()`/`ranking(liga=...)`).
+    """
+    linhas = sessao.execute(
+        select(
+            AgendaPartida.id,
+            AgendaPartida.inicio_previsto,
+            AgendaPartida.id_equipe_a,
+            AgendaPartida.id_equipe_b,
+            AgendaPartida.vitoria_a,
+            AgendaPartida.torneio,
+        )
+        .join(DimJogo, DimJogo.id_jogo == AgendaPartida.id_jogo)
+        .where(
+            DimJogo.codigo == jogo,
+            AgendaPartida.id_equipe_a.is_not(None),
+            AgendaPartida.id_equipe_b.is_not(None),
+            AgendaPartida.vitoria_a.is_not(None),
+        )
+        .order_by(AgendaPartida.inicio_previsto)
+    ).all()
+
+    return [
+        Confronto(
+            id_partida=linha[0],
+            data=linha[1],
+            id_equipe_a=linha[2],
+            id_equipe_b=linha[3],
+            vitoria_a=bool(linha[4]),
+            liga=linha[5],
+        )
+        for linha in linhas
+    ]
+
+
+def _preencher_partidas_liquipedia(
+    sessao, jogo: str, equipes: dict[int, Equipe]
+) -> None:
+    """Conta quantos confrontos decididos cada equipe tem, sem OpenDota.
+
+    Sem stats de jogador, `partidas` e o unico numero de volume que da para
+    calcular para estes jogos - mas ele PRECISA ser calculado aqui: sem isto
+    toda equipe fica com `partidas=0`, `winrate` sai sempre 0%, e o filtro
+    final de `estado()` (`if equipe.partidas`) descartaria TODAS as equipes -
+    o ranking viria vazio mesmo com confrontos reais no banco.
+    """
+    for coluna in (AgendaPartida.id_equipe_a, AgendaPartida.id_equipe_b):
+        for id_equipe, contagem in sessao.execute(
+            select(coluna, func.count())
+            .join(DimJogo, DimJogo.id_jogo == AgendaPartida.id_jogo)
+            .where(
+                DimJogo.codigo == jogo,
+                coluna.is_not(None),
+                AgendaPartida.vitoria_a.is_not(None),
+            )
+            .group_by(coluna)
+        ):
+            equipe = equipes.get(id_equipe)
+            if equipe is not None:
+                equipe.partidas += contagem
+
+
+def _carregar_equipes(sessao, jogo: str = "dota2") -> dict[int, Equipe]:
+    """As equipes do jogo, com o desempenho medio quando a fonte tem.
+
+    As medias de GPM/XPM/KDA saem do fato de jogador da OpenDota, que so
+    existe para Dota 2 - o time nao tem GPM proprio, tem o GPM dos cinco que
+    jogaram por ele. Para os outros jogos esses campos ficam `None` (o padrao
+    do dataclass `Equipe`): a Liquipedia da o placar final, nao telemetria por
+    jogador, e mostrar um numero inventado seria pior que mostrar um travessao
+    - a tela ja trata `None` como "sem dado" em vez de "zero".
     """
     equipes = {
         linha[0]: Equipe(
@@ -217,6 +309,10 @@ def _carregar_equipes(sessao, jogo: str = "dota2") -> dict[int, Equipe]:
             .where(DimJogo.codigo == jogo)
         )
     }
+
+    if jogo != "dota2":
+        _preencher_partidas_liquipedia(sessao, jogo, equipes)
+        return equipes
 
     # O lado do fato ("radiant"/"dire") liga o jogador a equipe da partida.
     for lado, coluna in (
@@ -434,9 +530,15 @@ def ajustar_e_salvar(jogo: str = "dota2") -> dict[str, Any]:
         equipes = _carregar_equipes(sessao, jogo)
 
     if len(confrontos) < 10:
+        comando = (
+            "cli.py collect opendota"
+            if jogo == "dota2"
+            else f"cli.py collect liquipedia --wiki {jogo}"
+        )
         raise ValueError(
             f"confrontos de menos para ajustar ({len(confrontos)}). "
-            "Colete mais partidas com `cli.py collect opendota`."
+            f"Colete mais partidas com `{comando}` - repetido ao longo do tempo, "
+            "porque o ticker da Liquipedia so guarda uma janela recente."
         )
 
     regularizacao = _escolher_regularizacao(confrontos)
@@ -525,8 +627,9 @@ def estado(jogo: str = "dota2") -> tuple[dict[int, Equipe], dict[str, Any]]:
         raise FileNotFoundError(
             f"as forcas de {jogo!r} nao foram ajustadas. Rode "
             f"`python cli.py train-confronto --jogo {jogo}` - e note que o ajuste "
-            "precisa de partidas COM RESULTADO, que hoje so a OpenDota traz, e so "
-            "para Dota 2."
+            "precisa de partidas COM RESULTADO: para Dota 2 elas vem da OpenDota, "
+            "para os demais jogos vem do ticker da Liquipedia "
+            f"(`cli.py collect liquipedia --wiki {jogo}`, coletado ao longo do tempo)."
         )
 
     with session_scope() as sessao:
