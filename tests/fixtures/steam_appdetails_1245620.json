@@ -1,0 +1,28 @@
+{
+  "1245620": {
+    "success": true,
+    "data": {
+      "type": "game",
+      "name": "ELDEN RING",
+      "steam_appid": 1245620,
+      "required_age": 16,
+      "is_free": false,
+      "developers": ["FromSoftware Inc."],
+      "publishers": ["FromSoftware Inc.", "Bandai Namco Entertainment"],
+      "price_overview": {
+        "currency": "BRL",
+        "initial": 24990,
+        "final": 12495,
+        "discount_percent": 50,
+        "initial_formatted": "R$ 249,90",
+        "final_formatted": "R$ 124,95"
+      },
+      "metacritic": { "score": 94, "url": "https://www.metacritic.com/game/elden-ring" },
+      "genres": [
+        { "id": "1", "description": "Action" },
+        { "id": "3", "description": "RPG" }
+      ],
+      "release_date": { "coming_soon": false, "date": "24 Feb, 2022" }
+    }
+  }
+}

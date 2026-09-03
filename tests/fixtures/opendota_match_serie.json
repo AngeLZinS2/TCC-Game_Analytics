@@ -1,0 +1,186 @@
+{
+  "match_id": 8979484553,
+  "radiant_win": true,
+  "duration": 2097,
+  "radiant_gold_adv": [
+    0,
+    -22,
+    -677,
+    -669,
+    -685,
+    -1185,
+    -1166,
+    -1464,
+    -880,
+    -1378,
+    -1024,
+    -531,
+    -82,
+    -416,
+    28,
+    -168,
+    441,
+    -1,
+    -124,
+    696,
+    2053,
+    2283,
+    1836,
+    3056,
+    4537,
+    3831,
+    4197,
+    6199,
+    8897,
+    8959,
+    7699,
+    8127,
+    10696,
+    12807,
+    13447
+  ],
+  "radiant_xp_adv": [
+    0,
+    -8,
+    76,
+    -400,
+    -217,
+    -389,
+    -629,
+    -548,
+    117,
+    153,
+    -138,
+    752,
+    500,
+    -9,
+    1183,
+    343,
+    3279,
+    2521,
+    1392,
+    2326,
+    3332,
+    3124,
+    3748,
+    8314,
+    10364,
+    9250,
+    9536,
+    14495,
+    15792,
+    15885,
+    14897,
+    18338,
+    19532,
+    20860,
+    23397
+  ],
+  "objectives": [
+    {
+      "time": 370,
+      "type": "building_kill",
+      "key": "npc_dota_goodguys_tower1_bot"
+    },
+    {
+      "time": 572,
+      "type": "building_kill",
+      "key": "npc_dota_badguys_tower1_mid"
+    },
+    {
+      "time": 667,
+      "type": "building_kill",
+      "key": "npc_dota_badguys_tower1_top"
+    },
+    {
+      "time": 879,
+      "type": "building_kill",
+      "key": "npc_dota_goodguys_tower1_mid"
+    },
+    {
+      "time": 1196,
+      "type": "building_kill",
+      "key": "npc_dota_badguys_tower1_bot"
+    },
+    {
+      "time": 1383,
+      "type": "building_kill",
+      "key": "npc_dota_badguys_tower2_mid"
+    },
+    {
+      "time": 1455,
+      "type": "CHAT_MESSAGE_ROSHAN_KILL",
+      "team": 2
+    },
+    {
+      "time": 1513,
+      "type": "building_kill",
+      "key": "npc_dota_badguys_tower2_top"
+    },
+    {
+      "time": 1520,
+      "type": "building_kill",
+      "key": "npc_dota_goodguys_tower2_bot"
+    },
+    {
+      "time": 1623,
+      "type": "building_kill",
+      "key": "npc_dota_badguys_tower3_mid"
+    },
+    {
+      "time": 1671,
+      "type": "building_kill",
+      "key": "npc_dota_badguys_range_rax_mid"
+    },
+    {
+      "time": 1671,
+      "type": "building_kill",
+      "key": "npc_dota_badguys_melee_rax_mid"
+    },
+    {
+      "time": 1776,
+      "type": "building_kill",
+      "key": "npc_dota_badguys_tower2_bot"
+    },
+    {
+      "time": 1777,
+      "type": "building_kill",
+      "key": "npc_dota_goodguys_tower1_top"
+    },
+    {
+      "time": 1803,
+      "type": "building_kill",
+      "key": "npc_dota_goodguys_tower2_top"
+    },
+    {
+      "time": 1907,
+      "type": "building_kill",
+      "key": "npc_dota_badguys_tower3_top"
+    },
+    {
+      "time": 1913,
+      "type": "building_kill",
+      "key": "npc_dota_badguys_range_rax_top"
+    },
+    {
+      "time": 1914,
+      "type": "building_kill",
+      "key": "npc_dota_badguys_melee_rax_top"
+    },
+    {
+      "time": 1922,
+      "type": "building_kill",
+      "key": "npc_dota_badguys_tower3_bot"
+    },
+    {
+      "time": 1941,
+      "type": "building_kill",
+      "key": "npc_dota_badguys_range_rax_bot"
+    },
+    {
+      "time": 2098,
+      "type": "building_kill",
+      "key": "npc_dota_badguys_fort"
+    }
+  ]
+}

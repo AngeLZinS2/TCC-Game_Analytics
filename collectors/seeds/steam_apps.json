@@ -1,0 +1,17 @@
+{
+  "descricao": "Lista semente de app_ids do Steam monitorados na Fase 1. Escolhida por relevancia competitiva/mercado para o TCC. Edite a vontade ou use --steamspy-top na CLI.",
+  "apps": [
+    { "app_id": 570, "nome": "Dota 2", "motivo": "cruzamento com o dominio de partidas (OpenDota)" },
+    { "app_id": 730, "nome": "Counter-Strike 2", "motivo": "referencia de esports FPS" },
+    { "app_id": 578080, "nome": "PUBG: BATTLEGROUNDS", "motivo": "battle royale de alto CCU" },
+    { "app_id": 1172470, "nome": "Apex Legends", "motivo": "battle royale free-to-play" },
+    { "app_id": 359550, "nome": "Tom Clancy's Rainbow Six Siege", "motivo": "FPS tatico competitivo" },
+    { "app_id": 252490, "nome": "Rust", "motivo": "survival com CCU alto e sazonal" },
+    { "app_id": 440, "nome": "Team Fortress 2", "motivo": "titulo antigo, serie longa de referencia" },
+    { "app_id": 271590, "nome": "Grand Theft Auto V", "motivo": "AAA pago, contraste de precificacao" },
+    { "app_id": 1085660, "nome": "Destiny 2", "motivo": "live service free-to-play" },
+    { "app_id": 892970, "nome": "Valheim", "motivo": "indie de sucesso, contraste com AAA" },
+    { "app_id": 1245620, "nome": "ELDEN RING", "motivo": "single-player AAA, CCU dirigido por DLC" },
+    { "app_id": 322330, "nome": "Don't Starve Together", "motivo": "cauda longa estavel" }
+  ]
+}

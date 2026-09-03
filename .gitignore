@@ -1,0 +1,23 @@
+.env
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+
+# Dashboard (React)
+dashboard/node_modules/
+dashboard/dist/
+*.tsbuildinfo
+
+# Payloads brutos coletados (podem ficar grandes; sao reprodutiveis)
+data/raw/
+!data/raw/.gitkeep
+
+# Fixtures de teste SAO versionadas
+!tests/fixtures/**
+
+# Modelos treinados (binarios; `cli.py train-sentimento` e `train-confronto` regeneram)
+data/modelos/

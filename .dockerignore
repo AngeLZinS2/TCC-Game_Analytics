@@ -1,0 +1,11 @@
+.git
+.venv
+venv
+__pycache__
+*.py[cod]
+.pytest_cache
+data/raw
+.env
+README.md
+dashboard/node_modules
+dashboard/dist

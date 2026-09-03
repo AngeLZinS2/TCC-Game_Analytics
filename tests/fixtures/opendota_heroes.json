@@ -1,0 +1,42 @@
+[
+  {
+    "id": 1,
+    "name": "npc_dota_hero_antimage",
+    "localized_name": "Anti-Mage"
+  },
+  {
+    "id": 2,
+    "name": "npc_dota_hero_axe",
+    "localized_name": "Axe"
+  },
+  {
+    "id": 3,
+    "name": "npc_dota_hero_bane",
+    "localized_name": "Bane"
+  },
+  {
+    "id": 4,
+    "name": "npc_dota_hero_bloodseeker",
+    "localized_name": "Bloodseeker"
+  },
+  {
+    "id": 5,
+    "name": "npc_dota_hero_crystal_maiden",
+    "localized_name": "Crystal Maiden"
+  },
+  {
+    "id": 6,
+    "name": "npc_dota_hero_drow_ranger",
+    "localized_name": "Drow Ranger"
+  },
+  {
+    "id": 7,
+    "name": "npc_dota_hero_earthshaker",
+    "localized_name": "Earthshaker"
+  },
+  {
+    "id": 8,
+    "name": "npc_dota_hero_juggernaut",
+    "localized_name": "Juggernaut"
+  }
+]

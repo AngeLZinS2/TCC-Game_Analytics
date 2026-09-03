@@ -1,0 +1,80 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * A camada base repete o que o Stitch embute em cada tela gerada, para o
+ * codigo comecar do mesmo ponto que o desenho.
+ */
+@layer base {
+  html,
+  body {
+    margin: 0;
+    padding: 0;
+  }
+
+  body {
+    overscroll-behavior: none;
+  }
+
+  /* Os icones sao a Material Symbols Outlined, carregada no index.html. */
+  .material-symbols-outlined {
+    font-family: "Material Symbols Outlined";
+    font-weight: normal;
+    font-style: normal;
+    line-height: 1;
+    letter-spacing: normal;
+    text-transform: none;
+    display: inline-block;
+    white-space: nowrap;
+    word-wrap: normal;
+    direction: ltr;
+    font-variation-settings:
+      "FILL" 0,
+      "wght" 400,
+      "GRAD" 0,
+      "opsz" 24;
+    -webkit-font-smoothing: antialiased;
+  }
+}
+
+@layer components {
+  /*
+   * A barra de rolagem some no mockup do Stitch. Aqui ela fica: some ate o
+   * ponteiro entrar na area rolavel, porque as tabelas de telemetria rolam
+   * na horizontal e sem indicacao nenhuma nao da para saber que rolam.
+   */
+  .rolagem-discreta {
+    scrollbar-width: thin;
+    scrollbar-color: theme("colors.outline-variant") transparent;
+  }
+
+  .rolagem-discreta::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  .rolagem-discreta::-webkit-scrollbar-thumb {
+    background-color: theme("colors.outline-variant");
+    border-radius: 9999px;
+  }
+
+  .rolagem-discreta::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  /*
+   * Rotulo desenhado dentro do SVG do Recharts.
+   *
+   * Nao da para usar classe utilitaria do Tailwind aqui: `<text>` do SVG e
+   * pintado por atributo de apresentacao, e o tamanho vem de `font-size`, nao
+   * das classes de texto. Entao os dois valores ficam escritos a mao, com os
+   * mesmos numeros do token `title-code`.
+   */
+  .rotulo-marca {
+    font-family: "Space Grotesk", system-ui, sans-serif;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+  }
+}

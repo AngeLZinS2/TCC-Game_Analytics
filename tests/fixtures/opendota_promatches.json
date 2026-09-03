@@ -1,0 +1,53 @@
+[
+  {
+    "match_id": 8979484553,
+    "duration": 2097,
+    "start_time": 1788368820,
+    "radiant_team_id": 10212329,
+    "radiant_name": "Team Synapse",
+    "dire_team_id": 10233067,
+    "dire_name": "4ikibamboni",
+    "leagueid": 19944,
+    "league_name": "EPL Masters 2026 ",
+    "series_id": 1137132,
+    "series_type": 1,
+    "radiant_score": 25,
+    "dire_score": 10,
+    "radiant_win": true,
+    "version": 22
+  },
+  {
+    "match_id": 8979344496,
+    "duration": 2692,
+    "start_time": 1788363820,
+    "radiant_team_id": 10212329,
+    "radiant_name": "Team Synapse",
+    "dire_team_id": 10233067,
+    "dire_name": "4ikibamboni",
+    "leagueid": 19944,
+    "league_name": "EPL Masters 2026 ",
+    "series_id": 1137132,
+    "series_type": 1,
+    "radiant_score": 38,
+    "dire_score": 21,
+    "radiant_win": true,
+    "version": 22
+  },
+  {
+    "match_id": 8979241530,
+    "duration": 1750,
+    "start_time": 1788360100,
+    "radiant_team_id": 10164236,
+    "radiant_name": "PuckChamp",
+    "dire_team_id": 10225542,
+    "dire_name": "DYNASTY",
+    "leagueid": 19944,
+    "league_name": "EPL Masters 2026 ",
+    "series_id": 1137089,
+    "series_type": 1,
+    "radiant_score": 11,
+    "dire_score": 34,
+    "radiant_win": false,
+    "version": 22
+  }
+]

@@ -1,0 +1,127 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: ga_postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-gaming_analytics}
+      POSTGRES_USER: ${POSTGRES_USER:-gaming}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-gaming}
+    ports:
+      # Porta alta no host para nao conflitar com um Postgres local.
+      - "${POSTGRES_PORT:-55432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-gaming} -d ${POSTGRES_DB:-gaming_analytics}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build: .
+    container_name: ga_api
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      # Dentro da rede do compose o banco atende em postgres:5432.
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:-gaming_analytics}
+      POSTGRES_USER: ${POSTGRES_USER:-gaming}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-gaming}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      LOG_FORMAT: ${LOG_FORMAT:-json}
+      RAW_DATA_DIR: /app/data/raw
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173,http://localhost:4173}
+      # A chave vem do .env da maquina (que nao e versionado); o compose so a
+      # repassa. Sem ela o container sobe igual e o assistente responde 503.
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      OPENROUTER_MODEL: ${OPENROUTER_MODEL:-minimax/minimax-m3:free}
+    ports:
+      - "8000:8000"
+    volumes:
+      # Traz os payloads brutos e os modelos treinados (`train-sentimento`,
+      # `train-confronto`). Sem este mount a API subiria sem os artefatos e as
+      # telas de ML responderiam 503.
+      - ./data:/app/data
+    command: >
+      sh -c "python cli.py init-db &&
+             uvicorn api.main:app --host 0.0.0.0 --port 8000"
+
+  dashboard:
+    build: ./dashboard
+    container_name: ga_dashboard
+    depends_on:
+      - api
+    ports:
+      - "${DASHBOARD_PORT:-3000}:80"
+
+  # A ingestao periodica. E o que separa "um script que alguem roda" de um
+  # pipeline: sem ele, `fato_snapshot_jogo_steam` fica com uma janela so e a
+  # serie temporal que o esquema promete nunca ganha forma.
+  #
+  # Servico proprio, e nao um agendador dentro da API, porque coleta e trabalho
+  # de lote: demorada, dependente de rede alheia, e que nao deve nada ao ciclo
+  # de vida de um servidor HTTP. Assim um deploy da API nao interrompe a
+  # ingestao, e uma coleta longa nao concorre com o dashboard.
+  agendador:
+    build: .
+    container_name: ga_agendador
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:-gaming_analytics}
+      POSTGRES_USER: ${POSTGRES_USER:-gaming}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-gaming}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      LOG_FORMAT: ${LOG_FORMAT:-json}
+      RAW_DATA_DIR: /app/data/raw
+      # Os intervalos ficam aqui e nao no codigo: dobrar a frequencia da coleta
+      # nao deveria exigir rebuild de imagem.
+      AGENDADOR_STEAM_MINUTOS: ${AGENDADOR_STEAM_MINUTOS:-60}
+      AGENDADOR_OPENDOTA_MINUTOS: ${AGENDADOR_OPENDOTA_MINUTOS:-360}
+      AGENDADOR_LIQUIPEDIA_MINUTOS: ${AGENDADOR_LIQUIPEDIA_MINUTOS:-720}
+      OPENDOTA_API_KEY: ${OPENDOTA_API_KEY:-}
+    volumes:
+      - ./data:/app/data
+    # `restart: unless-stopped` e nao `always`: se alguem parar o agendador de
+    # proposito, ele fica parado ate mandarem subir.
+    restart: unless-stopped
+    # Os 10s padrao do Docker NAO bastam, e isso foi medido: parar o servico
+    # durante uma coleta devolvia exit 137 (SIGKILL). O laco sai no SIGTERM
+    # quando esta esperando, mas nao interrompe uma coleta em curso - e uma
+    # passada pela Steam leva ~3s por jogo monitorado.
+    #
+    # 180s cobrem uns 50 jogos com folga. Passar disso, o Docker mata - o que e
+    # feio mas nao perigoso: os payloads ja estao em `data/raw/`, a carga e uma
+    # transacao (ou entra inteira ou nao entra), e a proxima rodada recoleta.
+    stop_grace_period: 180s
+    command: ["python", "agendador.py"]
+
+  # Servico sob demanda: docker compose run --rm collector collect steam
+  collector:
+    build: .
+    profiles: ["tools"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:-gaming_analytics}
+      POSTGRES_USER: ${POSTGRES_USER:-gaming}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-gaming}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      LOG_FORMAT: ${LOG_FORMAT:-text}
+      RAW_DATA_DIR: /app/data/raw
+    volumes:
+      - ./data:/app/data
+    entrypoint: ["python", "cli.py"]
+    command: ["collect", "steam"]
+
+volumes:
+  pgdata:

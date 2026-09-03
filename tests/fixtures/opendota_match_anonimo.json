@@ -1,0 +1,31 @@
+{
+  "match_id": 8000000001,
+  "start_time": 1788368820,
+  "duration": 1800,
+  "game_mode": 99,
+  "lobby_type": 0,
+  "patch": 60,
+  "radiant_win": false,
+  "players": [
+    {
+      "account_id": null,
+      "personaname": null,
+      "hero_id": 14,
+      "player_slot": 0,
+      "kills": 3,
+      "deaths": 7,
+      "assists": 4,
+      "damage_taken": 5000,
+      "towers_killed": 0,
+      "roshan_kills": 0
+    },
+    {
+      "account_id": 0,
+      "hero_id": 0,
+      "player_slot": 128,
+      "kills": 9,
+      "deaths": 1,
+      "assists": 11
+    }
+  ]
+}

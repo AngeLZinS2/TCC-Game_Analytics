@@ -1,0 +1,37 @@
+# --- Coleta / HTTP ---
+requests>=2.32.3
+urllib3>=2.2.3
+
+# --- Parsing de HTML (agenda da Liquipedia) ---
+# A agenda vem como HTML da API MediaWiki, nao como JSON estruturado. Regex
+# sobre HTML de wiki quebra em silencio quando o markup muda; um parser de
+# verdade quebra alto, no seletor que deixou de existir.
+beautifulsoup4>=4.12
+
+# --- Validacao / configuracao ---
+pydantic>=2.12.0
+pydantic-settings>=2.7.0
+python-dotenv>=1.0.1
+
+# --- Banco de dados ---
+SQLAlchemy>=2.0.44
+psycopg[binary]>=3.2.3
+alembic>=1.14.0
+
+# --- API (Fase 5) ---
+fastapi>=0.118.0
+uvicorn[standard]>=0.34.0
+
+# --- Machine learning (Fase 6) ---
+# O modelo de previsao le do star schema e roda dentro da propria API; nao ha
+# servico de inferencia separado.
+scikit-learn>=1.6
+joblib>=1.4
+
+# --- Agendamento (Fase 1+) ---
+APScheduler>=3.11.0
+
+# --- Testes ---
+pytest>=8.3.0
+# TestClient do FastAPI roda sobre httpx2 (o httpx 0.x foi depreciado pelo Starlette).
+httpx2>=2.12.0

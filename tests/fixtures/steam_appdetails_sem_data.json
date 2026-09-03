@@ -1,0 +1,15 @@
+{
+  "3000001": {
+    "success": true,
+    "data": {
+      "type": "game",
+      "name": "Jogo Anunciado",
+      "steam_appid": 3000001,
+      "is_free": false,
+      "developers": ["Estudio Fictício"],
+      "publishers": [],
+      "genres": [],
+      "release_date": { "coming_soon": true, "date": "Q3 2026" }
+    }
+  }
+}
