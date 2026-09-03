@@ -1,9 +1,13 @@
 /**
  * O jogo do dominio de partidas, escolhido uma vez e valido em todas as telas.
  *
- * No desenho do Stitch os chips de jogo ficam na barra superior, acima das
- * telas - entao a escolha nao pode morar no estado de uma pagina. Ela vive
- * aqui, e Partidas, Herois e Jogadores leem daqui.
+ * O seletor (`componentes/SeletorDeJogo.tsx`) aparece em cada tela que
+ * depende do jogo - Partidas, Herois, Jogadores, Previsao de Confronto - mas a
+ * escolha continua uma so, e nao o estado de uma pagina: e por isso que ela
+ * vive aqui, num contexto acima de todas elas, e nao dentro de cada uma.
+ * Trocar o jogo em Herois e abrir Jogadores em seguida tem que manter a
+ * escolha - se cada tela guardasse o proprio estado, o jogo "resetaria" a
+ * cada navegacao.
  *
  * O valor fica na URL (`?jogo=`) e nao em estado local: assim um link para
  * "Herois do LoL" continua sendo um link para os herois do LoL quando alguem

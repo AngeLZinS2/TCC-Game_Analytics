@@ -12,20 +12,14 @@
 
 import { useMemo, useState } from "react";
 
-import { useJogosDisponiveis, usePersonagens, useSaude } from "../api/consultas";
+import { usePersonagens, useSaude } from "../api/consultas";
 import type { ResumoPersonagem } from "../api/tipos";
 import { Botao, Consulta, Icone, Selo } from "../componentes/base";
 import { RetratoHeroi } from "../componentes/RetratoHeroi";
-import {
-  CAMPO,
-  ChipContagem,
-  KpiHud,
-  Painel,
-  Pilula,
-  Segmentos,
-} from "../componentes/hud";
+import { CAMPO, KpiHud, Painel, Pilula, Segmentos } from "../componentes/hud";
+import { SeletorDeJogo } from "../componentes/SeletorDeJogo";
 import { useJogoAtual } from "../layout/JogoAtual";
-import { corDoJogo, PALETA_POLOS } from "../tema";
+import { PALETA_POLOS } from "../tema";
 import { fmtDecimal, fmtNumero, fmtPercentual } from "../utilitarios/formatos";
 
 const NO_GRAFICO = 10;
@@ -117,7 +111,7 @@ function LinhaDivergente({
 }
 
 export function HeroisPagina() {
-  const { jogo, definirJogo } = useJogoAtual();
+  const { jogo } = useJogoAtual();
   const [minPartidas, setMinPartidas] = useState(5);
   const [ordenacao, setOrdenacao] = useState<Ordenacao>("winrate");
   const [busca, setBusca] = useState("");
@@ -128,7 +122,6 @@ export function HeroisPagina() {
     ordenar_por: "winrate",
     limite: 200,
   });
-  const jogosDisponiveis = useJogosDisponiveis();
   const saude = useSaude();
 
   const online = saude.data?.status === "ok";
@@ -210,19 +203,7 @@ export function HeroisPagina() {
 
       {/* ==================== FILTROS ==================== */}
       <section className="flex flex-wrap items-center gap-space-md rounded-xl bg-surface-container-low/90 p-space-base shadow-lg">
-        <div className="flex flex-wrap items-center gap-space-xs">
-          {jogosDisponiveis.data?.map((disponivel) => (
-            <ChipContagem
-              key={disponivel.codigo}
-              ativo={disponivel.codigo === jogo}
-              contagem={disponivel.partidas}
-              cor={corDoJogo(disponivel.codigo)}
-              aoClicar={() => disponivel.partidas > 0 && definirJogo(disponivel.codigo)}
-            >
-              {disponivel.nome}
-            </ChipContagem>
-          ))}
-        </div>
+        <SeletorDeJogo />
 
         <label className="flex items-center gap-space-xs">
           <span className="font-label-caps text-label-caps uppercase tracking-widest text-outline">

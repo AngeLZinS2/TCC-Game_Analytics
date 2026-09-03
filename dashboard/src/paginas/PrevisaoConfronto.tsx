@@ -36,9 +36,10 @@ import type {
   ValidacaoConfronto,
 } from "../api/tipos";
 import { Consulta, Esqueleto, Icone, MensagemErro, Selo } from "../componentes/base";
-import { Modal } from "../componentes/Modal";
-import { useJogoAtual } from "../layout/JogoAtual";
 import { BarraSegmentada, CAMPO, Painel, Pilula } from "../componentes/hud";
+import { Modal } from "../componentes/Modal";
+import { SeletorDeJogo } from "../componentes/SeletorDeJogo";
+import { useJogoAtual } from "../layout/JogoAtual";
 import { PALETA_POLOS, TOKENS } from "../tema";
 import {
   fmtDataCurta,
@@ -589,6 +590,15 @@ export function PrevisaoConfrontoPagina() {
             </div>
 
             <div className="flex flex-wrap items-center gap-space-sm">
+              {/* Criterio mais largo que o padrao do componente (so partidas):
+                  a agenda existe sem nenhuma partida coletada, porque a coleta
+                  de RESULTADO e so da OpenDota e so cobre Dota 2 hoje. */}
+              <SeletorDeJogo
+                disponivel={(item) =>
+                  item.partidas > 0 || item.equipes > 0 || item.agenda > 0
+                }
+              />
+
               <label className="flex items-center gap-space-xs">
                 <span className="font-label-caps text-label-caps uppercase tracking-widest text-outline">
                   Campeonato

@@ -935,7 +935,7 @@ com histórico. As telas de Partidas, Heróis e Jogadores continuam vazias para 
 é o estado correto, não um bug.
 
 Por isso `GET /api/partidas/jogos` ganhou `apenas_com_dados`, ligado por padrão: devolver as
-73 faria a barra do topo renderizar 73 chips, a maioria levando a telas vazias — o seletor
+73 faria o seletor de jogo listar 73 opções, a maioria levando a telas vazias — ele
 viraria uma lista de promessas. O endpoint também passou a devolver `equipes` e `agenda`
 junto de `partidas`, porque um jogo com 1.409 equipes e 54 confrontos agendados não está
 vazio; está esperando outra fonte.
@@ -988,7 +988,8 @@ os 66 jogos com agenda, o ajuste só para os que têm partidas com resultado.
 ### Fase 3 — Riot API (LoL)
 
 Próxima fase. O star schema já tem o discriminador (`dim_jogo.codigo`), as rotas de partidas
-aceitam `?jogo=`, e a barra superior tem os chips de Dota 2 / LoL / Valorant.
+aceitam `?jogo=`, e o seletor de jogo (`componentes/SeletorDeJogo.tsx`) já lista qualquer
+código que a API devolva — hoje Dota 2, VALORANT e Counter-Strike.
 
 **O que isso prova e o que não prova, para ser preciso:** está provado que os endpoints leem
 o discriminador, porque é o mesmo código que serve Dota 2 hoje. **Não** está provado que

@@ -2,7 +2,7 @@
  * Partidas coletadas.
  *
  * Porte da tela "Partidas" do Stitch: cabecalho de comando, a barra de filtros
- * com os chips de jogo e os dropdowns, quatro KPIs (um deles com a barra
+ * com o seletor de jogo e os dropdowns, quatro KPIs (um deles com a barra
  * segmentada de winrate), histograma de duracao, serie de ingestao e a tabela
  * densa com paginacao.
  */
@@ -12,7 +12,6 @@ import { useNavigate } from "react-router-dom";
 
 import {
   useFiltrosPartidas,
-  useJogosDisponiveis,
   usePartidas,
   usePartidasPorDia,
   useResumoPartidas,
@@ -25,12 +24,12 @@ import { HistogramaNeon } from "../componentes/graficos/HistogramaNeon";
 import {
   BarraSegmentada,
   CAMPO,
-  ChipContagem,
   KpiHud,
   Paginacao,
   Painel,
   Sparkline,
 } from "../componentes/hud";
+import { SeletorDeJogo } from "../componentes/SeletorDeJogo";
 import { useJogoAtual } from "../layout/JogoAtual";
 import { corDoJogo, PALETA_POLOS } from "../tema";
 import {
@@ -60,7 +59,7 @@ export function LadoVencedor({ vencedor }: { vencedor: string | null }) {
 
 export function PartidasPagina() {
   const navegar = useNavigate();
-  const { jogo, definirJogo } = useJogoAtual();
+  const { jogo } = useJogoAtual();
 
   const [liga, setLiga] = useState("");
   const [modo, setModo] = useState("");
@@ -74,7 +73,6 @@ export function PartidasPagina() {
     return new Date(Date.now() - periodo * 86400_000).toISOString().slice(0, 10);
   }, [periodo]);
 
-  const jogosDisponiveis = useJogosDisponiveis();
   const filtros = useFiltrosPartidas(jogo);
   const resumo = useResumoPartidas(jogo);
   const porDia = usePartidasPorDia(jogo);
@@ -187,26 +185,8 @@ export function PartidasPagina() {
 
       {/* ==================== BARRA DE FILTROS ==================== */}
       <section className="space-y-space-md rounded-xl bg-surface-container-low/90 p-space-base shadow-lg">
-        <div className="flex flex-wrap items-center gap-space-xs">
-          <span className="mr-space-xs font-label-caps text-label-caps uppercase tracking-widest text-outline">
-            Jogo:
-          </span>
-          {jogosDisponiveis.data?.map((disponivel) => (
-            <ChipContagem
-              key={disponivel.codigo}
-              ativo={disponivel.codigo === jogo}
-              contagem={disponivel.partidas}
-              cor={corDoJogo(disponivel.codigo)}
-              aoClicar={() =>
-                disponivel.partidas > 0 && definirJogo(disponivel.codigo)
-              }
-            >
-              {disponivel.nome}
-            </ChipContagem>
-          ))}
-        </div>
-
         <div className="flex flex-wrap items-center gap-space-sm">
+          <SeletorDeJogo />
           <label className="flex items-center gap-space-xs">
             <span className="font-label-caps text-label-caps uppercase tracking-widest text-outline">
               Torneio

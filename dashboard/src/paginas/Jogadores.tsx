@@ -8,12 +8,11 @@
 
 import { useEffect, useMemo, useState } from "react";
 
-import { useJogadores, useJogosDisponiveis, useSaude } from "../api/consultas";
+import { useJogadores, useSaude } from "../api/consultas";
 import type { ResumoJogador } from "../api/tipos";
 import { Botao, Consulta, Icone, Selo } from "../componentes/base";
 import {
   CAMPO,
-  ChipContagem,
   KpiHud,
   Paginacao,
   Painel,
@@ -21,6 +20,7 @@ import {
   Segmentos,
   Sparkline,
 } from "../componentes/hud";
+import { SeletorDeJogo } from "../componentes/SeletorDeJogo";
 import { useJogoAtual } from "../layout/JogoAtual";
 import { corDoJogo } from "../tema";
 import { fmtDecimal, fmtNumero, fmtPercentual } from "../utilitarios/formatos";
@@ -150,7 +150,7 @@ function CartaoMvp({
 }
 
 export function JogadoresPagina() {
-  const { jogo, definirJogo } = useJogoAtual();
+  const { jogo } = useJogoAtual();
 
   const [minPartidas, setMinPartidas] = useState(3);
   const [ordenacao, setOrdenacao] = useState<Ordenacao>("partidas");
@@ -159,7 +159,6 @@ export function JogadoresPagina() {
   const [porPagina, setPorPagina] = useState(25);
 
   const jogadores = useJogadores(jogo, minPartidas, 200);
-  const jogosDisponiveis = useJogosDisponiveis();
   const saude = useSaude();
 
   const online = saude.data?.status === "ok";
@@ -268,19 +267,7 @@ export function JogadoresPagina() {
           />
         </div>
 
-        <div className="flex flex-wrap items-center gap-space-xs">
-          {jogosDisponiveis.data?.map((disponivel) => (
-            <ChipContagem
-              key={disponivel.codigo}
-              ativo={disponivel.codigo === jogo}
-              contagem={disponivel.partidas}
-              cor={corDoJogo(disponivel.codigo)}
-              aoClicar={() => disponivel.partidas > 0 && definirJogo(disponivel.codigo)}
-            >
-              {disponivel.nome}
-            </ChipContagem>
-          ))}
-        </div>
+        <SeletorDeJogo />
       </section>
 
       {/* ==================== QUATRO KPIS ==================== */}
