@@ -30,14 +30,22 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/ml/confronto", tags=["ml"])
 
 
-def _relatorio() -> dict[str, Any]:
-    relatorio = motor.carregar_relatorio()
+def _relatorio(jogo: str) -> dict[str, Any]:
+    """O relatorio DAQUELE jogo.
+
+    O argumento nao e enfeite: sem ele esta funcao devolvia sempre o arquivo do
+    Dota 2, e `/relatorio?jogo=counterstrike` respondia com `"jogo": "dota2"`
+    dentro do corpo - numero certo respondendo a pergunta errada.
+    """
+    relatorio = motor.carregar_relatorio(jogo)
     if relatorio is None:
         raise HTTPException(
             status_code=503,
             detail=(
-                "Forças das equipes não ajustadas. "
-                "Rode `python cli.py train-confronto`."
+                f"As forças das equipes de {jogo} não foram ajustadas. O ajuste "
+                f"precisa de partidas COM RESULTADO, e hoje só o Dota 2 tem "
+                f"(a coleta de resultados vem da OpenDota). Para {jogo} existem "
+                "a agenda e as equipes, vindas da Liquipedia."
             ),
         )
     return relatorio
@@ -70,13 +78,13 @@ def _para_schema(equipe: motor.Equipe) -> EquipeConfronto:
 @router.get("/relatorio", response_model=RelatorioConfronto)
 def relatorio(jogo: str = "dota2") -> RelatorioConfronto:
     """Como as forcas foram ajustadas e o que a validacao temporal disse."""
-    return RelatorioConfronto(**_relatorio())
+    return RelatorioConfronto(**_relatorio(jogo))
 
 
 @router.get("/ligas", response_model=list[LigaConfronto])
 def listar_ligas(jogo: str = "dota2") -> list[LigaConfronto]:
     """Campeonatos presentes nos dados coletados."""
-    _relatorio()
+    _relatorio(jogo)
     return [LigaConfronto(**liga) for liga in motor.ligas(jogo)]
 
 
@@ -94,7 +102,7 @@ def listar_ranking(
     ),
 ) -> list[EquipeConfronto]:
     """Equipes ordenadas por forca - a resposta a 'quem e o favorito'."""
-    _relatorio()
+    _relatorio(jogo)
     return [
         _para_schema(equipe)
         for equipe in motor.ranking(jogo, liga)
@@ -109,7 +117,7 @@ def prever(
     jogo: str = "dota2",
 ) -> PrevisaoConfronto:
     """Probabilidade de a equipe A vencer a B, com os fatores por tras."""
-    relatorio_atual = _relatorio()
+    relatorio_atual = _relatorio(jogo)
 
     try:
         previsao = motor.prever(equipe_a, equipe_b, jogo)
@@ -153,9 +161,12 @@ def listar_agenda(
     Por padrao devolve tambem os que nao tem previsao: escondê-los daria a
     impressao de que a agenda e menor do que e, e o motivo ("time sem historico
     coletado") diz onde a coleta precisa crescer.
-    """
-    _relatorio()
 
+    **Nao exige modelo ajustado**, ao contrario dos outros endpoints deste
+    router: o calendario vem da Liquipedia e existe para os 66 jogos com agenda,
+    enquanto o ajuste so existe para os que tem partidas com resultado. Exigir o
+    relatorio aqui devolvia 503 para um calendario que estava completo no banco.
+    """
     return [
         ConfrontoAgendado(
             id_externo=confronto.id_externo,

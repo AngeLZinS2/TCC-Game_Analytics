@@ -958,6 +958,33 @@ Uma wiki fora do ar não derruba a varredura: cada uma roda dentro do seu `try`,
 resultado agregado é sucesso se **alguma** respondeu. Exigir todas faria uma wiki dormente
 reagendar a varredura inteira para cinco minutos depois.
 
+#### O que a Fase 12 quebrou, e o conserto
+
+Abrir 73 jogos expôs três defeitos que só existiam porque o projeto era de um jogo só.
+
+**O chip do jogo era desabilitado por `partidas === 0`.** Counter-Strike tem 1.409 equipes
+e 54 confrontos agendados, e zero partidas coletadas — o chip aparecia inerte e não havia
+como abrir a agenda que existe. Era literalmente impossível selecionar o jogo. Hoje "vazio"
+significa vazio em todas as fontes, e o `title` do chip diz o que cada jogo tem.
+
+**O artefato do modelo de confronto era um arquivo só.** `carregar_relatorio()` lia
+`metricas_confronto.json` sem olhar de qual jogo ele era, então
+`/api/ml/confronto/relatorio?jogo=counterstrike` devolvia o relatório do Dota 2 — com
+`"jogo": "dota2"` dentro do corpo da resposta. Número certo respondendo a pergunta errada,
+que é o pior tipo de erro num projeto sobre integridade de dado. Agora é
+`metricas_confronto_<jogo>.json`, e um jogo sem ajuste responde 503 explicando o que falta.
+
+**A tela de confronto ignorava o jogo selecionado** — nenhum dos cinco hooks enviava
+`jogo`, embora a API sempre tenha aceitado o parâmetro. E, como a página inteira vivia
+dentro de um `<Consulta estado={relatorio}>`, um jogo sem modelo não mostrava nada: nem o
+calendário, que vem de outra fonte e funciona. Agora a ausência do modelo esconde só o que
+depende dele (ranking de força, confronto hipotético, campeonatos); a agenda continua na
+tela, com os cards marcados **sem modelo para este jogo** em vez do enganoso "sem histórico
+coletado" — porque ali não falta o histórico *daquele time*, falta o ajuste do jogo inteiro.
+
+O endpoint `/agenda` deixou de exigir relatório pelo mesmo motivo: o calendário existe para
+os 66 jogos com agenda, o ajuste só para os que têm partidas com resultado.
+
 ### Fase 3 — Riot API (LoL)
 
 Próxima fase. O star schema já tem o discriminador (`dim_jogo.codigo`), as rotas de partidas
@@ -1044,8 +1071,15 @@ O frontend é verificado pelo compilador:
 
 ```powershell
 cd dashboard
-npm run lint         # tsc --noEmit sobre todo o src/
+npm run lint         # tsc -b --noEmit
 ```
+
+**Use `npm run lint`, não `npx tsc --noEmit`.** O `tsconfig.json` da raiz é do tipo
+*solution* (`"files": []` mais `references`), e nesse formato `tsc --noEmit` não verifica
+nada — sai com código 0 sem olhar um arquivo. É um no-op que parece um teste passando. O
+`-b` (build mode) é o que segue as referências e checa `src/` de verdade; o
+`npm run build` do Docker já usa `tsc -b`, então o erro aparece no build mesmo quando o
+comando manual mente.
 
 ## Estrutura
 

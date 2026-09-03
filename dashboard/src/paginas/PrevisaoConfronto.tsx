@@ -35,8 +35,9 @@ import type {
   RelatorioConfronto,
   ValidacaoConfronto,
 } from "../api/tipos";
-import { Consulta, Icone, MensagemErro, Selo } from "../componentes/base";
+import { Consulta, Esqueleto, Icone, MensagemErro, Selo } from "../componentes/base";
 import { Modal } from "../componentes/Modal";
+import { useJogoAtual } from "../layout/JogoAtual";
 import { BarraSegmentada, CAMPO, Painel, Pilula } from "../componentes/hud";
 import { PALETA_POLOS, TOKENS } from "../tema";
 import {
@@ -420,8 +421,16 @@ function CardConfronto({
           <div className="h-full flex-1" style={{ background: PALETA_POLOS.negativo }} />
         </div>
       ) : (
-        <div className="mt-space-sm font-label-caps text-label-caps uppercase tracking-widest text-outline">
-          sem histórico coletado
+        <div
+          className="mt-space-sm font-label-caps text-label-caps uppercase tracking-widest text-outline"
+          title={jogo.motivo_sem_previsao ?? undefined}
+        >
+          {/* O rotulo era fixo em "sem historico coletado", e isso passou a
+              mentir: num jogo sem modelo ajustado nao falta o historico DESTE
+              time - falta o ajuste do jogo inteiro. */}
+          {jogo.motivo_sem_previsao?.startsWith("o modelo")
+            ? "sem modelo para este jogo"
+            : "sem histórico coletado"}
         </div>
       )}
 
@@ -462,11 +471,24 @@ export function PrevisaoConfrontoPagina() {
   const [soComPrevisao, setSoComPrevisao] = useState(false);
   const [aberto, setAberto] = useState<ConfrontoAgendado | null>(null);
 
-  const relatorio = useRelatorioConfronto();
-  const ligas = useLigasConfronto();
-  const ranking = useRankingConfronto(liga, minPartidas);
-  const agenda = useAgendaConfronto(soComPrevisao);
-  const previsao = usePrevisaoConfronto(equipeA, equipeB);
+  // A tela nao lia o chip do topo: trocar de jogo nao mudava nada aqui, e a
+  // API respondia sempre sobre Dota 2, que e o padrao dela.
+  const { jogo } = useJogoAtual();
+
+  const relatorio = useRelatorioConfronto(jogo);
+  const ligas = useLigasConfronto(jogo);
+  const ranking = useRankingConfronto(jogo, liga, minPartidas);
+  const agenda = useAgendaConfronto(jogo, soComPrevisao);
+  const previsao = usePrevisaoConfronto(jogo, equipeA, equipeB);
+
+  // Trocar de jogo limpa a selecao: um `id_equipe` de Dota nao existe em
+  // Counter-Strike, e mante-lo pediria a previsao de um par que nao existe.
+  useEffect(() => {
+    setEquipeA(null);
+    setEquipeB(null);
+    setLiga(null);
+    setAberto(null);
+  }, [jogo]);
 
   const equipes = useMemo(() => ranking.data ?? [], [ranking.data]);
 
@@ -522,25 +544,21 @@ export function PrevisaoConfrontoPagina() {
       ? previsao.data
       : undefined;
 
-  if (relatorio.isError) {
-    return (
-      <Painel icone="swords" titulo="Previsão de confronto">
-        <MensagemErro erro={relatorio.error} />
-        <p className="mt-space-base font-body-md text-body-md text-on-surface-variant">
-          Ajuste as forças com{" "}
-          <code className="rounded bg-surface-container px-space-xs py-space-xxs font-title-code text-title-code text-primary">
-            python cli.py train-confronto
-          </code>{" "}
-          e recarregue.
-        </p>
-      </Painel>
-    );
-  }
+  /**
+   * O relatorio do ajuste - `undefined` quando este jogo nunca foi ajustado.
+   *
+   * Antes a tela inteira vivia dentro de um `<Consulta estado={relatorio}>`, e
+   * o efeito era que um jogo sem modelo nao mostrava NADA - nem o calendario,
+   * que vem de outra fonte e funciona. Agora a ausencia do modelo esconde so o
+   * que depende dele: o ranking de forca, o confronto hipotetico e a lista de
+   * campeonatos. A agenda continua na tela.
+   */
+  const dados: RelatorioConfronto | undefined = relatorio.data;
+
+  if (relatorio.isPending) return <Esqueleto altura={320} />;
 
   return (
-    <Consulta estado={relatorio} altura={320}>
-      {(dados: RelatorioConfronto) => (
-        <>
+    <>
           {/* ==================== CABECALHO ==================== */}
           <section className="flex flex-col gap-space-base pt-space-base lg:flex-row lg:items-center lg:justify-between">
             <div className="flex flex-col gap-space-xs">
@@ -554,11 +572,20 @@ export function PrevisaoConfrontoPagina() {
                 </span>
               </div>
 
-              <p className="font-body-sm text-body-sm text-on-surface-variant">
-                Qual time tem mais chance de vencer, a partir do histórico de{" "}
-                {fmtNumero(dados.confrontos)} confrontos entre {dados.equipes} equipes.
-                Método: <strong>{dados.metodo}</strong>.
-              </p>
+              {dados ? (
+                <p className="font-body-sm text-body-sm text-on-surface-variant">
+                  Qual time tem mais chance de vencer, a partir do histórico de{" "}
+                  {fmtNumero(dados.confrontos)} confrontos entre {dados.equipes} equipes.
+                  Método: <strong>{dados.metodo}</strong>.
+                </p>
+              ) : (
+                <p className="font-body-sm text-body-sm text-on-surface-variant">
+                  O calendário deste jogo vem da Liquipedia e aparece abaixo.{" "}
+                  <strong className="text-error">A previsão, não:</strong> ela precisa de
+                  partidas com resultado, e a coleta de resultados vem da OpenDota, que
+                  hoje só cobre Dota 2.
+                </p>
+              )}
             </div>
 
             <div className="flex flex-wrap items-center gap-space-sm">
@@ -599,7 +626,7 @@ export function PrevisaoConfrontoPagina() {
             </div>
           </section>
 
-          <AvisoValidacao validacao={dados.validacao} />
+          {dados && <AvisoValidacao validacao={dados.validacao} />}
 
           {/* ==================== KANBAN DA AGENDA ==================== */}
           <Painel
@@ -737,6 +764,11 @@ export function PrevisaoConfrontoPagina() {
             )}
           </Modal>
 
+          {/* As tres secoes abaixo leem as FORCAS ajustadas. Sem modelo elas
+              so teriam erros para mostrar, e tres paineis de erro empilhados
+              dizem menos que uma frase no cabecalho. */}
+          {dados && (
+            <>
           {/* ==================== CONFRONTO HIPOTETICO ==================== */}
           <Painel
             icone="swords"
@@ -943,8 +975,8 @@ export function PrevisaoConfrontoPagina() {
               )}
             </Consulta>
           </Painel>
-        </>
-      )}
-    </Consulta>
+            </>
+          )}
+    </>
   );
 }

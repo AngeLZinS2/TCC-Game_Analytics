@@ -29,9 +29,15 @@ function useTituloDaRota(): string {
 /**
  * Chips de jogo do dominio de partidas.
  *
- * Um jogo sem partida coletada aparece desabilitado em vez de sumir: o schema
- * de partidas ja e compartilhado entre os tres, e mostrar o que ainda nao foi
- * populado e mostrar o plano do projeto na tela.
+ * **Um jogo so e desabilitado quando nao tem NADA.** A regra era
+ * `partidas === 0`, e ela ficou errada quando as 73 wikis da Liquipedia
+ * entraram: Counter-Strike tem 1.409 equipes e 54 confrontos agendados e zero
+ * partidas coletadas - o chip dele aparecia inerte, e nao havia como abrir a
+ * agenda que existe. Agora "vazio" significa vazio em todas as fontes, e o
+ * `title` diz o que cada jogo de fato tem.
+ *
+ * A lista rola na horizontal porque passou de tres jogos para dezenas. Sem a
+ * rolagem, os chips empurram a barra e quebram o cabecalho.
  */
 function ChipsDeJogo() {
   const jogos = useJogosDisponiveis();
@@ -41,24 +47,35 @@ function ChipsDeJogo() {
 
   return (
     <div
-      className="flex items-center gap-space-xs"
+      className="rolagem-discreta flex max-w-full items-center gap-space-xs overflow-x-auto"
       role="group"
       aria-label="Jogo do domínio de partidas"
     >
       {jogos.data.map((jogo) => {
-        const vazio = jogo.partidas === 0;
+        const vazio =
+          jogo.partidas === 0 && jogo.equipes === 0 && jogo.agenda === 0;
         const ativo = jogo.codigo === atual;
+        const oQueTem = [
+          jogo.partidas ? `${jogo.partidas} partidas` : null,
+          jogo.equipes ? `${jogo.equipes} equipes` : null,
+          jogo.agenda ? `${jogo.agenda} na agenda` : null,
+        ]
+          .filter(Boolean)
+          .join(" · ");
 
         return (
           <button
             key={jogo.codigo}
             type="button"
+            // `shrink-0`: sem isso os chips se espremem ate o nome virar
+            // "Counter-..." em vez de rolar.
+            data-jogo={jogo.codigo}
             disabled={vazio}
             aria-pressed={ativo}
             onClick={() => definirJogo(jogo.codigo)}
-            title={vazio ? "Nenhuma partida coletada ainda" : `${jogo.partidas} partidas`}
+            title={vazio ? "Nada coletado ainda" : oQueTem}
             className={[
-              "inline-flex items-center gap-space-xs rounded px-space-md py-space-xs font-title-code text-title-code transition-colors",
+              "inline-flex shrink-0 items-center gap-space-xs whitespace-nowrap rounded px-space-md py-space-xs font-title-code text-title-code transition-colors",
               vazio
                 ? "cursor-not-allowed bg-surface-container/40 text-outline/50"
                 : ativo

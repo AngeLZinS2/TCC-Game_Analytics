@@ -63,7 +63,21 @@ from ml.modelos import SEMENTE
 logger = logging.getLogger(__name__)
 
 PASTA = Path(__file__).resolve().parent.parent / "data" / "modelos"
-ARQUIVO_METRICAS = PASTA / "metricas_confronto.json"
+def arquivo_metricas(jogo: str) -> Path:
+    """O artefato do modelo, UM POR JOGO.
+
+    Era um arquivo so, e isso era um bug silencioso: `carregar_relatorio()` lia
+    `metricas_confronto.json` sem olhar de qual jogo ele era, entao
+    `/api/ml/confronto/relatorio?jogo=counterstrike` devolvia o relatorio do
+    Dota 2 - com `"jogo": "dota2"` dentro da resposta - como se fosse de CS.
+    Numeros certos respondendo a pergunta errada, que e o pior tipo de erro num
+    projeto sobre integridade de dado.
+
+    O nome entra no arquivo porque as forcas sao ajustadas sobre o historico de
+    UM jogo: um `id_equipe` de Counter-Strike nao tem forca no ajuste do Dota, e
+    a taxa base de um nao diz nada sobre o outro.
+    """
+    return PASTA / f"metricas_confronto_{jogo}.json"
 
 #: Grade de regularizacao. `C` alto deixa as forcas livres e faz um time
 #: invicto de duas partidas valer mais que um consistente de onze; `C` baixo
@@ -462,7 +476,7 @@ def ajustar_e_salvar(jogo: str = "dota2") -> dict[str, Any]:
         },
     }
 
-    ARQUIVO_METRICAS.write_text(
+    arquivo_metricas(jogo).write_text(
         json.dumps(relatorio, indent=2, ensure_ascii=False), encoding="utf-8"
     )
     logger.info(
@@ -472,10 +486,12 @@ def ajustar_e_salvar(jogo: str = "dota2") -> dict[str, Any]:
     return relatorio
 
 
-def carregar_relatorio() -> dict[str, Any] | None:
-    if not ARQUIVO_METRICAS.exists():
+def carregar_relatorio(jogo: str = "dota2") -> dict[str, Any] | None:
+    """O relatorio do jogo pedido, ou `None` se ele nunca foi ajustado."""
+    caminho = arquivo_metricas(jogo)
+    if not caminho.exists():
         return None
-    return json.loads(ARQUIVO_METRICAS.read_text(encoding="utf-8"))
+    return json.loads(caminho.read_text(encoding="utf-8"))
 
 
 # ---------------------------------------------------------------------------
@@ -504,10 +520,13 @@ def _fator(
 
 def estado(jogo: str = "dota2") -> tuple[dict[int, Equipe], dict[str, Any]]:
     """Equipes com forca preenchida, e o relatorio do ultimo ajuste."""
-    relatorio = carregar_relatorio()
+    relatorio = carregar_relatorio(jogo)
     if relatorio is None:
         raise FileNotFoundError(
-            "forcas nao ajustadas. Rode `python cli.py train-confronto` primeiro."
+            f"as forcas de {jogo!r} nao foram ajustadas. Rode "
+            f"`python cli.py train-confronto --jogo {jogo}` - e note que o ajuste "
+            "precisa de partidas COM RESULTADO, que hoje so a OpenDota traz, e so "
+            "para Dota 2."
         )
 
     with session_scope() as sessao:
@@ -676,9 +695,20 @@ def agenda(jogo: str = "dota2", limite: int = 40) -> list[ConfrontoAgendado]:
     Partida sem previsao continua na lista. Escondê-la daria a impressao de que
     a agenda e menor do que e, e o motivo ("time sem historico coletado") e
     informacao util - e o que diz onde a coleta precisa crescer.
+
+    **A agenda NAO exige modelo ajustado.** O calendario vem da Liquipedia e a
+    previsao vem do nosso ajuste - sao fontes diferentes, e amarrar uma na outra
+    fazia um jogo sem modelo (Counter-Strike, Valorant, e outros 70) devolver
+    503 no lugar de um calendario que existe e esta completo. Sem forcas, todo
+    confronto sai com `probabilidade_a=None` e o motivo diz por que.
     """
-    equipes, relatorio = estado(jogo)
-    lado = float(relatorio["vantagem_lado_a"])
+    try:
+        equipes, relatorio = estado(jogo)
+        lado = float(relatorio["vantagem_lado_a"])
+        sem_modelo = False
+    except FileNotFoundError:
+        equipes, lado, sem_modelo = {}, 0.0, True
+
     agora = datetime.now(timezone.utc)
 
     with session_scope() as sessao:
@@ -704,7 +734,16 @@ def agenda(jogo: str = "dota2", limite: int = 40) -> list[ConfrontoAgendado]:
         a = equipes.get(linha[3]) if linha[3] else None
         b = equipes.get(linha[4]) if linha[4] else None
 
-        if a is None or b is None:
+        if sem_modelo:
+            # Distinguir dos casos abaixo importa: aqui nao falta o TIME, falta
+            # o modelo do jogo inteiro. Dizer "sem historico coletado: Falcons"
+            # sobre um time que a Liquipedia conhece bem seria enganoso.
+            motivo = (
+                f"o modelo de {jogo} não foi ajustado: a previsão precisa de "
+                "partidas com resultado, que ainda não são coletadas para este jogo"
+            )
+            probabilidade = None
+        elif a is None or b is None:
             faltando = [
                 nome
                 for nome, equipe in ((linha[1], a), (linha[2], b))

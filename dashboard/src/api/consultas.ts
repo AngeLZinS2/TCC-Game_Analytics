@@ -280,28 +280,42 @@ export function usePerguntarAssistente() {
 }
 
 // --- Previsao de confronto entre equipes (Fase 9) ---
+//
+// Todos estes hooks recebem `jogo` e o mandam para a API.
+//
+// Antes nenhum mandava, e o efeito era duplo: trocar o chip do topo nao mudava
+// nada na tela, e a API - que sempre teve o parametro com padrao `dota2` -
+// respondia sobre Dota 2 independentemente do que estivesse selecionado. O
+// `jogo` tambem entra na `queryKey`, senao o cache do TanStack devolveria a
+// resposta de um jogo para a pergunta de outro.
 
-export function useRelatorioConfronto() {
+export function useRelatorioConfronto(jogo: string) {
   return useQuery({
-    queryKey: ["confronto", "relatorio"],
-    queryFn: () => buscar<RelatorioConfronto>("/api/ml/confronto/relatorio"),
+    queryKey: ["confronto", "relatorio", jogo],
+    queryFn: () =>
+      buscar<RelatorioConfronto>("/api/ml/confronto/relatorio", { jogo }),
     retry: false,
   });
 }
 
-export function useLigasConfronto() {
+export function useLigasConfronto(jogo: string) {
   return useQuery({
-    queryKey: ["confronto", "ligas"],
-    queryFn: () => buscar<LigaConfronto[]>("/api/ml/confronto/ligas"),
+    queryKey: ["confronto", "ligas", jogo],
+    queryFn: () => buscar<LigaConfronto[]>("/api/ml/confronto/ligas", { jogo }),
     retry: false,
   });
 }
 
-export function useRankingConfronto(liga: string | null, minPartidas: number) {
+export function useRankingConfronto(
+  jogo: string,
+  liga: string | null,
+  minPartidas: number,
+) {
   return useQuery({
-    queryKey: ["confronto", "ranking", liga, minPartidas],
+    queryKey: ["confronto", "ranking", jogo, liga, minPartidas],
     queryFn: () =>
       buscar<EquipeConfronto[]>("/api/ml/confronto/ranking", {
+        jogo,
         liga: liga ?? undefined,
         min_partidas: minPartidas,
       }),
@@ -311,13 +325,15 @@ export function useRankingConfronto(liga: string | null, minPartidas: number) {
 }
 
 export function usePrevisaoConfronto(
+  jogo: string,
   equipeA: number | null,
   equipeB: number | null,
 ) {
   return useQuery({
-    queryKey: ["confronto", "prever", equipeA, equipeB],
+    queryKey: ["confronto", "prever", jogo, equipeA, equipeB],
     queryFn: () =>
       buscar<PrevisaoConfronto>("/api/ml/confronto/prever", {
+        jogo,
         equipe_a: equipeA!,
         equipe_b: equipeB!,
       }),
@@ -330,11 +346,12 @@ export function usePrevisaoConfronto(
 }
 
 /** Proximos confrontos do calendario, com a previsao de cada um. */
-export function useAgendaConfronto(apenasComPrevisao: boolean) {
+export function useAgendaConfronto(jogo: string, apenasComPrevisao: boolean) {
   return useQuery({
-    queryKey: ["confronto", "agenda", apenasComPrevisao],
+    queryKey: ["confronto", "agenda", jogo, apenasComPrevisao],
     queryFn: () =>
       buscar<ConfrontoAgendado[]>("/api/ml/confronto/agenda", {
+        jogo,
         limite: 40,
         apenas_com_previsao: apenasComPrevisao,
       }),

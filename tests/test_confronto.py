@@ -13,7 +13,14 @@ from datetime import datetime, timedelta, timezone
 import numpy as np
 import pytest
 
-from ml.confronto import Confronto, _ajustar, _matriz, _probabilidade
+from ml.confronto import (
+    Confronto,
+    _ajustar,
+    _matriz,
+    _probabilidade,
+    arquivo_metricas,
+    carregar_relatorio,
+)
 
 
 def _confronto(a: int, b: int, vitoria_a: bool, minutos: int = 0) -> Confronto:
@@ -107,3 +114,29 @@ def test_forcas_cobrem_todas_as_equipes_vistas():
     forcas, _ = _ajustar(confrontos, regularizacao=1.0)
     assert set(forcas) == {7, 8, 9}
     assert all(np.isfinite(valor) for valor in forcas.values())
+
+
+# ---------------------------------------------------------------------------
+# O artefato por jogo
+# ---------------------------------------------------------------------------
+
+
+def test_cada_jogo_tem_seu_arquivo_de_metricas():
+    """Era UM arquivo para todos os jogos, e isso era um bug silencioso.
+
+    `carregar_relatorio()` lia `metricas_confronto.json` sem olhar de qual jogo
+    ele era, entao `/api/ml/confronto/relatorio?jogo=counterstrike` devolvia o
+    relatorio do Dota 2 - com `"jogo": "dota2"` dentro da propria resposta.
+    Numero certo respondendo a pergunta errada.
+    """
+    de_dota = arquivo_metricas("dota2")
+    de_cs = arquivo_metricas("counterstrike")
+
+    assert de_dota != de_cs
+    assert "dota2" in de_dota.name
+    assert "counterstrike" in de_cs.name
+
+
+def test_jogo_nunca_ajustado_devolve_none():
+    """`None` e nao o relatorio de outro jogo - a diferenca e o bug acima."""
+    assert carregar_relatorio("jogo-que-nao-existe-xyz") is None
