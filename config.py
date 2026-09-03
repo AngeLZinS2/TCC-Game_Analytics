@@ -111,6 +111,15 @@ class Settings(BaseSettings):
     #: rodada sao ~23 chamadas e ~70 segundos, entao diario e barato para eles.
     agendador_equipes_minutos: int = Field(default=1440, ge=60)
 
+    #: Quantas wikis coletar equipes por rodada do agendador.
+    #:
+    #: Nao da para varrer as 71 de uma vez: o Counter-Strike sozinho tem 1.410
+    #: equipes e leva 97 segundos; as 71 juntas passariam de uma hora e meia de
+    #: chamadas seguidas a um servico publico e gratuito. O rodizio pega as
+    #: proximas N a cada rodada e volta ao inicio - uma varredura completa leva
+    #: cerca de uma semana, que e rapido para um dado que muda em meses.
+    agendador_equipes_por_rodada: int = Field(default=10, ge=1, le=80)
+
     #: Quantas partidas pedir por rodada do agendador.
     agendador_opendota_limite: int = Field(default=100, ge=1, le=500)
 

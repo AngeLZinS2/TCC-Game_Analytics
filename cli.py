@@ -74,6 +74,18 @@ def _parser() -> argparse.ArgumentParser:
         help="limita o total de apps a coletar (0 = sem limite; util para testes)",
     )
 
+    liquipedia = coletar.add_argument_group("liquipedia / liquipedia-times")
+    liquipedia.add_argument(
+        "--wiki",
+        default="dota2",
+        help="codigo da wiki da Liquipedia (ver collectors/seeds/liquipedia_wikis.json)",
+    )
+    liquipedia.add_argument(
+        "--todas-wikis",
+        action="store_true",
+        help="percorre TODAS as wikis do registro que suportam esta fonte",
+    )
+
     equipes = coletar.add_argument_group("liquipedia-times")
     equipes.add_argument(
         "--limite-equipes",
@@ -97,6 +109,9 @@ def _parser() -> argparse.ArgumentParser:
     )
 
     sub.add_parser("stats", help="contagem de linhas por tabela")
+    sub.add_parser(
+        "seed-jogos", help="sincroniza dim_jogo com o registro de wikis da Liquipedia"
+    )
 
     sentimento = sub.add_parser(
         "train-sentimento",
@@ -156,7 +171,9 @@ def _construir_coletor(args: argparse.Namespace, storage):
     if args.fonte == "liquipedia":
         from collectors.liquipedia_collector import LiquipediaCollector
 
-        return LiquipediaCollector(raw_storage=storage, settings=settings)
+        return LiquipediaCollector(
+            raw_storage=storage, settings=settings, wiki=args.wiki
+        )
 
     if args.fonte == "liquipedia-times":
         from collectors.liquipedia_wiki_collector import LiquipediaWikiCollector
@@ -164,6 +181,7 @@ def _construir_coletor(args: argparse.Namespace, storage):
         return LiquipediaWikiCollector(
             raw_storage=storage,
             settings=settings,
+            wiki=args.wiki,
             limite_equipes=args.limite_equipes,
         )
 
@@ -256,6 +274,15 @@ def _cmd_stats() -> int:
     return 0
 
 
+def _cmd_seed_jogos() -> int:
+    from etl.load_jogos import sincronizar
+    from etl.wikis import registro
+
+    criados = sincronizar()
+    print(f"{len(registro())} wikis no registro; {criados} jogos criados agora")
+    return 0
+
+
 def _cmd_train_sentimento(args) -> int:
     from ml.sentimento import treinar
 
@@ -342,6 +369,8 @@ def main(argv: list[str] | None = None) -> int:
         return _cmd_collect(args)
     if args.comando == "stats":
         return _cmd_stats()
+    if args.comando == "seed-jogos":
+        return _cmd_seed_jogos()
     if args.comando == "train-sentimento":
         return _cmd_train_sentimento(args)
     if args.comando == "train-confronto":

@@ -139,25 +139,98 @@ def _coletar_opendota(settings: Settings, storage: RawStorage) -> CollectionResu
         coletor.close()
 
 
-def _coletar_liquipedia(settings: Settings, storage: RawStorage) -> CollectionResult:
-    from collectors.liquipedia_collector import LiquipediaCollector
+def _somar(parciais: list[CollectionResult], fonte: str) -> CollectionResult:
+    """Junta os resultados de varias wikis num resultado so.
 
-    coletor = LiquipediaCollector(raw_storage=storage, settings=settings)
-    try:
-        return coletor.run(carregar=True)
-    finally:
-        coletor.close()
+    `sucesso` e verdadeiro se ALGUMA wiki respondeu. Exigir todas faria uma wiki
+    dormente derrubar o resultado das outras 70, e reagendar a varredura inteira
+    para daqui a cinco minutos por causa dela.
+    """
+    return CollectionResult(
+        fonte=fonte,
+        sucesso=any(p.sucesso for p in parciais) if parciais else False,
+        registros_coletados=sum(p.registros_coletados for p in parciais),
+        registros_processados=sum(p.registros_processados for p in parciais),
+        registros_carregados=sum(p.registros_carregados for p in parciais),
+        falhas=sum(1 for p in parciais if not p.sucesso),
+    )
+
+
+def _coletar_liquipedia(settings: Settings, storage: RawStorage) -> CollectionResult:
+    """A agenda de TODAS as wikis que tem `Liquipedia:Matches`.
+
+    Uma chamada por wiki - sao 66, cerca de tres minutos no intervalo padrao.
+    Barato o suficiente para varrer tudo a cada rodada.
+    """
+    from collectors.liquipedia_collector import LiquipediaCollector
+    from etl.wikis import com_agenda
+
+    parciais: list[CollectionResult] = []
+    for wiki in com_agenda():
+        coletor = LiquipediaCollector(
+            raw_storage=storage, settings=settings, wiki=wiki.codigo
+        )
+        try:
+            parciais.append(coletor.run(carregar=True))
+        except Exception as exc:  # noqa: BLE001 - uma wiki nao derruba a varredura
+            logger.warning(
+                "agenda de uma wiki falhou",
+                extra={"wiki": wiki.codigo, "erro": f"{type(exc).__name__}: {exc}"},
+            )
+            parciais.append(CollectionResult(fonte="liquipedia", sucesso=False))
+        finally:
+            coletor.close()
+
+    return _somar(parciais, "liquipedia")
+
+
+#: Onde o rodizio parou. Estado em memoria de proposito: perde-se no restart, e
+#: perder significa recomecar a varredura, nao corromper nada.
+_proxima_wiki_de_equipes = 0
 
 
 def _coletar_equipes(settings: Settings, storage: RawStorage) -> CollectionResult:
-    """As paginas de equipe da wiki - quem sao os times, nao o que jogaram."""
-    from collectors.liquipedia_wiki_collector import LiquipediaWikiCollector
+    """As paginas de equipe, algumas wikis por rodada.
 
-    coletor = LiquipediaWikiCollector(raw_storage=storage, settings=settings)
-    try:
-        return coletor.run(carregar=True)
-    finally:
-        coletor.close()
+    Rodizio em vez de varredura completa: ver `agendador_equipes_por_rodada`.
+    """
+    global _proxima_wiki_de_equipes
+
+    from collectors.liquipedia_wiki_collector import LiquipediaWikiCollector
+    from etl.wikis import com_times
+
+    todas = com_times()
+    if not todas:
+        return CollectionResult(fonte="liquipedia", sucesso=True)
+
+    quantas = min(settings.agendador_equipes_por_rodada, len(todas))
+    lote = [
+        todas[(_proxima_wiki_de_equipes + i) % len(todas)] for i in range(quantas)
+    ]
+    _proxima_wiki_de_equipes = (_proxima_wiki_de_equipes + quantas) % len(todas)
+
+    logger.info(
+        "rodizio de equipes",
+        extra={"wikis": [w.codigo for w in lote], "de": len(todas)},
+    )
+
+    parciais: list[CollectionResult] = []
+    for wiki in lote:
+        coletor = LiquipediaWikiCollector(
+            raw_storage=storage, settings=settings, wiki=wiki.codigo
+        )
+        try:
+            parciais.append(coletor.run(carregar=True))
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(
+                "equipes de uma wiki falharam",
+                extra={"wiki": wiki.codigo, "erro": f"{type(exc).__name__}: {exc}"},
+            )
+            parciais.append(CollectionResult(fonte="liquipedia", sucesso=False))
+        finally:
+            coletor.close()
+
+    return _somar(parciais, "liquipedia")
 
 
 def montar_tarefas(settings: Settings) -> list[Tarefa]:
@@ -259,6 +332,18 @@ def rodar(parada: Parada | None = None) -> int:
     parada = parada or Parada()
     signal.signal(signal.SIGTERM, parada.pedir_parada)
     signal.signal(signal.SIGINT, parada.pedir_parada)
+
+    # `dim_jogo` precisa ter as wikis antes de qualquer carga: o loader da
+    # agenda resolve o `id_jogo` pelo codigo e falha se ele nao existir.
+    try:
+        from etl.load_jogos import sincronizar
+
+        sincronizar()
+    except Exception as exc:  # noqa: BLE001 - banco fora do ar nao trava o boot
+        logger.warning(
+            "nao foi possivel sincronizar dim_jogo",
+            extra={"erro": f"{type(exc).__name__}: {exc}"},
+        )
 
     tarefas = montar_tarefas(settings)
     storage = RawStorage(settings.raw_data_path, registrar_no_banco=True)

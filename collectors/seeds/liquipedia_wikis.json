@@ -1,0 +1,440 @@
+[
+  {
+    "codigo": "ageofempires",
+    "nome": "Age of Empires",
+    "agenda": true,
+    "times": true
+  },
+  {
+    "codigo": "apexlegends",
+    "nome": "Apex Legends",
+    "agenda": true,
+    "times": true
+  },
+  {
+    "codigo": "arenafps",
+    "nome": "Arena FPS",
+    "agenda": true,
+    "times": true
+  },
+  {
+    "codigo": "artifact",
+    "nome": "Artifact",
+    "agenda": true,
+    "times": true
+  },
+  {
+    "codigo": "autochess",
+    "nome": "Auto Chess",
+    "agenda": true,
+    "times": true
+  },
+  {
+    "codigo": "battalion",
+    "nome": "Battalion 1944",
+    "agenda": true,
+    "times": true
+  },
+  {
+    "codigo": "battlerite",
+    "nome": "Battlerite",
+    "agenda": true,
+    "times": true
+  },
+  {
+    "codigo": "brawlhalla",
+    "nome": "Brawlhalla",
+    "agenda": false,
+    "times": true
+  },
+  {
+    "codigo": "brawlstars",
+    "nome": "Brawl Stars",
+    "agenda": true,
+    "times": true
+  },
+  {
+    "codigo": "callofduty",
+    "nome": "Call of Duty",
+    "agenda": true,
+    "times": true
+  },
+  {
+    "codigo": "chess",
+    "nome": "Chess",
+    "agenda": true,
+    "times": true
+  },
+  {
+    "codigo": "clashofclans",
+    "nome": "Clash of Clans",
+    "agenda": true,
+    "times": true
+  },
+  {
+    "codigo": "clashroyale",
+    "nome": "Clash Royale",
+    "agenda": true,
+    "times": true
+  },
+  {
+    "codigo": "counterstrike",
+    "nome": "Counter-Strike",
+    "agenda": true,
+    "times": true
+  },
+  {
+    "codigo": "criticalops",
+    "nome": "Critical Ops",
+    "agenda": true,
+    "times": true
+  },
+  {
+    "codigo": "crossfire",
+    "nome": "CrossFire",
+    "agenda": true,
+    "times": true
+  },
+  {
+    "codigo": "deadlock",
+    "nome": "Deadlock",
+    "agenda": true,
+    "times": true
+  },
+  {
+    "codigo": "deltaforce",
+    "nome": "Delta Force",
+    "agenda": true,
+    "times": true
+  },
+  {
+    "codigo": "dota2",
+    "nome": "Dota 2",
+    "agenda": true,
+    "times": true
+  },
+  {
+    "codigo": "easportsfc",
+    "nome": "EA SPORTS FC",
+    "agenda": true,
+    "times": true
+  },
+  {
+    "codigo": "eva",
+    "nome": "Esports Virtual Arenas",
+    "agenda": true,
+    "times": true
+  },
+  {
+    "codigo": "fighters",
+    "nome": "Fighting Games",
+    "agenda": false,
+    "times": true
+  },
+  {
+    "codigo": "formula1",
+    "nome": "Formula 1",
+    "agenda": false,
+    "times": true
+  },
+  {
+    "codigo": "fortnite",
+    "nome": "Fortnite",
+    "agenda": false,
+    "times": true
+  },
+  {
+    "codigo": "freefire",
+    "nome": "Free Fire",
+    "agenda": true,
+    "times": true
+  },
+  {
+    "codigo": "geoguessr",
+    "nome": "GeoGuessr",
+    "agenda": true,
+    "times": true
+  },
+  {
+    "codigo": "goals",
+    "nome": "GOALS",
+    "agenda": true,
+    "times": true
+  },
+  {
+    "codigo": "halo",
+    "nome": "Halo",
+    "agenda": true,
+    "times": true
+  },
+  {
+    "codigo": "hearthstone",
+    "nome": "Hearthstone",
+    "agenda": true,
+    "times": true
+  },
+  {
+    "codigo": "heroes",
+    "nome": "Heroes of the Storm",
+    "agenda": true,
+    "times": true
+  },
+  {
+    "codigo": "honorofkings",
+    "nome": "Honor of Kings",
+    "agenda": true,
+    "times": true
+  },
+  {
+    "codigo": "identityv",
+    "nome": "Identity V",
+    "agenda": true,
+    "times": true
+  },
+  {
+    "codigo": "leagueoflegends",
+    "nome": "League of Legends",
+    "agenda": true,
+    "times": true
+  },
+  {
+    "codigo": "magic",
+    "nome": "Magic: The Gathering",
+    "agenda": true,
+    "times": true
+  },
+  {
+    "codigo": "marvelrivals",
+    "nome": "Marvel Rivals",
+    "agenda": true,
+    "times": true
+  },
+  {
+    "codigo": "mobilelegends",
+    "nome": "Mobile Legends: Bang Bang",
+    "agenda": true,
+    "times": true
+  },
+  {
+    "codigo": "naraka",
+    "nome": "Naraka",
+    "agenda": true,
+    "times": true
+  },
+  {
+    "codigo": "omegastrikers",
+    "nome": "Omega Strikers",
+    "agenda": true,
+    "times": true
+  },
+  {
+    "codigo": "osu",
+    "nome": "osu!",
+    "agenda": true,
+    "times": true
+  },
+  {
+    "codigo": "overwatch",
+    "nome": "Overwatch",
+    "agenda": true,
+    "times": true
+  },
+  {
+    "codigo": "paladins",
+    "nome": "Paladins",
+    "agenda": true,
+    "times": true
+  },
+  {
+    "codigo": "pokemon",
+    "nome": "Pokemon",
+    "agenda": true,
+    "times": true
+  },
+  {
+    "codigo": "pubg",
+    "nome": "PUBG: Battlegrounds",
+    "agenda": true,
+    "times": true
+  },
+  {
+    "codigo": "pubgmobile",
+    "nome": "PUBG Mobile",
+    "agenda": true,
+    "times": true
+  },
+  {
+    "codigo": "rainbowsix",
+    "nome": "Rainbow Six",
+    "agenda": true,
+    "times": true
+  },
+  {
+    "codigo": "rematch",
+    "nome": "Rematch",
+    "agenda": true,
+    "times": true
+  },
+  {
+    "codigo": "rocketleague",
+    "nome": "Rocket League",
+    "agenda": true,
+    "times": true
+  },
+  {
+    "codigo": "runeterra",
+    "nome": "Legends of Runeterra",
+    "agenda": true,
+    "times": true
+  },
+  {
+    "codigo": "sideswipe",
+    "nome": "Rocket League Sideswipe",
+    "agenda": true,
+    "times": false
+  },
+  {
+    "codigo": "simracing",
+    "nome": "Sim Racing",
+    "agenda": true,
+    "times": true
+  },
+  {
+    "codigo": "smash",
+    "nome": "Smash",
+    "agenda": false,
+    "times": true
+  },
+  {
+    "codigo": "smite",
+    "nome": "SMITE",
+    "agenda": true,
+    "times": true
+  },
+  {
+    "codigo": "splatoon",
+    "nome": "Splatoon",
+    "agenda": true,
+    "times": true
+  },
+  {
+    "codigo": "splitgate",
+    "nome": "Splitgate",
+    "agenda": true,
+    "times": true
+  },
+  {
+    "codigo": "squadrons",
+    "nome": "Star Wars: Squadrons",
+    "agenda": true,
+    "times": true
+  },
+  {
+    "codigo": "starcraft",
+    "nome": "StarCraft",
+    "agenda": false,
+    "times": true
+  },
+  {
+    "codigo": "starcraft2",
+    "nome": "StarCraft 2",
+    "agenda": false,
+    "times": true
+  },
+  {
+    "codigo": "stormgate",
+    "nome": "Stormgate",
+    "agenda": true,
+    "times": true
+  },
+  {
+    "codigo": "tarkovarena",
+    "nome": "Escape from Tarkov: Arena",
+    "agenda": true,
+    "times": true
+  },
+  {
+    "codigo": "teamfortress",
+    "nome": "Team Fortress",
+    "agenda": true,
+    "times": true
+  },
+  {
+    "codigo": "tetris",
+    "nome": "Tetris",
+    "agenda": true,
+    "times": true
+  },
+  {
+    "codigo": "tft",
+    "nome": "Teamfight Tactics",
+    "agenda": true,
+    "times": true
+  },
+  {
+    "codigo": "thefinals",
+    "nome": "The Finals",
+    "agenda": true,
+    "times": true
+  },
+  {
+    "codigo": "trackmania",
+    "nome": "TrackMania",
+    "agenda": true,
+    "times": true
+  },
+  {
+    "codigo": "underlords",
+    "nome": "Dota Underlords",
+    "agenda": true,
+    "times": true
+  },
+  {
+    "codigo": "valorant",
+    "nome": "VALORANT",
+    "agenda": true,
+    "times": true
+  },
+  {
+    "codigo": "warcraft",
+    "nome": "Warcraft",
+    "agenda": true,
+    "times": true
+  },
+  {
+    "codigo": "warthunder",
+    "nome": "War Thunder",
+    "agenda": true,
+    "times": true
+  },
+  {
+    "codigo": "wildcard",
+    "nome": "Wildcard",
+    "agenda": true,
+    "times": false
+  },
+  {
+    "codigo": "wildrift",
+    "nome": "Wild Rift",
+    "agenda": true,
+    "times": true
+  },
+  {
+    "codigo": "worldoftanks",
+    "nome": "World of Tanks",
+    "agenda": true,
+    "times": true
+  },
+  {
+    "codigo": "worldofwarcraft",
+    "nome": "World of Warcraft",
+    "agenda": true,
+    "times": true
+  },
+  {
+    "codigo": "zula",
+    "nome": "Zula",
+    "agenda": true,
+    "times": true
+  }
+]

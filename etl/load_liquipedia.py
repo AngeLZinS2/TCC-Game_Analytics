@@ -41,6 +41,8 @@ from etl.transform_liquipedia import ResultadoAgenda
 logger = logging.getLogger(__name__)
 
 #: O jogo a que a agenda pertence. A pagina coletada e a wiki de Dota 2.
+#: O jogo padrao. Cada coleta informa o seu; este e so o valor historico,
+#: de quando o projeto era so Dota 2.
 JOGO = "dota2"
 
 #: Sufixos de organizacao que aparecem num lado e nao no outro. So entram na
@@ -142,18 +144,24 @@ def _resolver(nome: str, mapa: dict[str, int]) -> int | None:
     return None
 
 
-def carregar(resultado: ResultadoAgenda) -> int:
-    """Persiste a agenda, resolvendo as equipes contra a dimensao."""
+def carregar(resultado: ResultadoAgenda, jogo: str = JOGO) -> int:
+    """Persiste a agenda, resolvendo as equipes contra a dimensao.
+
+    `jogo` e o codigo da wiki de onde a agenda veio. As equipes sao
+    resolvidas SO dentro dele: `Fnatic` existe em counterstrike, valorant e
+    leagueoflegends como organizacoes diferentes para efeito de historico,
+    e cruzar as tres daria a um confronto de CS o retrospecto do time de LoL.
+    """
     if not resultado.partidas:
         return 0
 
     agora = datetime.now(timezone.utc)
 
     with session_scope() as sessao:
-        id_jogo = sessao.scalar(select(DimJogo.id_jogo).where(DimJogo.codigo == JOGO))
+        id_jogo = sessao.scalar(select(DimJogo.id_jogo).where(DimJogo.codigo == jogo))
         if id_jogo is None:
             raise RuntimeError(
-                f"jogo {JOGO!r} ausente em dim_jogo - rode `cli.py init-db`"
+                f"jogo {jogo!r} ausente em dim_jogo - rode `cli.py seed-jogos`"
             )
 
         mapa = _mapa_de_equipes(sessao, id_jogo)

@@ -855,6 +855,109 @@ devolve lista vazia. Resolver isso exige um mapeamento de nomes que é exatament
 casamento difuso que este projeto recusa em outros lugares. Fica registrado como próximo
 passo, não como algo meio-feito.
 
+### Fase 12 — As 73 wikis da Liquipedia
+
+A Liquipedia mantém uma wiki por jogo, cada uma com a sua API MediaWiki. O projeto usava
+uma: `dota2`. Esta fase abre as outras.
+
+#### O registro saiu de uma varredura, não de uma lista
+
+Cada wiki foi perguntada sobre as duas coisas que o nosso pipeline consome — se
+`Liquipedia:Matches` existe e se `Category:Teams` tem membros — numa requisição por wiki.
+O resultado está em `collectors/seeds/liquipedia_wikis.json`:
+
+| situação | quantas | exemplos |
+|---|---|---|
+| agenda **e** times | 64 | dota2, counterstrike, valorant, leagueoflegends |
+| só times | 7 | fighters, starcraft2, smash, starcraft, fortnite, formula1, brawlhalla |
+| só agenda | 2 | sideswipe, wildcard |
+| nenhum dos dois | 1 | illuvium — fica de fora |
+
+Os sete "só times" têm uma explicação comum: são **competições individuais**. Em Smash,
+StarCraft, Fighting Games e Formula 1 quem se enfrenta é pessoa, não equipe, e a wiki
+organiza o calendário de outro jeito. A ausência da página não é falha da varredura — é o
+formato do esporte aparecendo no esquema. Há um teste que falha se algum deles passar a ter
+agenda, avisando que o registro precisa ser regerado.
+
+Ficam de fora `commons`, `hub`, `lab`, `esports` e `dota2gamearchive`: são wikis meta,
+internas ou de arquivo. Entrariam em `dim_jogo` e apareceriam num seletor de jogos
+prometendo uma tela que nunca teria dado.
+
+```powershell
+.\.venv\Scripts\python.exe cli.py seed-jogos                              # 73 linhas em dim_jogo
+.\.venv\Scripts\python.exe cli.py collect liquipedia --wiki counterstrike
+.\.venv\Scripts\python.exe cli.py collect liquipedia-times --wiki valorant
+```
+
+#### A armadilha que quase passou: `teamid` só existe no Dota
+
+A [Fase 11](#fase-11--equipes-pela-api-mediawiki-da-liquipedia) ligou equipe e partida pelo
+`|teamid=` do infobox, que é o mesmo número que a OpenDota publica. Ao abrir as outras
+wikis, medi o mesmo infobox em counterstrike, valorant, leagueoflegends e rocketleague:
+
+```
+counterstrike:  100 Thieves   campos: name, region, location, created, disbanded
+valorant:       100 Thieves   campos: name, region, location
+```
+
+**Não há `teamid` fora do Dota.** O parser da Fase 11 exigia esse campo, então teria
+descartado 100% das equipes das outras 70 wikis — e **em silêncio**: o coletor reportaria
+"0 equipes" e nada pareceria quebrado.
+
+A identidade passou a ter duas formas, decididas pela fonte:
+
+- **com `teamid`** (Dota 2): o número, que mantém o vínculo com as partidas da OpenDota;
+- **sem `teamid`** (as outras 70): o **título da página**, que a MediaWiki garante único por
+  wiki e é para onde os links da agenda apontam.
+
+Não é improviso — é usar o identificador que cada fonte de fato publica. Improviso seria
+inventar um id nosso e perder o vínculo com o link. A migration `0008` alargou
+`dim_equipe.id_externo` de 32 para 200 caracteres, porque título de página não cabe em 32,
+e `dim_jogo.codigo` de 16 para 32 (`leagueoflegends` tem 15 — passava raspando).
+
+#### Resultado medido
+
+| jogo | equipes | agenda | confrontos com as duas equipes |
+|---|---|---|---|
+| dota2 | 675 | 90 | 52 (58%) |
+| counterstrike | **1.409** | 54 | **44 (81%)** |
+| valorant | 0 | 72 | 0 |
+
+O Counter-Strike casa melhor que o Dota, e o motivo é instrutivo: a dimensão dele veio
+inteira da mesma fonte que a agenda, então os nomes coincidem. No Dota a dimensão é mistura
+de OpenDota e Liquipedia, e a diferença de grafia entre as duas cobra o seu preço.
+
+#### O que 73 jogos **não** significa
+
+`dim_jogo` tem 73 linhas, mas **só o Dota 2 tem partidas**. A coleta de resultados vem da
+OpenDota, que é específica de Dota — as outras 72 wikis entram com agenda e equipes, não
+com histórico. As telas de Partidas, Heróis e Jogadores continuam vazias para elas, e isso
+é o estado correto, não um bug.
+
+Por isso `GET /api/partidas/jogos` ganhou `apenas_com_dados`, ligado por padrão: devolver as
+73 faria a barra do topo renderizar 73 chips, a maioria levando a telas vazias — o seletor
+viraria uma lista de promessas. O endpoint também passou a devolver `equipes` e `agenda`
+junto de `partidas`, porque um jogo com 1.409 equipes e 54 confrontos agendados não está
+vazio; está esperando outra fonte.
+
+#### Custo e cortesia com a fonte
+
+| varredura | chamadas | tempo |
+|---|---|---|
+| agenda de todas as wikis | 66 (uma por wiki) | ~3,5 min |
+| equipes de **uma** wiki | 3 a 30 (lotes de 50 títulos) | 67 s (dota2, 962) a 97 s (counterstrike, 1.410) |
+| equipes das 71 | ~2.000 | passaria de 1h30 |
+
+A última linha é o motivo de o agendador fazer **rodízio** nas equipes em vez de varredura
+completa: `AGENDADOR_EQUIPES_POR_RODADA` (padrão 10) pega as próximas N a cada rodada
+diária e volta ao início. Uma varredura completa leva cerca de uma semana — rápido para um
+dado que muda em meses, e educado com um serviço público e gratuito. A agenda, por ser uma
+chamada por wiki, é varrida inteira a cada rodada.
+
+Uma wiki fora do ar não derruba a varredura: cada uma roda dentro do seu `try`, e o
+resultado agregado é sucesso se **alguma** respondeu. Exigir todas faria uma wiki dormente
+reagendar a varredura inteira para cinco minutos depois.
+
 ### Fase 3 — Riot API (LoL)
 
 Próxima fase. O star schema já tem o discriminador (`dim_jogo.codigo`), as rotas de partidas
@@ -951,7 +1054,7 @@ gaming-analytics/
 ├── collectors/          # um módulo por fonte, interface comum em base.py
 │   ├── base.py          # BaseCollector, RawRecord, CollectionResult
 │   ├── http_client.py   # rate limiting + backoff exponencial
-│   ├── seeds/           # listas semente de coleta
+│   ├── seeds/           # semente da Steam e o registro das 73 wikis da Liquipedia
 │   ├── steam_collector.py
 │   ├── steam_loja.py    # consulta pontual a loja, sem gravar nada
 │   └── liquipedia_wiki_collector.py
@@ -977,7 +1080,7 @@ gaming-analytics/
 ├── ml/                  # sentimento (Fase 7), confronto (Fase 9), assistente (Fase 8)
 ├── tests/
 ├── agendador.py         # laço de ingestão periódica (serviço do compose)
-├── cli.py               # init-db, collect, stats, train-sentimento, train-confronto
+├── cli.py               # init-db, seed-jogos, collect, stats, train-sentimento, train-confronto
 └── docker-compose.yml
 ```
 
@@ -996,5 +1099,6 @@ Todas as variáveis estão documentadas em `.env.example`. As mais relevantes:
 | `AGENDADOR_OPENDOTA_MINUTOS` | `360` | intervalo da coleta automática de partidas |
 | `AGENDADOR_LIQUIPEDIA_MINUTOS` | `720` | intervalo da leitura da agenda futura |
 | `AGENDADOR_EQUIPES_MINUTOS` | `1440` | intervalo da leitura das páginas de equipe da wiki |
+| `AGENDADOR_EQUIPES_POR_RODADA` | `10` | quantas wikis por rodada (as 71 juntas passariam de 1h30) |
 | `DASHBOARD_PORT` | `3000` | porta publicada pelo dashboard no compose |
 | `RIOT_API_KEY` | — | Fase 3 (LoL) |

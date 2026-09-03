@@ -27,6 +27,8 @@ from api.schemas import (
     FiltrosDisponiveis,
 )
 from db.models import (
+    AgendaPartida,
+    DimEquipe,
     DimJogador,
     DimJogo,
     DimPartida,
@@ -68,21 +70,61 @@ def _media(valor) -> float | None:
 
 
 @router.get("/jogos", response_model=list[JogoDisponivel])
-def listar_jogos(sessao: Session = Depends(get_db)) -> list[JogoDisponivel]:
-    """Jogos cadastrados e quantas partidas cada um ja tem coletadas."""
+def listar_jogos(
+    sessao: Session = Depends(get_db),
+    apenas_com_dados: bool = True,
+) -> list[JogoDisponivel]:
+    """Jogos cadastrados e quanto ja foi coletado de cada um.
+
+    **O filtro e ligado por padrao, e isso e uma decisao de tela.** Depois que
+    as 73 wikis da Liquipedia entraram, `dim_jogo` tem 74 linhas. Devolver todas
+    faria a barra do topo renderizar 74 chips, a maioria levando a telas vazias
+    - o seletor viraria uma lista de promessas em vez de um seletor.
+
+    `apenas_com_dados=false` devolve o cadastro inteiro, que e o que uma tela de
+    administracao ou o assistente precisam saber.
+    """
+    equipes = (
+        select(DimEquipe.id_jogo, func.count().label("equipes"))
+        .group_by(DimEquipe.id_jogo)
+        .subquery()
+    )
+    agenda = (
+        select(AgendaPartida.id_jogo, func.count().label("agenda"))
+        .group_by(AgendaPartida.id_jogo)
+        .subquery()
+    )
+
     consulta = (
         select(
             DimJogo.codigo,
             DimJogo.nome,
             func.count(DimPartida.id_partida).label("partidas"),
+            func.coalesce(equipes.c.equipes, 0).label("equipes"),
+            func.coalesce(agenda.c.agenda, 0).label("agenda"),
         )
         .outerjoin(DimPartida, DimPartida.id_jogo == DimJogo.id_jogo)
-        .group_by(DimJogo.codigo, DimJogo.nome)
-        .order_by(desc("partidas"))
+        .outerjoin(equipes, equipes.c.id_jogo == DimJogo.id_jogo)
+        .outerjoin(agenda, agenda.c.id_jogo == DimJogo.id_jogo)
+        .group_by(
+            DimJogo.codigo, DimJogo.nome, equipes.c.equipes, agenda.c.agenda
+        )
+        .order_by(desc("partidas"), desc("agenda"), desc("equipes"), DimJogo.nome)
     )
+
+    linhas = list(sessao.execute(consulta))
+    if apenas_com_dados:
+        linhas = [l for l in linhas if l.partidas or l.equipes or l.agenda]
+
     return [
-        JogoDisponivel(codigo=linha.codigo, nome=linha.nome, partidas=linha.partidas)
-        for linha in sessao.execute(consulta)
+        JogoDisponivel(
+            codigo=linha.codigo,
+            nome=linha.nome,
+            partidas=linha.partidas,
+            equipes=linha.equipes,
+            agenda=linha.agenda,
+        )
+        for linha in linhas
     ]
 
 

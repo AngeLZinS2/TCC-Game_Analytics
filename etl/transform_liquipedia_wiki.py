@@ -10,9 +10,24 @@ no tema e leva o parser junto.
 
 **O que isto resolve.** A agenda chega com nome de exibicao, e casar nome com
 nome e frageil - foi por isso que `load_liquipedia.py` recusa casamento difuso.
-O infobox traz `|teamid=`, que e o MESMO identificador que a OpenDota usa em
-`radiant_team.team_id`. Com ele o vinculo deixa de ser semelhanca de texto e
-vira igualdade de inteiro.
+Na wiki de Dota 2 o infobox traz `|teamid=`, que e o MESMO identificador que a
+OpenDota usa em `radiant_team.team_id`. Com ele o vinculo deixa de ser
+semelhanca de texto e vira igualdade de inteiro.
+
+**Mas `teamid` so existe no Dota.** Foi medido: em counterstrike, valorant,
+leagueoflegends e rocketleague o `{{Infobox team}}` traz `name`, `region`,
+`location`, `created` e `disbanded`, e nada mais. Exigir `teamid` faria o parser
+descartar 100% das equipes das outras 70 wikis **em silencio** - o coletor
+diria "0 equipes" e nada pareceria quebrado.
+
+Entao a identidade tem duas formas, e a fonte decide qual:
+
+* **Com `teamid`** (Dota 2): o numero, que liga com as partidas da OpenDota.
+* **Sem `teamid`** (todas as outras): o TITULO DA PAGINA, que a MediaWiki
+  garante unico por wiki e que e para onde os links da agenda apontam.
+
+Nao e improviso: e usar o identificador que cada fonte de fato publica. O que
+seria improviso e inventar um id numerico nosso e perder o vinculo com o link.
 
 **Sobre a extracao ser um parser e nao um regex.** A primeira tentativa foi
 `\\|\\s*disbanded\\s*=\\s*([^\\n|]*)`, e ela devolveu `}}` para uma equipe ativa:
@@ -69,9 +84,9 @@ class EquipeWiki(BaseModel):
 
     pagina: str
     nome: str
-    #: O `teamid` do infobox. E a chave do vinculo com a OpenDota, e por isso
-    #: uma equipe sem ele nao serve ao proposito deste modulo.
-    id_externo: int
+    #: A identidade na fonte: o `teamid` quando a wiki publica um (Dota 2), o
+    #: titulo da pagina quando nao publica. Ver o cabecalho do modulo.
+    id_externo: str
     regiao: str | None = None
     pais: str | None = None
     ativa: bool = True
@@ -188,23 +203,23 @@ def _data(valor: str) -> date | None:
 
 
 def parse_equipe(pagina: str, wikitexto: str) -> EquipeWiki | None:
-    """Uma pagina de equipe -> `EquipeWiki`, ou `None` se ela nao serve.
+    """Uma pagina de equipe -> `EquipeWiki`, ou `None` se nao ha infobox.
 
-    Descarta quem nao tem `teamid`: sem ele nao ha vinculo com as partidas, e
-    uma linha so com nome e regiao nao responde nenhuma pergunta do projeto.
+    A identidade sai do `teamid` quando a wiki publica um, e do titulo da pagina
+    quando nao publica - ver o cabecalho do modulo. So a ausencia do proprio
+    `{{Infobox team}}` descarta a pagina, porque ai nao ha o que ler.
     """
     campos = campos_do_template(wikitexto, "Infobox team")
     if not campos:
         return None
 
     bruto_id = _limpar(campos.get("teamid", ""))
-    if not bruto_id.isdigit():
-        return None
+    identidade = bruto_id if bruto_id.isdigit() else pagina
 
     return EquipeWiki(
         pagina=pagina,
         nome=_limpar(campos.get("name", "")) or pagina,
-        id_externo=int(bruto_id),
+        id_externo=identidade,
         regiao=_regiao(campos.get("region", "")),
         pais=_limpar(campos.get("location", "")) or None,
         # Campo vazio = em atividade. E a convencao da propria wiki.
@@ -228,7 +243,7 @@ def transformar(payload: object) -> ResultadoEquipes:
         return ResultadoEquipes()
 
     equipes: list[EquipeWiki] = []
-    vistos: set[int] = set()
+    vistos: set[str] = set()
 
     for pagina in paginas.values():
         if not isinstance(pagina, dict):

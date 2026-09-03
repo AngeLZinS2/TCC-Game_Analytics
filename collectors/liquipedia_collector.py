@@ -88,7 +88,10 @@ class LiquipediaCollector(BaseCollector[ResultadoAgenda]):
         return [
             RawRecord(
                 fonte=self.fonte,
-                endpoint=ENDPOINT_AGENDA,
+                # A wiki entra no endpoint: sem isso os payloads de todas
+                # elas cairiam no mesmo caminho de `data/raw/` e o ultimo
+                # sobrescreveria os outros.
+                endpoint=f"{ENDPOINT_AGENDA}/{self.wiki}",
                 identificador=self.wiki,
                 payload=payload,
             )
@@ -101,13 +104,15 @@ class LiquipediaCollector(BaseCollector[ResultadoAgenda]):
             # payload (`matches` e `equipes`), e `ler_ultima_coleta` devolve os
             # dois juntos. Sem isto, `--from-raw liquipedia` entregaria o
             # wikitexto das equipes a este parser de HTML.
-            if registro.fonte != self.fonte or registro.endpoint != ENDPOINT_AGENDA:
+            if registro.fonte != self.fonte or not registro.endpoint.startswith(
+                ENDPOINT_AGENDA
+            ):
                 continue
             agenda.partidas.extend(transformar(registro.payload).partidas)
         return agenda
 
     def load(self, dados: ResultadoAgenda) -> int:
-        return carregar(dados)
+        return carregar(dados, jogo=self.wiki)
 
     def close(self) -> None:
         self.client.close()

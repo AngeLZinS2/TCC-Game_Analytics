@@ -158,7 +158,7 @@ class LiquipediaWikiCollector(BaseCollector[ResultadoEquipes]):
             registros.append(
                 RawRecord(
                     fonte=self.fonte,
-                    endpoint=ENDPOINT_EQUIPES,
+                    endpoint=f"{ENDPOINT_EQUIPES}/{self.wiki}",
                     identificador=f"lote-{numero:03d}",
                     payload=dados,
                 )
@@ -173,7 +173,9 @@ class LiquipediaWikiCollector(BaseCollector[ResultadoEquipes]):
         for registro in registros:
             # Ver o comentario gemeo em `liquipedia_collector.py`: a fonte e a
             # mesma, o endpoint e que separa agenda de equipes.
-            if registro.fonte != self.fonte or registro.endpoint != ENDPOINT_EQUIPES:
+            if registro.fonte != self.fonte or not registro.endpoint.startswith(
+                ENDPOINT_EQUIPES
+            ):
                 continue
             for equipe in transformar(registro.payload).equipes:
                 if equipe.id_externo in vistos:
@@ -184,7 +186,7 @@ class LiquipediaWikiCollector(BaseCollector[ResultadoEquipes]):
         return ResultadoEquipes(equipes=equipes)
 
     def load(self, resultado: ResultadoEquipes) -> int:
-        return carregar(resultado)
+        return carregar(resultado, jogo=self.wiki)
 
     def close(self) -> None:
         self.client.close()

@@ -9,7 +9,9 @@ escolhidas por serem as primeiras: cada uma cobre um caso que ja quebrou algo.
   `{{Team|...}}` aninhado dentro de um parametro, com `|` dentro.
 * **1st.VN** - dissolvida com data PARCIAL (`2014-??-??`).
 * **2Be Continued Esports** - dissolvida com data completa.
-* **Absolute Legends** - sem `teamid`, e por isso nao serve ao projeto.
+* **Absolute Legends** - sem `teamid`. Depois que o projeto passou a cobrir
+  as 73 wikis, ela deixou de ser descarte e virou o caso normal: identidade
+  pelo titulo da pagina.
 
 Se a Liquipedia mudar o nome de um campo do infobox, estes testes falham antes
 de a dimensao ficar com regiao nula em silencio.
@@ -72,9 +74,9 @@ def test_template_ausente_devolve_vazio():
 def test_equipe_ativa_vem_com_teamid_e_regiao(equipes):
     spirit = equipes["Team Spirit"]
 
-    # O teamid e o motivo de tudo isto existir: e o mesmo numero que a
-    # OpenDota publica, e o que permite ligar sem casar nome com nome.
-    assert spirit.id_externo == 7119388
+    # Na wiki de Dota 2 a identidade e o teamid: o mesmo numero que a OpenDota
+    # publica, e o que permite ligar sem casar nome com nome.
+    assert spirit.id_externo == "7119388"
     assert spirit.ativa is True
     assert spirit.regiao == "CIS"
     assert spirit.pagina == "Team Spirit"
@@ -117,14 +119,32 @@ def test_disbanded_preenchido_marca_inativa(equipes):
     assert inativas, "a fixture tem equipes dissolvidas"
 
 
-def test_equipe_sem_teamid_e_descartada(payload):
-    """Sem `teamid` nao ha vinculo com as partidas.
+def test_sem_teamid_a_identidade_e_a_pagina():
+    """Fora do Dota o infobox nao tem `teamid`, e isso nao pode descartar tudo.
 
-    Uma linha so com nome e regiao nao responde nenhuma pergunta do projeto, e
-    ainda competiria no casamento por nome com a equipe certa.
+    Foi medido: em counterstrike, valorant, leagueoflegends e rocketleague o
+    `{{Infobox team}}` traz `name`, `region`, `location`, `created` e
+    `disbanded`, e nada mais. A versao anterior deste parser exigia `teamid` e
+    teria descartado 100% das equipes dessas 70 wikis EM SILENCIO - o coletor
+    diria "0 equipes" e nada pareceria quebrado.
     """
+    texto = "{{Infobox team|name=100 Thieves|region=North America|disbanded=}}"
+    equipe = parse_equipe("100 Thieves", texto)
+
+    assert equipe is not None
+    assert equipe.id_externo == "100 Thieves"
+    assert equipe.regiao == "North America"
+
+
+def test_pagina_sem_infobox_e_descartada(payload):
+    """So a ausencia do proprio infobox descarta - ai nao ha o que ler."""
+    equipe = parse_equipe("Alguma", "#REDIRECT [[Outra]]")
+    assert equipe is None
+
+    # A fixture tem uma pagina sem `teamid`; ela agora ENTRA, identificada
+    # pelo titulo, em vez de sumir.
     nomes = {e.nome for e in transformar(payload).equipes}
-    assert "Absolute Legends" not in nomes
+    assert "Absolute Legends" in nomes
 
 
 # ----------------------------------------------------------- o transform

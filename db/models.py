@@ -205,7 +205,7 @@ class DimJogo(Base):
     __tablename__ = "dim_jogo"
 
     id_jogo: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    codigo: Mapped[str] = mapped_column(String(16), nullable=False, unique=True)
+    codigo: Mapped[str] = mapped_column(String(32), nullable=False, unique=True)
     nome: Mapped[str] = mapped_column(String(64), nullable=False)
 
 
@@ -261,8 +261,18 @@ class DimEquipe(Base):
         Integer, primary_key=True, autoincrement=True
     )
     id_jogo: Mapped[int] = mapped_column(ForeignKey("dim_jogo.id_jogo"), nullable=False)
-    #: `team_id` da fonte.
-    id_externo: Mapped[str] = mapped_column(String(32), nullable=False)
+    #: A identidade da equipe NA FONTE, e ela muda de forma por jogo.
+    #:
+    #: Em Dota 2 e o `team_id` numerico, que a OpenDota e a Liquipedia usam em
+    #: comum - foi ele que permitiu ligar as duas sem casar nome com nome. Nas
+    #: outras wikis esse campo simplesmente NAO EXISTE no infobox (medido em
+    #: counterstrike, valorant, leagueoflegends e rocketleague), e a identidade
+    #: passa a ser o titulo da pagina, que a MediaWiki garante unico por wiki.
+    #:
+    #: Semantica mista numa coluna so incomoda, mas a unicidade e por
+    #: `(id_jogo, id_externo)`: cada jogo tem UM esquema de identidade, e
+    #: nenhuma consulta compara id entre jogos diferentes.
+    id_externo: Mapped[str] = mapped_column(String(200), nullable=False)
 
     nome: Mapped[str] = mapped_column(String(120), nullable=False)
     tag: Mapped[str | None] = mapped_column(String(32))

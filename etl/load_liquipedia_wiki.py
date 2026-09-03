@@ -93,7 +93,7 @@ def carregar(resultado: ResultadoEquipes, jogo: str = "dota2") -> int:
         inseridas = atualizadas = 0
 
         for wiki in resultado.equipes:
-            chave = str(wiki.id_externo)
+            chave = wiki.id_externo
             equipe = existentes.get(chave)
 
             if equipe is None:

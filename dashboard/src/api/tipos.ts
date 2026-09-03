@@ -82,6 +82,15 @@ export interface JogoDisponivel {
   codigo: string;
   nome: string;
   partidas: number;
+  /**
+   * Equipes e confrontos agendados do jogo.
+   *
+   * Existem porque, com 73 jogos cadastrados, "partidas" sozinho diria que o
+   * projeto cobre um. Um jogo com 1.409 equipes e 54 confrontos na agenda nao
+   * esta vazio - esta esperando a coleta de partidas, que vem de outra fonte.
+   */
+  equipes: number;
+  agenda: number;
 }
 
 export interface ResumoPersonagem {

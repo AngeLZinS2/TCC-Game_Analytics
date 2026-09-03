@@ -106,11 +106,19 @@ class AgregadoGenero(BaseModel):
 
 
 class JogoDisponivel(BaseModel):
-    """Jogo do star schema e quanto ja foi coletado dele."""
+    """Um jogo do star schema e o quanto ja foi coletado dele.
+
+    `equipes` e `agenda` existem porque, com 74 jogos cadastrados e um so com
+    partidas, "partidas" sozinho diria que o projeto cobre um jogo. Um jogo com
+    600 equipes e 40 confrontos agendados nao esta vazio - esta esperando a
+    coleta de partidas, que e outra fonte.
+    """
 
     codigo: str
     nome: str
     partidas: int
+    equipes: int = 0
+    agenda: int = 0
 
 
 class ResumoPersonagem(BaseModel):
