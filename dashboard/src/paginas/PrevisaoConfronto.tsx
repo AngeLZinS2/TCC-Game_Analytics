@@ -30,6 +30,7 @@ import {
 import type {
   ConfrontoAgendado,
   EquipeConfronto,
+  FatorConfronto,
   LigaConfronto,
   PrevisaoConfronto as TipoPrevisao,
   RelatorioConfronto,
@@ -173,10 +174,172 @@ function LadoDoConfronto({
 }
 
 /**
+ * Badge compacto de confiabilidade, dentro do proprio modal.
+ *
+ * O paragrafo inteiro (por que supera ou nao a taxa base) ja mora na faixa do
+ * topo da pagina (`AvisoValidacao`) - repetir o texto aqui, dentro de CADA
+ * modal, cansaria quem abre confronto atras de confronto no kanban. O badge
+ * da o mesmo veredito num relance, com o numero que sustenta ele no `title`.
+ */
+function BadgeConfianca({ validacao }: { validacao: ValidacaoConfronto }) {
+  if (!validacao.suficiente) {
+    return (
+      <span className="inline-flex items-center gap-space-xs rounded-full bg-surface-container px-space-md py-space-xs font-badge-status text-badge-status uppercase tracking-widest text-outline">
+        <Icone nome="help" className="text-[14px]" />
+        Amostra curta · {validacao.avaliadas} partidas
+      </span>
+    );
+  }
+
+  const superaBase = (validacao.acuracia ?? 0) > (validacao.taxa_base ?? 0);
+  const cor = superaBase ? PALETA_POLOS.positivo : PALETA_POLOS.negativo;
+
+  return (
+    <span
+      className="inline-flex items-center gap-space-xs rounded-full px-space-md py-space-xs font-badge-status text-badge-status uppercase tracking-widest"
+      style={{ color: cor, background: `${cor}1a` }}
+      title={`ROC-AUC ${fmtDecimal(validacao.roc_auc ?? 0, 3)} sobre ${validacao.avaliadas} partidas de teste, taxa base ${fmtPercentual((validacao.taxa_base ?? 0) * 100, 0)}`}
+    >
+      <Icone nome={superaBase ? "verified" : "warning"} className="text-[14px]" />
+      {superaBase ? "Supera o chute" : "Sem poder preditivo"} ·{" "}
+      {fmtPercentual((validacao.acuracia ?? 0) * 100, 0)}
+    </span>
+  );
+}
+
+/** Icone de cada fator, por rotulo. Decoracao — nunca a unica pista do que e. */
+function iconeDoFator(rotulo: string): string {
+  if (rotulo.startsWith("Força")) return "bolt";
+  if (rotulo.startsWith("Winrate")) return "trending_up";
+  if (rotulo.startsWith("Partidas")) return "table_rows";
+  if (rotulo.startsWith("Ouro")) return "payments";
+  if (rotulo.startsWith("Experiência")) return "auto_awesome";
+  if (rotulo.startsWith("KDA")) return "swords";
+  if (rotulo.startsWith("Duração")) return "schedule";
+  return "insights";
+}
+
+/**
+ * A fracao do lado A na barra proporcional de um fator.
+ *
+ * Barra proporcional, nao gradiente fixo: a largura de cada lado e a fatia
+ * dele no total, entao a diferenca entre "588 x 452" e "9,69 x 2,13" aparece
+ * na hora. Os valores sao deslocados para nao-negativo antes da divisao
+ * porque a forca vai a numeros negativos, e uma fracao com denominador que
+ * muda de sinal nao significa nada.
+ */
+function fracaoDoFator(fator: FatorConfronto): number {
+  const a = fator.valor_a ?? 0;
+  const b = fator.valor_b ?? 0;
+  const piso = Math.min(0, a, b);
+  const total = a - piso + (b - piso);
+  return total > 0 ? (a - piso) / total : 0.5;
+}
+
+/**
+ * Um fator do "por que", como cartao de HUD — nao como linha de tabela.
+ *
+ * Os numeros sao exatamente os que a API ja mandava; o que muda e a
+ * apresentacao, para casar com o resto do desenho: cartao com brilho no
+ * canto quando o fator pesa na conta, icone, e a mesma barra proporcional de
+ * antes.
+ */
+function CartaoFator({
+  fator,
+  nomeA,
+  nomeB,
+}: {
+  fator: FatorConfronto;
+  nomeA: string;
+  nomeB: string;
+}) {
+  const indefinido = fator.valor_a === null || fator.valor_b === null;
+  const favoreceA = (fator.diferenca ?? 0) > 0;
+  const fracaoA = fracaoDoFator(fator);
+
+  return (
+    <div className="relative overflow-hidden rounded-xl bg-surface-container p-space-base">
+      {fator.peso_no_modelo && (
+        <div
+          className="pointer-events-none absolute right-0 top-0 h-20 w-20 rounded-full bg-primary-container/10 blur-2xl"
+          aria-hidden
+        />
+      )}
+
+      <div className="flex items-center justify-between gap-space-xs">
+        <span className="flex items-center gap-space-xs font-label-caps text-label-caps uppercase tracking-widest text-outline">
+          <Icone
+            nome={iconeDoFator(fator.rotulo)}
+            className={`text-[16px] ${fator.peso_no_modelo ? "text-primary" : ""}`}
+          />
+          {fator.rotulo}
+        </span>
+        {fator.peso_no_modelo && (
+          <span className="shrink-0 rounded bg-primary/10 px-space-xs py-space-xxs font-badge-status text-badge-status uppercase text-primary">
+            entra na conta
+          </span>
+        )}
+      </div>
+
+      <div className="mt-space-sm flex items-start justify-between gap-space-sm">
+        <div className="min-w-0">
+          <div
+            className="truncate font-headline-sm text-headline-sm tabular-nums"
+            style={{ color: favoreceA ? PALETA_POLOS.positivo : TOKENS.texto }}
+          >
+            {fator.valor_a ?? "—"}
+          </div>
+          <div className="truncate font-label-caps text-label-caps text-outline">{nomeA}</div>
+        </div>
+        <div className="min-w-0 text-right">
+          <div
+            className="truncate font-headline-sm text-headline-sm tabular-nums"
+            style={{
+              color:
+                !favoreceA && fator.diferenca !== null ? PALETA_POLOS.negativo : TOKENS.texto,
+            }}
+          >
+            {fator.valor_b ?? "—"}
+          </div>
+          <div className="truncate font-label-caps text-label-caps text-outline">{nomeB}</div>
+        </div>
+      </div>
+
+      {indefinido ? (
+        <div className="mt-space-sm font-body-sm text-body-sm text-outline">
+          sem dado dos dois lados
+        </div>
+      ) : (
+        <div className="mt-space-sm flex h-1.5 w-full overflow-hidden rounded-full bg-surface-container-highest">
+          <div
+            className="h-full"
+            style={{ width: `${fracaoA * 100}%`, background: PALETA_POLOS.positivo }}
+          />
+          <div className="h-full flex-1" style={{ background: PALETA_POLOS.negativo }} />
+        </div>
+      )}
+      {fator.unidade && (
+        <div className="mt-space-xxs text-right font-label-caps text-label-caps text-outline">
+          {fator.unidade}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
  * O detalhe de um confronto: placar de probabilidade e os fatores por tras.
  *
  * Montado no modal do kanban e na secao de confronto hipotetico - por isso e um
  * componente, e nao um trecho inline.
+ *
+ * O desenho segue o mesmo HUD denso das outras telas ML do projeto (faixa de
+ * motor + confianca, cartoes com brilho, barra de probabilidade grossa) —
+ * mas so com o que existe ANTES da partida: forca, winrate, medias por time,
+ * confrontos diretos. Nao ha placar de abates, torres ou curva de vantagem
+ * minuto a minuto porque essa telemetria e de partida EM ANDAMENTO, e o
+ * projeto removeu esse modelo (Fase 6) — usar os mesmos rotulos aqui venderia
+ * um dado que a tela nao tem.
  */
 function DetalheConfronto({
   previsao,
@@ -185,8 +348,21 @@ function DetalheConfronto({
   previsao: TipoPrevisao;
   jogo: string;
 }) {
+  const favoritoA = previsao.probabilidade_a >= previsao.probabilidade_b;
+  const corFavorito = favoritoA ? PALETA_POLOS.positivo : PALETA_POLOS.negativo;
+
   return (
     <div className="space-y-space-lg">
+      {/* ---------- Motor de previsao + confianca ---------- */}
+      <div className="flex flex-wrap items-center justify-between gap-space-sm rounded-lg border border-outline-variant/30 bg-surface-container-lowest px-space-lg py-space-sm">
+        <span className="flex items-center gap-space-xs font-title-code text-title-code uppercase tracking-widest text-on-surface-variant">
+          <Icone nome="psychology" className="text-[16px] text-primary" />
+          Motor de previsão
+          <span className="text-outline">· Bradley-Terry regularizado</span>
+        </span>
+        <BadgeConfianca validacao={previsao.validacao} />
+      </div>
+
       <div className="space-y-space-lg rounded-lg bg-surface-container-lowest p-space-lg">
         <div className="flex flex-col items-center gap-space-lg sm:flex-row">
           <LadoDoConfronto
@@ -201,6 +377,26 @@ function DetalheConfronto({
             probabilidade={previsao.probabilidade_b}
             cor={PALETA_POLOS.negativo}
             rotuloLado={rotuloDoLado(jogo, "b")}
+          />
+        </div>
+
+        {/* Barra de probabilidade em destaque - o "placar" desta tela. */}
+        <div
+          className="flex h-3 w-full overflow-hidden rounded-full bg-surface-container-highest"
+          style={{ boxShadow: `0 0 18px ${corFavorito}4d` }}
+        >
+          <div
+            className="h-full transition-all"
+            style={{
+              width: `${previsao.probabilidade_a * 100}%`,
+              background: `linear-gradient(90deg, ${PALETA_POLOS.positivo}99, ${PALETA_POLOS.positivo})`,
+            }}
+          />
+          <div
+            className="h-full flex-1 transition-all"
+            style={{
+              background: `linear-gradient(90deg, ${PALETA_POLOS.negativo}, ${PALETA_POLOS.negativo}99)`,
+            }}
           />
         </div>
 
@@ -225,99 +421,33 @@ function DetalheConfronto({
         />
       </div>
 
-      {/* ---------- Por que ---------- */}
+      {/* ---------- Estatisticas pre-partida ---------- */}
       <div>
         <h3 className="flex items-center gap-space-xs font-headline-sm text-headline-sm uppercase tracking-wide text-on-surface">
           <Icone nome="balance" className="text-[20px] text-primary" />
-          Por que essa chance
+          Estatísticas pré-partida
         </h3>
         <p className="mt-space-xxs font-body-sm text-body-sm text-outline">
           Só a força entra na conta da probabilidade. O resto é o contexto que explica de
           onde ela veio.
         </p>
 
-        <div className="mt-space-md space-y-space-sm">
-          {previsao.fatores.map((fator) => {
-            /*
-             * Barra proporcional, nao gradiente fixo: a largura de cada lado e
-             * a fatia dele no total, entao a diferenca entre "588 x 452" e
-             * "9,69 x 2,13" aparece na hora. Os valores sao deslocados para
-             * nao-negativo antes da divisao porque a forca vai a numeros
-             * negativos, e uma fracao com denominador que muda de sinal nao
-             * significa nada.
-             */
-            const a = fator.valor_a ?? 0;
-            const b = fator.valor_b ?? 0;
-            const piso = Math.min(0, a, b);
-            const total = a - piso + (b - piso);
-            const fracaoA = total > 0 ? (a - piso) / total : 0.5;
-
-            const indefinido = fator.valor_a === null || fator.valor_b === null;
-            const favoreceA = (fator.diferenca ?? 0) > 0;
-
-            return (
-              <div
-                key={fator.rotulo}
-                className="flex items-center gap-space-sm rounded bg-surface-container px-space-md py-space-sm"
-              >
-                <span
-                  className="w-24 shrink-0 text-right font-title-code text-title-code tabular-nums"
-                  style={{ color: favoreceA ? PALETA_POLOS.positivo : TOKENS.textoSuave }}
-                >
-                  {fator.valor_a ?? "—"}
-                </span>
-
-                <div className="flex flex-1 flex-col items-center gap-space-xxs">
-                  <span className="flex items-center gap-space-xs font-label-caps text-label-caps uppercase tracking-widest text-outline">
-                    {fator.peso_no_modelo && (
-                      <Icone nome="functions" className="text-[14px] text-primary" />
-                    )}
-                    {fator.rotulo}
-                    {fator.unidade && ` (${fator.unidade})`}
-                  </span>
-
-                  {indefinido ? (
-                    <span className="font-body-sm text-body-sm text-outline">
-                      sem dado dos dois lados
-                    </span>
-                  ) : (
-                    <div className="flex h-1.5 w-full overflow-hidden rounded-full bg-surface-container-highest">
-                      <div
-                        className="h-full"
-                        style={{
-                          width: `${fracaoA * 100}%`,
-                          background: PALETA_POLOS.positivo,
-                        }}
-                      />
-                      <div
-                        className="h-full flex-1"
-                        style={{ background: PALETA_POLOS.negativo }}
-                      />
-                    </div>
-                  )}
-                </div>
-
-                <span
-                  className="w-24 shrink-0 font-title-code text-title-code tabular-nums"
-                  style={{
-                    color:
-                      !favoreceA && fator.diferenca !== null
-                        ? PALETA_POLOS.negativo
-                        : TOKENS.textoSuave,
-                  }}
-                >
-                  {fator.valor_b ?? "—"}
-                </span>
-              </div>
-            );
-          })}
+        <div className="mt-space-md grid grid-cols-1 gap-space-sm sm:grid-cols-2 lg:grid-cols-3">
+          {previsao.fatores.map((fator) => (
+            <CartaoFator
+              key={fator.rotulo}
+              fator={fator}
+              nomeA={previsao.equipe_a.nome}
+              nomeB={previsao.equipe_b.nome}
+            />
+          ))}
         </div>
 
         <p className="mt-space-md font-body-sm text-body-sm text-outline">
-          <Icone nome="functions" className="text-[14px] text-primary" /> marca o único
-          fator que entra na conta. Winrate, GPM e KDA descrevem os times, mas não são
-          somados à probabilidade — eles já estão embutidos na força, que foi estimada a
-          partir de quem venceu quem.
+          <Icone nome="bolt" className="text-[14px] text-primary" /> marca o único fator
+          que entra na conta. Winrate, GPM e KDA descrevem os times, mas não são somados à
+          probabilidade — eles já estão embutidos na força, que foi estimada a partir de
+          quem venceu quem.
         </p>
       </div>
 
