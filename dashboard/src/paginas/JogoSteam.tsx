@@ -64,7 +64,7 @@ export function JogoSteamPagina() {
   return (
     <Consulta estado={detalhe} altura={320}>
       {(dados: DetalheJogoSteam) => {
-        const { jogo } = dados;
+        const { jogo, ficha } = dados;
         const classificacao = classificacaoSteam(jogo.classificacao_steam);
 
         const pontos = serieRecortada.map((ponto: PontoSerie) => ({
@@ -95,6 +95,7 @@ export function JogoSteamPagina() {
                   <CapaJogo
                     appId={jogo.app_id}
                     nome={jogo.nome}
+                    imagemUrl={ficha.imagem_header}
                     className="h-20 w-20 rounded-lg"
                   />
 
@@ -922,9 +923,7 @@ function OndeComprar({
         <p className="rounded-lg bg-surface-container-lowest px-space-base py-space-md font-body-md text-body-sm text-outline">
           {menor
             ? "Nenhuma loja com oferta agora."
-            : "Sem dado coletado ainda — configure a "}
-          {!menor && <code>ITAD_API_KEY</code>}
-          {!menor && " (grátis, em isthereanydeal.com/apps/my) ou aguarde o coletor de preço."}
+            : "Este jogo ainda não passou pelo coletor de preço (IsThereAnyDeal) — a próxima rodada periódica traz o comparativo."}
         </p>
         {menor && (
           <p className="mt-space-sm font-body-md text-body-sm text-on-surface-variant">
