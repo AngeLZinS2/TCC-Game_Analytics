@@ -108,10 +108,32 @@ export interface NoticiaSteam {
   resumo: string | null;
 }
 
+export interface OfertaLoja {
+  loja: string;
+  preco: Decimal;
+  preco_normal: Decimal | null;
+  desconto: number | null;
+  moeda: string | null;
+  url: string | null;
+  drm: string | null;
+  /** `true` na loja mais barata. */
+  melhor: boolean;
+}
+
+export interface MenorPrecoHistorico {
+  preco: Decimal;
+  loja: string | null;
+  moeda: string | null;
+  data: string | null;
+}
+
 export interface DetalheJogoSteam {
   jogo: JogoSteam;
   ficha: FichaJogoSteam;
   noticias: NoticiaSteam[];
+  /** Ofertas em outras lojas, da mais barata para a mais cara. */
+  ofertas: OfertaLoja[];
+  menor_preco_historico: MenorPrecoHistorico | null;
   serie: PontoSerie[];
 }
 

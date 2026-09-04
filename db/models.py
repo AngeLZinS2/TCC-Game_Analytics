@@ -147,6 +147,20 @@ class DimJogoSteam(Base):
     coletado_ficha_em: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True)
     )
+
+    # --- Comparacao de preco (Fase 17, IsThereAnyDeal) ------------------
+    #: UUID do jogo no ITAD, achado uma vez por Steam appid e cacheado.
+    #: `""` (string vazia) = ja procurado e NAO existe no ITAD - o marcador
+    #: que evita repetir a busca a cada rodada.
+    itad_id: Mapped[str | None] = mapped_column(String(40))
+    #: O menor preco que o jogo JA teve em qualquer loja acompanhada - o
+    #: numero que responde "compro agora ou espero a proxima promo?".
+    menor_preco_historico: Mapped[Decimal | None] = mapped_column(Numeric(10, 2))
+    menor_preco_historico_loja: Mapped[str | None] = mapped_column(String(60))
+    menor_preco_historico_moeda: Mapped[str | None] = mapped_column(String(8))
+    menor_preco_historico_em: Mapped[date | None] = mapped_column(Date)
+    coletado_preco_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
     criado_em: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -158,6 +172,9 @@ class DimJogoSteam(Base):
         back_populates="jogo", cascade="all, delete-orphan"
     )
     noticias: Mapped[list["NoticiaJogoSteam"]] = relationship(
+        back_populates="jogo", cascade="all, delete-orphan"
+    )
+    ofertas: Mapped[list["OfertaJogoSteam"]] = relationship(
         back_populates="jogo", cascade="all, delete-orphan"
     )
 
@@ -196,6 +213,45 @@ class NoticiaJogoSteam(Base):
     __table_args__ = (
         UniqueConstraint("app_id", "gid", name="uq_noticia_app_gid"),
         Index("ix_noticia_app_data", "app_id", "publicado_em"),
+    )
+
+
+class OfertaJogoSteam(Base):
+    """Preco atual de um jogo numa loja, via IsThereAnyDeal (Fase 17).
+
+    Uma linha por (jogo, loja): o preco que AQUELA loja pede agora, o preco
+    cheio e o desconto. A tela ordena por preco e marca a mais barata - e
+    responde "esta mais barato fora da Steam?".
+
+    `menor_preco_historico` do jogo mora em `dim_jogo_steam`, nao aqui: e um
+    numero por jogo, nao por loja.
+    """
+
+    __tablename__ = "oferta_jogo_steam"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    app_id: Mapped[int] = mapped_column(
+        ForeignKey("dim_jogo_steam.app_id", ondelete="CASCADE"), nullable=False
+    )
+    loja_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    loja: Mapped[str] = mapped_column(String(60), nullable=False)
+    preco: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
+    #: Preco cheio (sem desconto). Igual a `preco` quando nao ha promo.
+    preco_normal: Mapped[Decimal | None] = mapped_column(Numeric(10, 2))
+    desconto: Mapped[int | None] = mapped_column(Integer)
+    moeda: Mapped[str | None] = mapped_column(String(8))
+    url: Mapped[str | None] = mapped_column(Text)
+    #: "Steam", "GOG", "DRM-free"... o que a loja entrega. Ajuda a nao
+    #: comparar chave de Steam com copia DRM-free como se fossem a mesma coisa.
+    drm: Mapped[str | None] = mapped_column(String(120))
+    coletado_em: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+
+    jogo: Mapped["DimJogoSteam"] = relationship(back_populates="ofertas")
+
+    __table_args__ = (
+        UniqueConstraint("app_id", "loja_id", name="uq_oferta_app_loja"),
     )
 
 

@@ -14,7 +14,9 @@ import { useJogoSteam } from "../api/consultas";
 import type {
   DetalheJogoSteam,
   FichaJogoSteam,
+  MenorPrecoHistorico,
   NoticiaSteam,
+  OfertaLoja,
   PontoSerie,
 } from "../api/tipos";
 import { Botao, Consulta, Icone, Selo } from "../componentes/base";
@@ -220,6 +222,13 @@ export function JogoSteamPagina() {
                 acento="primaria"
               />
             </section>
+
+            {/* ==================== ONDE COMPRAR ==================== */}
+            <OndeComprar
+              ofertas={dados.ofertas}
+              menor={dados.menor_preco_historico}
+              gratuito={jogo.gratuito}
+            />
 
             {/* ==================== FICHA ==================== */}
             <FichaDoJogo ficha={dados.ficha} nome={jogo.nome} />
@@ -864,6 +873,188 @@ function UltimasAtualizacoes({ noticias }: { noticias: NoticiaSteam[] }) {
           <CartaoNoticia key={n.gid} noticia={n} destaque={i === 0} />
         ))}
       </div>
+    </Painel>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Onde comprar (Fase 17, IsThereAnyDeal)
+// ---------------------------------------------------------------------------
+
+function moedaBr(valor: number | string | null, moeda: string | null): string {
+  const n = typeof valor === "string" ? Number(valor) : valor;
+  if (n === null || n === undefined || Number.isNaN(n)) return "—";
+  try {
+    return n.toLocaleString("pt-BR", {
+      style: "currency",
+      currency: moeda || "BRL",
+    });
+  } catch {
+    return `${moeda ?? ""} ${n.toFixed(2)}`;
+  }
+}
+
+function OndeComprar({
+  ofertas,
+  menor,
+  gratuito,
+}: {
+  ofertas: OfertaLoja[];
+  menor: MenorPrecoHistorico | null;
+  gratuito: boolean | null;
+}) {
+  if (gratuito) return null;
+  if (ofertas.length === 0) {
+    return (
+      <Painel
+        icone="sell"
+        titulo="Onde comprar"
+        descricao="Comparação de preço entre lojas (IsThereAnyDeal)."
+      >
+        <p className="rounded-lg bg-surface-container-lowest px-space-base py-space-md font-body-md text-body-sm text-outline">
+          Sem ofertas coletadas — configure a <code>ITAD_API_KEY</code> (grátis, em
+          isthereanydeal.com/apps/my) ou o coletor de preço ainda não passou por este jogo.
+        </p>
+      </Painel>
+    );
+  }
+
+  const maisBarata = ofertas[0];
+  const precoSteam = ofertas.find((o) => o.loja.toLowerCase() === "steam")?.preco;
+  const economia =
+    precoSteam !== undefined && Number(maisBarata.preco) < Number(precoSteam)
+      ? Number(precoSteam) - Number(maisBarata.preco)
+      : 0;
+  const naMinima =
+    menor !== null &&
+    Math.abs(Number(maisBarata.preco) - Number(menor.preco)) < 0.01;
+
+  return (
+    <Painel
+      icone="sell"
+      titulo="Onde comprar"
+      descricao="Preço atual em outras lojas — IsThereAnyDeal, ~33 lojas."
+      meta={
+        menor !== null && (
+          <span
+            className="rounded-lg bg-surface-container-lowest px-space-sm py-space-xs font-title-code text-title-code text-outline"
+            title={
+              menor.data
+                ? `menor preço registrado, em ${fmtData(menor.data)}`
+                : "menor preço registrado"
+            }
+          >
+            mínima histórica:{" "}
+            <strong className="text-tertiary-container">
+              {moedaBr(menor.preco, menor.moeda)}
+            </strong>
+            {menor.loja ? ` · ${menor.loja}` : ""}
+          </span>
+        )
+      }
+    >
+      {/* faixa-resumo */}
+      <div className="flex flex-wrap items-baseline gap-space-sm rounded-xl bg-surface-container-lowest p-space-base">
+        <span className="font-label-caps text-label-caps uppercase tracking-widest text-outline">
+          Melhor preço
+        </span>
+        <span className="font-headline-kpi text-headline-kpi leading-none text-primary-container">
+          {moedaBr(maisBarata.preco, maisBarata.moeda)}
+        </span>
+        <span className="font-title-code text-title-code text-on-surface-variant">
+          na {maisBarata.loja}
+        </span>
+        {economia > 0 && (
+          <span className="rounded bg-tertiary-container/15 px-space-xs py-space-xxs font-badge-status text-badge-status uppercase text-tertiary-container">
+            {moedaBr(economia, maisBarata.moeda)} abaixo da Steam
+          </span>
+        )}
+        {naMinima && (
+          <span className="rounded bg-tertiary-container/15 px-space-xs py-space-xxs font-badge-status text-badge-status uppercase text-tertiary-container">
+            no menor preço de sempre
+          </span>
+        )}
+      </div>
+
+      {/* lista de lojas */}
+      <div className="rolagem-discreta overflow-x-auto rounded-lg bg-surface-container-lowest">
+        <table className="w-full border-collapse text-left">
+          <thead>
+            <tr className="bg-surface-container font-label-caps text-label-caps uppercase tracking-wider text-outline">
+              <th className="px-space-md py-space-sm">Loja</th>
+              <th className="px-space-md py-space-sm text-right">Preço</th>
+              <th className="px-space-md py-space-sm text-right">De</th>
+              <th className="px-space-md py-space-sm text-right">Desc.</th>
+              <th className="px-space-md py-space-sm" />
+            </tr>
+          </thead>
+          <tbody className="font-body-md text-body-sm">
+            {ofertas.map((o, i) => (
+              <tr
+                key={o.loja + i}
+                className={i % 2 ? "bg-[#131824]" : "bg-[#10141D]"}
+                style={
+                  o.melhor
+                    ? { boxShadow: "inset 3px 0 0 #00e5ff" }
+                    : undefined
+                }
+              >
+                <td className="px-space-md py-space-sm">
+                  <span className="font-headline-sm text-headline-sm text-on-surface">
+                    {o.loja}
+                  </span>
+                  {o.melhor && (
+                    <span className="ml-space-xs rounded bg-primary-container/15 px-space-xxs py-[1px] font-badge-status text-badge-status uppercase text-primary-container">
+                      melhor
+                    </span>
+                  )}
+                  {o.drm && (
+                    <span className="ml-space-xs font-title-code text-title-code text-outline">
+                      {o.drm}
+                    </span>
+                  )}
+                </td>
+                <td className="px-space-md py-space-sm text-right font-title-code text-title-code tabular-nums text-on-surface">
+                  {moedaBr(o.preco, o.moeda)}
+                </td>
+                <td className="px-space-md py-space-sm text-right font-title-code text-title-code tabular-nums text-outline">
+                  {o.desconto ? (
+                    <s>{moedaBr(o.preco_normal, o.moeda)}</s>
+                  ) : (
+                    "—"
+                  )}
+                </td>
+                <td className="px-space-md py-space-sm text-right">
+                  {o.desconto ? (
+                    <span className="rounded bg-tertiary-container/15 px-space-xs py-space-xxs font-title-code text-title-code text-tertiary-container">
+                      −{o.desconto}%
+                    </span>
+                  ) : (
+                    <span className="text-outline">—</span>
+                  )}
+                </td>
+                <td className="px-space-md py-space-sm text-right">
+                  {o.url && (
+                    <a
+                      href={o.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-space-xxs font-title-code text-title-code text-primary hover:underline"
+                    >
+                      abrir <Icone nome="open_in_new" className="text-[13px]" />
+                    </a>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <p className="font-body-sm text-body-sm text-outline">
+        Preço em BRL para o Brasil. Chave de Steam de loja terceira ativa na sua conta
+        normalmente — confira a coluna de DRM. Fonte: isthereanydeal.com
+      </p>
     </Painel>
   );
 }

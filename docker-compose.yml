@@ -38,6 +38,9 @@ services:
       # repassa. Sem ela o container sobe igual e o assistente responde 503.
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
       OPENROUTER_MODEL: ${OPENROUTER_MODEL:-minimax/minimax-m3:free}
+      # Idem: sem ITAD_API_KEY o painel "Onde comprar" nao aparece.
+      ITAD_API_KEY: ${ITAD_API_KEY:-}
+      ITAD_COUNTRY: ${ITAD_COUNTRY:-BR}
     ports:
       - "8000:8000"
     volumes:
@@ -90,7 +93,10 @@ services:
       AGENDADOR_BRACKETS_MINUTOS: ${AGENDADOR_BRACKETS_MINUTOS:-1440}
       AGENDADOR_BRACKETS_POR_RODADA: ${AGENDADOR_BRACKETS_POR_RODADA:-10}
       AGENDADOR_RANKING_MINUTOS: ${AGENDADOR_RANKING_MINUTOS:-10080}
+      AGENDADOR_PRECOS_MINUTOS: ${AGENDADOR_PRECOS_MINUTOS:-720}
       OPENDOTA_API_KEY: ${OPENDOTA_API_KEY:-}
+      ITAD_API_KEY: ${ITAD_API_KEY:-}
+      ITAD_COUNTRY: ${ITAD_COUNTRY:-BR}
     volumes:
       - ./data:/app/data
     # `restart: unless-stopped` e nao `always`: se alguem parar o agendador de

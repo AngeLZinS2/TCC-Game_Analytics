@@ -1360,10 +1360,47 @@ construído pelos snapshots do agendador e não dá para recuperar o passado.
 
 #### Na tela
 
-Dois painéis novos em `JogoSteam.tsx`: **"Ficha do jogo"** (recursos, plataformas, idiomas
-com marca de dublagem, classificação etária + descritores, conquistas, alcance do SteamSpy,
-tags da comunidade, requisitos num `<details>`) e **"Últimas atualizações"** (as notícias,
-com selo do feed e resumo). Tudo aparece só quando há dado — sem linha em branco.
+Três painéis novos em `JogoSteam.tsx`: **"Ficha do jogo"** (tiles de Classificação /
+Plataformas / Idiomas / Conquistas, faixa de descritores de conteúdo, modos de jogo em
+pílulas, alcance do SteamSpy, tags da comunidade como barras com gradiente, requisitos num
+`<details>`), **"Últimas atualizações"** (notícias em cartões de 2 colunas, post oficial
+antes de imprensa) e **"Onde comprar"** (Fase 17). Tudo aparece só quando há dado.
+
+### Fase 17 — Comparação de preço (IsThereAnyDeal)
+
+O painel mostrava o preço na Steam. Um jogo pago pode estar em promoção em outra loja — a
+informação que decide a compra.
+
+#### Nuuvem e Eneba: por que não direto
+
+- **Eneba** (`api.eneba.com`): é uma **API de merchant** — para quem *vende* chaves na
+  Eneba, não para consultar preço. Não casa por Steam appid. Beco sem saída.
+- **Nuuvem** (`api.nuuvem.com`): retorna exatamente o que se quer (preço, promoção, Steam
+  appid), mas é **restrita a parceiros aprovados** — pedido pelo suporte, sem garantia.
+
+#### IsThereAnyDeal
+
+`api.isthereanydeal.com` é feito para essa pergunta: casa por Steam appid, devolve o preço
+atual em **~33 lojas** (Nuuvem incluída — GOG, Fanatical, GreenManGaming, Humble…) e o
+**menor preço histórico**. Chave **grátis e self-service** (sem aprovação), 1000 req/5 min.
+O único que fica de fora é a Eneba — o ITAD não lista revendedor de chave de mercado
+cinza, por política.
+
+Fluxo por rodada (`collectors/itad_collector.py`): `lookup` (GET, um por appid) só para
+jogos pagos sem `itad_id` cacheado — `""` marca "já procurei, não existe lá"; depois
+`prices` e `historylow` (POST, um só cada, a lista de UUIDs no corpo). São 2 chamadas
+fixas + N lookups na primeira vez de cada jogo. Tabela `oferta_jogo_steam` (uma linha por
+loja, substituída inteira a cada rodada — promo que acabou não fica no banco); o menor
+histórico em `dim_jogo_steam` (migration `0012`).
+
+**Sem `ITAD_API_KEY` nada disso roda**: o coletor recusa, a tarefa `precos` não é agendada,
+e o painel "Onde comprar" não aparece — igual ao assistente sem OpenRouter. A chave sai de
+isthereanydeal.com/apps/my e entra no `.env`.
+
+Na tela: faixa "melhor preço R$ X na Loja Y · R$ Z abaixo da Steam", tabela ordenada por
+preço com a mais barata destacada, preço cheio riscado, desconto %, coluna de DRM (chave
+de Steam × cópia própria da loja), e a mínima histórica no cabeçalho ("no menor preço de
+sempre" quando a oferta atual empata com ela).
 
 ### Fase 3 — Riot API (LoL)
 

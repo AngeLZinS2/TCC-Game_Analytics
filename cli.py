@@ -24,6 +24,7 @@ FONTES = (
     "liquipedia-times",
     "liquipedia-bracket",
     "valve-standings",
+    "itad",
 )
 
 
@@ -123,6 +124,19 @@ def _parser() -> argparse.ArgumentParser:
             "coleta todos os snapshots mensais do ranking desde 2024 "
             "(backfill; sem isso pega so o mais recente)"
         ),
+    )
+
+    itad = coletar.add_argument_group("itad")
+    itad.add_argument(
+        "--limite-jogos",
+        type=int,
+        metavar="N",
+        help="consulta preco so dos N primeiros jogos pagos (util para testar)",
+    )
+    itad.add_argument(
+        "--forcar-lookup",
+        action="store_true",
+        help="refaz o lookup do ITAD mesmo para jogos que ja tem itad_id",
     )
 
     opendota = coletar.add_argument_group("opendota")
@@ -235,6 +249,16 @@ def _construir_coletor(args: argparse.Namespace, storage):
             todos=args.todos,
         )
 
+    if args.fonte == "itad":
+        from collectors.itad_collector import ItadCollector
+
+        return ItadCollector(
+            raw_storage=storage,
+            settings=settings,
+            limite=args.limite_jogos,
+            forcar_lookup=args.forcar_lookup,
+        )
+
     from collectors.opendota_collector import OpenDotaCollector
 
     return OpenDotaCollector(
@@ -264,6 +288,10 @@ def _carregador(fonte: str):
         return carregar
     if fonte == "valve-standings":
         from etl.load_valve_standings import carregar
+
+        return carregar
+    if fonte == "itad":
+        from etl.load_itad import carregar
 
         return carregar
     from etl.load_dota import carregar

@@ -140,7 +140,9 @@ def test_intervalos_vem_da_configuracao():
         agendador_equipes_minutos = 60
         agendador_brackets_minutos = 75
         agendador_ranking_minutos = 90
+        agendador_precos_minutos = 120
         agendador_opendota_limite = 10
+        itad_api_key = "chave-de-teste"
 
     tarefas = {t.nome: t.intervalo_segundos for t in montar_tarefas(FakeSettings())}
     assert tarefas == {
@@ -150,7 +152,24 @@ def test_intervalos_vem_da_configuracao():
         "equipes": 3600,
         "brackets": 4500,
         "ranking": 5400,
+        "precos": 7200,
     }
+
+
+def test_tarefa_de_preco_so_entra_com_chave_do_itad():
+    class SemChave:
+        agendador_steam_minutos = 60
+        agendador_opendota_minutos = 360
+        agendador_liquipedia_minutos = 720
+        agendador_equipes_minutos = 1440
+        agendador_brackets_minutos = 1440
+        agendador_ranking_minutos = 10080
+        agendador_precos_minutos = 720
+        agendador_opendota_limite = 100
+        itad_api_key = None
+
+    nomes = {t.nome for t in montar_tarefas(SemChave())}
+    assert "precos" not in nomes
 
 
 @pytest.mark.parametrize(

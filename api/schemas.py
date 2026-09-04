@@ -137,10 +137,35 @@ class NoticiaSteam(BaseModel):
     resumo: str | None
 
 
+class OfertaLoja(BaseModel):
+    """Preco de um jogo numa loja, via IsThereAnyDeal."""
+
+    loja: str
+    preco: Decimal
+    preco_normal: Decimal | None
+    desconto: int | None
+    moeda: str | None
+    url: str | None
+    drm: str | None
+    #: `True` na loja mais barata da lista.
+    melhor: bool = False
+
+
+class MenorPrecoHistorico(BaseModel):
+    preco: Decimal
+    loja: str | None
+    moeda: str | None
+    data: date | None
+
+
 class DetalheJogoSteam(BaseModel):
     jogo: JogoSteam
     ficha: FichaJogoSteam
     noticias: list[NoticiaSteam] = []
+    #: Ofertas em outras lojas, da mais barata para a mais cara. Vazio para
+    #: jogo gratuito ou quando o ITAD nao conhece o jogo (ou sem `ITAD_API_KEY`).
+    ofertas: list[OfertaLoja] = []
+    menor_preco_historico: MenorPrecoHistorico | None = None
     serie: list[PontoSerie]
 
 

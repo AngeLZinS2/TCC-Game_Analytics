@@ -18,11 +18,18 @@ from api.schemas import (
     DetalheJogoSteam,
     FichaJogoSteam,
     JogoSteam,
+    MenorPrecoHistorico,
     NoticiaSteam,
+    OfertaLoja,
     PontoSerie,
     PontoSerieTotal,
 )
-from db.models import DimJogoSteam, FatoSnapshotJogoSteam, NoticiaJogoSteam
+from db.models import (
+    DimJogoSteam,
+    FatoSnapshotJogoSteam,
+    NoticiaJogoSteam,
+    OfertaJogoSteam,
+)
 from db.session import get_db
 
 router = APIRouter(prefix="/api/steam", tags=["steam"])
@@ -290,6 +297,37 @@ def detalhar_jogo(app_id: int, sessao: Session = Depends(get_db)) -> DetalheJogo
         )
     )
 
+    ofertas_raw = list(
+        sessao.scalars(
+            select(OfertaJogoSteam)
+            .where(OfertaJogoSteam.app_id == app_id)
+            .order_by(OfertaJogoSteam.preco)
+        )
+    )
+    ofertas = [
+        OfertaLoja(
+            loja=o.loja,
+            preco=o.preco,
+            preco_normal=o.preco_normal,
+            desconto=o.desconto,
+            moeda=o.moeda,
+            url=o.url,
+            drm=o.drm,
+            melhor=(i == 0),
+        )
+        for i, o in enumerate(ofertas_raw)
+    ]
+    menor_historico = (
+        MenorPrecoHistorico(
+            preco=jogo.menor_preco_historico,
+            loja=jogo.menor_preco_historico_loja,
+            moeda=jogo.menor_preco_historico_moeda,
+            data=jogo.menor_preco_historico_em,
+        )
+        if jogo.menor_preco_historico is not None
+        else None
+    )
+
     return DetalheJogoSteam(
         jogo=_montar_jogo(
             jogo,
@@ -315,6 +353,8 @@ def detalhar_jogo(app_id: int, sessao: Session = Depends(get_db)) -> DetalheJogo
             )
             for n in noticias
         ],
+        ofertas=ofertas,
+        menor_preco_historico=menor_historico,
         serie=[
             PontoSerie(
                 janela_coleta=s.janela_coleta,

@@ -55,7 +55,10 @@ class RateLimitedClient:
             read=max_retries,
             status=max_retries,
             status_forcelist=(429, 500, 502, 503, 504),
-            allowed_methods=frozenset(["GET"]),
+            # POST entra porque as APIs que usamos com POST sao de consulta
+            # (o ITAD recebe a lista de ids no corpo), nao de escrita - repetir
+            # nao causa efeito colateral.
+            allowed_methods=frozenset(["GET", "POST"]),
             backoff_factor=1.0,
             respect_retry_after_header=True,
             raise_on_status=False,
@@ -85,6 +88,44 @@ class RateLimitedClient:
         self._aguardar()
         inicio = time.monotonic()
         resposta = self.session.get(url, params=params, timeout=self.timeout)
+        duracao_ms = round((time.monotonic() - inicio) * 1000)
+
+        logger.debug(
+            "requisicao concluida",
+            extra={
+                "cliente": self.nome,
+                "url": url,
+                "status": resposta.status_code,
+                "duracao_ms": duracao_ms,
+            },
+        )
+        resposta.raise_for_status()
+
+        try:
+            return resposta.json()
+        except ValueError as exc:
+            raise RespostaInvalidaError(
+                f"{url} respondeu {resposta.status_code} com corpo nao-JSON "
+                f"({resposta.headers.get('Content-Type')})"
+            ) from exc
+
+    def post_json(
+        self, url: str, json: Any, params: dict[str, Any] | None = None
+    ) -> Any:
+        """POST com corpo JSON que devolve JSON, respeitando o rate limit.
+
+        O IsThereAnyDeal recebe a lista de ids no corpo e os parametros
+        (`key`, `country`) na query.
+
+        Raises:
+            requests.HTTPError: status final >= 400 apos os retries.
+            RespostaInvalidaError: corpo nao e JSON valido.
+        """
+        self._aguardar()
+        inicio = time.monotonic()
+        resposta = self.session.post(
+            url, params=params, json=json, timeout=self.timeout
+        )
         duracao_ms = round((time.monotonic() - inicio) * 1000)
 
         logger.debug(

@@ -148,12 +148,31 @@ class Settings(BaseSettings):
     #: Quantas partidas pedir por rodada do agendador.
     agendador_opendota_limite: int = Field(default=100, ge=1, le=500)
 
+    #: Intervalo entre coletas de preco (IsThereAnyDeal), em minutos.
+    #:
+    #: Promocao de loja dura dias, nao minutos. Duas vezes ao dia pega o
+    #: comeco e o fim de uma promo com folga. Sem `itad_api_key` a tarefa nem
+    #: e agendada.
+    agendador_precos_minutos: int = Field(default=720, ge=60)
+
     #: Coletar uma vez logo que o agendador sobe, em vez de esperar o intervalo.
     #:
     #: Seguro por construcao: a coleta da Steam e upsert na janela horaria e a
     #: da OpenDota pula partidas ja existentes. Um restart nao duplica nada - no
     #: pior caso repete uma chamada de rede.
     agendador_rodar_ao_iniciar: bool = True
+
+    # --- Comparacao de preco (IsThereAnyDeal) ---
+    #: Chave gratuita e self-service em https://isthereanydeal.com/apps/my/ .
+    #: Sem ela o coletor `itad` recusa rodar e o painel "Onde comprar" nao
+    #: aparece - estado esperado, como o assistente sem OpenRouter.
+    itad_api_key: str | None = None
+    itad_base_url: str = "https://api.isthereanydeal.com"
+    #: Pais para o preco e a moeda. BR -> R$ e as lojas que vendem pro Brasil.
+    itad_country: str = "BR"
+    #: Segundos entre chamadas. O limite deles e 1000 / 5 min; 0.4s da folga
+    #: enorme e ainda cobre centenas de jogos numa rodada.
+    itad_rate_limit_seconds: float = Field(default=0.4, gt=0)
 
     # --- Assistente (OpenRouter) ---
     #: Sem chave, o endpoint do assistente responde 503 com a instrucao. E um

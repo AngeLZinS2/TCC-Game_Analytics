@@ -337,9 +337,24 @@ def _coletar_ranking(settings: Settings, storage: RawStorage) -> CollectionResul
         coletor.close()
 
 
+def _coletar_precos(settings: Settings, storage: RawStorage) -> CollectionResult:
+    """Preco dos jogos pagos nas outras lojas (IsThereAnyDeal)."""
+    from collectors.itad_collector import ItadCollector
+
+    coletor = ItadCollector(raw_storage=storage, settings=settings)
+    try:
+        return coletor.run(carregar=True)
+    finally:
+        coletor.close()
+
+
 def montar_tarefas(settings: Settings) -> list[Tarefa]:
-    """As tarefas do agendador, na ordem em que rodam quando empatam."""
-    return [
+    """As tarefas do agendador, na ordem em que rodam quando empatam.
+
+    A tarefa de preco (`itad`) so entra quando ha `ITAD_API_KEY` - sem chave
+    ela nao teria o que fazer.
+    """
+    tarefas = [
         Tarefa(
             nome="steam",
             intervalo_segundos=settings.agendador_steam_minutos * 60,
@@ -371,6 +386,15 @@ def montar_tarefas(settings: Settings) -> list[Tarefa]:
             executar=_coletar_ranking,
         ),
     ]
+    if settings.itad_api_key:
+        tarefas.append(
+            Tarefa(
+                nome="precos",
+                intervalo_segundos=settings.agendador_precos_minutos * 60,
+                executar=_coletar_precos,
+            )
+        )
+    return tarefas
 
 
 @dataclass
