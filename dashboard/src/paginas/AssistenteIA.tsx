@@ -171,7 +171,12 @@ function CartaoJogoAoVivo({ jogo }: { jogo: JogoAoVivo }) {
         appId={jogo.app_id}
         nome={jogo.nome}
         imagemUrl={jogo.imagem_header}
-        className="h-40 w-full rounded-none sm:h-48"
+        // aspect-video (16:9) casa com a proporcao real do `background_raw`
+        // (~1440x810) que o backend manda agora - a altura fixa de antes
+        // (h-40/h-48) cortava a imagem inteira numa faixa fina em telas
+        // largas, e esticava um header pequeno (460x215) alem do tamanho
+        // real dele, pixelando.
+        className="aspect-video max-h-[420px] w-full rounded-none"
       />
 
       <div className="flex flex-col gap-space-base p-space-base">

@@ -958,7 +958,12 @@ def _bloco_steam_ao_vivo(
     jogo_ao_vivo = JogoAoVivo(
         app_id=app_id,
         nome=nome,
-        imagem_header=dados.get("header_image"),
+        # `background_raw` (~1440x810, a arte de fundo da loja) em vez do
+        # `header_image` (460x215, feito pra caber pequeno numa lista) - o
+        # banner desta tela e largo, e esticar uma imagem pequena pra ocupar
+        # a largura toda so pixela. Cai pro header quando o jogo nao tem
+        # background_raw (alguns tipos de item na loja nao tem).
+        imagem_header=dados.get("background_raw") or dados.get("header_image"),
         generos=generos,
         desenvolvedora=", ".join(dados.get("developers") or []) or None,
         preco_atual=(preco.get("final") / 100) if preco.get("final") is not None else None,
