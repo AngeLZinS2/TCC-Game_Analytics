@@ -15,7 +15,9 @@ import pytest
 
 from ml.confronto import (
     Confronto,
+    Equipe,
     _ajustar,
+    _fatores_da_previsao,
     _matriz,
     _probabilidade,
     arquivo_metricas,
@@ -141,3 +143,51 @@ def test_cada_jogo_tem_seu_arquivo_de_metricas():
 def test_jogo_nunca_ajustado_devolve_none():
     """`None` e nao o relatorio de outro jogo - a diferenca e o bug acima."""
     assert carregar_relatorio("jogo-que-nao-existe-xyz") is None
+
+
+# ---------------------------------------------------------------------------
+# Fatores por genero de jogo
+# ---------------------------------------------------------------------------
+
+
+def _equipe(id_equipe: int, **kwargs) -> Equipe:
+    return Equipe(id_equipe=id_equipe, nome=f"E{id_equipe}", tag=None, logo_url=None, **kwargs)
+
+
+def test_fatores_de_fps_nao_trazem_vocabulario_de_moba():
+    """CS não tem telemetria por jogador (a Liquipedia dá só o placar). GPM,
+    XPM, KDA e duração são conceitos de MOBA e não podem aparecer numa tela de
+    FPS - nem como '—'."""
+    a = _equipe(1, partidas=4, vitorias=3, forca=1.2)
+    b = _equipe(2, partidas=5, vitorias=2, forca=0.4)
+
+    rotulos = [f.rotulo for f in _fatores_da_previsao(a, b)]
+
+    assert rotulos == ["Força estimada", "Winrate", "Partidas coletadas"]
+    assert not any(
+        termo in r for r in rotulos for termo in ("Ouro", "Experiência", "KDA", "Duração")
+    )
+
+
+def test_fatores_de_moba_trazem_a_telemetria_quando_ha_dado():
+    """Dota tem GPM/XPM/KDA da OpenDota - aí os quatro fatores entram."""
+    a = _equipe(1, partidas=10, vitorias=7, forca=0.9, gpm_medio=540.0, xpm_medio=600.0,
+                kda_medio=3.1, duracao_media_segundos=2100.0)
+    b = _equipe(2, partidas=8, vitorias=3, forca=0.2, gpm_medio=500.0, xpm_medio=560.0,
+                kda_medio=2.4, duracao_media_segundos=2400.0)
+
+    rotulos = [f.rotulo for f in _fatores_da_previsao(a, b)]
+
+    assert "Ouro por minuto" in rotulos
+    assert "KDA médio" in rotulos
+    assert "Duração média" in rotulos
+
+
+def test_um_lado_com_telemetria_e_o_outro_sem_ainda_mostra_o_fator():
+    """Se A jogou no Dota e tem GPM mas B nunca apareceu, o fator entra com o
+    lado de B em branco - some só quando NENHUM lado tem o número."""
+    a = _equipe(1, partidas=10, vitorias=7, forca=0.9, gpm_medio=540.0)
+    b = _equipe(2, partidas=0, vitorias=0, forca=0.0)
+
+    rotulos = [f.rotulo for f in _fatores_da_previsao(a, b)]
+    assert "Ouro por minuto" in rotulos

@@ -472,9 +472,9 @@ function DetalheConfronto({
 
         <p className="mt-space-md font-body-sm text-body-sm text-outline">
           <Icone nome="bolt" className="text-[14px] text-primary" /> marca o único fator
-          que entra na conta. Winrate, GPM e KDA descrevem os times, mas não são somados à
-          probabilidade — eles já estão embutidos na força, que foi estimada a partir de
-          quem venceu quem.
+          que entra na conta. As outras linhas descrevem os times, mas não são somadas à
+          probabilidade — já estão embutidas na força, que foi estimada a partir de quem
+          venceu quem.
         </p>
       </div>
 
@@ -1029,7 +1029,11 @@ export function PrevisaoConfrontoPagina() {
           <Painel
             icone="leaderboard"
             titulo={liga ? `Ranking de força — ${liga}` : "Ranking de força"}
-            descricao="Zero é a média do conjunto. Clique numa linha para colocá-la no lado A."
+            descricao={
+              dados?.prior_externo
+                ? `Força é a estimativa do Bradley-Terry sobre os confrontos coletados, ancorada no ranking da ${dados.prior_externo.fonte} (coluna à parte). Não é a posição da ${dados.prior_externo.fonte}: um time com bom retrospecto sobe acima dela. Zero é a média; clique numa linha para colocá-la no lado A.`
+                : "Força é a estimativa do Bradley-Terry sobre os confrontos coletados. Zero é a média; clique numa linha para colocá-la no lado A."
+            }
             meta={
               <Selo cor="primario">
                 {fmtNumero(equipes.length)} equipes com {minPartidas}+ partidas
@@ -1039,6 +1043,13 @@ export function PrevisaoConfrontoPagina() {
             <Consulta estado={ranking} vazio="Nenhuma equipe atinge esse mínimo.">
               {(lista: EquipeConfronto[]) => {
                 const maiorForca = Math.max(...lista.map((e) => Math.abs(e.forca)), 0.01);
+                // GPM/KDA são telemetria de MOBA (OpenDota → só Dota 2); a
+                // posição da Valve só existe em CS. As colunas seguem o que o
+                // jogo realmente tem, em vez de mostrar "—" numa tela de FPS.
+                const temTelemetria = lista.some((e) => e.gpm_medio !== null);
+                const temRankingExterno = lista.some(
+                  (e) => e.posicao_ranking !== null,
+                );
 
                 return (
                   <div className="rolagem-discreta overflow-x-auto rounded-lg bg-surface-container-lowest">
@@ -1050,14 +1061,20 @@ export function PrevisaoConfrontoPagina() {
                           <th className="px-space-md py-space-sm">Força</th>
                           <th className="px-space-md py-space-sm text-right">Partidas</th>
                           <th className="px-space-md py-space-sm text-right">Winrate</th>
-                          <th
-                            className="px-space-md py-space-sm text-right"
-                            title="Posição no Regional Standings da Valve (só CS)"
-                          >
-                            Valve
-                          </th>
-                          <th className="px-space-md py-space-sm text-right">GPM</th>
-                          <th className="px-space-md py-space-sm text-right">KDA</th>
+                          {temRankingExterno && (
+                            <th
+                              className="px-space-md py-space-sm text-right"
+                              title="Posição no Regional Standings da Valve"
+                            >
+                              Valve
+                            </th>
+                          )}
+                          {temTelemetria && (
+                            <>
+                              <th className="px-space-md py-space-sm text-right">GPM</th>
+                              <th className="px-space-md py-space-sm text-right">KDA</th>
+                            </>
+                          )}
                         </tr>
                       </thead>
 
@@ -1131,24 +1148,30 @@ export function PrevisaoConfrontoPagina() {
                               <td className="px-space-md py-space-sm text-right font-title-code text-title-code tabular-nums text-on-surface">
                                 {fmtPercentual(equipe.winrate)}
                               </td>
-                              <td
-                                className="px-space-md py-space-sm text-right font-title-code text-title-code tabular-nums text-on-surface-variant"
-                                title={
-                                  equipe.pontos_ranking !== null
-                                    ? `${equipe.pontos_ranking} pontos`
-                                    : undefined
-                                }
-                              >
-                                {equipe.posicao_ranking !== null
-                                  ? `#${equipe.posicao_ranking}`
-                                  : "—"}
-                              </td>
-                              <td className="px-space-md py-space-sm text-right font-title-code text-title-code tabular-nums text-on-surface-variant">
-                                {fmtNumero(equipe.gpm_medio)}
-                              </td>
-                              <td className="px-space-md py-space-sm text-right font-title-code text-title-code tabular-nums text-on-surface-variant">
-                                {fmtDecimal(equipe.kda_medio, 2)}
-                              </td>
+                              {temRankingExterno && (
+                                <td
+                                  className="px-space-md py-space-sm text-right font-title-code text-title-code tabular-nums text-on-surface-variant"
+                                  title={
+                                    equipe.pontos_ranking !== null
+                                      ? `${equipe.pontos_ranking} pontos`
+                                      : undefined
+                                  }
+                                >
+                                  {equipe.posicao_ranking !== null
+                                    ? `#${equipe.posicao_ranking}`
+                                    : "—"}
+                                </td>
+                              )}
+                              {temTelemetria && (
+                                <>
+                                  <td className="px-space-md py-space-sm text-right font-title-code text-title-code tabular-nums text-on-surface-variant">
+                                    {fmtNumero(equipe.gpm_medio)}
+                                  </td>
+                                  <td className="px-space-md py-space-sm text-right font-title-code text-title-code tabular-nums text-on-surface-variant">
+                                    {fmtDecimal(equipe.kda_medio, 2)}
+                                  </td>
+                                </>
+                              )}
                             </tr>
                           );
                         })}

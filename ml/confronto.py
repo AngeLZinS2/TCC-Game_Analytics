@@ -891,24 +891,43 @@ def prever(id_equipe_a: int, id_equipe_b: int, jogo: str = "dota2") -> Previsao:
         contribuicao_lado=round(lado, 4),
         confrontos_diretos=len(diretos),
         vitorias_diretas_a=vitorias_diretas_a,
-        fatores=[
-            # A forca e o unico fator que entra na conta da probabilidade. Os
-            # outros sao o contexto que explica de onde ela veio - marca-los
-            # como se pesassem seria mentir sobre o modelo.
-            _fator("Força no ranking", a.forca, b.forca, "", peso=True, casas=3),
-            _fator("Winrate", a.winrate, b.winrate, "%"),
-            _fator("Partidas coletadas", a.partidas, b.partidas, "", casas=0),
-            _fator("Ouro por minuto", a.gpm_medio, b.gpm_medio, "GPM", casas=0),
-            _fator("Experiência por minuto", a.xpm_medio, b.xpm_medio, "XPM", casas=0),
-            _fator("KDA médio", a.kda_medio, b.kda_medio, "", casas=2),
-            _fator(
-                "Duração média",
-                a.duracao_media_segundos / 60 if a.duracao_media_segundos else None,
-                b.duracao_media_segundos / 60 if b.duracao_media_segundos else None,
-                "min",
-            ),
-        ],
+        fatores=_fatores_da_previsao(a, b),
     )
+
+
+def _fatores_da_previsao(a: Equipe, b: Equipe) -> list[Fator]:
+    """Os fatores do 'por que', so os que fazem sentido para este jogo.
+
+    Forca, winrate e numero de partidas existem para qualquer esporte. Ja
+    GPM/XPM/KDA/duracao sao telemetria por jogador da OpenDota - e a OpenDota
+    so cobre Dota 2. Para um confronto de Counter-Strike esses quatro nao tem
+    dado NENHUM e, pior, sao vocabulario de MOBA ("ouro por minuto" num FPS):
+    entram na lista so quando pelo menos um lado tem o numero.
+    """
+    # A forca e o unico fator que entra na conta da probabilidade. Os outros
+    # sao contexto que explica de onde ela veio - marca-los como se pesassem
+    # seria mentir sobre o modelo.
+    fatores = [
+        _fator("Força estimada", a.forca, b.forca, "", peso=True, casas=3),
+        _fator("Winrate", a.winrate, b.winrate, "%"),
+        _fator("Partidas coletadas", a.partidas, b.partidas, "", casas=0),
+    ]
+
+    telemetria = [
+        _fator("Ouro por minuto", a.gpm_medio, b.gpm_medio, "GPM", casas=0),
+        _fator("Experiência por minuto", a.xpm_medio, b.xpm_medio, "XPM", casas=0),
+        _fator("KDA médio", a.kda_medio, b.kda_medio, "", casas=2),
+        _fator(
+            "Duração média",
+            a.duracao_media_segundos / 60 if a.duracao_media_segundos else None,
+            b.duracao_media_segundos / 60 if b.duracao_media_segundos else None,
+            "min",
+        ),
+    ]
+    fatores.extend(
+        f for f in telemetria if f.valor_a is not None or f.valor_b is not None
+    )
+    return fatores
 
 
 def ranking(jogo: str = "dota2", liga: str | None = None) -> list[Equipe]:

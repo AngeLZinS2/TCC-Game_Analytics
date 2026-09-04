@@ -1025,8 +1025,9 @@ no bloco do adversário — nenhum marcado ou os dois marcados viram `None`, nun
 (mais rica — dá GPM/XPM/KDA por time); todo outro jogo lê `agenda_partida` filtrando
 `vitoria_a IS NOT NULL`. O Bradley-Terry não vê diferença — só precisa de quem venceu. O
 que muda é o "por quê": para os outros jogos, `gpm_medio`/`xpm_medio`/`kda_medio` ficam
-`None` (a Liquipedia dá o placar final, não telemetria por jogador), e a tela já tratava
-isso como travessão — nenhuma mudança de schema foi necessária ali.
+`None` (a Liquipedia dá o placar final, não telemetria por jogador), e o modelo omite
+esses fatores da resposta — não são conceitos de Counter-Strike (ver a correção na
+Fase 15). Nenhuma mudança de schema foi necessária ali.
 
 Uma consequência não óbvia: sem stats de jogador, `Equipe.partidas` não tinha de onde vir
 para os jogos novos. A contagem para Dota sai como efeito colateral do laço que soma
@@ -1280,6 +1281,19 @@ em 2 partidas coletadas mas #4 no ranking da Valve, saiu de força ~0 para **+1,
 
 14 partidas de teste continuam sendo pouca amostra, e a tela não esconde isso. O prior
 melhora a direção; não transforma 111 confrontos em certeza.
+
+#### Vocabulário por jogo
+
+Revisando a tela de CS: o modal ainda listava "Ouro por minuto", "Experiência por minuto",
+"KDA médio" e "Duração média" — todos com travessão, porque a Liquipedia não dá isso, mas
+listados assim mesmo. São termos de MOBA num FPS. `_fatores_da_previsao` passou a montar a
+lista pelo que o jogo **tem**: força, winrate e partidas para qualquer esporte; os quatro
+de telemetria só entram quando pelo menos um lado tem o número (na prática, só Dota 2). A
+tabela de ranking faz o mesmo — a coluna Valve aparece só onde há ranking externo, as
+colunas GPM/KDA só onde há telemetria. E o fator antes rotulado "Força no ranking" virou
+"Força estimada": ao lado de um badge "#2 Valve", "força no ranking" sugeria que era a
+posição da Valve, quando é o coeficiente do Bradley-Terry (que, para 3DMAX, #31 na Valve
+mas 4/4 no retrospecto, fica bem acima da posição dela).
 
 ### Fase 3 — Riot API (LoL)
 
