@@ -33,6 +33,7 @@ import type {
   FatorConfronto,
   LigaConfronto,
   PrevisaoConfronto as TipoPrevisao,
+  PrioExternoConfronto,
   RelatorioConfronto,
   ValidacaoConfronto,
 } from "../api/tipos";
@@ -161,6 +162,19 @@ function LadoDoConfronto({
         <div className="font-title-code text-title-code text-outline">
           {equipe.vitorias}/{equipe.partidas} · {fmtPercentual(equipe.winrate)}
         </div>
+        {equipe.posicao_ranking !== null && (
+          <div
+            className="mt-space-xxs inline-flex items-center gap-1 rounded-full bg-surface-container-high px-2 py-[1px] font-title-code text-title-code text-on-surface-variant"
+            title={
+              equipe.pontos_ranking !== null
+                ? `${equipe.pontos_ranking} pontos no Regional Standings da Valve`
+                : "Regional Standings da Valve"
+            }
+          >
+            <Icone nome="social_leaderboard" className="text-[13px] text-primary" />
+            #{equipe.posicao_ranking} Valve
+          </div>
+        )}
       </div>
 
       <div
@@ -344,9 +358,11 @@ function CartaoFator({
 function DetalheConfronto({
   previsao,
   jogo,
+  priorExterno = null,
 }: {
   previsao: TipoPrevisao;
   jogo: string;
+  priorExterno?: PrioExternoConfronto | null;
 }) {
   const favoritoA = previsao.probabilidade_a >= previsao.probabilidade_b;
   const corFavorito = favoritoA ? PALETA_POLOS.positivo : PALETA_POLOS.negativo;
@@ -355,10 +371,21 @@ function DetalheConfronto({
     <div className="space-y-space-lg">
       {/* ---------- Motor de previsao + confianca ---------- */}
       <div className="flex flex-wrap items-center justify-between gap-space-sm rounded-lg border border-outline-variant/30 bg-surface-container-lowest px-space-lg py-space-sm">
-        <span className="flex items-center gap-space-xs font-title-code text-title-code uppercase tracking-widest text-on-surface-variant">
+        <span className="flex flex-wrap items-center gap-space-xs font-title-code text-title-code uppercase tracking-widest text-on-surface-variant">
           <Icone nome="psychology" className="text-[16px] text-primary" />
           Motor de previsão
           <span className="text-outline">· Bradley-Terry regularizado</span>
+          {priorExterno && (
+            <span
+              className="text-outline"
+              title={`Prior: diferença de ranking da ${priorExterno.fonte} (peso ${fmtDecimal(
+                priorExterno.peso,
+                2,
+              )}, snapshot de ${priorExterno.data_mais_recente}). Puxa o time de pouco histórico para a posição dele no ranking em vez de para 50%.`}
+            >
+              · prior: ranking {priorExterno.fonte}
+            </span>
+          )}
         </span>
         <BadgeConfianca validacao={previsao.validacao} />
       </div>
@@ -931,7 +958,7 @@ export function PrevisaoConfrontoPagina() {
             ) : previsao.isError ? (
               <MensagemErro erro={previsao.error} />
             ) : previsaoDoModal ? (
-              <DetalheConfronto previsao={previsaoDoModal} jogo={jogo} />
+              <DetalheConfronto previsao={previsaoDoModal} jogo={jogo} priorExterno={dados?.prior_externo ?? null} />
             ) : (
               <div className="h-48 animate-pulse rounded bg-surface-container-high/60" />
             )}
@@ -993,7 +1020,7 @@ export function PrevisaoConfrontoPagina() {
 
             <Consulta estado={previsao} altura={260} vazio="Escolha dois times diferentes.">
               {(resultado: TipoPrevisao) => (
-                <DetalheConfronto previsao={resultado} jogo={jogo} />
+                <DetalheConfronto previsao={resultado} jogo={jogo} priorExterno={dados?.prior_externo ?? null} />
               )}
             </Consulta>
           </Painel>
@@ -1023,6 +1050,12 @@ export function PrevisaoConfrontoPagina() {
                           <th className="px-space-md py-space-sm">Força</th>
                           <th className="px-space-md py-space-sm text-right">Partidas</th>
                           <th className="px-space-md py-space-sm text-right">Winrate</th>
+                          <th
+                            className="px-space-md py-space-sm text-right"
+                            title="Posição no Regional Standings da Valve (só CS)"
+                          >
+                            Valve
+                          </th>
                           <th className="px-space-md py-space-sm text-right">GPM</th>
                           <th className="px-space-md py-space-sm text-right">KDA</th>
                         </tr>
@@ -1097,6 +1130,18 @@ export function PrevisaoConfrontoPagina() {
                               </td>
                               <td className="px-space-md py-space-sm text-right font-title-code text-title-code tabular-nums text-on-surface">
                                 {fmtPercentual(equipe.winrate)}
+                              </td>
+                              <td
+                                className="px-space-md py-space-sm text-right font-title-code text-title-code tabular-nums text-on-surface-variant"
+                                title={
+                                  equipe.pontos_ranking !== null
+                                    ? `${equipe.pontos_ranking} pontos`
+                                    : undefined
+                                }
+                              >
+                                {equipe.posicao_ranking !== null
+                                  ? `#${equipe.posicao_ranking}`
+                                  : "—"}
                               </td>
                               <td className="px-space-md py-space-sm text-right font-title-code text-title-code tabular-nums text-on-surface-variant">
                                 {fmtNumero(equipe.gpm_medio)}

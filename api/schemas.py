@@ -382,6 +382,9 @@ class EquipeConfronto(BaseModel):
     xpm_medio: float | None
     kda_medio: float | None
     duracao_media_segundos: float | None
+    #: Posicao e pontos no ranking da Valve (so CS). `None` fora dele.
+    posicao_ranking: int | None = None
+    pontos_ranking: int | None = None
 
 
 class FatorConfronto(BaseModel):
@@ -429,6 +432,19 @@ class LigaConfronto(BaseModel):
     fim: datetime | None
 
 
+class PrioExternoConfronto(BaseModel):
+    """O prior de ranking usado no ajuste (Fase 15). Ausente = Bradley-Terry puro."""
+
+    fonte: str
+    #: Peso que a regressao aprendeu para a diferenca de rating. Maior = o
+    #: modelo se apoiou mais no ranking externo do que no historico proprio.
+    peso: float
+    snapshots: int
+    data_mais_recente: str
+    equipes_no_ranking: int
+    equipes_no_ranking_com_confronto: int
+
+
 class RelatorioConfronto(BaseModel):
     ajustado_em: datetime
     jogo: str
@@ -442,6 +458,8 @@ class RelatorioConfronto(BaseModel):
     primeira_partida: datetime | None
     ultima_partida: datetime | None
     validacao: ValidacaoConfronto
+    #: `None` para todo jogo que nao e CS - eles nao tem ranking externo.
+    prior_externo: PrioExternoConfronto | None = None
     forcas: dict[str, float]
 
 

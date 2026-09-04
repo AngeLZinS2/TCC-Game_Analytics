@@ -17,7 +17,14 @@ from dataclasses import asdict
 from config import BASE_DIR, get_settings
 from logging_config import configurar_logging
 
-FONTES = ("steam", "opendota", "liquipedia", "liquipedia-times", "liquipedia-bracket")
+FONTES = (
+    "steam",
+    "opendota",
+    "liquipedia",
+    "liquipedia-times",
+    "liquipedia-bracket",
+    "valve-standings",
+)
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -105,6 +112,16 @@ def _parser() -> argparse.ArgumentParser:
             "titulo de uma pagina de torneio a coletar (repita para varios). "
             "Sem isso, le os torneios distintos ja vistos em agenda_partida "
             "para esta wiki."
+        ),
+    )
+
+    valve = coletar.add_argument_group("valve-standings")
+    valve.add_argument(
+        "--todos",
+        action="store_true",
+        help=(
+            "coleta todos os snapshots mensais do ranking desde 2024 "
+            "(backfill; sem isso pega so o mais recente)"
         ),
     )
 
@@ -209,6 +226,15 @@ def _construir_coletor(args: argparse.Namespace, storage):
             torneios=args.torneio,
         )
 
+    if args.fonte == "valve-standings":
+        from collectors.valve_standings_collector import ValveStandingsCollector
+
+        return ValveStandingsCollector(
+            raw_storage=storage,
+            settings=settings,
+            todos=args.todos,
+        )
+
     from collectors.opendota_collector import OpenDotaCollector
 
     return OpenDotaCollector(
@@ -236,6 +262,10 @@ def _carregador(fonte: str):
         from etl.load_liquipedia import carregar
 
         return carregar
+    if fonte == "valve-standings":
+        from etl.load_valve_standings import carregar
+
+        return carregar
     from etl.load_dota import carregar
 
     return carregar
@@ -253,6 +283,14 @@ def _cmd_collect(args: argparse.Namespace) -> int:
             registros = storage.ler_ultima_coleta(coletor.fonte)
             print(f"Reprocessando {len(registros)} payloads do disco...")
             resultado = coletor.parse(registros)
+            if args.fonte == "valve-standings":
+                # `parse` devolve uma lista de snapshots (um por mes), e o
+                # proprio coletor sabe carregar a lista. `resultado.total` nao
+                # existe aqui - o "normalizado" e a soma das linhas.
+                carregados = 0 if args.no_load else coletor.load(resultado)
+                normalizados = sum(r.total for r in resultado)
+                print(f"itens normalizados={normalizados} carregados={carregados}")
+                return 0
             if args.no_load:
                 carregados = 0
             elif args.fonte.startswith("liquipedia"):

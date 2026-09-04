@@ -81,7 +81,7 @@ def test_time_que_so_vence_recebe_forca_maior():
         _confronto(4, 3, False, 4),  # 3 vence
         _confronto(2, 3, True, 5),   # 2 vence
     ]
-    forcas, _ = _ajustar(confrontos, regularizacao=1.0)
+    forcas, _, _ = _ajustar(confrontos, regularizacao=1.0)
 
     assert forcas[1] > forcas[2] > forcas[4]
 
@@ -94,8 +94,8 @@ def test_regularizacao_forte_encolhe_as_forcas():
         _confronto(1, 3, True, 2),
         _confronto(3, 2, False, 3),
     ]
-    frouxa, _ = _ajustar(confrontos, regularizacao=10.0)
-    apertada, _ = _ajustar(confrontos, regularizacao=0.01)
+    frouxa, _, _ = _ajustar(confrontos, regularizacao=10.0)
+    apertada, _, _ = _ajustar(confrontos, regularizacao=0.01)
 
     assert max(abs(v) for v in apertada.values()) < max(abs(v) for v in frouxa.values())
 
@@ -103,15 +103,16 @@ def test_regularizacao_forte_encolhe_as_forcas():
 def test_uma_classe_so_nao_quebra_o_ajuste():
     """Se o lado A venceu todas, nao ha o que separar - forcas ficam em zero."""
     confrontos = [_confronto(1, 2, True, 0), _confronto(3, 4, True, 1)]
-    forcas, lado = _ajustar(confrontos)
+    forcas, lado, peso = _ajustar(confrontos)
 
     assert set(forcas.values()) == {0.0}
     assert lado == 0.0
+    assert peso == 0.0
 
 
 def test_forcas_cobrem_todas_as_equipes_vistas():
     confrontos = [_confronto(7, 8, True, 0), _confronto(8, 9, False, 1)]
-    forcas, _ = _ajustar(confrontos, regularizacao=1.0)
+    forcas, _, _ = _ajustar(confrontos, regularizacao=1.0)
     assert set(forcas) == {7, 8, 9}
     assert all(np.isfinite(valor) for valor in forcas.values())
 

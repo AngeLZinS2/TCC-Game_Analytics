@@ -106,6 +106,32 @@ class RateLimitedClient:
                 f"({resposta.headers.get('Content-Type')})"
             ) from exc
 
+    def get_text(self, url: str, params: dict[str, Any] | None = None) -> str:
+        """GET que devolve o corpo como texto, respeitando o rate limit.
+
+        Para fontes que servem texto puro (markdown, CSV) em vez de JSON -
+        o Regional Standings da Valve publica tabelas markdown no GitHub.
+
+        Raises:
+            requests.HTTPError: status final >= 400 apos os retries.
+        """
+        self._aguardar()
+        inicio = time.monotonic()
+        resposta = self.session.get(url, params=params, timeout=self.timeout)
+        duracao_ms = round((time.monotonic() - inicio) * 1000)
+
+        logger.debug(
+            "requisicao concluida",
+            extra={
+                "cliente": self.nome,
+                "url": url,
+                "status": resposta.status_code,
+                "duracao_ms": duracao_ms,
+            },
+        )
+        resposta.raise_for_status()
+        return resposta.text
+
     def close(self) -> None:
         self.session.close()
 

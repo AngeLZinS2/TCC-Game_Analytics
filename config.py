@@ -136,6 +136,15 @@ class Settings(BaseSettings):
     #: martelaria a Liquipedia; o rodizio espalha o custo ao longo dos dias.
     agendador_brackets_por_rodada: int = Field(default=10, ge=1, le=80)
 
+    #: Intervalo entre leituras do ranking externo (Valve Regional Standings),
+    #: em minutos.
+    #:
+    #: A Valve publica um snapshot novo por mes. Checar uma vez por semana pega
+    #: o mes novo com folga e custa 2 chamadas ao GitHub (listar + baixar) - o
+    #: repo aceita 60/hora sem autenticacao. O backfill dos meses anteriores e
+    #: `cli.py collect valve-standings --todos`, feito uma vez.
+    agendador_ranking_minutos: int = Field(default=10080, ge=60)
+
     #: Quantas partidas pedir por rodada do agendador.
     agendador_opendota_limite: int = Field(default=100, ge=1, le=500)
 

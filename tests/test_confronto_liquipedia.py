@@ -146,6 +146,57 @@ def test_torneios_conhecidos_de_jogo_sem_agenda_e_vazia():
     assert torneios_conhecidos("jogo-que-nao-existe-xyz") == []
 
 
+def test_ratings_externos_sao_z_score_por_snapshot(sessao_bd):
+    """`_carregar_ratings_externos` normaliza dentro de cada snapshot: media
+    perto de zero, e nenhum valor absurdo. Sem isso o prior entraria numa
+    escala arbitraria (a pontuacao da Valve nao significa nada fora da lista
+    dela)."""
+    from ml.confronto import _carregar_ratings_externos
+
+    snaps = _carregar_ratings_externos(sessao_bd, "counterstrike")
+    if not snaps:
+        pytest.skip("ranking da Valve nao coletado nesta maquina")
+
+    import statistics
+
+    for _data, ratings in snaps:
+        if len(ratings) < 2:
+            continue
+        media = statistics.fmean(ratings.values())
+        assert abs(media) < 1e-6
+        assert all(abs(v) < 6 for v in ratings.values())
+
+
+def test_ratings_em_e_point_in_time(sessao_bd):
+    """`_ratings_em` devolve o snapshot vigente na data pedida, nunca um
+    posterior - e o que impede o ranking de agosto de vazar na previsao de
+    julho na validacao walk-forward."""
+    from datetime import date, timedelta
+
+    from ml.confronto import _carregar_ratings_externos, _ratings_em
+
+    snaps = _carregar_ratings_externos(sessao_bd, "counterstrike")
+    if len(snaps) < 2:
+        pytest.skip("menos de dois snapshots do ranking - rode collect --todos")
+
+    (_data0, r0), (data1, _r1) = snaps[0], snaps[1]
+    # Um dia antes do segundo snapshot ainda enxerga o primeiro.
+    assert _ratings_em(snaps, data1 - timedelta(days=1)) == r0
+    # Antes de tudo: dicionario vazio, nao erro.
+    assert _ratings_em(snaps, date(2000, 1, 1)) == {}
+    # Sem data (modelo final): o mais recente.
+    assert _ratings_em(snaps, None) == snaps[-1][1]
+
+
+def test_jogo_sem_ranking_nao_tem_prior(sessao_bd):
+    """Todo jogo que nao e CS: `_carregar_ratings_externos` vazio, e ai o
+    modulo volta a ser o Bradley-Terry puro da Fase 14 - sem coluna a mais."""
+    from ml.confronto import _carregar_ratings_externos
+
+    assert _carregar_ratings_externos(sessao_bd, "dota2") == []
+    assert _carregar_ratings_externos(sessao_bd, "valorant") == []
+
+
 def test_partida_decidida_fora_do_dota_nunca_fica_sem_equipe(sessao_bd):
     """O bug que o usuario apontou: jogos com confronto ja 100% decidido e o
     sistema "nao consegue trazer". A causa era FK nula - o time da agenda nao

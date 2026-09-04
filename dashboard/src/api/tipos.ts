@@ -345,6 +345,9 @@ export interface EquipeConfronto {
   xpm_medio: number | null;
   kda_medio: number | null;
   duracao_media_segundos: number | null;
+  /** Posicao e pontos no ranking da Valve (so CS). `null` fora dele. */
+  posicao_ranking: number | null;
+  pontos_ranking: number | null;
 }
 
 export interface FatorConfronto {
@@ -391,6 +394,16 @@ export interface LigaConfronto {
   fim: string | null;
 }
 
+export interface PrioExternoConfronto {
+  fonte: string;
+  /** Peso que a regressao deu para a diferenca de rating do ranking externo. */
+  peso: number;
+  snapshots: number;
+  data_mais_recente: string;
+  equipes_no_ranking: number;
+  equipes_no_ranking_com_confronto: number;
+}
+
 export interface RelatorioConfronto {
   ajustado_em: string;
   jogo: string;
@@ -404,6 +417,8 @@ export interface RelatorioConfronto {
   primeira_partida: string | null;
   ultima_partida: string | null;
   validacao: ValidacaoConfronto;
+  /** `null` para todo jogo que nao e CS. */
+  prior_externo: PrioExternoConfronto | null;
   forcas: Record<string, number>;
 }
 

@@ -358,6 +358,65 @@ class AgendaPartida(Base):
     )
 
 
+class RankingExterno(Base):
+    """Ranking de equipes publicado por um terceiro, com data de referencia.
+
+    A previsao de confronto (`ml/confronto.py`) estima a forca de cada time SO
+    a partir dos confrontos que coletamos. Isso deixa o time com pouco
+    historico preso perto de 50% - correto quando nao se sabe nada, mas em
+    Counter-Strike a Valve publica um ranking oficial (`counter-strike_
+    regional_standings` no GitHub, cadencia mensal, ~400 times com pontuacao)
+    que ja sabe algo. Guardar essa pontuacao aqui permite usa-la como PRIOR do
+    Bradley-Terry: um time #6 no ranking da Valve com duas partidas coletadas
+    nao deveria ter forca ~0.
+
+    `data_referencia` e a data do snapshot (a Valve publica um por mes). Guardar
+    todos os snapshots - nao so o ultimo - e o que permite o prior ser
+    point-in-time na validacao walk-forward: prever uma partida de julho usa o
+    ranking de julho, nao o de hoje.
+
+    `id_equipe` e nula ate a reconciliacao casar o nome publicado com
+    `dim_equipe` - mesmo padrao de `agenda_partida`.
+    """
+
+    __tablename__ = "ranking_externo"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    #: Quem publicou o ranking. Hoje so `"valve"`; a coluna existe para o dia
+    #: em que houver uma segunda fonte sem precisar de outra tabela.
+    fonte: Mapped[str] = mapped_column(String(20), nullable=False)
+    id_jogo: Mapped[int] = mapped_column(ForeignKey("dim_jogo.id_jogo"), nullable=False)
+    data_referencia: Mapped[date] = mapped_column(Date, nullable=False)
+
+    id_equipe: Mapped[int | None] = mapped_column(ForeignKey("dim_equipe.id_equipe"))
+    #: O nome COMO O RANKING ESCREVEU - guardado alem da FK para a
+    #: reconciliacao poder melhorar depois sem recoletar.
+    equipe_nome: Mapped[str] = mapped_column(String(120), nullable=False)
+
+    posicao: Mapped[int] = mapped_column(Integer, nullable=False)
+    #: A pontuacao que o metodo da fonte atribuiu. `NULL` se a fonte so
+    #: publica ordem, sem numero.
+    pontos: Mapped[int | None] = mapped_column(Integer)
+    #: `"global"` ou uma regiao. A Valve publica os dois; guardamos o global.
+    regiao: Mapped[str | None] = mapped_column(String(20))
+
+    coletado_em: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "fonte",
+            "id_jogo",
+            "data_referencia",
+            "regiao",
+            "equipe_nome",
+            name="uq_ranking_externo_snapshot",
+        ),
+        Index("ix_ranking_externo_lookup", "fonte", "id_jogo", "data_referencia"),
+    )
+
+
 class DimTempo(Base):
     """Dimensao de calendario. `id_tempo` e a data no formato AAAAMMDD."""
 

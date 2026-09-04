@@ -41,6 +41,17 @@ wikis do catalogo - mas so da o placar final, sem stats de jogador. O metodo
 (Bradley-Terry) nao muda com a fonte; o que muda e o volume de historico e o
 "por que" que da para mostrar (GPM/XPM/KDA existem so onde a OpenDota chega).
 Ver `_carregar_confrontos` e `_carregar_equipes`, que fazem essa bifurcacao.
+
+**Prior de ranking externo (Fase 15).** Para Counter-Strike ha uma terceira
+entrada: o Regional Standings da Valve, em `ranking_externo`. Ele vira UMA
+coluna a mais na regressao - a diferenca de rating (z-score do log-pontos)
+entre os dois lados - e a regularizacao decide quanto peso dar a ela. O efeito
+que importa: um time no topo do ranking com duas partidas coletadas para de
+cair para ~50%, porque a coluna do prior o segura perto da posicao dele. Na
+validacao walk-forward o prior e point-in-time (o ranking vigente na data da
+partida, nunca um posterior). Para todo jogo sem `ranking_externo` a coluna
+nao existe e o modelo e identico ao da Fase 14. Ver `_carregar_ratings_
+externos`, `_ratings_em` e o parametro `ratings` de `_matriz`/`_ajustar`.
 """
 
 from __future__ import annotations
@@ -48,7 +59,7 @@ from __future__ import annotations
 import json
 import logging
 from dataclasses import asdict, dataclass, field
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -64,6 +75,7 @@ from db.models import (
     DimJogo,
     DimPartida,
     FatoPartidaJogador,
+    RankingExterno,
 )
 from db.session import session_scope
 from ml.modelos import SEMENTE
@@ -105,6 +117,12 @@ FRACAO_TESTE = 0.3
 #: mediria o intercepto, nao o modelo.
 MINIMO_HISTORICO = 1
 
+#: Fonte do ranking externo usado como prior (Fase 15). Hoje so a Valve, e so
+#: para Counter-Strike; `_carregar_ratings_externos` devolve vazio para
+#: qualquer jogo sem snapshot na tabela, e ai o modelo volta a ser o
+#: Bradley-Terry puro das fases anteriores - sem coluna a mais, sem mudanca.
+FONTE_RANKING_PRIOR = "valve"
+
 
 @dataclass(frozen=True)
 class Confronto:
@@ -130,6 +148,11 @@ class Equipe:
     xpm_medio: float | None = None
     kda_medio: float | None = None
     duracao_media_segundos: float | None = None
+    #: Posicao e pontos no ranking externo mais recente (Valve, so CS por
+    #: enquanto). `None` quando a equipe nao aparece nele. Contexto para a
+    #: tela - o efeito no modelo ja esta embutido em `forca` (Fase 15).
+    posicao_ranking: int | None = None
+    pontos_ranking: int | None = None
 
     @property
     def winrate(self) -> float:
@@ -287,6 +310,35 @@ def _preencher_partidas_liquipedia(
                 equipe.partidas += contagem
 
 
+def _preencher_ranking_externo(sessao, jogo: str, equipes: dict[int, Equipe]) -> None:
+    """Anexa posicao e pontos do ranking externo MAIS RECENTE a cada equipe.
+
+    So contexto de tela - o efeito no modelo ja esta em `forca`. `None` para
+    equipe fora do ranking, e no-op inteiro para jogo sem `ranking_externo`.
+    """
+    ultima = sessao.scalar(
+        select(func.max(RankingExterno.data_referencia))
+        .join(DimJogo, DimJogo.id_jogo == RankingExterno.id_jogo)
+        .where(DimJogo.codigo == jogo, RankingExterno.fonte == FONTE_RANKING_PRIOR)
+    )
+    if ultima is None:
+        return
+
+    for id_equipe, posicao, pontos in sessao.execute(
+        select(
+            RankingExterno.id_equipe, RankingExterno.posicao, RankingExterno.pontos
+        ).where(
+            RankingExterno.fonte == FONTE_RANKING_PRIOR,
+            RankingExterno.data_referencia == ultima,
+            RankingExterno.id_equipe.is_not(None),
+        )
+    ):
+        equipe = equipes.get(id_equipe)
+        if equipe is not None:
+            equipe.posicao_ranking = int(posicao)
+            equipe.pontos_ranking = int(pontos) if pontos is not None else None
+
+
 def _carregar_equipes(sessao, jogo: str = "dota2") -> dict[int, Equipe]:
     """As equipes do jogo, com o desempenho medio quando a fonte tem.
 
@@ -309,6 +361,8 @@ def _carregar_equipes(sessao, jogo: str = "dota2") -> dict[int, Equipe]:
             .where(DimJogo.codigo == jogo)
         )
     }
+
+    _preencher_ranking_externo(sessao, jogo, equipes)
 
     if jogo != "dota2":
         _preencher_partidas_liquipedia(sessao, jogo, equipes)
@@ -369,24 +423,112 @@ def _carregar_equipes(sessao, jogo: str = "dota2") -> dict[int, Equipe]:
     return equipes
 
 
-def _matriz(confrontos: list[Confronto], indices: dict[int, int]) -> tuple[np.ndarray, np.ndarray]:
+#: Um snapshot do ranking externo: a data em que valeu, e a forca relativa
+#: (z-score do log-pontos, dentro do snapshot) de cada equipe casada.
+Snapshot = tuple[date, dict[int, float]]
+
+
+def _carregar_ratings_externos(sessao, jogo: str) -> list[Snapshot]:
+    """Todos os snapshots do ranking externo do jogo, do mais antigo ao recente.
+
+    O rating e o z-score de `log(pontos)` DENTRO de cada snapshot: um numero
+    adimensional que diz "quantos desvios acima da media da lista este time
+    esta". `log` porque a pontuacao cai de forma quase exponencial (2011 no
+    topo, ~400 na cauda); z-score porque a escala de pontos da Valve nao tem
+    significado fora da lista dela.
+
+    Vazio para todo jogo sem linha em `ranking_externo` - e a maioria. Nesse
+    caso o resto do modulo ignora o prior e nada muda em relacao a Fase 14.
+    """
+    linhas = sessao.execute(
+        select(
+            RankingExterno.data_referencia,
+            RankingExterno.id_equipe,
+            RankingExterno.pontos,
+        )
+        .join(DimJogo, DimJogo.id_jogo == RankingExterno.id_jogo)
+        .where(
+            DimJogo.codigo == jogo,
+            RankingExterno.fonte == FONTE_RANKING_PRIOR,
+            RankingExterno.id_equipe.is_not(None),
+            RankingExterno.pontos.is_not(None),
+            RankingExterno.pontos > 0,
+        )
+        .order_by(RankingExterno.data_referencia)
+    ).all()
+
+    por_data: dict[date, dict[int, float]] = {}
+    for data_ref, id_equipe, pontos in linhas:
+        por_data.setdefault(data_ref, {})[int(id_equipe)] = float(np.log(pontos))
+
+    snapshots: list[Snapshot] = []
+    for data_ref in sorted(por_data):
+        brutos = por_data[data_ref]
+        valores = np.fromiter(brutos.values(), dtype=float)
+        media, desvio = float(valores.mean()), float(valores.std())
+        if desvio == 0.0:
+            continue
+        snapshots.append(
+            (data_ref, {ide: (v - media) / desvio for ide, v in brutos.items()})
+        )
+    return snapshots
+
+
+def _ratings_em(snapshots: list[Snapshot], quando: date | None) -> dict[int, float]:
+    """O snapshot vigente numa data - o mais recente com `data_referencia` <=
+    `quando`. Com `quando=None` (o modelo final, nao a validacao), usa o ultimo.
+
+    Point-in-time de proposito: prever uma partida de julho com o ranking de
+    agosto seria vazar resultado de agosto na previsao de julho.
+    """
+    if not snapshots:
+        return {}
+    if quando is None:
+        return snapshots[-1][1]
+    vigente: dict[int, float] = {}
+    for data_ref, ratings in snapshots:
+        if data_ref <= quando:
+            vigente = ratings
+        else:
+            break
+    return vigente
+
+
+def _matriz(
+    confrontos: list[Confronto],
+    indices: dict[int, int],
+    ratings: dict[int, float] | None = None,
+) -> tuple[np.ndarray, np.ndarray]:
     """Matriz de indicadores: +1 para o time do lado A, -1 para o do lado B.
 
     E a forma padrao de escrever Bradley-Terry como regressao logistica. Cada
     coluna e um time, e o coeficiente aprendido para ela e a forca dele.
+
+    Com `ratings` (Fase 15), UMA coluna a mais: a diferenca de rating externo
+    entre os dois lados. O modelo aprende o peso dela junto com as forcas - e a
+    regularizacao decide quanto confiar no prior contra o historico proprio.
+    Para um time com duas partidas, a coluna dele encolhe para ~0 e esse termo
+    e o que sobra dizendo algo sobre ele.
     """
-    X = np.zeros((len(confrontos), len(indices)))
+    extra = 1 if ratings else 0
+    X = np.zeros((len(confrontos), len(indices) + extra))
     y = np.zeros(len(confrontos), dtype=int)
 
     for linha, confronto in enumerate(confrontos):
         X[linha, indices[confronto.id_equipe_a]] = 1.0
         X[linha, indices[confronto.id_equipe_b]] = -1.0
+        if ratings:
+            X[linha, -1] = ratings.get(confronto.id_equipe_a, 0.0) - ratings.get(
+                confronto.id_equipe_b, 0.0
+            )
         y[linha] = 1 if confronto.vitoria_a else 0
 
     return X, y
 
 
-def _escolher_regularizacao(confrontos: list[Confronto]) -> float:
+def _escolher_regularizacao(
+    confrontos: list[Confronto], ratings: dict[int, float] | None = None
+) -> float:
     """Escolhe `C` por validacao cruzada DENTRO da janela recebida.
 
     Recebe so o treino. Rodar isto sobre o conjunto inteiro e depois reportar a
@@ -395,7 +537,7 @@ def _escolher_regularizacao(confrontos: list[Confronto]) -> float:
     """
     ids = sorted({c.id_equipe_a for c in confrontos} | {c.id_equipe_b for c in confrontos})
     indices = {id_equipe: posicao for posicao, id_equipe in enumerate(ids)}
-    X, y = _matriz(confrontos, indices)
+    X, y = _matriz(confrontos, indices, ratings)
 
     if len(set(y)) < 2 or len(y) < 20:
         return 0.5
@@ -427,43 +569,65 @@ def _escolher_regularizacao(confrontos: list[Confronto]) -> float:
 
 
 def _ajustar(
-    confrontos: list[Confronto], regularizacao: float | None = None
-) -> tuple[dict[int, float], float]:
-    """Devolve a forca de cada equipe e a vantagem do lado A (em log-odds)."""
+    confrontos: list[Confronto],
+    regularizacao: float | None = None,
+    ratings: dict[int, float] | None = None,
+) -> tuple[dict[int, float], float, float]:
+    """Devolve a forca de cada equipe, a vantagem do lado A (log-odds) e o peso
+    aprendido para o prior externo (0.0 quando nao ha prior).
+
+    Com `ratings`, a forca guardada de cada time ja SOMA o termo do prior
+    (`peso * rating`): quem consome `forca` depois - `_probabilidade`,
+    `prever`, o ranking - nao precisa saber que o prior existe. Para um time
+    com pouco historico, essa soma e o que o tira de ~0.
+    """
     ids = sorted({c.id_equipe_a for c in confrontos} | {c.id_equipe_b for c in confrontos})
     indices = {id_equipe: posicao for posicao, id_equipe in enumerate(ids)}
 
-    X, y = _matriz(confrontos, indices)
+    X, y = _matriz(confrontos, indices, ratings)
 
     # Uma classe so (todo mundo ganhou de um lado) nao tem o que ajustar.
     if len(set(y)) < 2:
-        return {id_equipe: 0.0 for id_equipe in ids}, 0.0
+        return {id_equipe: 0.0 for id_equipe in ids}, 0.0, 0.0
 
     modelo = LogisticRegression(
-        C=regularizacao if regularizacao is not None else _escolher_regularizacao(confrontos),
+        C=regularizacao
+        if regularizacao is not None
+        else _escolher_regularizacao(confrontos, ratings),
         max_iter=2000,
         random_state=SEMENTE,
     )
     modelo.fit(X, y)
 
+    peso_externo = float(modelo.coef_[0][-1]) if ratings else 0.0
     forcas = {
-        id_equipe: float(modelo.coef_[0][posicao]) for id_equipe, posicao in indices.items()
+        id_equipe: float(modelo.coef_[0][posicao])
+        + peso_externo * (ratings.get(id_equipe, 0.0) if ratings else 0.0)
+        for id_equipe, posicao in indices.items()
     }
-    return forcas, float(modelo.intercept_[0])
+    return forcas, float(modelo.intercept_[0]), peso_externo
 
 
 def _probabilidade(forca_a: float, forca_b: float, lado: float) -> float:
     return float(1.0 / (1.0 + np.exp(-((forca_a - forca_b) + lado))))
 
 
-def _avaliar_walk_forward(confrontos: list[Confronto]) -> dict[str, Any]:
+def _avaliar_walk_forward(
+    confrontos: list[Confronto], snapshots: list[Snapshot] | None = None
+) -> dict[str, Any]:
     """Reajusta as forcas antes de cada partida do periodo de teste.
 
     O corte e temporal: nenhuma partida do teste influencia a forca com que ela
     propria e prevista. E mais caro que um split unico - reajusta o modelo a
     cada partida - mas com 71 confrontos isso custa milissegundos, e e a unica
     forma de o numero significar alguma coisa.
+
+    Com `snapshots` (o ranking externo, Fase 15), o prior de cada reajuste usa
+    o snapshot VIGENTE na data da partida-alvo - nunca um posterior. E o que
+    mantem a validacao honesta: o ranking de agosto reflete resultados de
+    agosto, e usa-lo para prever julho seria vazamento.
     """
+    snapshots = snapshots or []
     corte = int(len(confrontos) * (1 - FRACAO_TESTE))
     probabilidades: list[float] = []
     reais: list[int] = []
@@ -482,8 +646,12 @@ def _avaliar_walk_forward(confrontos: list[Confronto]) -> dict[str, Any]:
         if vistos_a < MINIMO_HISTORICO or vistos_b < MINIMO_HISTORICO:
             continue
 
+        # O prior e o ranking vigente na data da partida - nao o de hoje.
+        ratings = _ratings_em(snapshots, alvo.data.date() if alvo.data else None)
         # `C` sai da validacao cruzada dentro do historico, nunca do teste.
-        forcas, lado = _ajustar(historico, _escolher_regularizacao(historico))
+        forcas, lado, _ = _ajustar(
+            historico, _escolher_regularizacao(historico, ratings), ratings
+        )
         probabilidades.append(
             _probabilidade(
                 forcas.get(alvo.id_equipe_a, 0.0), forcas.get(alvo.id_equipe_b, 0.0), lado
@@ -523,11 +691,36 @@ def _avaliar_walk_forward(confrontos: list[Confronto]) -> dict[str, Any]:
     }
 
 
+def _resumo_prior(
+    snapshots: list[Snapshot],
+    ratings_finais: dict[int, float],
+    forcas: dict[int, float],
+    peso: float,
+) -> dict[str, Any] | None:
+    """O bloco do relatorio que descreve o prior externo - ou `None` se nao ha.
+
+    `None` e o estado de todo jogo que nao e CS: a tela e a API sabem que, sem
+    este bloco, o modelo e o Bradley-Terry puro.
+    """
+    if not snapshots:
+        return None
+    cobertas = [ide for ide in ratings_finais if ide in forcas]
+    return {
+        "fonte": FONTE_RANKING_PRIOR,
+        "peso": round(peso, 4),
+        "snapshots": len(snapshots),
+        "data_mais_recente": snapshots[-1][0].isoformat(),
+        "equipes_no_ranking": len(ratings_finais),
+        "equipes_no_ranking_com_confronto": len(cobertas),
+    }
+
+
 def ajustar_e_salvar(jogo: str = "dota2") -> dict[str, Any]:
     """Ajusta as forcas sobre todo o historico e grava o relatorio."""
     with session_scope() as sessao:
         confrontos = _carregar_confrontos(sessao, jogo)
         equipes = _carregar_equipes(sessao, jogo)
+        snapshots = _carregar_ratings_externos(sessao, jogo)
 
     if len(confrontos) < 10:
         comando = (
@@ -541,8 +734,9 @@ def ajustar_e_salvar(jogo: str = "dota2") -> dict[str, Any]:
             "porque o ticker da Liquipedia so guarda uma janela recente."
         )
 
-    regularizacao = _escolher_regularizacao(confrontos)
-    forcas, lado = _ajustar(confrontos, regularizacao)
+    ratings_finais = _ratings_em(snapshots, None)
+    regularizacao = _escolher_regularizacao(confrontos, ratings_finais)
+    forcas, lado, peso_externo = _ajustar(confrontos, regularizacao, ratings_finais)
 
     for confronto in confrontos:
         for id_equipe, venceu in (
@@ -557,7 +751,7 @@ def ajustar_e_salvar(jogo: str = "dota2") -> dict[str, Any]:
         if id_equipe in equipes:
             equipes[id_equipe].forca = forca
 
-    validacao = _avaliar_walk_forward(confrontos)
+    validacao = _avaliar_walk_forward(confrontos, snapshots)
 
     PASTA.mkdir(parents=True, exist_ok=True)
     relatorio = {
@@ -573,6 +767,7 @@ def ajustar_e_salvar(jogo: str = "dota2") -> dict[str, Any]:
         "primeira_partida": confrontos[0].data.isoformat() if confrontos[0].data else None,
         "ultima_partida": confrontos[-1].data.isoformat() if confrontos[-1].data else None,
         "validacao": validacao,
+        "prior_externo": _resumo_prior(snapshots, ratings_finais, forcas, peso_externo),
         "forcas": {
             str(id_equipe): round(forca, 4) for id_equipe, forca in forcas.items()
         },

@@ -74,6 +74,8 @@ def _para_schema(equipe: motor.Equipe) -> EquipeConfronto:
             if equipe.duracao_media_segundos is not None
             else None
         ),
+        posicao_ranking=equipe.posicao_ranking,
+        pontos_ranking=equipe.pontos_ranking,
     )
 
 

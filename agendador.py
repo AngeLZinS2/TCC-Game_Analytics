@@ -322,6 +322,21 @@ def _coletar_brackets(settings: Settings, storage: RawStorage) -> CollectionResu
     return _somar(parciais, "liquipedia")
 
 
+def _coletar_ranking(settings: Settings, storage: RawStorage) -> CollectionResult:
+    """O ranking mais recente da Valve (CS2). Uma chamada, sem backfill.
+
+    O backfill dos meses anteriores e um `cli.py collect valve-standings
+    --todos` manual, uma vez; daqui em diante o snapshot novo entra sozinho.
+    """
+    from collectors.valve_standings_collector import ValveStandingsCollector
+
+    coletor = ValveStandingsCollector(raw_storage=storage, settings=settings)
+    try:
+        return coletor.run(carregar=True)
+    finally:
+        coletor.close()
+
+
 def montar_tarefas(settings: Settings) -> list[Tarefa]:
     """As tarefas do agendador, na ordem em que rodam quando empatam."""
     return [
@@ -349,6 +364,11 @@ def montar_tarefas(settings: Settings) -> list[Tarefa]:
             nome="brackets",
             intervalo_segundos=settings.agendador_brackets_minutos * 60,
             executar=_coletar_brackets,
+        ),
+        Tarefa(
+            nome="ranking",
+            intervalo_segundos=settings.agendador_ranking_minutos * 60,
+            executar=_coletar_ranking,
         ),
     ]
 

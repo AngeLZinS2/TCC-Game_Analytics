@@ -1208,6 +1208,79 @@ diz quando não há. Equipes criadas pela agenda entram sem região/país até o
 `liquipedia-times` passar — a previsão não depende desses campos, só o filtro de liga da
 tela de ranking.
 
+### Fase 15 — Ranking da Valve como prior do modelo (CS2)
+
+A Fase 14 deixou 13 jogos com previsão, mas em Counter-Strike a validação walk-forward ainda
+não superava a taxa base: 111 confrontos coletados, espalhados por dezenas de times, dão
+poucas partidas por time. Um time no topo do circuito com 2 ou 3 partidas capturadas caía
+para força ~0 — o modelo tratava "não sei nada sobre ele" e "ele é mediano" do mesmo jeito.
+
+#### HLTV: investigado, descartado
+
+A primeira ideia foi puxar partidas e ranking do HLTV. Medido:
+
+- **Não há API oficial.** As libs são scrapers não-oficiais.
+- `pip install hltv-async-api` **falha** — depende de `lxml`, que não tem wheel para
+  Python 3.14 e não compila no ambiente.
+- Requisição direta em `hltv.org/matches` e `/ranking/teams` → **`403`, header
+  `cf-mitigated: challenge`** (Cloudflare bot challenge).
+- Passar disso exige Camoufox (Firefox headless ~150 MB) ou proxy residencial pago —
+  fragilidade alta, contra o ToS deles, e os resultados de CS2 já vêm da Liquipedia.
+
+#### Valve Regional Standings: fonte aberta, sem scraping
+
+A Valve versiona o ranking oficial de CS2 no GitHub (`ValveSoftware/
+counter-strike_regional_standings`) como **markdown, um snapshot por mês**:
+
+```
+live/2026/standings_global_2026_08_03.md
+| Standing | Points | Team Name | Roster | ... |
+| 1        |   2011 | Spirit    | donk, magixx, sh1ro, tN1R, zont1x | ... |
+```
+
+396 linhas por snapshot — 352 times distintos (44 organizações aparecem 2x, com line-ups
+diferentes; fica a mais bem colocada). Tabela nova `ranking_externo` (migration `0010`),
+com `data_referencia` guardando a data de cada snapshot: manter todos — não só o último —
+é o que permite o prior ser point-in-time.
+
+`collectors/valve_standings_collector.py` descobre os arquivos pela API do GitHub (60
+req/hora sem autenticação, a coleta semanal gasta 2), baixa o global de
+`raw.githubusercontent.com`, e reconcilia os nomes contra `dim_equipe`. A Valve escreve
+curto ("Spirit", "G2", "9z"), a Liquipedia guarda longo ("Team Spirit", "G2 Esports", "9z
+Team") — `_resolver_valve` tenta cada afixo de organização (`Team`, `Esports`, `Clan`, …)
+grudado nos dois lados e casa por igualdade exata. Resultado: **48 dos 50 primeiros do
+ranking** casam (os 2 restantes não existem em `dim_equipe` ainda); na cauda a taxa cai,
+mas lá são times sem confronto coletado, que o modelo não usaria de qualquer forma.
+
+#### O prior no Bradley-Terry
+
+`ml/confronto.py` ganha **uma coluna** na matriz da regressão: a diferença de rating
+externo entre os dois lados, onde rating = z-score de `log(pontos)` dentro do snapshot. A
+`LogisticRegression` aprende o peso dela junto com as forças — e a regularização decide
+quanto confiar no ranking contra o histórico próprio. Para um time com 2 partidas, a coluna
+dele encolhe para ~0 e esse termo é o que sobra dizendo algo. A força guardada já soma
+`peso × rating`, então `_probabilidade`, `prever` e o ranking não mudam.
+
+Na validação walk-forward o prior é **point-in-time**: cada reajuste usa o snapshot vigente
+na data da partida-alvo (`_ratings_em`), nunca um posterior — o ranking de agosto reflete
+resultados de agosto, e usá-lo para prever julho seria vazamento.
+
+#### Resultado medido (A/B na mesma janela de teste, CS)
+
+```
+                 acurácia   base    ROC-AUC   Brier
+  SEM prior        50,0%    57,1%    0,562    0,246
+  COM prior        64,3%    57,1%    0,625    0,237
+```
+
+De abaixo da taxa base para acima dela, nas três métricas. O peso que a regressão deu ao
+prior foi **0,84** — ela se apoiou nele de verdade. Caso concreto: **9z Team**, 0 vitórias
+em 2 partidas coletadas mas #4 no ranking da Valve, saiu de força ~0 para **+1,46** — de
+"desconhecido" para "favorito", que é o que o circuito diz.
+
+14 partidas de teste continuam sendo pouca amostra, e a tela não esconde isso. O prior
+melhora a direção; não transforma 111 confrontos em certeza.
+
 ### Fase 3 — Riot API (LoL)
 
 Próxima fase. O star schema já tem o discriminador (`dim_jogo.codigo`), as rotas de partidas
@@ -1241,6 +1314,7 @@ O serviço `agendador` (`agendador.py`, no `docker-compose.yml`) resolve isso:
 | Liquipedia (ticker) | 12 h | o calendário de campeonato muda em dias, e eles bloqueiam por IP quem abusa |
 | Liquipedia (equipes) | 24 h, 10 wikis/rodada | página de equipe muda em meses; uma varredura completa das ~66 wikis leva ~1 semana |
 | Liquipedia (brackets) | 24 h, 10 wikis/rodada | bracket de torneio decidido não muda; o que cresce é a lista de torneios conhecidos e as fases de torneios em andamento |
+| Valve (ranking CS2) | 7 dias | a Valve publica um snapshot novo por mês; semanal pega o mês novo com folga e custa 2 chamadas ao GitHub |
 
 ```powershell
 docker compose up -d agendador
