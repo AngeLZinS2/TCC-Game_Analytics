@@ -20,6 +20,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 
+import { useEntrarNaTela } from "../hooks/animacao";
 import {
   useAgendaConfronto,
   useLigasConfronto,
@@ -38,7 +39,7 @@ import type {
   ValidacaoConfronto,
 } from "../api/tipos";
 import { Consulta, Esqueleto, Icone, MensagemErro, Selo } from "../componentes/base";
-import { BarraSegmentada, CAMPO, Painel, Pilula } from "../componentes/hud";
+import { BarraDivergente, BarraSegmentada, CAMPO, Painel, Pilula } from "../componentes/hud";
 import { Modal } from "../componentes/Modal";
 import { SeletorDeJogo } from "../componentes/SeletorDeJogo";
 import { useJogoAtual } from "../layout/JogoAtual";
@@ -325,12 +326,8 @@ function CartaoFator({
           sem dado dos dois lados
         </div>
       ) : (
-        <div className="mt-space-sm flex h-1.5 w-full overflow-hidden rounded-full bg-surface-container-highest">
-          <div
-            className="h-full"
-            style={{ width: `${fracaoA * 100}%`, background: PALETA_POLOS.positivo }}
-          />
-          <div className="h-full flex-1" style={{ background: PALETA_POLOS.negativo }} />
+        <div className="mt-space-sm">
+          <BarraSegmentada fracaoA={fracaoA} altura="h-1.5" />
         </div>
       )}
       {fator.unidade && (
@@ -367,6 +364,9 @@ function DetalheConfronto({
 }) {
   const favoritoA = previsao.probabilidade_a >= previsao.probabilidade_b;
   const corFavorito = favoritoA ? PALETA_POLOS.positivo : PALETA_POLOS.negativo;
+  // Rearma sempre que o confronto muda (outro card do kanban, outra dupla no
+  // simulador) - a barra volta a crescer do meio pra fora em vez de saltar.
+  const entrou = useEntrarNaTela(`${previsao.equipe_a.id_equipe}-${previsao.equipe_b.id_equipe}`);
 
   return (
     <div className="space-y-space-lg">
@@ -408,22 +408,25 @@ function DetalheConfronto({
           />
         </div>
 
-        {/* Barra de probabilidade em destaque - o "placar" desta tela. */}
+        {/* Barra de probabilidade em destaque - o "placar" desta tela. Cresce
+            dos dois lados a partir do meio (50/50) ate o placar de verdade. */}
         <div
           className="flex h-3 w-full overflow-hidden rounded-full bg-surface-container-highest"
           style={{ boxShadow: `0 0 18px ${corFavorito}4d` }}
         >
           <div
-            className="h-full transition-all"
+            className="h-full"
             style={{
-              width: `${previsao.probabilidade_a * 100}%`,
+              width: `${(entrou ? previsao.probabilidade_a : 0.5) * 100}%`,
               background: `linear-gradient(90deg, ${PALETA_POLOS.positivo}99, ${PALETA_POLOS.positivo})`,
+              transition: "width 800ms cubic-bezier(0.16, 1, 0.3, 1)",
             }}
           />
           <div
-            className="h-full flex-1 transition-all"
+            className="h-full flex-1"
             style={{
               background: `linear-gradient(90deg, ${PALETA_POLOS.negativo}, ${PALETA_POLOS.negativo}99)`,
+              transition: "width 800ms cubic-bezier(0.16, 1, 0.3, 1)",
             }}
           />
         </div>
@@ -590,15 +593,8 @@ function CardConfronto({
       </div>
 
       {tem ? (
-        <div className="mt-space-sm flex h-1.5 w-full overflow-hidden rounded-full bg-surface-container-highest">
-          <div
-            className="h-full"
-            style={{
-              width: `${jogo.probabilidade_a! * 100}%`,
-              background: PALETA_POLOS.positivo,
-            }}
-          />
-          <div className="h-full flex-1" style={{ background: PALETA_POLOS.negativo }} />
+        <div className="mt-space-sm">
+          <BarraSegmentada fracaoA={jogo.probabilidade_a!} altura="h-1.5" />
         </div>
       ) : (
         <div
@@ -1129,21 +1125,11 @@ export function PrevisaoConfrontoPagina() {
 
                               <td className="px-space-md py-space-sm">
                                 <div className="flex items-center gap-space-sm">
-                                  <div className="relative h-1.5 w-24 rounded-full bg-surface-container-highest">
-                                    <div
-                                      className="absolute top-0 h-full rounded-full"
-                                      style={{
-                                        left: positivo ? "50%" : undefined,
-                                        right: positivo ? undefined : "50%",
-                                        width: `${(Math.abs(equipe.forca) / maiorForca) * 50}%`,
-                                        background: cor,
-                                      }}
-                                    />
-                                    <div
-                                      className="absolute left-1/2 top-0 h-full w-[1px] bg-outline/60"
-                                      aria-hidden
-                                    />
-                                  </div>
+                                  <BarraDivergente
+                                    valor={equipe.forca}
+                                    maximo={maiorForca}
+                                    cor={cor}
+                                  />
                                   <span
                                     className="font-title-code text-title-code tabular-nums"
                                     style={{ color: cor }}

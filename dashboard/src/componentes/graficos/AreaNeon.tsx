@@ -14,6 +14,8 @@
 
 import { useId, useMemo, useState } from "react";
 
+import { useEntrarNaTela } from "../../hooks/animacao";
+
 export interface PontoArea {
   rotulo: string;
   valor: number;
@@ -72,6 +74,9 @@ export function AreaNeon({
   // fazem o segundo herdar o primeiro.
   const id = useId().replace(/:/g, "");
   const [ativo, setAtivo] = useState<number | null>(null);
+  // Rearma a animacao quando a serie muda (trocar o periodo, abrir outro
+  // jogo) - o traco volta a se desenhar em vez de saltar pra forma nova.
+  const entrou = useEntrarNaTela(pontos.map((p) => p.valor).join(","));
 
   const { coordenadas, maximo, indiceMaximo, marcasY } = useMemo(() => {
     const valores = pontos.map((p) => p.valor);
@@ -162,7 +167,12 @@ export function AreaNeon({
             </linearGradient>
           </defs>
 
-          <path d={area} fill={`url(#area-${id})`} />
+          <path
+            d={area}
+            fill={`url(#area-${id})`}
+            opacity={entrou ? 1 : 0}
+            style={{ transition: "opacity 900ms ease-out 400ms" }}
+          />
           <path
             className="drop-shadow-[0_0_8px_rgba(0,229,255,0.8)]"
             d={linha}
@@ -170,24 +180,40 @@ export function AreaNeon({
             stroke={`url(#traco-${id})`}
             strokeWidth="3"
             vectorEffect="non-scaling-stroke"
+            // O traco se desenha da esquerda pra direita: `pathLength=1`
+            // normaliza a curva pra 1 unidade, entao o dashoffset nao
+            // depende do comprimento real (que muda com a serie).
+            pathLength={1}
+            strokeDasharray={1}
+            strokeDashoffset={entrou ? 0 : 1}
+            style={{ transition: "stroke-dashoffset 1100ms cubic-bezier(0.16, 1, 0.3, 1)" }}
           />
 
           {coordenadas.map((coordenada, indice) => {
             const eMaximo = indice === indiceMaximo && pontos.length > 1;
             const eAtivo = indice === ativo;
+            // Escalona a chegada de cada ponto acompanhando o traco: o ponto
+            // so "pousa" quando a linha, na velocidade do dashoffset acima,
+            // teria acabado de passar por ele.
+            const atraso = 200 + (indice / Math.max(1, coordenadas.length - 1)) * 900;
 
             return (
               <circle
                 key={indice}
                 cx={coordenada.x}
                 cy={coordenada.y}
-                r={eMaximo || eAtivo ? 6 : 4}
+                r={entrou ? (eMaximo || eAtivo ? 6 : 4) : 0}
                 className={
                   eMaximo || eAtivo
                     ? "fill-primary-container stroke-surface stroke-2 drop-shadow-[0_0_8px_#00e5ff]"
                     : "fill-primary"
                 }
                 vectorEffect="non-scaling-stroke"
+                style={
+                  eAtivo
+                    ? undefined
+                    : { transition: `r 300ms ease-out ${atraso}ms` }
+                }
               />
             );
           })}

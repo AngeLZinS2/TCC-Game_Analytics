@@ -7,6 +7,8 @@
  * grafico existe para dizer, em vez de duplicar o comprimento em cor.
  */
 
+import { useEntrarNaTela } from "../../hooks/animacao";
+
 export interface FaixaHistograma {
   rotulo: string;
   valor: number;
@@ -34,6 +36,7 @@ export function HistogramaNeon({
   const total = faixas.reduce((soma, faixa) => soma + faixa.valor, 0);
   const maximo = Math.max(...faixas.map((f) => f.valor), 1);
   const indiceModal = faixas.findIndex((f) => f.valor === maximo);
+  const entrou = useEntrarNaTela(faixas.map((f) => f.valor).join(","));
 
   const percentual = (valor: number) =>
     total ? `${Math.round((valor / total) * 100)}%` : "0%";
@@ -72,14 +75,17 @@ export function HistogramaNeon({
               </span>
 
               <div
-                className={`w-full rounded-t transition-all ${
+                className={`w-full rounded-t ${
                   modal
                     ? "bg-gradient-to-t from-secondary to-primary-container shadow-[0_0_12px_rgba(0,229,255,0.35)]"
                     : "bg-surface-container-highest group-hover:bg-secondary-container"
                 }`}
-                // 2% de piso: uma faixa com uma partida so precisa continuar
-                // visivel, senao a coluna some e a faixa parece nao existir.
-                style={{ height: `${Math.max(2, altura)}%` }}
+                style={{
+                  // 2% de piso: uma faixa com uma partida so precisa continuar
+                  // visivel, senao a coluna some e a faixa parece nao existir.
+                  height: `${entrou ? Math.max(2, altura) : 0}%`,
+                  transition: `height 600ms cubic-bezier(0.16, 1, 0.3, 1) ${indice * 35}ms, background-color 200ms`,
+                }}
               />
             </div>
           );

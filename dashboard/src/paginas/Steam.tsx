@@ -32,6 +32,7 @@ import type {
 import { Botao, Consulta, Icone, MensagemErro } from "../componentes/base";
 import { CapaJogo } from "../componentes/CapaJogo";
 import {
+  BarraFina,
   BarraRanking,
   ChipContagem,
   KpiHud,
@@ -370,6 +371,8 @@ export function SteamPagina() {
                 etiqueta="VALVE_CONCURRENT_USERS // AGORA"
                 canto={genero ? `FILTRO: ${genero.toUpperCase()}` : "CATÁLOGO INTEIRO"}
                 valor={fmtNumero(somaJogadores)}
+                valorNumerico={somaJogadores}
+                formatarValor={fmtNumero}
                 rotulo="Jogadores conectados agora"
                 variacao={variacaoTotal}
                 notaVariacao="vs. coleta anterior"
@@ -382,6 +385,8 @@ export function SteamPagina() {
                 etiqueta="INDEXED_ENTITIES // CATÁLOGO"
                 canto={saude.data?.status === "ok" ? "100% OK" : "SEM CONTATO"}
                 valor={fmtNumero(emTela.length)}
+                valorNumerico={emTela.length}
+                formatarValor={fmtNumero}
                 rotulo="Jogos monitorados ativos"
                 acento="secundaria"
                 notaVariacao={`${gratuitos} gratuitos`}
@@ -399,6 +404,8 @@ export function SteamPagina() {
                 etiqueta="PEAK_CCU // HISTÓRICO"
                 canto="SOMA DOS PICOS"
                 valor={fmtCurto(somaPicos)}
+                valorNumerico={somaPicos}
+                formatarValor={fmtCurto}
                 rotulo="Maior audiência já coletada"
                 acento="terciaria"
                 notaVariacao={
@@ -407,12 +414,11 @@ export function SteamPagina() {
                     : undefined
                 }
               >
-                <div className="mt-space-md h-2 w-full overflow-hidden rounded-full bg-surface-container-lowest">
-                  <div
-                    className="h-full rounded-full bg-gradient-to-r from-tertiary-container to-tertiary"
-                    style={{
-                      width: `${somaPicos ? Math.min(100, (somaJogadores / somaPicos) * 100) : 0}%`,
-                    }}
+                <div className="mt-space-md">
+                  <BarraFina
+                    largura={somaPicos ? Math.min(100, (somaJogadores / somaPicos) * 100) : 0}
+                    className="bg-gradient-to-r from-tertiary-container to-tertiary"
+                    altura="h-2"
                   />
                 </div>
               </KpiHud>

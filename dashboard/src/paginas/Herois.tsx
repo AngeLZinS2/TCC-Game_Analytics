@@ -16,7 +16,15 @@ import { usePersonagens, useSaude } from "../api/consultas";
 import type { ResumoPersonagem } from "../api/tipos";
 import { Botao, Consulta, Icone, Selo } from "../componentes/base";
 import { RetratoHeroi } from "../componentes/RetratoHeroi";
-import { CAMPO, KpiHud, Painel, Pilula, Segmentos } from "../componentes/hud";
+import {
+  BarraFina,
+  BarraSegmentada,
+  CAMPO,
+  KpiHud,
+  Painel,
+  Pilula,
+  Segmentos,
+} from "../componentes/hud";
 import { SeletorDeJogo } from "../componentes/SeletorDeJogo";
 import { useJogoAtual } from "../layout/JogoAtual";
 import { PALETA_POLOS } from "../tema";
@@ -254,6 +262,8 @@ export function HeroisPagina() {
                 etiqueta="Heróis no recorte"
                 canto={`MÍN. ${minPartidas}`}
                 valor={fmtNumero(lista.length)}
+                valorNumerico={lista.length}
+                formatarValor={fmtNumero}
                 rotulo="Na dimensão de personagem"
                 acento="primaria"
                 notaVariacao={`${fmtNumero(escolhas)} escolhas somadas`}
@@ -265,21 +275,15 @@ export function HeroisPagina() {
                 etiqueta="Acima dos 50%"
                 canto="POLARIDADE"
                 valor={fmtNumero(acima)}
+                valorNumerico={acima}
+                formatarValor={fmtNumero}
                 rotulo="Heróis com mais vitórias que derrotas"
                 acento="terciaria"
                 notaVariacao={`${fmtNumero(lista.length - acima)} abaixo ou na linha`}
               >
-                <div className="mt-space-md flex h-2 w-full overflow-hidden rounded-full bg-surface-container-highest">
-                  <div
-                    className="h-full"
-                    style={{
-                      width: `${lista.length ? (acima / lista.length) * 100 : 0}%`,
-                      background: PALETA_POLOS.positivo,
-                    }}
-                  />
-                  <div
-                    className="h-full flex-1"
-                    style={{ background: PALETA_POLOS.negativo }}
+                <div className="mt-space-md">
+                  <BarraSegmentada
+                    fracaoA={lista.length ? acima / lista.length : 0}
                   />
                 </div>
               </KpiHud>
@@ -454,14 +458,8 @@ export function HeroisPagina() {
 
                         <td className="px-space-md py-space-sm">
                           <div className="flex items-center gap-space-sm">
-                            <div className="h-1.5 w-16 overflow-hidden rounded-full bg-surface-container-highest">
-                              <div
-                                className="h-full rounded-full"
-                                style={{
-                                  width: `${heroi.winrate}%`,
-                                  background: cor,
-                                }}
-                              />
+                            <div className="w-16">
+                              <BarraFina largura={heroi.winrate} cor={cor} />
                             </div>
                             <span
                               className="font-title-code text-title-code tabular-nums"

@@ -9,6 +9,7 @@
 
 import type { ReactNode } from "react";
 
+import { useContagem, useEntrarNaTela } from "../hooks/animacao";
 import { Icone } from "./base";
 
 /** Acento de um bloco. O desenho alterna os tres entre os cartoes. */
@@ -68,6 +69,9 @@ export function Sparkline({
   });
 
   const linha = `M ${pontos.join(" L ")}`;
+  // `entrou` rearma sempre que a serie muda - trocar de jogo/periodo faz o
+  // traco se desenhar de novo em vez de saltar pra silhueta nova.
+  const entrou = useEntrarNaTela(valores.join(","));
 
   return (
     <div className="mt-space-md flex h-9 w-full items-end">
@@ -84,8 +88,19 @@ export function Sparkline({
           strokeLinecap="round"
           strokeWidth="2.5"
           vectorEffect="non-scaling-stroke"
+          // `pathLength=1` normaliza o traco pra 1 unidade sempre - o
+          // dasharray/offset nao precisa saber o comprimento real da curva.
+          pathLength={1}
+          strokeDasharray={1}
+          strokeDashoffset={entrou ? 0 : 1}
+          style={{ transition: "stroke-dashoffset 900ms ease-out" }}
         />
-        <path d={`${linha} L 200,36 L 0,36 Z`} fill="currentColor" opacity="0.08" />
+        <path
+          d={`${linha} L 200,36 L 0,36 Z`}
+          fill="currentColor"
+          opacity={entrou ? 0.08 : 0}
+          style={{ transition: "opacity 900ms ease-out 300ms" }}
+        />
       </svg>
     </div>
   );
@@ -101,20 +116,33 @@ export function Segmentos({
   total?: number;
   acento?: Acento;
 }) {
+  const entrou = useEntrarNaTela(`${acesos}/${total}`);
+
   return (
     <div
       className="mt-space-md grid gap-1 pt-2"
       style={{ gridTemplateColumns: `repeat(${total}, minmax(0, 1fr))` }}
       aria-hidden
     >
-      {Array.from({ length: total }, (_, indice) => (
-        <div
-          key={indice}
-          className={`h-2 rounded-sm ${
-            indice < acesos ? ACENTO[acento].ponto : "bg-surface-container-highest"
-          }`}
-        />
-      ))}
+      {Array.from({ length: total }, (_, indice) => {
+        const aceso = indice < acesos;
+        return (
+          <div
+            key={indice}
+            className={`h-2 origin-left rounded-sm ${
+              aceso ? ACENTO[acento].ponto : "bg-surface-container-highest"
+            }`}
+            style={
+              aceso
+                ? {
+                    transform: `scaleX(${entrou ? 1 : 0})`,
+                    transition: `transform 350ms ease-out ${indice * 45}ms`,
+                  }
+                : undefined
+            }
+          />
+        );
+      })}
     </div>
   );
 }
@@ -127,6 +155,8 @@ export function KpiHud({
   etiqueta,
   canto,
   valor,
+  valorNumerico,
+  formatarValor,
   rotulo,
   variacao,
   notaVariacao,
@@ -137,7 +167,14 @@ export function KpiHud({
   etiqueta: string;
   /** Texto do canto superior direito. */
   canto?: ReactNode;
+  /** O numero pronto, ja formatado. Usado direto quando o valor nao e
+   * numerico ("Gratuito", "—", um texto) ou quando `valorNumerico` falta. */
   valor: ReactNode;
+  /** Quando presente (com `formatarValor`), o numero grande CONTA ate aqui em
+   * vez de nascer pronto - a mesma curva de desaceleracao de um contador
+   * digital. `null`/`undefined` cai de volta em `valor`. */
+  valorNumerico?: number | null;
+  formatarValor?: (valor: number) => string;
   rotulo: string;
   /** Variacao percentual. `null` quando ainda nao ha com o que comparar. */
   variacao?: number | null;
@@ -148,6 +185,13 @@ export function KpiHud({
 }) {
   const cor = ACENTO[acento];
   const subiu = (variacao ?? 0) >= 0;
+  const contagem = useContagem(
+    valorNumerico !== undefined && valorNumerico !== null && formatarValor
+      ? valorNumerico
+      : null,
+  );
+  const valorExibido =
+    contagem !== null && formatarValor ? formatarValor(contagem) : valor;
 
   return (
     <div className="group relative overflow-hidden rounded-xl bg-surface-container-low p-space-base shadow-lg transition-all hover:bg-surface-container">
@@ -169,9 +213,9 @@ export function KpiHud({
       <div className="mt-space-md flex items-baseline justify-between gap-space-sm">
         <div className="flex min-w-0 flex-col">
           <span
-            className={`font-headline-kpi text-headline-kpi tracking-tight ${cor.texto}`}
+            className={`font-headline-kpi text-headline-kpi tracking-tight tabular-nums ${cor.texto}`}
           >
-            {valor}
+            {valorExibido}
           </span>
           <span className="font-title-code text-title-code text-on-surface-variant">
             {rotulo}
@@ -329,6 +373,7 @@ export function BarraRanking({
   proporcao: number;
   aoClicar?: () => void;
 }) {
+  const entrou = useEntrarNaTela(proporcao);
   const conteudo = (
     <>
       <div className="flex items-center justify-between gap-space-sm font-title-code text-body-sm">
@@ -368,8 +413,11 @@ export function BarraRanking({
 
       <div className="flex h-3 w-full overflow-hidden rounded-full bg-surface-container-lowest">
         <div
-          className="h-full rounded-full bg-gradient-to-r from-primary-container via-primary to-secondary shadow-[0_0_10px_rgba(0,229,255,0.5)] transition-all duration-700"
-          style={{ width: `${Math.max(2, proporcao * 100).toFixed(1)}%` }}
+          className="h-full rounded-full bg-gradient-to-r from-primary-container via-primary to-secondary shadow-[0_0_10px_rgba(0,229,255,0.5)]"
+          style={{
+            width: `${entrou ? Math.max(2, proporcao * 100).toFixed(1) : 0}%`,
+            transition: "width 700ms cubic-bezier(0.16, 1, 0.3, 1)",
+          }}
         />
       </div>
     </>
@@ -395,8 +443,12 @@ export function BarraRanking({
  */
 export function BarraSegmentada({
   fracaoA,
-  corA = "bg-tertiary-container",
-  corB = "bg-error",
+  // Cor CSS de verdade (hex/rgb), nao classe Tailwind - o `PALETA_POLOS` do
+  // design system e o que todo chamador usa, e assim a barra aceita ele
+  // direto em vez de exigir uma classe soltando o mesmo tom.
+  corA = "#16ef7a",
+  corB = "#ff8a93",
+  altura = "h-2",
   legendaEsquerda,
   legendaDireita,
 }: {
@@ -404,16 +456,35 @@ export function BarraSegmentada({
   fracaoA: number;
   corA?: string;
   corB?: string;
+  altura?: string;
   legendaEsquerda?: ReactNode;
   legendaDireita?: ReactNode;
 }) {
   const a = Math.min(100, Math.max(0, fracaoA * 100));
+  const entrou = useEntrarNaTela(fracaoA);
+  // Cresce dos dois lados para o meio - e uma barra de DUAS grandezas, entao
+  // as duas nascem em zero, nao uma "roubando" espaco da outra.
+  const transicao = "width 700ms cubic-bezier(0.16, 1, 0.3, 1)";
 
   return (
     <div className="flex w-full flex-col gap-space-xs">
-      <div className="flex h-2 w-full overflow-hidden rounded-full bg-surface-container-highest">
-        <div className={`h-full ${corA}`} style={{ width: `${a}%` }} />
-        <div className={`h-full ${corB}`} style={{ width: `${100 - a}%` }} />
+      <div className={`flex ${altura} w-full overflow-hidden rounded-full bg-surface-container-highest`}>
+        <div
+          className="h-full"
+          style={{
+            width: `${entrou ? a : 50}%`,
+            background: corA,
+            transition: transicao,
+          }}
+        />
+        <div
+          className="h-full"
+          style={{
+            width: `${entrou ? 100 - a : 50}%`,
+            background: corB,
+            transition: transicao,
+          }}
+        />
       </div>
       {(legendaEsquerda || legendaDireita) && (
         <div className="flex items-center justify-between text-outline">
@@ -423,6 +494,115 @@ export function BarraSegmentada({
           </span>
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * Barra binaria - "ha dado" x "nao ha", nao uma proporcao. Acende cheia ou
+ * fica vazia; o rodape de um `KpiHud` cuja unica pergunta e "existe algo aqui?".
+ */
+export function BarraCheia({
+  acesa,
+  acento = "primaria",
+}: {
+  acesa: boolean;
+  acento?: Acento;
+}) {
+  const entrou = useEntrarNaTela(acesa);
+  const gradiente = {
+    primaria: "from-primary-container to-primary",
+    secundaria: "from-secondary-container to-secondary",
+    terciaria: "from-tertiary-container to-tertiary",
+  }[acento];
+
+  return (
+    <div className="mt-space-md h-2 w-full overflow-hidden rounded-full bg-surface-container-lowest">
+      <div
+        className={`h-full rounded-full bg-gradient-to-r ${gradiente}`}
+        style={{
+          width: entrou && acesa ? "100%" : "0%",
+          transition: "width 700ms cubic-bezier(0.16, 1, 0.3, 1)",
+        }}
+      />
+    </div>
+  );
+}
+
+/**
+ * Barra fina de uma cor so - a mini-barra de linha de tabela (winrate por
+ * heroi, tag por votos, forca por equipe...). Cresce de 0 ate `largura` na
+ * entrada, com a mesma curva de toda barra do projeto: e o "modelo" que
+ * qualquer progresso simples (nao ranking, nao polaridade de duas cores) usa.
+ */
+export function BarraFina({
+  largura,
+  cor,
+  opacidade,
+  className = "bg-primary",
+  altura = "h-1.5",
+}: {
+  /** 0 a 100. */
+  largura: number;
+  /** Cor CSS (hex/rgb). Sem ela, usa `className` para a cor (ex.: `bg-primary`). */
+  cor?: string;
+  /** 0 a 1 - para o caso de "amostra pequena, mostra mas esmaece". */
+  opacidade?: number;
+  className?: string;
+  altura?: string;
+}) {
+  const entrou = useEntrarNaTela(largura);
+  const alvo = Math.max(0, Math.min(100, largura));
+
+  return (
+    <div className={`${altura} overflow-hidden rounded-full bg-surface-container-highest`}>
+      <div
+        className={`h-full rounded-full ${cor ? "" : className}`}
+        style={{
+          width: `${entrou ? alvo : 0}%`,
+          background: cor,
+          opacity: opacidade,
+          transition: "width 650ms cubic-bezier(0.16, 1, 0.3, 1)",
+        }}
+      />
+    </div>
+  );
+}
+
+/**
+ * Barra divergente: cresce a partir do MEIO, pra esquerda ou pra direita
+ * conforme o sinal - o ranking de forca do Bradley-Terry, onde zero e a
+ * media e o que importa e "quanto acima ou abaixo" dela.
+ */
+export function BarraDivergente({
+  valor,
+  maximo,
+  cor,
+  className = "w-24",
+}: {
+  valor: number;
+  /** Maior `|valor|` do conjunto - `valor/maximo` vira a fracao dos 50% disponiveis de cada lado. */
+  maximo: number;
+  cor: string;
+  className?: string;
+}) {
+  const entrou = useEntrarNaTela(valor);
+  const positivo = valor >= 0;
+  const fracao = maximo > 0 ? Math.min(1, Math.abs(valor) / maximo) : 0;
+
+  return (
+    <div className={`relative h-1.5 rounded-full bg-surface-container-highest ${className}`}>
+      <div
+        className="absolute top-0 h-full rounded-full"
+        style={{
+          left: positivo ? "50%" : undefined,
+          right: positivo ? undefined : "50%",
+          width: `${(entrou ? fracao : 0) * 50}%`,
+          background: cor,
+          transition: "width 700ms cubic-bezier(0.16, 1, 0.3, 1)",
+        }}
+      />
+      <div className="absolute left-1/2 top-0 h-full w-[1px] bg-outline/60" aria-hidden />
     </div>
   );
 }

@@ -12,6 +12,7 @@ import { useJogadores, useSaude } from "../api/consultas";
 import type { ResumoJogador } from "../api/tipos";
 import { Botao, Consulta, Icone, Selo } from "../componentes/base";
 import {
+  BarraFina,
   CAMPO,
   KpiHud,
   Paginacao,
@@ -286,6 +287,8 @@ export function JogadoresPagina() {
                 etiqueta="Jogadores no recorte"
                 canto={`MÍN. ${minPartidas}`}
                 valor={fmtNumero(lista.length)}
+                valorNumerico={lista.length}
+                formatarValor={fmtNumero}
                 rotulo="Identificados na dimensão"
                 acento="primaria"
                 notaVariacao={`${fmtNumero(participacoes)} participações`}
@@ -297,6 +300,8 @@ export function JogadoresPagina() {
                 etiqueta="KDA médio do grupo"
                 canto="MÉDIA"
                 valor={kdaMedio === null ? "—" : fmtDecimal(kdaMedio, 2)}
+                valorNumerico={kdaMedio}
+                formatarValor={(v) => fmtDecimal(v, 2)}
                 rotulo="(kills + assists) / deaths"
                 acento="secundaria"
                 notaVariacao={`${comKda.length} com KDA calculável`}
@@ -314,13 +319,16 @@ export function JogadoresPagina() {
                 etiqueta="Maior winrate"
                 canto="TOPO"
                 valor={melhorWinrate ? fmtPercentual(melhorWinrate.winrate) : "—"}
+                valorNumerico={melhorWinrate?.winrate ?? null}
+                formatarValor={(v) => fmtPercentual(v)}
                 rotulo={melhorWinrate ? nomeDe(melhorWinrate) : "sem dados"}
                 acento="terciaria"
               >
-                <div className="mt-space-md h-2 w-full overflow-hidden rounded-full bg-surface-container-lowest">
-                  <div
-                    className="h-full rounded-full bg-gradient-to-r from-tertiary-container to-tertiary"
-                    style={{ width: `${melhorWinrate?.winrate ?? 0}%` }}
+                <div className="mt-space-md">
+                  <BarraFina
+                    largura={melhorWinrate?.winrate ?? 0}
+                    className="bg-gradient-to-r from-tertiary-container to-tertiary"
+                    altura="h-2"
                   />
                 </div>
               </KpiHud>
@@ -333,6 +341,12 @@ export function JogadoresPagina() {
                     lista.map((j) => j.personagem_assinatura).filter(Boolean),
                   ).size,
                 )}
+                valorNumerico={
+                  new Set(
+                    lista.map((j) => j.personagem_assinatura).filter(Boolean),
+                  ).size
+                }
+                formatarValor={fmtNumero}
                 rotulo="Heróis distintos como principal"
                 acento="primaria"
                 notaVariacao="entre os jogadores do recorte"
@@ -461,10 +475,10 @@ export function JogadoresPagina() {
 
                           <td className="px-space-md py-space-sm">
                             <div className="flex items-center gap-space-sm">
-                              <div className="h-1.5 w-20 overflow-hidden rounded-full bg-surface-container-highest">
-                                <div
-                                  className="h-full rounded-full bg-gradient-to-r from-primary-container to-tertiary"
-                                  style={{ width: `${jogador.winrate}%` }}
+                              <div className="w-20">
+                                <BarraFina
+                                  largura={jogador.winrate}
+                                  className="bg-gradient-to-r from-primary-container to-tertiary"
                                 />
                               </div>
                               <span className="font-title-code text-title-code tabular-nums text-tertiary">

@@ -22,7 +22,7 @@ import type {
 import { Botao, Consulta, Icone, Selo } from "../componentes/base";
 import { CapaJogo } from "../componentes/CapaJogo";
 import { AreaNeon } from "../componentes/graficos/AreaNeon";
-import { KpiHud, Painel } from "../componentes/hud";
+import { BarraFina, KpiHud, Painel } from "../componentes/hud";
 import {
   classificacaoSteam,
   fmtCurto,
@@ -155,24 +155,22 @@ export function JogoSteamPagina() {
                 etiqueta="Jogadores simultâneos"
                 canto="AGORA"
                 valor={fmtNumero(jogo.jogadores_simultaneos)}
+                valorNumerico={jogo.jogadores_simultaneos}
+                formatarValor={fmtNumero}
                 rotulo={`Coletado ${fmtRelativo(jogo.janela_coleta)}`}
                 variacao={jogo.variacao_jogadores}
                 notaVariacao="vs. coleta anterior"
                 acento="primaria"
               >
-                <div className="mt-space-md h-2 w-full overflow-hidden rounded-full bg-surface-container-lowest">
-                  <div
-                    className="h-full rounded-full bg-gradient-to-r from-primary-container to-secondary"
-                    style={{
-                      width: `${
-                        jogo.pico_jogadores && jogo.jogadores_simultaneos
-                          ? Math.min(
-                              100,
-                              (jogo.jogadores_simultaneos / jogo.pico_jogadores) * 100,
-                            )
-                          : 0
-                      }%`,
-                    }}
+                <div className="mt-space-md">
+                  <BarraFina
+                    largura={
+                      jogo.pico_jogadores && jogo.jogadores_simultaneos
+                        ? Math.min(100, (jogo.jogadores_simultaneos / jogo.pico_jogadores) * 100)
+                        : 0
+                    }
+                    className="bg-gradient-to-r from-primary-container to-secondary"
+                    altura="h-2"
                   />
                 </div>
               </KpiHud>
@@ -181,6 +179,8 @@ export function JogoSteamPagina() {
                 etiqueta="Avaliações positivas"
                 canto="STEAM REVIEWS"
                 valor={fmtPercentual(jogo.nota_avaliacoes, 0)}
+                valorNumerico={paraNumero(jogo.nota_avaliacoes)}
+                formatarValor={(v) => fmtPercentual(v, 0)}
                 rotulo={`${fmtCurto(jogo.numero_avaliacoes)} avaliações no total`}
                 acento="terciaria"
               >
@@ -205,6 +205,8 @@ export function JogoSteamPagina() {
                 etiqueta="Pico histórico"
                 canto="PEAK CCU"
                 valor={fmtCurto(jogo.pico_jogadores)}
+                valorNumerico={jogo.pico_jogadores}
+                formatarValor={fmtCurto}
                 rotulo="Maior valor já coletado"
                 acento="secundaria"
                 notaVariacao={`${fmtNumero(dados.serie.length)} snapshots na série`}
@@ -214,6 +216,8 @@ export function JogoSteamPagina() {
                 etiqueta="Preço atual"
                 canto={jogo.moeda ?? "—"}
                 valor={fmtMoeda(jogo.preco_no_momento, jogo.moeda)}
+                valorNumerico={paraNumero(jogo.preco_no_momento)}
+                formatarValor={(v) => fmtMoeda(v, jogo.moeda)}
                 rotulo={
                   jogo.desconto_percentual
                     ? `${jogo.desconto_percentual}% de desconto`
@@ -727,10 +731,11 @@ function FichaDoJogo({ ficha, nome }: { ficha: FichaJogoSteam; nome: string }) {
                 <span className="w-32 shrink-0 truncate font-title-code text-title-code text-on-surface-variant">
                   {tag}
                 </span>
-                <div className="h-2 flex-1 overflow-hidden rounded-full bg-surface-container-high">
-                  <div
-                    className="h-full rounded-full bg-gradient-to-r from-primary-container to-secondary"
-                    style={{ width: `${Math.max(4, (votos / maxVotos) * 100)}%` }}
+                <div className="flex-1">
+                  <BarraFina
+                    largura={Math.max(4, (votos / maxVotos) * 100)}
+                    className="bg-gradient-to-r from-primary-container to-secondary"
+                    altura="h-2"
                   />
                 </div>
                 <span className="w-12 shrink-0 text-right font-title-code text-title-code text-outline">

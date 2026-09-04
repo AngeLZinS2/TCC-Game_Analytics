@@ -21,6 +21,7 @@ import type { JogoSteam, PartidasPorDia, VisaoGeral } from "../api/tipos";
 import { Botao, Consulta, Icone } from "../componentes/base";
 import { AreaNeon } from "../componentes/graficos/AreaNeon";
 import {
+  BarraCheia,
   BarraRanking,
   KpiHud,
   Painel,
@@ -236,6 +237,8 @@ export function VisaoGeralPagina() {
                 etiqueta="Jogadores simultâneos na Steam"
                 canto={`${dados.jogos_steam} JOGOS`}
                 valor={fmtNumero(dados.jogadores_simultaneos_total)}
+                valorNumerico={dados.jogadores_simultaneos_total}
+                formatarValor={fmtNumero}
                 rotulo="Somados no último snapshot"
                 variacao={variacaoSteam}
                 notaVariacao="vs. coleta anterior"
@@ -248,6 +251,8 @@ export function VisaoGeralPagina() {
                 etiqueta="Snapshots da Steam"
                 canto="SÉRIE TEMPORAL"
                 valor={fmtNumero(dados.snapshots_steam)}
+                valorNumerico={dados.snapshots_steam}
+                formatarValor={fmtNumero}
                 rotulo="Linhas de fato do catálogo"
                 acento="secundaria"
                 notaVariacao={`${fmtNumero(dados.jogos_steam)} jogos monitorados`}
@@ -261,22 +266,21 @@ export function VisaoGeralPagina() {
                 etiqueta="Partidas coletadas"
                 canto="STAR SCHEMA"
                 valor={fmtNumero(dados.partidas)}
+                valorNumerico={dados.partidas}
+                formatarValor={fmtNumero}
                 rotulo="Partidas profissionais"
                 acento="terciaria"
                 notaVariacao={`${fmtNumero(dados.linhas_fato_partida)} linhas de fato`}
               >
-                <div className="mt-space-md h-2 w-full overflow-hidden rounded-full bg-surface-container-lowest">
-                  <div
-                    className="h-full rounded-full bg-gradient-to-r from-tertiary-container to-tertiary"
-                    style={{ width: dados.partidas ? "100%" : "0%" }}
-                  />
-                </div>
+                <BarraCheia acesa={Boolean(dados.partidas)} acento="terciaria" />
               </KpiHud>
 
               <KpiHud
                 etiqueta="Jogadores identificados"
                 canto={`${fmtNumero(dados.personagens)} HERÓIS`}
                 valor={fmtNumero(dados.jogadores)}
+                valorNumerico={dados.jogadores}
+                formatarValor={fmtNumero}
                 rotulo="Na dimensão de jogador"
                 acento="primaria"
                 notaVariacao="fatos anônimos não contam"

@@ -44,7 +44,7 @@ import type {
 import { Consulta, Icone, MensagemErro, Selo } from "../componentes/base";
 import { ArteJogo, CapaJogo } from "../componentes/CapaJogo";
 import { AreaNeon } from "../componentes/graficos/AreaNeon";
-import { KpiHud, Painel, Pilula } from "../componentes/hud";
+import { BarraFina, KpiHud, Painel, Pilula } from "../componentes/hud";
 import { PALETA_POLOS, TOKENS } from "../tema";
 import {
   classificacaoSteam,
@@ -431,13 +431,11 @@ function Classificador({ modelo }: { modelo?: string }) {
             </Selo>
           </div>
 
-          <div className="mt-space-base flex h-2 w-full overflow-hidden rounded-full bg-surface-container-highest">
-            <div
-              className="h-full transition-all duration-500"
-              style={{
-                width: `${probabilidade * 100}%`,
-                background: positiva ? PALETA_POLOS.positivo : PALETA_POLOS.negativo,
-              }}
+          <div className="mt-space-base">
+            <BarraFina
+              largura={probabilidade * 100}
+              cor={positiva ? PALETA_POLOS.positivo : PALETA_POLOS.negativo}
+              altura="h-2"
             />
           </div>
 
@@ -589,6 +587,8 @@ export function RecomendacoesReviewsPagina() {
                     etiqueta="Recomendação observada"
                     canto="RÓTULO REAL"
                     valor={fmtPercentual(taxa)}
+                    valorNumerico={taxa}
+                    formatarValor={(v) => fmtPercentual(v)}
                     rotulo={jogoSelecionado?.nome ?? "jogo selecionado"}
                     acento="terciaria"
                     variacao={geral === null ? null : taxa - geral}
@@ -598,6 +598,8 @@ export function RecomendacoesReviewsPagina() {
                     etiqueta="Avaliações com texto"
                     canto="COLETADAS"
                     valor={fmtNumero(dados.avaliacoes)}
+                    valorNumerico={dados.avaliacoes}
+                    formatarValor={fmtNumero}
                     rotulo={`${fmtNumero(dados.positivas)} recomendam`}
                     acento="primaria"
                     notaVariacao={`${fmtNumero(dados.avaliacoes - dados.positivas)} não recomendam`}
@@ -608,6 +610,8 @@ export function RecomendacoesReviewsPagina() {
                     valor={
                       piorAspecto ? fmtPercentual(piorAspecto.percentual_positivo, 0) : "—"
                     }
+                    valorNumerico={piorAspecto?.percentual_positivo ?? null}
+                    formatarValor={(v) => fmtPercentual(v, 0)}
                     rotulo={piorAspecto?.aspecto ?? "amostra insuficiente"}
                     acento="secundaria"
                     notaVariacao={
@@ -620,6 +624,8 @@ export function RecomendacoesReviewsPagina() {
                     etiqueta="ROC-AUC do modelo"
                     canto="ORDENAÇÃO"
                     valor={metricas ? fmtDecimal(metricas.roc_auc, 3) : "—"}
+                    valorNumerico={metricas?.roc_auc ?? null}
+                    formatarValor={(v) => fmtDecimal(v, 3)}
                     rotulo={metricas?.familia ?? ""}
                     acento="primaria"
                     notaVariacao={
@@ -690,16 +696,16 @@ export function RecomendacoesReviewsPagina() {
                           <span className="w-32 shrink-0 truncate font-body-sm text-body-sm text-on-surface-variant">
                             {aspecto.aspecto}
                           </span>
-                          <div className="h-2 flex-1 overflow-hidden rounded-full bg-surface-container-highest">
-                            <div
-                              className="h-full rounded-full transition-all"
-                              style={{
-                                width: `${aspecto.percentual_positivo}%`,
-                                background: poucos
+                          <div className="flex-1">
+                            <BarraFina
+                              largura={aspecto.percentual_positivo}
+                              cor={
+                                poucos
                                   ? TOKENS.contornoSuave
-                                  : corDaTaxa(aspecto.percentual_positivo),
-                                opacity: poucos ? 0.6 : 1,
-                              }}
+                                  : corDaTaxa(aspecto.percentual_positivo)
+                              }
+                              opacidade={poucos ? 0.6 : 1}
+                              altura="h-2"
                             />
                           </div>
                           <span
@@ -915,13 +921,11 @@ export function RecomendacoesReviewsPagina() {
                       <span className="w-44 shrink-0 truncate font-headline-sm text-headline-sm text-on-surface">
                         {jogo.jogo}
                       </span>
-                      <div className="h-2 flex-1 overflow-hidden rounded-full bg-surface-container-highest">
-                        <div
-                          className="h-full rounded-full"
-                          style={{
-                            width: `${jogo.percentual_positivo}%`,
-                            background: corDaTaxa(jogo.percentual_positivo),
-                          }}
+                      <div className="flex-1">
+                        <BarraFina
+                          largura={jogo.percentual_positivo}
+                          cor={corDaTaxa(jogo.percentual_positivo)}
+                          altura="h-2"
                         />
                       </div>
                       <span

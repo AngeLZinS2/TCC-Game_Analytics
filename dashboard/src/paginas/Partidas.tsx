@@ -22,6 +22,7 @@ import { Botao, Consulta, Icone, Selo } from "../componentes/base";
 import { AreaNeon } from "../componentes/graficos/AreaNeon";
 import { HistogramaNeon } from "../componentes/graficos/HistogramaNeon";
 import {
+  BarraFina,
   BarraSegmentada,
   CAMPO,
   KpiHud,
@@ -252,6 +253,8 @@ export function PartidasPagina() {
                 etiqueta="Partidas analisadas"
                 canto="STAR SCHEMA"
                 valor={fmtNumero(dados.partidas)}
+                valorNumerico={dados.partidas}
+                formatarValor={fmtNumero}
                 rotulo="Partidas profissionais"
                 acento="primaria"
                 notaVariacao={`${fmtDataCurta(dados.primeira_partida)} — ${fmtDataCurta(dados.ultima_partida)}`}
@@ -263,25 +266,26 @@ export function PartidasPagina() {
                 etiqueta="Duração mediana"
                 canto="MEDIANA"
                 valor={fmtDuracao(dados.duracao_mediana_segundos)}
+                valorNumerico={dados.duracao_mediana_segundos}
+                formatarValor={fmtDuracao}
                 rotulo="Metade das partidas abaixo disso"
                 acento="secundaria"
                 notaVariacao={`média de ${fmtDuracao(dados.duracao_media_segundos)}`}
               >
-                <div className="mt-space-md h-2 w-full overflow-hidden rounded-full bg-surface-container-lowest">
-                  <div
-                    className="h-full rounded-full bg-gradient-to-r from-secondary-container to-secondary"
-                    style={{
-                      width: `${
-                        dados.duracao_media_segundos && dados.duracao_mediana_segundos
-                          ? Math.min(
+                <div className="mt-space-md">
+                  <BarraFina
+                    largura={
+                      dados.duracao_media_segundos && dados.duracao_mediana_segundos
+                        ? Math.min(
+                            100,
+                            (dados.duracao_mediana_segundos /
+                              dados.duracao_media_segundos) *
                               100,
-                              (dados.duracao_mediana_segundos /
-                                dados.duracao_media_segundos) *
-                                100,
-                            )
-                          : 0
-                      }%`,
-                    }}
+                          )
+                        : 0
+                    }
+                    className="bg-gradient-to-r from-secondary-container to-secondary"
+                    altura="h-2"
                   />
                 </div>
               </KpiHud>
@@ -290,6 +294,8 @@ export function PartidasPagina() {
                 etiqueta="Radiant vs Dire"
                 canto="EQUILÍBRIO"
                 valor={fmtPercentual(dados.winrate_radiant)}
+                valorNumerico={dados.winrate_radiant}
+                formatarValor={(v) => fmtPercentual(v)}
                 rotulo="Vitórias do lado Radiant"
                 acento="terciaria"
               >
@@ -315,6 +321,8 @@ export function PartidasPagina() {
                 etiqueta="Jogadores monitorados"
                 canto={`${fmtNumero(dados.personagens_usados)} HERÓIS`}
                 valor={fmtNumero(dados.jogadores_distintos)}
+                valorNumerico={dados.jogadores_distintos}
+                formatarValor={fmtNumero}
                 rotulo="Jogadores distintos no recorte"
                 acento="primaria"
                 notaVariacao="fatos anônimos não contam"
