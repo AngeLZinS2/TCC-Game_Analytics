@@ -467,7 +467,11 @@ class JogoAoVivo(BaseModel):
 
     app_id: int
     nome: str
+    #: A capa (460x215): pequena, mas nitida e sempre presente.
     imagem_header: str | None
+    #: A arte de fundo da loja - grande, mas as vezes ja vem escurecida pela
+    #: propria Valve. A tela usa de fundo atras da capa, nao como banner.
+    imagem_fundo: str | None = None
     generos: list[str]
     desenvolvedora: str | None
     preco_atual: Decimal | None

@@ -119,6 +119,17 @@ def test_instrucao_marca_o_conhecimento_geral():
         # A sobra solta juntava palavras nao adjacentes e produzia um termo que
         # nao existe na loja; o recorte em trechos contiguos e o que corrige.
         ("o cyberpunk 2077 vale a pena? ele esta no banco?", "cyberpunk 2077"),
+        # Vocabulario de "onde compro isso mais barato" - a pergunta que o
+        # painel de preco existe pra responder. Sem estas palavras na lista de
+        # vazias, elas grudavam no nome ("helldivers 2 pelo menor") e a busca
+        # na loja nao achava nada.
+        ("Onde encontro o Helldivers 2 pelo menor preço?", "helldivers 2"),
+        ("quero comprar o Hollow Knight pelo menor valor", "hollow knight"),
+        ("onde compro elden ring mais barato?", "elden ring"),
+        (
+            "Call of Duty Modern Warfare III onde encontro pelo menor preço?",
+            "call of duty modern warfare iii",
+        ),
     ],
 )
 def test_termo_de_jogo_sobra_o_nome(pergunta: str, esperado: str):
@@ -166,6 +177,27 @@ def test_nome_casa_numeral_romano_com_arabico_dos_dois_lados():
     assert _confirma_nome("Civilization VI", "quanto custa civilization 6?")
     # Continua rejeitando jogo errado - a folga e so no numeral, nao no nome.
     assert not _confirma_nome("HELLDIVERS™ 2", "qual o preço de portal 2?")
+
+
+def test_nome_casa_apesar_da_pontuacao_do_titulo_oficial():
+    """Segundo caso do mesmo problema: o titulo oficial tem pontuacao que
+    ninguem digita. "Call of Duty®: Modern Warfare® III" era achado pela
+    busca e rejeitado na confirmacao por causa do dois-pontos."""
+    cod = "Call of Duty®: Modern Warfare® III"
+    assert _confirma_nome(cod, "Call of Duty Modern Warfare III onde acho mais barato?")
+    assert _confirma_nome(cod, "quanto custa call of duty: modern warfare iii?")
+
+    # Apostrofo e hifen, o mesmo caso.
+    assert _confirma_nome("Marvel's Spider-Man Remastered", "preco de marvels spider man remastered")
+    assert _confirma_nome("Half-Life 2", "quanto custa half life 2?")
+
+
+def test_pontuacao_nao_afrouxa_o_casamento_de_jogo_errado():
+    """A folga e so de escrita: DLC e jogo diferente continuam fora."""
+    dlc = "Call of Duty®: Modern Warfare® III - Tracer Pack: Underboss Pro Pack"
+    assert not _confirma_nome(dlc, "call of duty modern warfare iii preço")
+    assert not _confirma_nome("Call of Duty®: Modern Warfare® III", "quanto custa o portal 2?")
+    assert not _confirma_nome("Dota Underlords", "quantas partidas de dota temos")
 
 
 @pytest.mark.parametrize(

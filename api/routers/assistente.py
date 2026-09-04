@@ -66,6 +66,7 @@ def responder(entrada: EntradaPergunta) -> RespostaAssistente:
             app_id=j.app_id,
             nome=j.nome,
             imagem_header=j.imagem_header,
+            imagem_fundo=j.imagem_fundo,
             generos=j.generos,
             desenvolvedora=j.desenvolvedora,
             preco_atual=j.preco_atual,

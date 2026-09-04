@@ -167,17 +167,36 @@ function CartaoJogoAoVivo({ jogo }: { jogo: JogoAoVivo }) {
 
   return (
     <div className="overflow-hidden rounded-xl bg-surface-container-lowest ring-1 ring-tertiary-container/30">
-      <ArteJogo
-        appId={jogo.app_id}
-        nome={jogo.nome}
-        imagemUrl={jogo.imagem_header}
-        // aspect-video (16:9) casa com a proporcao real do `background_raw`
-        // (~1440x810) que o backend manda agora - a altura fixa de antes
-        // (h-40/h-48) cortava a imagem inteira numa faixa fina em telas
-        // largas, e esticava um header pequeno (460x215) alem do tamanho
-        // real dele, pixelando.
-        className="aspect-video max-h-[420px] w-full rounded-none"
-      />
+      {/*
+        Fundo borrado + capa nítida por cima, em vez de uma imagem só esticada
+        na largura toda. A capa da Steam tem 460x215 e fica pixelada se
+        crescer além disso; a arte de fundo é grande, mas em vários jogos a
+        própria Valve já entrega escurecida e borrada (Call of Duty) enquanto
+        em outros vem viva (Helldivers). Cada uma no papel em que funciona:
+        a de fundo preenche a largura, a capa fica nítida no tamanho nativo.
+      */}
+      <div className="relative flex items-center justify-center overflow-hidden bg-surface-container-high px-space-base py-space-lg">
+        {jogo.imagem_fundo && (
+          <>
+            <div
+              className="absolute inset-0 scale-110 bg-cover bg-center opacity-60 blur-md"
+              style={{ backgroundImage: `url(${jogo.imagem_fundo})` }}
+              aria-hidden
+            />
+            <div
+              className="absolute inset-0 bg-gradient-to-t from-surface-container-lowest/90 to-transparent"
+              aria-hidden
+            />
+          </>
+        )}
+
+        <ArteJogo
+          appId={jogo.app_id}
+          nome={jogo.nome}
+          imagemUrl={jogo.imagem_header}
+          className="relative h-auto max-h-[215px] w-full max-w-[460px] shadow-2xl"
+        />
+      </div>
 
       <div className="flex flex-col gap-space-base p-space-base">
         <div className="flex flex-wrap items-start justify-between gap-space-sm">

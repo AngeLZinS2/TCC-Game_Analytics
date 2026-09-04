@@ -175,7 +175,11 @@ class JogoAoVivo:
 
     app_id: int
     nome: str
+    #: A capa (460x215): pequena, mas nitida e sempre presente.
     imagem_header: str | None
+    #: A arte de fundo da pagina da loja - grande, mas as vezes ja vem
+    #: escurecida/borrada pela propria Valve. Serve de fundo, nao de capa.
+    imagem_fundo: str | None
     generos: list[str]
     desenvolvedora: str | None
     preco_atual: float | None
@@ -739,6 +743,9 @@ PALAVRAS_VAZIAS = frozenset(
     partida partidas heroi herois jogador jogadores time times
     avaliacao avaliacoes review reviews nota notas preco precos valor custa
     modelo modelos previsao previsoes acuracia recomendacao recomendacoes
+    pelo pela pelos pelas menor maior barata baratas custo custar
+    encontro encontra encontrar acha achar comprar compra comprando compro
+    posso consigo consegue vende vender vendendo desconto promocao
     """.split()
 )
 
@@ -789,24 +796,28 @@ _ROMANO_PARA_ARABICO = {
 }
 
 
-def _variantes_numeral(texto: str) -> set[str]:
-    """`texto` e, quando ele tiver um numeral romano OU arabico isolado (I-X /
-    1-10), a mesma string com o numeral trocado pro outro sistema.
+def _formas_comparaveis(texto: str) -> set[str]:
+    """As formas de `texto` que valem como "o mesmo nome", so escrito diferente.
 
-    Existe porque o mesmo jogo aparece como "Helldivers 2" na Steam e
-    "Helldivers II" na boca do mundo (e vice-versa: "Diablo IV" na Steam,
-    "Diablo 4" para muita gente) - sem isto, a checagem de conteudo de
-    `_confirma_nome` rejeita um casamento certo por causa so do algarismo.
+    Duas folgas, e as duas sao FORMATACAO, nunca ambiguidade de jogo:
+
+    * **Pontuacao e espaco somem.** O titulo oficial tem pontuacao que ninguem
+      digita numa pergunta: "Call of Duty®: Modern Warfare® III" (dois-pontos),
+      "Marvel's Spider-Man" (apostrofo e hifen), "S.T.A.L.K.E.R. 2" (pontos).
+      Comparar so o alfanumerico resolve os tres de uma vez.
+    * **Numeral romano vira arabico, e vice-versa.** O mesmo jogo e
+      "Helldivers 2" na Steam e "Helldivers II" na boca do mundo - e ao
+      contrario em "Diablo IV"/"Diablo 4".
+
+    O que NAO afrouxa: o nome inteiro continua tendo que aparecer, em ordem.
     """
-    tokens = texto.split(" ")
-    variantes = {texto}
-    romano_para_arabico = {**_ROMANO_PARA_ARABICO}
+    tokens = re.findall(r"[a-z0-9]+", texto)
     arabico_para_romano = {v: k for k, v in _ROMANO_PARA_ARABICO.items()}
-    for mapa in (romano_para_arabico, arabico_para_romano):
-        trocado = [mapa.get(tok, tok) for tok in tokens]
-        if trocado != tokens:
-            variantes.add(" ".join(trocado))
-    return variantes
+
+    formas = {"".join(tokens)}
+    for mapa in (_ROMANO_PARA_ARABICO, arabico_para_romano):
+        formas.add("".join(mapa.get(token, token) for token in tokens))
+    return formas
 
 
 def _confirma_nome(nome: str, pergunta: str) -> bool:
@@ -816,15 +827,15 @@ def _confirma_nome(nome: str, pergunta: str) -> bool:
     `etl/load_liquipedia.py`: buscar "mais caros" na loja devolve algum app, e
     aceitar esse app produziria uma resposta confiante sobre o jogo errado -
     que e pior que nao responder. Por isso a exigencia e de conter o nome
-    inteiro, contiguo, e nao de parecer - a UNICA folga e o numeral romano vs
-    arabico (`_variantes_numeral`), que e formatacao, nao ambiguidade de jogo.
+    inteiro, contiguo - as unicas folgas sao as de escrita listadas em
+    `_formas_comparaveis`.
     """
     alvo = _normalizar(nome)
-    if len(alvo) < MINIMO_DO_TERMO:
+    if len(re.sub(r"[^a-z0-9]+", "", alvo)) < MINIMO_DO_TERMO:
         return False
 
-    pergunta_normalizada = _normalizar(pergunta)
-    if not any(variante in pergunta_normalizada for variante in _variantes_numeral(alvo)):
+    pergunta_comparavel = "".join(re.findall(r"[a-z0-9]+", _normalizar(pergunta)))
+    if not any(forma in pergunta_comparavel for forma in _formas_comparaveis(alvo)):
         return False
 
     # Um app chamado "Mais" casaria com quase toda pergunta em portugues.
@@ -958,12 +969,14 @@ def _bloco_steam_ao_vivo(
     jogo_ao_vivo = JogoAoVivo(
         app_id=app_id,
         nome=nome,
-        # `background_raw` (~1440x810, a arte de fundo da loja) em vez do
-        # `header_image` (460x215, feito pra caber pequeno numa lista) - o
-        # banner desta tela e largo, e esticar uma imagem pequena pra ocupar
-        # a largura toda so pixela. Cai pro header quando o jogo nao tem
-        # background_raw (alguns tipos de item na loja nao tem).
-        imagem_header=dados.get("background_raw") or dados.get("header_image"),
+        # As duas imagens, cada uma pro que ela presta - ver `CartaoJogoAoVivo`.
+        # `header_image` e a capa nitida: pequena (460x215), mas sempre existe
+        # e e sempre a arte principal. `background_raw` varia MUITO de jogo pra
+        # jogo - no Helldivers e a arte grande e viva, no Call of Duty e a
+        # mesma arte escurecida e borrada. Por isso ela vai de FUNDO, atras da
+        # capa, nunca como o banner em si.
+        imagem_header=dados.get("header_image"),
+        imagem_fundo=dados.get("background_raw") or dados.get("background"),
         generos=generos,
         desenvolvedora=", ".join(dados.get("developers") or []) or None,
         preco_atual=(preco.get("final") / 100) if preco.get("final") is not None else None,

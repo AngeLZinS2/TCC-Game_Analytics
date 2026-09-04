@@ -419,7 +419,13 @@ export interface JogoRecomendado {
 export interface JogoAoVivo {
   app_id: number;
   nome: string;
+  /** A capa (460x215): pequena, mas nítida e sempre presente. */
   imagem_header: string | null;
+  /**
+   * A arte de fundo da loja — grande, mas às vezes já vem escurecida/borrada
+   * pela própria Valve. Serve de fundo atrás da capa, não como banner.
+   */
+  imagem_fundo: string | null;
   generos: string[];
   desenvolvedora: string | null;
   preco_atual: Decimal | null;
