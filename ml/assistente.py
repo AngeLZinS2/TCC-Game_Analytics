@@ -74,6 +74,9 @@ O CONTEXTO abaixo vem em blocos, e cada bloco declara a FONTE dele:
 - NOSSO BANCO: dados que a plataforma coletou, mediu e armazenou.
 - LOJA DA STEAM: consultada agora, ao vivo, para o jogo citado na pergunta - \
 pode ser um jogo que não está no nosso banco.
+- STEAMSPY: um terceiro (não é a Steam, não somos nós) consultado agora sobre \
+TODO um gênero da Steam - milhares de jogos, não só os do nosso banco. Os \
+números dele são estimativas, não medição oficial.
 
 REGRAS, em ordem de prioridade:
 
@@ -105,6 +108,13 @@ entre os jogos listados nele, citando nome, nota e jogadores como aparecem lá \
 - nunca um jogo de fora dessa lista, mesmo que ele exista no restante do \
 CONTEXTO ou no seu conhecimento geral. Se o bloco disser que não há \
 candidato, diga isso e não ofereça um jogo substituto.
+9. Se a pergunta pedir o melhor/pior avaliado "da Steam" ou "do gênero X" (sem \
+dizer "do nosso catálogo"/"que vocês monitoram") e houver um bloco fonte \
+STEAMSPY, responda com ELE, não com o bloco do nosso banco - é o que cobre a \
+Steam inteira, não só os jogos que coletamos. Diga "segundo o SteamSpy" e que \
+é sobre o gênero inteiro, não só o nosso catálogo. Se esse bloco disser que \
+falta um gênero na pergunta, repita esse pedido em vez de responder com os \
+poucos jogos do nosso banco como se fossem "os piores/melhores da Steam".
 """
 
 
@@ -356,7 +366,17 @@ def _bloco_recomendacao(
     regra 8 da instrucao proibe o modelo de inventar um jogo pra preencher a
     lacuna, e a unica forma de garantir isso e a lacuna aparecer explicita no
     contexto.
+
+    "Qual jogo de ação tem a PIOR avaliação" cita genero mas NAO pede
+    recomendacao nenhuma - pede o extremo oposto, e quem responde por isso e
+    `_bloco_extremo_avaliacao` (que busca em toda a Steam, nao so aqui). Sem
+    esta checagem essa pergunta acionava os dois blocos e a tela mostrava
+    cartao de jogo bom (Hades, Terraria...) do lado de uma resposta sobre o
+    pior jogo - dois blocos discordando na mesma tela.
     """
+    if _extremo_avaliacao_pedido(pergunta) is not None:
+        return None, []
+
     genero = _genero_pedido(pergunta)
     if genero is None and not _pede_recomendacao(pergunta):
         return None, []
@@ -396,6 +416,89 @@ def _bloco_recomendacao(
     return (
         Bloco("recomendacao", f"Recomendação ({rotulo}) - catálogo próprio", "\n".join(linhas)),
         candidatos,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Extremo de avaliacao em TODA a Steam (SteamSpy, nao so o nosso catalogo)
+# ---------------------------------------------------------------------------
+
+#: "melhor"/"pior" avaliado - o rotulo tambem e o que entra no texto do bloco.
+GATILHOS_EXTREMO_AVALIACAO: dict[str, tuple[str, ...]] = {
+    "pior": ("pior avaliacao", "pior avaliado", "pior nota", "mais mal avaliado",
+             "menos aprovado", "mais reprovado"),
+    "melhor": ("melhor avaliacao", "melhor avaliado", "melhor nota",
+               "mais bem avaliado", "mais aprovado"),
+}
+
+
+def _extremo_avaliacao_pedido(pergunta: str) -> str | None:
+    """`"pior"`, `"melhor"` ou `None` - qual extremo a pergunta pede, se algum."""
+    normalizada = _normalizar(pergunta)
+    for rotulo, termos in GATILHOS_EXTREMO_AVALIACAO.items():
+        if any(_normalizar(termo) in normalizada for termo in termos):
+            return rotulo
+    return None
+
+
+def _bloco_extremo_avaliacao(pergunta: str) -> Bloco | None:
+    """O melhor/pior avaliado de um genero, em TODA a Steam - nao so o nosso banco.
+
+    Devolve `None` quando a pergunta nao pede extremo nenhum (o caso comum).
+    Quando pede mas SEM genero, o bloco ainda entra - so que pedindo o genero
+    de volta, em vez de silenciosamente responder com os poucos jogos do
+    nosso catalogo como se fossem "os piores/melhores da Steam" (o problema
+    relatado: um catalogo de 20 e poucos jogos nao tem como responder por
+    toda a loja, e a resposta antiga nao deixava isso claro o bastante).
+    """
+    extremo = _extremo_avaliacao_pedido(pergunta)
+    if extremo is None:
+        return None
+
+    genero = _genero_pedido(pergunta)
+    if genero is None:
+        return Bloco(
+            "extremo_avaliacao",
+            "Melhor/pior avaliado em toda a Steam",
+            "Falta o gênero na pergunta. Buscar isso em TODA a Steam (não só "
+            "o nosso catálogo de 20 e poucos jogos) só é possível por gênero "
+            "- ação, aventura, rpg, estratégia, indie, simulação, "
+            "multijogador, acesso antecipado ou gratuito. Peça à pessoa para "
+            "citar um gênero; não responda com o pior/melhor do nosso "
+            "catálogo como se fosse resposta sobre a Steam inteira.",
+        )
+
+    achado = steam_loja.extremo_avaliacao_por_genero(genero, pior=(extremo == "pior"))
+    if achado is None:
+        return Bloco(
+            "extremo_avaliacao",
+            f"{'Pior' if extremo == 'pior' else 'Melhor'} avaliado de {genero} (SteamSpy)",
+            "A consulta ao SteamSpy falhou ou não achou nenhum jogo do gênero "
+            f"{genero} com avaliações suficientes agora. Diga que a consulta "
+            "à Steam inteira falhou - não substitua pelo nosso catálogo sem "
+            "avisar que é uma base muito menor.",
+            fonte="steam",
+        )
+
+    proporcao = round(achado["proporcao_positiva"] * 100, 1)
+    linhas = [
+        f"FONTE: SteamSpy, consultado agora - estimativa de terceiro sobre "
+        f"avaliações públicas de TODO o gênero {genero} na Steam (milhares de "
+        "jogos, não só os do nosso catálogo).",
+        f"Nome: {achado['nome']}",
+        f"AppID: {achado['app_id']}",
+        f"Avaliações positivas: {proporcao}% "
+        f"({achado['positivas']} positivas, {achado['negativas']} negativas, "
+        f"{achado['total_avaliacoes']} avaliações no total)",
+        f"Donos estimados: {achado['owners']}",
+    ]
+
+    return Bloco(
+        "extremo_avaliacao",
+        f"{'Pior' if extremo == 'pior' else 'Melhor'} avaliado de {genero}, "
+        "em toda a Steam (SteamSpy)",
+        "\n".join(linhas),
+        fonte="steam",
     )
 
 
@@ -801,6 +904,11 @@ def montar_contexto(pergunta: str) -> ContextoMontado:
         recomendacao, recomendacoes = _bloco_recomendacao(pergunta, sessao)
         if recomendacao is not None:
             blocos.append(recomendacao)
+
+    # Nao depende de sessao (e so rede, ver steam_loja.extremo_avaliacao_por_genero).
+    extremo = _bloco_extremo_avaliacao(pergunta)
+    if extremo is not None:
+        blocos.append(extremo)
 
     if "modelos" in escolhidos:
         blocos.append(_bloco_modelos())

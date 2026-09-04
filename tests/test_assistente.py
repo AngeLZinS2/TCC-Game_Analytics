@@ -21,8 +21,10 @@ from ml.assistente import (
     GATILHOS,
     INSTRUCAO,
     Bloco,
+    _bloco_extremo_avaliacao,
     _bloco_recomendacao,
     _confirma_nome,
+    _extremo_avaliacao_pedido,
     _genero_pedido,
     _normalizar,
     _pede_recomendacao,
@@ -197,6 +199,20 @@ def test_recomendacoes_por_genero_vem_do_catalogo_e_ordenadas():
     assert notas == sorted(notas, reverse=True)
 
 
+def test_bloco_recomendacao_nao_dispara_para_pergunta_de_pior_avaliado():
+    """"Qual jogo de ação tem a PIOR avaliação" cita genero mas pede o extremo
+    oposto de uma recomendacao - so quem responde e `_bloco_extremo_avaliacao`
+    (bug real: as duas perguntas disparavam junto, e a tela mostrava cartao de
+    jogo bom do lado da resposta sobre o pior jogo)."""
+    with session_scope() as sessao:
+        bloco, candidatos = _bloco_recomendacao(
+            "qual jogo de ação tem a pior avaliação na Steam?", sessao
+        )
+
+    assert bloco is None
+    assert candidatos == []
+
+
 def test_bloco_recomendacao_sem_genero_pede_todo_catalogo():
     with session_scope() as sessao:
         bloco, candidatos = _bloco_recomendacao("me recomenda um jogo", sessao)
@@ -225,6 +241,40 @@ def test_bloco_recomendacao_genero_nao_reconhecido_cai_no_geral():
     assert bloco is not None
     assert candidatos
     assert "melhor avaliação geral" in bloco.titulo.lower()
+
+
+@pytest.mark.parametrize(
+    "pergunta,esperado",
+    [
+        ("qual jogo tem a pior avaliação da steam?", "pior"),
+        ("qual jogo é o pior avaliado?", "pior"),
+        ("qual é o jogo mais mal avaliado de ação?", "pior"),
+        ("qual rpg tem a melhor avaliação?", "melhor"),
+        ("qual jogo tem mais jogadores?", None),
+    ],
+)
+def test_extremo_avaliacao_pedido(pergunta: str, esperado: str | None):
+    assert _extremo_avaliacao_pedido(pergunta) == esperado
+
+
+def test_bloco_extremo_ausente_sem_pedido_de_extremo():
+    """Pergunta comum nao aciona a consulta ao SteamSpy (que faz rede)."""
+    assert _bloco_extremo_avaliacao("quantas partidas coletamos?") is None
+
+
+def test_bloco_extremo_sem_genero_pede_o_genero_em_vez_de_usar_o_catalogo():
+    """O bug relatado: "pior avaliação" sem genero nao tem como responder
+    sobre TODA a Steam - a resposta certa e pedir o genero de volta, nao
+    silenciosamente usar os 20 e poucos jogos do nosso catalogo como se
+    fossem "os piores da Steam"."""
+    bloco = _bloco_extremo_avaliacao("qual é o jogo com a pior avaliação?")
+
+    assert bloco is not None
+    assert bloco.chave == "extremo_avaliacao"
+    assert "falta o genero" in _normalizar(bloco.conteudo)
+    # Nao faz chamada nenhuma ao SteamSpy - a fonte fica "banco" (o default),
+    # porque este bloco especifico e so a instrucao de pedir o genero.
+    assert bloco.fonte == "banco"
 
 
 def test_bloco_do_banco_e_bloco_da_loja_se_declaram():

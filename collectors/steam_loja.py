@@ -33,6 +33,12 @@ logger = logging.getLogger(__name__)
 URL_BUSCA = "https://store.steampowered.com/api/storesearch/"
 URL_FICHA = "https://store.steampowered.com/api/appdetails"
 URL_AVALIACOES = "https://store.steampowered.com/appreviews/{app_id}"
+URL_STEAMSPY = "https://steamspy.com/api.php"
+
+#: Abaixo disto, "pior avaliado" so mediria obscuridade - um app com 3
+#: avaliacoes pode cair em 0% so por acaso de amostra pequena, o que nao e o
+#: mesmo que ser realmente malvisto por um publico de verdade.
+MINIMO_AVALIACOES_EXTREMO = 1000
 
 
 def _pegar(url: str, params: dict[str, Any]) -> Any | None:
@@ -123,3 +129,50 @@ def resumo_avaliacoes(app_id: int) -> dict[str, Any] | None:
 
     resumo = dados.get("query_summary")
     return resumo if isinstance(resumo, dict) else None
+
+
+def extremo_avaliacao_por_genero(genero: str, pior: bool) -> dict[str, Any] | None:
+    """O jogo com a melhor/pior proporcao de avaliacoes positivas de um genero,
+    sobre TODO o catalogo que o SteamSpy indexa - nao so os jogos no nosso banco.
+
+    Existe porque "qual o pior jogo da Steam" nao tem resposta correta dentro
+    de um catalogo de 20 e poucos jogos: a Steam tem centenas de milhares. O
+    SteamSpy e a unica fonte que devolve avaliacao de um genero INTEIRO numa
+    chamada so (dezenas de milhares de apps) - a API oficial da Steam so fala
+    de UM app por vez, e nao ha endpoint (oficial ou nao) que ordene a loja
+    inteira por nota.
+
+    Fonte: SteamSpy, um terceiro - as contagens sao estimativas dele sobre
+    avaliacoes publicas da Steam, nao a Steam nem nossa medicao. Quem chama
+    isto deve marcar a procedencia de acordo (`fonte="steam"` no `Bloco`, e a
+    instrucao do assistente ja pede a frase "segundo o SteamSpy").
+    """
+    dados = _pegar(URL_STEAMSPY, {"request": "genre", "genre": genero})
+    if not isinstance(dados, dict):
+        return None
+
+    candidatos: list[tuple[float, int, dict[str, Any]]] = []
+    for item in dados.values():
+        if not isinstance(item, dict):
+            continue
+        positivas = item.get("positive") or 0
+        negativas = item.get("negative") or 0
+        total = positivas + negativas
+        if total < MINIMO_AVALIACOES_EXTREMO:
+            continue
+        candidatos.append((positivas / total, total, item))
+
+    if not candidatos:
+        return None
+
+    candidatos.sort(key=lambda c: c[0], reverse=not pior)
+    proporcao, total, item = candidatos[0]
+    return {
+        "app_id": item.get("appid"),
+        "nome": item.get("name"),
+        "proporcao_positiva": proporcao,
+        "positivas": item.get("positive"),
+        "negativas": item.get("negative"),
+        "total_avaliacoes": total,
+        "owners": item.get("owners"),
+    }
