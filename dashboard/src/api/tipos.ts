@@ -394,12 +394,31 @@ export interface BlocoContexto {
   fonte: string;
 }
 
+/**
+ * Um candidato escolhido pelo Python (`ml.assistente._recomendacoes`), nao
+ * pelo modelo - por isso vem com `app_id`: e o que deixa a tela desenhar um
+ * cartao de verdade, com imagem e link pro jogo, em vez de tentar adivinhar
+ * de qual jogo o texto da resposta estava falando.
+ */
+export interface JogoRecomendado {
+  app_id: number;
+  nome: string;
+  generos: string[];
+  nota_avaliacoes: number | null;
+  jogadores_simultaneos: number | null;
+  preco: number | null;
+  moeda: string | null;
+  gratuito: boolean | null;
+}
+
 export interface RespostaAssistente {
   pergunta: string;
   resposta: string;
   modelo: string;
   /** O que o modelo recebeu - permite conferir cada numero da resposta. */
   blocos: BlocoContexto[];
+  /** Preenchido so quando a pergunta pediu recomendacao de jogo. */
+  recomendacoes: JogoRecomendado[];
   tokens_entrada: number | null;
   tokens_saida: number | null;
 }

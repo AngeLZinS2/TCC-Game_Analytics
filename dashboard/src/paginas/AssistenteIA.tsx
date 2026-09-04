@@ -15,15 +15,18 @@
  */
 
 import { useState } from "react";
+import { Link } from "react-router-dom";
 
 import { usePerguntarAssistente, useStatusAssistente } from "../api/consultas";
-import type { BlocoContexto, RespostaAssistente } from "../api/tipos";
+import type { BlocoContexto, JogoRecomendado, RespostaAssistente } from "../api/tipos";
 import { Botao, Consulta, Icone, MensagemErro, Selo } from "../componentes/base";
+import { ArteJogo } from "../componentes/CapaJogo";
 import { Painel, Pilula } from "../componentes/hud";
-import { fmtNumero } from "../utilitarios/formatos";
+import { fmtMoeda, fmtNumero, fmtPercentual } from "../utilitarios/formatos";
 
 /** Perguntas que exercitam blocos de contexto diferentes. */
 const SUGESTOES = [
+  "Que jogo de ação você recomenda?",
   "Quantos jogos da Steam estão sendo monitorados?",
   "Qual jogo tem mais jogadores simultâneos e quantos?",
   "Qual herói tem o pior winrate e em quantas partidas?",
@@ -85,6 +88,60 @@ function BlocoDeContexto({ bloco }: { bloco: BlocoContexto }) {
         </pre>
       )}
     </div>
+  );
+}
+
+/**
+ * O cartão de um jogo recomendado - imagem, gêneros e os três números que
+ * justificam a escolha, em vez de exigir que quem lê procure isso no texto.
+ *
+ * `jogo` vem de `resposta.recomendacoes`, não de interpretar a resposta do
+ * modelo: é o Python (`ml.assistente._recomendacoes`) quem decide o ranking,
+ * então o cartão mostra exatamente o candidato que o sistema escolheu, nunca
+ * um jogo que o texto livre "pareceu" estar recomendando.
+ */
+function CartaoJogoRecomendado({ jogo }: { jogo: JogoRecomendado }) {
+  return (
+    <Link
+      to={`/steam/${jogo.app_id}`}
+      className="group flex flex-col overflow-hidden rounded-xl bg-surface-container-lowest ring-1 ring-outline-variant/20 transition-all hover:-translate-y-0.5 hover:ring-primary/50 hover:shadow-lg"
+    >
+      <ArteJogo appId={jogo.app_id} nome={jogo.nome} className="h-32 w-full rounded-none" />
+
+      <div className="flex flex-1 flex-col gap-space-sm p-space-base">
+        <h3 className="font-headline-sm text-headline-sm text-on-surface transition-colors group-hover:text-primary">
+          {jogo.nome}
+        </h3>
+
+        {jogo.generos.length > 0 && (
+          <div className="flex flex-wrap gap-space-xxs">
+            {jogo.generos.slice(0, 3).map((genero) => (
+              <Selo key={genero}>{genero}</Selo>
+            ))}
+          </div>
+        )}
+
+        <div className="mt-auto flex items-center justify-between gap-space-xs border-t border-outline-variant/20 pt-space-sm font-title-code text-title-code">
+          <span
+            className="flex items-center gap-space-xxs text-tertiary"
+            title="Avaliações positivas"
+          >
+            <Icone nome="thumb_up" className="text-[14px]" />
+            {fmtPercentual(jogo.nota_avaliacoes)}
+          </span>
+          <span
+            className="flex items-center gap-space-xxs text-on-surface-variant"
+            title="Jogadores simultâneos agora"
+          >
+            <Icone nome="groups" className="text-[14px]" />
+            {fmtNumero(jogo.jogadores_simultaneos)}
+          </span>
+          <span className="text-primary-container">
+            {jogo.gratuito ? "Gratuito" : fmtMoeda(jogo.preco, jogo.moeda)}
+          </span>
+        </div>
+      </div>
+    </Link>
   );
 }
 
@@ -199,6 +256,21 @@ export function AssistenteIAPagina() {
                 O contexto já foi montado a partir do banco; o que demora é a resposta do
                 provedor.
               </p>
+            </Painel>
+          )}
+
+          {/* ==================== JOGOS RECOMENDADOS ==================== */}
+          {resposta && !assistente.isPending && resposta.recomendacoes.length > 0 && (
+            <Painel
+              icone="stadia_controller"
+              titulo="Jogos recomendados"
+              descricao="Escolhidos pelo sistema a partir do catálogo — nota de avaliação e popularidade agora, não pelo modelo."
+            >
+              <div className="grid grid-cols-1 gap-space-base sm:grid-cols-2 lg:grid-cols-3">
+                {resposta.recomendacoes.map((jogo) => (
+                  <CartaoJogoRecomendado key={jogo.app_id} jogo={jogo} />
+                ))}
+              </div>
             </Painel>
           )}
 

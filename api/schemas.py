@@ -440,12 +440,34 @@ class BlocoContexto(BaseModel):
     fonte: str = "banco"
 
 
+class JogoRecomendado(BaseModel):
+    """Um candidato escolhido por `ml.assistente._recomendacoes`, nao pelo modelo.
+
+    Existe pra tela desenhar um cartao com imagem em vez de so texto - e
+    carrega o `app_id` de proposito, que e o que faz o cartao linkar pro
+    detalhe do jogo de verdade.
+    """
+
+    app_id: int
+    nome: str
+    generos: list[str]
+    nota_avaliacoes: float | None
+    jogadores_simultaneos: int | None
+    preco: float | None
+    moeda: str | None
+    gratuito: bool | None
+
+
 class RespostaAssistente(BaseModel):
     pergunta: str
     resposta: str
     modelo: str
     #: O que o modelo recebeu. E o que permite conferir cada numero da resposta.
     blocos: list[BlocoContexto]
+    #: Preenchido so quando a pergunta pediu recomendacao - a tela desenha um
+    #: cartao por item em vez de confiar em texto livre pra saber qual jogo foi
+    #: recomendado.
+    recomendacoes: list[JogoRecomendado] = []
     tokens_entrada: int | None
     tokens_saida: int | None
 

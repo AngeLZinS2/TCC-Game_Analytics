@@ -100,6 +100,11 @@ o caminho real é este: buscar o jogo pelo nome nas telas "Jogos da Steam" ou \
 "Recomendações por Reviews" e clicar no resultado - a coleta acontece na hora, \
 em segundos. Não invente outra tela, outro cadastro nem outro procedimento. \
 Jogos que não são da Steam não podem ser coletados por esta plataforma.
+8. Quando houver um bloco "Recomendação (...)", a resposta PRECISA escolher \
+entre os jogos listados nele, citando nome, nota e jogadores como aparecem lá \
+- nunca um jogo de fora dessa lista, mesmo que ele exista no restante do \
+CONTEXTO ou no seu conhecimento geral. Se o bloco disser que não há \
+candidato, diga isso e não ofereça um jogo substituto.
 """
 
 
@@ -120,11 +125,36 @@ class Bloco:
 
 
 @dataclass
+class JogoRecomendado:
+    """Um candidato de `_recomendacoes`, ja pronto pra tela desenhar um cartao.
+
+    Existe separado do texto do modelo de proposito: a tela NAO tenta advinhar
+    de qual jogo o texto fala (analisar a resposta em busca de um nome e
+    exatamente o tipo de inferencia fragil que este projeto evita em outro
+    lugar). O cartao vem de quem decidiu o ranking - o Python -, nao de quem
+    so descreve o resultado - o modelo.
+    """
+
+    app_id: int
+    nome: str
+    generos: list[str]
+    nota_avaliacoes: float | None
+    jogadores_simultaneos: int | None
+    preco: float | None
+    moeda: str | None
+    gratuito: bool | None
+
+
+@dataclass
 class Resposta:
     pergunta: str
     resposta: str
     modelo: str
     blocos: list[Bloco] = field(default_factory=list)
+    #: Os jogos que uma pergunta de recomendacao selecionou - ver `_recomendacoes`.
+    #: Vazio fora desse caso. A tela usa isto para desenhar cartao com imagem,
+    #: em vez de confiar em texto livre pra saber qual jogo foi recomendado.
+    recomendacoes: list[JogoRecomendado] = field(default_factory=list)
     tokens_entrada: int | None = None
     tokens_saida: int | None = None
 
@@ -176,9 +206,10 @@ def _bloco_steam(sessao) -> Bloco:
     )
 
     linhas = []
-    for nome, jogadores, nota, preco, moeda in sessao.execute(
+    for nome, generos, jogadores, nota, preco, moeda in sessao.execute(
         select(
             DimJogoSteam.nome,
+            DimJogoSteam.generos,
             recentes.c.jogadores_simultaneos,
             recentes.c.nota_avaliacoes,
             recentes.c.preco_no_momento,
@@ -193,7 +224,8 @@ def _bloco_steam(sessao) -> Bloco:
             else "sem preco"
         )
         linhas.append(
-            f"{nome}: {jogadores or 0} jogadores simultaneos, "
+            f"{nome} ({', '.join(generos or []) or 'genero nao coletado'}): "
+            f"{jogadores or 0} jogadores simultaneos, "
             f"{nota or '-'}% de avaliacoes positivas, {preco_texto}"
         )
 
@@ -201,6 +233,169 @@ def _bloco_steam(sessao) -> Bloco:
         "steam",
         "Catalogo da Steam (ultimo snapshot de cada jogo)",
         "\n".join(linhas) or "Nenhum jogo coletado.",
+    )
+
+
+# ---------------------------------------------------------------------------
+# Recomendacao por genero (ou "melhor avaliado", sem genero)
+# ---------------------------------------------------------------------------
+
+#: Portugues -> o genero exato como a Steam guarda em `dim_jogo_steam.generos`
+#: (`appdetails.genres[].description`, em ingles). Cada chave de uma palavra so
+#: casa por TOKEN inteiro (ver `_genero_pedido`); as de duas ou mais, por trecho
+#: contiguo - o mesmo criterio de `_termos_de_jogo`, pela mesma razao: "rpg"
+#: dentro de outra palavra nao deveria casar, "acesso antecipado" sim.
+MAPA_GENEROS: dict[str, str] = {
+    "acao": "Action",
+    "aventura": "Adventure",
+    "rpg": "RPG",
+    "estrategia": "Strategy",
+    "simulacao": "Simulation",
+    "simulador": "Simulation",
+    "indie": "Indie",
+    "multijogador": "Massively Multiplayer",
+    "mmo": "Massively Multiplayer",
+    "massivo": "Massively Multiplayer",
+    "acesso antecipado": "Early Access",
+    "early access": "Early Access",
+    "gratuito": "Free To Play",
+    "gratis": "Free To Play",
+    "f2p": "Free To Play",
+}
+
+#: Frases que pedem uma recomendacao mesmo sem nomear genero nenhum - "me
+#: recomenda um jogo" vira "os mais bem avaliados do catalogo inteiro".
+GATILHOS_RECOMENDACAO = (
+    "recomenda", "recomendo", "recomendacao",
+    "sugere", "sugestao", "indica", "indicacao",
+    "vale a pena jogar", "devo jogar",
+)
+
+
+def _genero_pedido(pergunta: str) -> str | None:
+    """O genero da Steam que a pergunta pede, se houver algum reconhecivel."""
+    normalizada = _normalizar(pergunta)
+    tokens = set(re.findall(r"[a-z0-9]+", normalizada))
+    for chave, genero in MAPA_GENEROS.items():
+        if " " in chave:
+            if chave in normalizada:
+                return genero
+        elif chave in tokens:
+            return genero
+    return None
+
+
+def _pede_recomendacao(pergunta: str) -> bool:
+    normalizada = _normalizar(pergunta)
+    return any(_normalizar(gatilho) in normalizada for gatilho in GATILHOS_RECOMENDACAO)
+
+
+def _recomendacoes(
+    sessao, genero: str | None, limite: int = 3
+) -> list[JogoRecomendado]:
+    """Os melhores candidatos do NOSSO catalogo - nunca um jogo de fora dele.
+
+    Ranking por nota de avaliacao e, empatando, por jogadores simultaneos
+    agora - os dois numeros que a tela de Jogos da Steam ja usa para "o que
+    esta bem" e "o que esta em alta". Nada aqui e decidido pelo modelo: o
+    Python escolhe os candidatos, o modelo so descreve o que o Python achou.
+    """
+    recentes = (
+        select(FatoSnapshotJogoSteam)
+        .distinct(FatoSnapshotJogoSteam.app_id)
+        .order_by(
+            FatoSnapshotJogoSteam.app_id, desc(FatoSnapshotJogoSteam.janela_coleta)
+        )
+        .subquery()
+    )
+
+    consulta = (
+        select(
+            DimJogoSteam.app_id,
+            DimJogoSteam.nome,
+            DimJogoSteam.generos,
+            DimJogoSteam.gratuito,
+            recentes.c.nota_avaliacoes,
+            recentes.c.jogadores_simultaneos,
+            recentes.c.preco_no_momento,
+            recentes.c.moeda,
+        )
+        .join(recentes, recentes.c.app_id == DimJogoSteam.app_id)
+    )
+    if genero:
+        consulta = consulta.where(DimJogoSteam.generos.any(genero))
+    consulta = consulta.order_by(
+        desc(func.coalesce(recentes.c.nota_avaliacoes, 0)),
+        desc(func.coalesce(recentes.c.jogadores_simultaneos, 0)),
+    ).limit(limite)
+
+    return [
+        JogoRecomendado(
+            app_id=app_id,
+            nome=nome,
+            generos=generos or [],
+            nota_avaliacoes=float(nota) if nota is not None else None,
+            jogadores_simultaneos=jogadores,
+            preco=float(preco) if preco is not None else None,
+            moeda=moeda,
+            gratuito=gratuito,
+        )
+        for app_id, nome, generos, gratuito, nota, jogadores, preco, moeda in sessao.execute(
+            consulta
+        )
+    ]
+
+
+def _bloco_recomendacao(
+    pergunta: str, sessao
+) -> tuple[Bloco | None, list[JogoRecomendado]]:
+    """Bloco + lista estruturada para uma pergunta de recomendacao.
+
+    Devolve `(None, [])` quando a pergunta nao pede recomendacao nenhuma - o
+    caso comum. Quando pede, o bloco e SEMPRE gerado, mesmo sem candidato: a
+    regra 8 da instrucao proibe o modelo de inventar um jogo pra preencher a
+    lacuna, e a unica forma de garantir isso e a lacuna aparecer explicita no
+    contexto.
+    """
+    genero = _genero_pedido(pergunta)
+    if genero is None and not _pede_recomendacao(pergunta):
+        return None, []
+
+    candidatos = _recomendacoes(sessao, genero)
+    rotulo = f"gênero {genero}" if genero else "melhor avaliação geral"
+
+    if not candidatos:
+        return (
+            Bloco(
+                "recomendacao",
+                f"Recomendação ({rotulo})",
+                f"Nenhum jogo de {rotulo} no nosso catálogo. Diga que não há "
+                "candidato aqui - não substitua por um jogo de fora do catálogo.",
+            ),
+            [],
+        )
+
+    linhas = [
+        f"Candidatos do NOSSO catálogo para {rotulo}, do melhor pro pior "
+        "(nota de avaliação e depois jogadores simultâneos agora). "
+        "Recomende só entre estes:",
+    ]
+    for c in candidatos:
+        preco_texto = (
+            "Gratuito"
+            if c.gratuito
+            else f"{c.moeda or ''} {c.preco}".strip() if c.preco is not None
+            else "sem preço"
+        )
+        linhas.append(
+            f"- {c.nome}: {c.nota_avaliacoes if c.nota_avaliacoes is not None else '-'}% "
+            f"de avaliações positivas, {c.jogadores_simultaneos or 0} jogadores agora, "
+            f"gêneros {', '.join(c.generos) or '-'}, {preco_texto}"
+        )
+
+    return (
+        Bloco("recomendacao", f"Recomendação ({rotulo}) - catálogo próprio", "\n".join(linhas)),
+        candidatos,
     )
 
 
@@ -557,16 +752,24 @@ GATILHOS: dict[str, tuple[str, ...]] = {
 }
 
 
-def montar_contexto(pergunta: str) -> list[Bloco]:
+@dataclass
+class ContextoMontado:
+    blocos: list[Bloco]
+    #: Populado so quando a pergunta pede recomendacao - ver `_bloco_recomendacao`.
+    recomendacoes: list[JogoRecomendado] = field(default_factory=list)
+
+
+def montar_contexto(pergunta: str) -> ContextoMontado:
     """Escolhe os blocos relevantes para a pergunta.
 
     O bloco geral entra sempre: e barato e responde as perguntas de contagem,
     que sao a maioria. Quando nada casa, entram todos - vale gastar contexto
     para nao responder "nao sei" tendo o dado.
 
-    Por cima disso, se a pergunta nomear um jogo identificavel, entra o bloco da
-    loja ao vivo - inclusive para jogo que nunca foi coletado. E a unica parte
-    do contexto que faz rede, e a unica que pode falhar sem quebrar nada.
+    Por cima disso, dois blocos independem dos gatilhos por palavra e sao
+    sempre tentados: a loja ao vivo (se a pergunta nomear um jogo identificavel)
+    e a recomendacao (se a pergunta pedir uma, com ou sem genero). Nenhum dos
+    dois precisa da palavra "steam" nem "avaliacao" pra disparar.
     """
     normalizada = _normalizar(pergunta)
 
@@ -591,16 +794,21 @@ def montar_contexto(pergunta: str) -> list[Bloco]:
             if chave in escolhidos:
                 blocos.append(construtores[chave](sessao))
 
-        # A consulta a loja vai por ultimo e independe dos gatilhos: perguntar
-        # de um jogo especifico nao precisa mencionar "steam" nem "avaliacao".
         ao_vivo = _bloco_steam_ao_vivo(pergunta, sessao)
         if ao_vivo is not None:
             blocos.append(ao_vivo)
 
+        recomendacao, recomendacoes = _bloco_recomendacao(pergunta, sessao)
+        if recomendacao is not None:
+            blocos.append(recomendacao)
+
     if "modelos" in escolhidos:
         blocos.append(_bloco_modelos())
 
-    return [bloco for bloco in blocos if bloco.conteudo.strip()]
+    return ContextoMontado(
+        blocos=[bloco for bloco in blocos if bloco.conteudo.strip()],
+        recomendacoes=recomendacoes,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -616,7 +824,8 @@ def perguntar(pergunta: str) -> Resposta:
             "OPENROUTER_API_KEY nao configurada. Defina no .env para usar o assistente."
         )
 
-    blocos = montar_contexto(pergunta)
+    contexto_montado = montar_contexto(pergunta)
+    blocos = contexto_montado.blocos
     contexto = "\n\n".join(
         f"### {bloco.titulo}\n{bloco.conteudo}" for bloco in blocos
     )
@@ -671,6 +880,7 @@ def perguntar(pergunta: str) -> Resposta:
         resposta=texto.strip(),
         modelo=dados.get("model") or settings.openrouter_model,
         blocos=blocos,
+        recomendacoes=contexto_montado.recomendacoes,
         tokens_entrada=uso.get("prompt_tokens"),
         tokens_saida=uso.get("completion_tokens"),
     )

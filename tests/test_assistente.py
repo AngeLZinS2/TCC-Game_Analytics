@@ -16,12 +16,17 @@ from __future__ import annotations
 
 import pytest
 
+from db.session import session_scope
 from ml.assistente import (
     GATILHOS,
     INSTRUCAO,
     Bloco,
+    _bloco_recomendacao,
     _confirma_nome,
+    _genero_pedido,
     _normalizar,
+    _pede_recomendacao,
+    _recomendacoes,
     _termos_de_jogo,
 )
 
@@ -140,6 +145,86 @@ def test_nome_precisa_estar_contido_na_pergunta():
 
     assert not _confirma_nome("Dota Underlords", "quantas partidas de dota temos")
     assert not _confirma_nome("Mais", "quais os jogos mais caros")
+
+
+@pytest.mark.parametrize(
+    "pergunta,esperado",
+    [
+        ("que jogo de ação você recomenda?", "Action"),
+        ("quero um jogo de RPG bom", "RPG"),
+        ("tem algum jogo de estratégia?", "Strategy"),
+        ("indica um indie", "Indie"),
+        ("prefiro jogo gratuito", "Free To Play"),
+        ("qual o preço de hollow knight?", None),
+    ],
+)
+def test_genero_pedido(pergunta: str, esperado: str | None):
+    assert _genero_pedido(pergunta) == esperado
+
+
+def test_genero_pedido_nao_casa_substring_dentro_de_outra_palavra():
+    """"rpg" so deve casar como token inteiro, nao como pedaco de outra palavra."""
+    assert _genero_pedido("quantos jogadores tem esse corpg") is None
+
+
+@pytest.mark.parametrize(
+    "pergunta",
+    [
+        "o que você me recomenda?",
+        "tem alguma sugestão de jogo?",
+        "qual jogo vale a pena jogar?",
+    ],
+)
+def test_pede_recomendacao_sem_genero(pergunta: str):
+    assert _pede_recomendacao(pergunta)
+    assert _genero_pedido(pergunta) is None
+
+
+def test_pede_recomendacao_falso_para_pergunta_comum():
+    assert not _pede_recomendacao("quantos jogos da steam estao no banco?")
+
+
+def test_recomendacoes_por_genero_vem_do_catalogo_e_ordenadas():
+    """Cada candidato precisa ter o genero pedido e vir do melhor pro pior."""
+    with session_scope() as sessao:
+        candidatos = _recomendacoes(sessao, genero="Action")
+
+    assert candidatos
+    for candidato in candidatos:
+        assert "Action" in candidato.generos
+
+    notas = [c.nota_avaliacoes or 0 for c in candidatos]
+    assert notas == sorted(notas, reverse=True)
+
+
+def test_bloco_recomendacao_sem_genero_pede_todo_catalogo():
+    with session_scope() as sessao:
+        bloco, candidatos = _bloco_recomendacao("me recomenda um jogo", sessao)
+
+    assert bloco is not None
+    assert bloco.chave == "recomendacao"
+    assert candidatos
+    assert "catálogo" in bloco.conteudo.lower()
+
+
+def test_bloco_recomendacao_ausente_sem_pedido_de_recomendacao():
+    with session_scope() as sessao:
+        bloco, candidatos = _bloco_recomendacao("quantas partidas coletamos?", sessao)
+
+    assert bloco is None
+    assert candidatos == []
+
+
+def test_bloco_recomendacao_genero_nao_reconhecido_cai_no_geral():
+    """"Terror" nao esta em `MAPA_GENEROS" - sem genero pra filtrar, o pedido de
+    recomendacao ainda dispara, so que sobre o catalogo inteiro (nunca um jogo
+    inventado de fora dele)."""
+    with session_scope() as sessao:
+        bloco, candidatos = _bloco_recomendacao("recomenda um jogo de terror", sessao)
+
+    assert bloco is not None
+    assert candidatos
+    assert "melhor avaliação geral" in bloco.titulo.lower()
 
 
 def test_bloco_do_banco_e_bloco_da_loja_se_declaram():

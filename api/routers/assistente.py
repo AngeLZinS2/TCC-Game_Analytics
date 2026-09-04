@@ -12,7 +12,7 @@ import logging
 
 from fastapi import APIRouter, HTTPException
 
-from api.schemas import BlocoContexto, EntradaPergunta, RespostaAssistente
+from api.schemas import BlocoContexto, EntradaPergunta, JogoRecomendado, RespostaAssistente
 from config import get_settings
 from ml.assistente import AssistenteIndisponivel, perguntar
 
@@ -57,6 +57,19 @@ def responder(entrada: EntradaPergunta) -> RespostaAssistente:
                 chave=b.chave, titulo=b.titulo, conteudo=b.conteudo, fonte=b.fonte
             )
             for b in resposta.blocos
+        ],
+        recomendacoes=[
+            JogoRecomendado(
+                app_id=j.app_id,
+                nome=j.nome,
+                generos=j.generos,
+                nota_avaliacoes=j.nota_avaliacoes,
+                jogadores_simultaneos=j.jogadores_simultaneos,
+                preco=j.preco,
+                moeda=j.moeda,
+                gratuito=j.gratuito,
+            )
+            for j in resposta.recomendacoes
         ],
         tokens_entrada=resposta.tokens_entrada,
         tokens_saida=resposta.tokens_saida,
