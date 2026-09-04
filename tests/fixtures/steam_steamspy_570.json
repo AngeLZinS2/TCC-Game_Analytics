@@ -1,0 +1,27 @@
+{
+  "appid": 570,
+  "name": "Dota 2",
+  "developer": "Valve",
+  "publisher": "Valve",
+  "owners": "100,000,000 .. 200,000,000",
+  "average_forever": 0,
+  "average_2weeks": 0,
+  "median_forever": 0,
+  "median_2weeks": 0,
+  "ccu": 623941,
+  "positive": 2037143,
+  "negative": 461826,
+  "price": "0",
+  "initialprice": "0",
+  "discount": "0",
+  "tags": {
+    "Free to Play": 60040,
+    "MOBA": 20225,
+    "Multiplayer": 15411,
+    "Strategy": 14289,
+    "e-sports": 11816,
+    "Team-Based": 10989,
+    "Competitive": 8324,
+    "Action": 7939
+  }
+}

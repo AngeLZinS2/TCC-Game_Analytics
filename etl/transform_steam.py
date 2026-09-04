@@ -8,6 +8,7 @@ tambem a parte com testes de fixture em `tests/`.
 from __future__ import annotations
 
 import logging
+import re
 from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Any, Iterable, Sequence
@@ -22,6 +23,18 @@ FONTE = "steam"
 ENDPOINT_DETALHES = "appdetails"
 ENDPOINT_AVALIACOES = "appreviews"
 ENDPOINT_JOGADORES = "numberofcurrentplayers"
+ENDPOINT_STEAMSPY = "steamspy-app"
+ENDPOINT_NOTICIAS = "news"
+
+#: Steam publica so o ID do descritor de conteudo; o texto vem numa string
+#: solta e em ingles. Esta tabela e a traducao para os IDs conhecidos.
+_DESCRITORES_CONTEUDO = {
+    1: "Nudez ou conteúdo sexual",
+    2: "Violência ou sangue frequente",
+    3: "Conteúdo sexual adulto",
+    4: "Nudez ou conteúdo sexual frequente",
+    5: "Conteúdo adulto em geral",
+}
 
 # A Steam localiza a data conforme o parametro `l`. Coletamos com l=english
 # justamente para cair em um destes formatos.
@@ -48,6 +61,43 @@ class JogoSteam(BaseModel):
     preco_atual: Decimal | None = None
     moeda: str | None = None
     nota_metacritic: int | None = None
+
+    # --- Ficha (Fase 16), tudo de `appdetails` --------------------------
+    recursos: list[str] = Field(default_factory=list)
+    plataformas: list[str] = Field(default_factory=list)
+    idiomas: list[str] = Field(default_factory=list)
+    idiomas_com_audio: list[str] = Field(default_factory=list)
+    faixa_etaria: int | None = None
+    descritores_conteudo: list[str] = Field(default_factory=list)
+    classificacoes: dict[str, str] = Field(default_factory=dict)
+    suporte_controle: str | None = None
+    conquistas_total: int | None = None
+    conquistas_destaque: list[dict[str, str]] = Field(default_factory=list)
+    analises_totais: int | None = None
+    dlc_ids: list[int] = Field(default_factory=list)
+    site_oficial: str | None = None
+    imagem_header: str | None = None
+    em_breve: bool | None = None
+    requisitos_minimos: str | None = None
+
+    # --- SteamSpy (Fase 16), preenchido pelo endpoint proprio -----------
+    donos_estimados: str | None = None
+    tempo_jogo_medio_min: int | None = None
+    tempo_jogo_mediano_min: int | None = None
+    tags_comunidade: dict[str, int] = Field(default_factory=dict)
+
+
+class NoticiaSteam(BaseModel):
+    """Linha de `dim_jogo_steam_noticia` - um post do feed oficial do jogo."""
+
+    app_id: int
+    gid: str
+    titulo: str
+    url: str | None = None
+    autor: str | None = None
+    feed: str | None = None
+    publicado_em: datetime | None = None
+    resumo: str | None = None
 
 
 class SnapshotSteam(BaseModel):
@@ -89,6 +139,7 @@ class ResultadoSteam(BaseModel):
     jogos: list[JogoSteam] = Field(default_factory=list)
     snapshots: list[SnapshotSteam] = Field(default_factory=list)
     avaliacoes: list[AvaliacaoSteam] = Field(default_factory=list)
+    noticias: list[NoticiaSteam] = Field(default_factory=list)
 
     @property
     def total(self) -> int:
@@ -164,6 +215,84 @@ def _juntar(valores: Any) -> str | None:
     return ", ".join(itens) or None
 
 
+_TAG_HTML = re.compile(r"<[^>]+>")
+#: BBCode do feed de noticias da Steam (usa BBCode, nao HTML). Lista explicita
+#: de proposito: a Valve escreve secoes como "[ MAPS ]" no corpo das notas, e
+#: isso e conteudo, nao marcacao - um regex generico apagaria.
+_TAG_BBCODE = re.compile(
+    r"\[/?(?:p|list|olist|\*|b|i|u|s|h[1-6]|url|img|quote|code|spoiler|noparse"
+    r"|table|tr|td|th|strike|hr|previewyoutube|carousel)"
+    r"(?:=[^\]]*)?\]",
+    re.IGNORECASE,
+)
+_ESPACO = re.compile(r"[ \t]*\n[ \t]*")
+
+
+def _texto_de_html(bruto: Any, limite: int | None = None) -> str | None:
+    """HTML/BBCode -> texto puro. A Steam manda descricao, requisitos e o corpo
+    das noticias em marcacao - `<tag>` na loja, `[tag]` no feed de noticias."""
+    if not isinstance(bruto, str) or not bruto.strip():
+        return None
+    texto = _TAG_BBCODE.sub(" ", _TAG_HTML.sub(" ", bruto))
+    texto = texto.replace("\\[", "[").replace("\\]", "]")  # bracket escapado -> literal
+    texto = texto.replace("&nbsp;", " ").replace("&amp;", "&").replace("&lt;", "<")
+    texto = texto.replace("&gt;", ">").replace("&quot;", '"').replace("&#39;", "'")
+    texto = _ESPACO.sub("\n", texto)
+    texto = re.sub(r"[ \t]{2,}", " ", texto).strip()
+    if limite and len(texto) > limite:
+        texto = texto[:limite].rsplit(" ", 1)[0] + "…"
+    return texto or None
+
+
+def _parse_idiomas(bruto: Any) -> tuple[list[str], list[str]]:
+    """`supported_languages` -> (todos, com_audio).
+
+    Vem como HTML: "English<strong>*</strong>, French<strong>*</strong>, ...
+    <br><strong>*</strong>languages with full audio support". O `*` marca
+    audio dublado.
+    """
+    if not isinstance(bruto, str) or not bruto.strip():
+        return [], []
+    corpo = re.split(r"<br\s*/?>", bruto, maxsplit=1)[0]
+    todos: list[str] = []
+    com_audio: list[str] = []
+    for pedaco in corpo.split(","):
+        tem_audio = "<strong>*</strong>" in pedaco or "*" in _TAG_HTML.sub("", pedaco)
+        nome = _TAG_HTML.sub("", pedaco).replace("*", "").strip()
+        if not nome:
+            continue
+        todos.append(nome)
+        if tem_audio:
+            com_audio.append(nome)
+    return todos, com_audio
+
+
+def _parse_classificacoes(bruto: Any) -> dict[str, str]:
+    """`ratings` -> {orgao: nota}, so onde ha `rating` legivel.
+
+    A Steam devolve um dicionario por orgao (esrb, pegi, dejus, usk...) com
+    varias chaves internas; a que interessa e `rating`.
+    """
+    if not isinstance(bruto, dict):
+        return {}
+    saida: dict[str, str] = {}
+    for orgao, dados in bruto.items():
+        if isinstance(dados, dict) and dados.get("rating"):
+            saida[str(orgao)] = str(dados["rating"])
+    return saida
+
+
+def _parse_conquistas_destaque(bruto: Any) -> list[dict[str, str]]:
+    if not isinstance(bruto, dict):
+        return []
+    destaque = bruto.get("highlighted") or []
+    return [
+        {"nome": str(d["name"]), "icone": str(d.get("path", ""))}
+        for d in destaque
+        if isinstance(d, dict) and d.get("name")
+    ]
+
+
 def _extrair_dados_appdetails(payload: Any, app_id: int) -> dict[str, Any] | None:
     """A resposta vem como {"<app_id>": {"success": bool, "data": {...}}}.
 
@@ -198,6 +327,11 @@ def parse_appdetails(payload: Any, app_id: int) -> JogoSteam | None:
     lancamento = dados.get("release_date") or {}
     data_texto = lancamento.get("date") or None
 
+    plataformas_raw = dados.get("platforms") or {}
+    idiomas, idiomas_audio = _parse_idiomas(dados.get("supported_languages"))
+    descritores = dados.get("content_descriptors") or {}
+    requisitos = dados.get("pc_requirements") or {}
+
     return JogoSteam(
         app_id=int(dados.get("steam_appid", app_id)),
         nome=str(dados.get("name") or f"app-{app_id}"),
@@ -215,6 +349,32 @@ def parse_appdetails(payload: Any, app_id: int) -> JogoSteam | None:
         preco_atual=_centavos_para_decimal(preco.get("final")),
         moeda=preco.get("currency"),
         nota_metacritic=metacritic.get("score"),
+        recursos=list(
+            dict.fromkeys(
+                str(c["description"])
+                for c in dados.get("categories") or []
+                if isinstance(c, dict) and c.get("description")
+            )
+        ),
+        plataformas=[k for k in ("windows", "mac", "linux") if plataformas_raw.get(k)],
+        idiomas=idiomas,
+        idiomas_com_audio=idiomas_audio,
+        faixa_etaria=_inteiro(dados.get("required_age")),
+        descritores_conteudo=[
+            _DESCRITORES_CONTEUDO[i]
+            for i in (descritores.get("ids") or [])
+            if i in _DESCRITORES_CONTEUDO
+        ],
+        classificacoes=_parse_classificacoes(dados.get("ratings")),
+        suporte_controle=dados.get("controller_support"),
+        conquistas_total=(dados.get("achievements") or {}).get("total"),
+        conquistas_destaque=_parse_conquistas_destaque(dados.get("achievements")),
+        analises_totais=(dados.get("recommendations") or {}).get("total"),
+        dlc_ids=[int(x) for x in dados.get("dlc") or [] if str(x).isdigit()],
+        site_oficial=dados.get("website") or None,
+        imagem_header=dados.get("header_image") or None,
+        em_breve=lancamento.get("coming_soon"),
+        requisitos_minimos=_texto_de_html(requisitos.get("minimum"), limite=1200),
     )
 
 
@@ -322,6 +482,69 @@ def parse_jogadores_simultaneos(payload: Any) -> int | None:
     return int(contagem) if isinstance(contagem, int) else None
 
 
+def parse_steamspy(payload: Any) -> dict[str, Any]:
+    """SteamSpy `appdetails` -> os campos de mercado da ficha.
+
+    O plano gratuito do SteamSpy nao da numero exato de donos, so a faixa
+    ("1,000,000 .. 2,000,000") - e nao ha por que fingir precisao maior. Um
+    jogo novo demais volta com tudo zerado; nesse caso nao gravamos nada.
+    """
+    if not isinstance(payload, dict) or not payload.get("appid"):
+        return {}
+
+    tags = payload.get("tags")
+    tags_limpas: dict[str, int] = {}
+    if isinstance(tags, dict):
+        tags_limpas = {
+            str(nome): int(votos)
+            for nome, votos in tags.items()
+            if isinstance(votos, (int, float)) and votos
+        }
+
+    donos = str(payload.get("owners") or "").strip()
+    if donos in ("", "0 .. 0"):
+        donos = None
+    medio = _inteiro(payload.get("average_forever"))
+    mediano = _inteiro(payload.get("median_forever"))
+
+    # SteamSpy ainda sem dados para o app: sem faixa de donos, sem tags, sem
+    # tempo de jogo - nao ha o que gravar.
+    if not tags_limpas and not donos and not medio:
+        return {}
+
+    return {
+        "donos_estimados": donos,
+        "tempo_jogo_medio_min": medio or None,
+        "tempo_jogo_mediano_min": mediano or None,
+        "tags_comunidade": tags_limpas,
+    }
+
+
+def parse_noticias(payload: Any, app_id: int, limite_resumo: int = 600) -> list[NoticiaSteam]:
+    """ISteamNews/GetNewsForApp -> lista de posts do feed oficial."""
+    if not isinstance(payload, dict):
+        return []
+    itens = (payload.get("appnews") or {}).get("newsitems") or []
+    noticias: list[NoticiaSteam] = []
+    for item in itens:
+        if not isinstance(item, dict) or not item.get("gid") or not item.get("title"):
+            continue
+        publicado = _epoch_para_datetime(item.get("date"))
+        noticias.append(
+            NoticiaSteam(
+                app_id=app_id,
+                gid=str(item["gid"])[:32],
+                titulo=str(item["title"]).strip()[:500],
+                url=item.get("url") or None,
+                autor=(str(item.get("author")).strip() or None) if item.get("author") else None,
+                feed=item.get("feedlabel") or item.get("feedname") or None,
+                publicado_em=publicado,
+                resumo=_texto_de_html(item.get("contents"), limite=limite_resumo),
+            )
+        )
+    return noticias
+
+
 # ---------------------------------------------------------------------------
 # Montagem do resultado
 # ---------------------------------------------------------------------------
@@ -365,10 +588,18 @@ def transformar(
         # O resumo agregado e igual em toda pagina; basta a primeira.
         avaliacoes = paginas_avaliacoes[0] if paginas_avaliacoes else None
         jogadores = paginas_jogadores[0] if paginas_jogadores else None
+        steamspy = (endpoints.get(ENDPOINT_STEAMSPY) or [None])[0]
+        noticias = (endpoints.get(ENDPOINT_NOTICIAS) or [None])[0]
 
         jogo = parse_appdetails(detalhes.payload, app_id) if detalhes else None
         if jogo is not None:
+            if steamspy is not None:
+                for campo, valor in parse_steamspy(steamspy.payload).items():
+                    setattr(jogo, campo, valor)
             resultado.jogos.append(jogo)
+
+        if noticias is not None:
+            resultado.noticias.extend(parse_noticias(noticias.payload, app_id))
 
         # Sem dimensao nao ha FK possivel; o snapshot seria orfao.
         if jogo is None:

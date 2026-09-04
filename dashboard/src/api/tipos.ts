@@ -66,8 +66,52 @@ export interface PontoSerieTotal {
   jogos: number;
 }
 
+export interface ConquistaDestaque {
+  nome: string;
+  icone: string;
+}
+
+/** Metadados quase estáticos do jogo — a "ficha" estilo SteamDB. */
+export interface FichaJogoSteam {
+  tipo: string | null;
+  recursos: string[];
+  plataformas: string[];
+  idiomas: string[];
+  idiomas_com_audio: string[];
+  faixa_etaria: number | null;
+  descritores_conteudo: string[];
+  classificacoes: Record<string, string>;
+  suporte_controle: string | null;
+  conquistas_total: number | null;
+  conquistas_destaque: ConquistaDestaque[];
+  analises_totais: number | null;
+  dlc_ids: number[];
+  site_oficial: string | null;
+  imagem_header: string | null;
+  em_breve: boolean | null;
+  requisitos_minimos: string | null;
+  donos_estimados: string | null;
+  tempo_jogo_medio_min: number | null;
+  tempo_jogo_mediano_min: number | null;
+  /** [tag, votos], já ordenado por votos desc. */
+  tags_comunidade: [string, number][];
+  coletado_ficha_em: string | null;
+}
+
+export interface NoticiaSteam {
+  gid: string;
+  titulo: string;
+  url: string | null;
+  autor: string | null;
+  feed: string | null;
+  publicado_em: string | null;
+  resumo: string | null;
+}
+
 export interface DetalheJogoSteam {
   jogo: JogoSteam;
+  ficha: FichaJogoSteam;
+  noticias: NoticiaSteam[];
   serie: PontoSerie[];
 }
 

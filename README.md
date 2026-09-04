@@ -220,13 +220,15 @@ npm run preview      # serve o build em http://localhost:4173
 
 ### Fase 1 — Steam (catálogo / mercado)
 
-Coleta de três endpoints públicos da Steam, **nenhum exige chave de API**:
+Coleta de endpoints públicos da Steam, **nenhum exige chave de API**:
 
 | Endpoint | Uso |
 |---|---|
-| `store.steampowered.com/api/appdetails` | nome, gêneros, desenvolvedora, preço, Metacritic |
+| `store.steampowered.com/api/appdetails` | nome, gêneros, preço, Metacritic — e a ficha inteira (Fase 16) |
 | `store.steampowered.com/appreviews/<id>` | resumo agregado das avaliações |
 | `api.steampowered.com/.../GetNumberOfCurrentPlayers` | jogadores simultâneos |
+| `api.steampowered.com/ISteamNews/GetNewsForApp` | patch notes e anúncios (Fase 16) |
+| `steamspy.com/api.php?request=appdetails` | donos estimados, tempo de jogo, tags da comunidade (Fase 16) |
 
 Os dois primeiros dividem o mesmo host e o mesmo balde de rate limit (~200 req / 5 min por IP), então
 compartilham o mesmo cliente HTTP.
@@ -1318,6 +1320,50 @@ série). Continua sendo contexto — não entra na conta da probabilidade.
 Limite honesto: o placar do Clash of Clans é destruição/estrelas, não "jogos" — o rótulo
 fica aproximado nesses casos. E não há profundidade além do placar da série: a Liquipedia
 não publica estatística por round nem por jogador fora do Dota.
+
+### Fase 16 — Ficha do jogo (estilo SteamDB)
+
+A tela de detalhe de um jogo da Steam mostrava nome, gêneros, preço e a série de jogadores.
+O SteamDB mostra dezenas de coisas a mais. **Ele não tem API e proíbe scraping** — mas é um
+agregador das APIs oficiais da Steam, e a maior parte do que ele exibe estava **no payload
+de `appdetails` que o coletor sempre gravou e nunca extraía**.
+
+#### O que passou a entrar (migration `0011`)
+
+Reprocessando os payloads em disco — **zero rede**:
+
+| Campo | Origem no `appdetails` |
+|---|---|
+| Recursos (conquistas, cartas, nuvem, Workshop, controle…) | `categories` |
+| Plataformas (Win/Mac/Linux) | `platforms` |
+| Idiomas + quais têm dublagem | `supported_languages` (HTML, com `*` marcando áudio) |
+| Faixa etária, descritores de conteúdo, classificações (ESRB/PEGI/USK/DEJUS…) | `required_age`, `content_descriptors`, `ratings` |
+| Nº de conquistas + as principais (com ícone) | `achievements` |
+| Nº de recomendações na loja | `recommendations.total` |
+| DLCs, site oficial, requisitos mínimos, "em breve" | `dlc`, `website`, `pc_requirements`, `release_date` |
+
+#### O que exigiu chamada nova
+
+- **SteamSpy por app** (`?request=appdetails`) — donos estimados (faixa, nunca número
+  exato — é o teto do plano gratuito e não fingimos precisão), tempo de jogo médio, e as
+  **tags da comunidade com contagem de votos** (a folksonomia que o SteamDB destaca). Já
+  usávamos o SteamSpy para a semente; virou +1 chamada por app.
+- **`ISteamNews/GetNewsForApp`** (público, sem chave) — as últimas atualizações: patch
+  notes e anúncios do feed oficial. Tabela nova `dim_jogo_steam_noticia`, idempotente pelo
+  `gid` do post. É o "changelog" do SteamDB na versão possível sem conectar como cliente
+  Steam.
+
+O `xpaw` (steamapi.xpaw.me) lista o resto: quase tudo exige chave ou é de outro domínio
+(game servers, economia de itens, inventário, matchmaking). O gráfico histórico de
+jogadores é a especialidade do SteamDB — anos de coleta própria; o nosso está sendo
+construído pelos snapshots do agendador e não dá para recuperar o passado.
+
+#### Na tela
+
+Dois painéis novos em `JogoSteam.tsx`: **"Ficha do jogo"** (recursos, plataformas, idiomas
+com marca de dublagem, classificação etária + descritores, conquistas, alcance do SteamSpy,
+tags da comunidade, requisitos num `<details>`) e **"Últimas atualizações"** (as notícias,
+com selo do feed e resumo). Tudo aparece só quando há dado — sem linha em branco.
 
 ### Fase 3 — Riot API (LoL)
 

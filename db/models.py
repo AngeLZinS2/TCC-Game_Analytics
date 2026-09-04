@@ -97,6 +97,56 @@ class DimJogoSteam(Base):
     preco_atual: Mapped[Decimal | None] = mapped_column(Numeric(10, 2))
     moeda: Mapped[str | None] = mapped_column(String(8))
     nota_metacritic: Mapped[int | None] = mapped_column(Integer)
+
+    # --- Ficha do jogo (Fase 16) ------------------------------------------
+    # Tudo abaixo ja vinha no payload de `appdetails` que o coletor sempre
+    # gravou - so nao era extraido. Reprocessar do raw preenche sem rede.
+
+    #: Recursos da Steam ("Conquistas", "Cartas colecionaveis", "Nuvem",
+    #: "Suporte total a controle"...). Sao os `categories` do appdetails.
+    recursos: Mapped[list[str] | None] = mapped_column(ARRAY(Text))
+    #: Subconjunto de {"windows", "mac", "linux"}.
+    plataformas: Mapped[list[str] | None] = mapped_column(ARRAY(Text))
+    #: Idiomas de interface/legenda suportados.
+    idiomas: Mapped[list[str] | None] = mapped_column(ARRAY(Text))
+    #: Idiomas com audio dublado (subconjunto de `idiomas`).
+    idiomas_com_audio: Mapped[list[str] | None] = mapped_column(ARRAY(Text))
+    #: Idade minima declarada na loja (`required_age`).
+    faixa_etaria: Mapped[int | None] = mapped_column(Integer)
+    #: Descritores de conteudo da Steam (violencia, nudez...).
+    descritores_conteudo: Mapped[list[str] | None] = mapped_column(ARRAY(Text))
+    #: Classificacao por orgao: {"esrb": "M", "pegi": "18", "dejus": "18"...}.
+    classificacoes: Mapped[dict | None] = mapped_column(JSONB)
+    #: "full", "partial" ou nulo (`controller_support`).
+    suporte_controle: Mapped[str | None] = mapped_column(String(16))
+    #: Quantas conquistas o jogo tem (`achievements.total`).
+    conquistas_total: Mapped[int | None] = mapped_column(Integer)
+    #: As conquistas em destaque, com icone: [{"nome": ..., "icone": ...}].
+    conquistas_destaque: Mapped[list | None] = mapped_column(JSONB)
+    #: Total de recomendacoes positivas que a loja exibe (`recommendations`).
+    analises_totais: Mapped[int | None] = mapped_column(Integer)
+    #: app_ids das DLCs.
+    dlc_ids: Mapped[list[int] | None] = mapped_column(ARRAY(Integer))
+    site_oficial: Mapped[str | None] = mapped_column(Text)
+    imagem_header: Mapped[str | None] = mapped_column(Text)
+    #: `release_date.coming_soon` - lancado ou ainda por vir.
+    em_breve: Mapped[bool | None] = mapped_column(Boolean)
+    #: Requisitos minimos de PC, ja em texto puro (o payload vem em HTML).
+    requisitos_minimos: Mapped[str | None] = mapped_column(Text)
+
+    # --- SteamSpy (Fase 16) ---------------------------------------------
+    #: Faixa de donos estimada ("1,000,000 .. 2,000,000"). O plano gratuito
+    #: do SteamSpy so da faixa, nunca numero exato - e proposital nao fingir
+    #: precisao aqui.
+    donos_estimados: Mapped[str | None] = mapped_column(String(48))
+    tempo_jogo_medio_min: Mapped[int | None] = mapped_column(Integer)
+    tempo_jogo_mediano_min: Mapped[int | None] = mapped_column(Integer)
+    #: Tags da comunidade com contagem de votos: {"RPG": 1240, ...}.
+    tags_comunidade: Mapped[dict | None] = mapped_column(JSONB)
+
+    coletado_ficha_em: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True)
+    )
     criado_em: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -106,6 +156,46 @@ class DimJogoSteam(Base):
 
     snapshots: Mapped[list["FatoSnapshotJogoSteam"]] = relationship(
         back_populates="jogo", cascade="all, delete-orphan"
+    )
+    noticias: Mapped[list["NoticiaJogoSteam"]] = relationship(
+        back_populates="jogo", cascade="all, delete-orphan"
+    )
+
+
+class NoticiaJogoSteam(Base):
+    """Noticia / patch note oficial de um jogo (`ISteamNews/GetNewsForApp`).
+
+    O SteamDB mostra o changelog de cada jogo; esta e a versao possivel sem
+    conectar como cliente Steam: os posts do "Community Announcements" e do
+    feed oficial, que e onde estudio publica as notas de atualizacao.
+
+    `gid` e o id da noticia na Steam - unico por jogo, e o que da idempotencia:
+    recoletar nao duplica, so acrescenta o que e novo.
+    """
+
+    __tablename__ = "dim_jogo_steam_noticia"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    app_id: Mapped[int] = mapped_column(
+        ForeignKey("dim_jogo_steam.app_id", ondelete="CASCADE"), nullable=False
+    )
+    gid: Mapped[str] = mapped_column(String(32), nullable=False)
+    titulo: Mapped[str] = mapped_column(Text, nullable=False)
+    url: Mapped[str | None] = mapped_column(Text)
+    autor: Mapped[str | None] = mapped_column(String(120))
+    feed: Mapped[str | None] = mapped_column(String(120))
+    publicado_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    #: Corpo em texto puro, cortado - a lista da tela nao quer o BBCode inteiro.
+    resumo: Mapped[str | None] = mapped_column(Text)
+    coletado_em: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+
+    jogo: Mapped["DimJogoSteam"] = relationship(back_populates="noticias")
+
+    __table_args__ = (
+        UniqueConstraint("app_id", "gid", name="uq_noticia_app_gid"),
+        Index("ix_noticia_app_data", "app_id", "publicado_em"),
     )
 
 

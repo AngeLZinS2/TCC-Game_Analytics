@@ -1,0 +1,47 @@
+{
+  "appnews": {
+    "appid": 570,
+    "newsitems": [
+      {
+        "gid": "1842212951298513",
+        "title": "The International 2026 Grand Champions",
+        "url": "https://steamstore-a.akamaihd.net/news/externalpost/steam_community_announcements/1842212951298513",
+        "is_external_url": true,
+        "author": "krAnk0r",
+        "contents": "Congratulations to Team Spirit, Grand Champions at The International 2026. After enduring a challenging year, Team Spirit regained their ultimate form just in time to take a five-game Grand Finals slugfest and claim the Aegis of Champions in Shanghai.Spirit's Group Stage started strong, with 2-0 vic...",
+        "feedlabel": "Community Announcements",
+        "date": 1787792862,
+        "feedname": "steam_community_announcements",
+        "feed_type": 1,
+        "appid": 570
+      },
+      {
+        "gid": "1841579228666735",
+        "title": "'Dude no joke looks like Hugh Jackman now': The internet is swooning over Gabe Newell's svelte new look at The International",
+        "url": "https://steamstore-a.akamaihd.net/news/externalpost/PC Gamer/1841579228666735",
+        "is_external_url": true,
+        "author": "Andy Chalk",
+        "contents": "Valve honcho Gabe Newell recorded a video to kick off The International 2026, the latest edition of Valve's annual <a href=\"https://www.pcgamer.com/dota-2/\" target=\"_blank\">Dota 2</a> championship tournament, and as noticed by <a href=\"https://www.gamesradar.com/games/valve-chief-gabe-newell-makes-a-rare-public-appearance-as-new-chad-gabe-and-rings-in-dota-2s-biggest-tournament/\" target=\"_blank\">GamesRadar</a>, the reaction to it is pleasingly wholesome... <a href=\"https://www.pcgamer.com/games/dude-no-joke-looks-like-hugh-jackman-now-the-internet-is-swooning-over-gabe-newells-svelte-new-look-at-the-international/?utm_source=steam&utm_medium=referral\" target=\"_blank\">Read more.</a>",
+        "feedlabel": "PC Gamer",
+        "date": 1787257316,
+        "feedname": "PC Gamer",
+        "feed_type": 0,
+        "appid": 570
+      },
+      {
+        "gid": "1841579228661427",
+        "title": "The International Main Event",
+        "url": "https://steamstore-a.akamaihd.net/news/externalpost/steam_community_announcements/1841579228661427",
+        "is_external_url": true,
+        "author": "krAnk0r",
+        "contents": "The sixteen best Dota teams in the world spent the last week battling through an intense Group Stage, and now only eight contenders remain. In a matter of hours Team Vision, Team Liquid, Nigma Galaxy, Team Falcons, BoomBoys, Team Spirit, Iron Wing, and Team Yandex will begin the final push to claim ...",
+        "feedlabel": "Community Announcements",
+        "date": 1787107564,
+        "feedname": "steam_community_announcements",
+        "feed_type": 1,
+        "appid": 570
+      }
+    ],
+    "count": 3250
+  }
+}

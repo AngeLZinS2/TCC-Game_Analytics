@@ -88,8 +88,59 @@ class PontoSerieTotal(BaseModel):
     jogos: int
 
 
+class ConquistaDestaque(BaseModel):
+    nome: str
+    icone: str
+
+
+class FichaJogoSteam(BaseModel):
+    """Metadados do jogo que quase nao mudam - a "ficha" estilo SteamDB.
+
+    Fica fora de `JogoSteam` (a linha da tabela) de proposito: sao ~20 campos
+    que so a tela de detalhe usa, e carregar isso em cada linha da lista de
+    jogos seria peso morto.
+    """
+
+    tipo: str | None = None
+    recursos: list[str] = []
+    plataformas: list[str] = []
+    idiomas: list[str] = []
+    idiomas_com_audio: list[str] = []
+    faixa_etaria: int | None = None
+    descritores_conteudo: list[str] = []
+    classificacoes: dict[str, str] = {}
+    suporte_controle: str | None = None
+    conquistas_total: int | None = None
+    conquistas_destaque: list[ConquistaDestaque] = []
+    analises_totais: int | None = None
+    dlc_ids: list[int] = []
+    site_oficial: str | None = None
+    imagem_header: str | None = None
+    em_breve: bool | None = None
+    requisitos_minimos: str | None = None
+    #: SteamSpy - faixa, nunca numero exato.
+    donos_estimados: str | None = None
+    tempo_jogo_medio_min: int | None = None
+    tempo_jogo_mediano_min: int | None = None
+    #: {tag: votos}, ja ordenado por votos desc.
+    tags_comunidade: list[tuple[str, int]] = []
+    coletado_ficha_em: datetime | None = None
+
+
+class NoticiaSteam(BaseModel):
+    gid: str
+    titulo: str
+    url: str | None
+    autor: str | None
+    feed: str | None
+    publicado_em: datetime | None
+    resumo: str | None
+
+
 class DetalheJogoSteam(BaseModel):
     jogo: JogoSteam
+    ficha: FichaJogoSteam
+    noticias: list[NoticiaSteam] = []
     serie: list[PontoSerie]
 
 

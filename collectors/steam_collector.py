@@ -31,6 +31,8 @@ from etl.transform_steam import (
     ENDPOINT_AVALIACOES,
     ENDPOINT_DETALHES,
     ENDPOINT_JOGADORES,
+    ENDPOINT_NOTICIAS,
+    ENDPOINT_STEAMSPY,
     FONTE,
     ResultadoSteam,
     transformar,
@@ -43,7 +45,12 @@ URL_APPREVIEWS = "https://store.steampowered.com/appreviews/{app_id}"
 URL_JOGADORES = (
     "https://api.steampowered.com/ISteamUserStats/GetNumberOfCurrentPlayers/v1/"
 )
+URL_NOTICIAS = "https://api.steampowered.com/ISteamNews/GetNewsForApp/v2/"
 URL_STEAMSPY = "https://steamspy.com/api.php"
+
+#: Quantas noticias pedir por jogo. O feed muda em dias; 5 cobre as ultimas
+#: atualizacoes sem inchar o payload.
+NOTICIAS_POR_APP = 5
 # ISteamApps/GetAppList foi deprecado. O endpoint atual e IStoreService/GetAppList
 # (requer STEAM_API_KEY e pagina pelo parametro last_appid).
 URL_GETAPPLIST = "https://api.steampowered.com/IStoreService/GetAppList/v1/"
@@ -80,6 +87,12 @@ class SteamCollector(BaseCollector[ResultadoSteam]):
         self.api_client = RateLimitedClient(
             nome="steam-api",
             intervalo_minimo=self.settings.steam_api_rate_limit_seconds,
+            max_retries=self.settings.http_max_retries,
+            timeout=self.settings.http_timeout_seconds,
+        )
+        self.spy_client = RateLimitedClient(
+            nome="steamspy",
+            intervalo_minimo=self.settings.steam_spy_rate_limit_seconds,
             max_retries=self.settings.http_max_retries,
             timeout=self.settings.http_timeout_seconds,
         )
@@ -287,6 +300,22 @@ class SteamCollector(BaseCollector[ResultadoSteam]):
                 URL_JOGADORES,
                 {"appid": app_id},
             ),
+            (
+                ENDPOINT_NOTICIAS,
+                self.api_client,
+                URL_NOTICIAS,
+                {
+                    "appid": app_id,
+                    "count": NOTICIAS_POR_APP,
+                    "maxlength": 0,
+                },
+            ),
+            (
+                ENDPOINT_STEAMSPY,
+                self.spy_client,
+                URL_STEAMSPY,
+                {"request": "appdetails", "appid": app_id},
+            ),
         )
 
         registros: list[RawRecord] = self._coletar_avaliacoes(app_id)
@@ -395,3 +424,4 @@ class SteamCollector(BaseCollector[ResultadoSteam]):
     def close(self) -> None:
         self.store_client.close()
         self.api_client.close()
+        self.spy_client.close()

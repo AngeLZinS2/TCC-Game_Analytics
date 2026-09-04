@@ -17,11 +17,17 @@ from etl.transform_steam import (
     ENDPOINT_AVALIACOES,
     ENDPOINT_DETALHES,
     ENDPOINT_JOGADORES,
+    ENDPOINT_NOTICIAS,
+    ENDPOINT_STEAMSPY,
+    _parse_idiomas,
+    _texto_de_html,
     parse_appdetails,
     parse_appreviews,
     parse_data_lancamento,
     parse_jogadores_simultaneos,
+    parse_noticias,
     parse_preco,
+    parse_steamspy,
     transformar,
     truncar_janela,
 )
@@ -226,3 +232,96 @@ def test_transformar_ignora_outras_fontes(carregar_fixture):
         coletado_em=MOMENTO,
     )
     assert transformar([registro]).total == 0
+
+
+# --- ficha do jogo (Fase 16) ---------------------------------------------
+
+
+def test_appdetails_ficha_extrai_recursos_e_plataformas(carregar_fixture):
+    jogo = parse_appdetails(carregar_fixture("steam_appdetails_ficha"), 3751260)
+    assert "Steam Achievements" in jogo.recursos
+    assert jogo.plataformas == ["windows"]
+    assert jogo.suporte_controle == "full"
+    assert jogo.conquistas_total == 46
+    assert jogo.analises_totais == 3767
+    assert jogo.dlc_ids == [4417550]
+    assert jogo.em_breve is False
+    assert jogo.site_oficial == "https://dawnwalkergame.com"
+
+
+def test_appdetails_ficha_traduz_descritores_e_classificacoes(carregar_fixture):
+    jogo = parse_appdetails(carregar_fixture("steam_appdetails_ficha"), 3751260)
+    assert jogo.faixa_etaria == 18
+    # IDs 1,2,5 -> textos em portugues
+    assert any("sexual" in d.lower() for d in jogo.descritores_conteudo)
+    assert jogo.classificacoes.get("pegi") == "18"
+    assert "esrb" in jogo.classificacoes
+
+
+def test_appdetails_ficha_idiomas_com_e_sem_audio(carregar_fixture):
+    jogo = parse_appdetails(carregar_fixture("steam_appdetails_ficha"), 3751260)
+    assert "English" in jogo.idiomas
+    assert "English" in jogo.idiomas_com_audio
+    # todo idioma dublado tambem esta na lista geral
+    assert set(jogo.idiomas_com_audio) <= set(jogo.idiomas)
+
+
+def test_parse_idiomas_marca_audio_pelo_asterisco():
+    todos, audio = _parse_idiomas(
+        "English<strong>*</strong>, Portuguese - Brazil<br><strong>*</strong>full audio"
+    )
+    assert todos == ["English", "Portuguese - Brazil"]
+    assert audio == ["English"]
+
+
+def test_texto_de_html_tira_marcacao_e_corta():
+    assert _texto_de_html("<p>Olá <b>mundo</b></p>") == "Olá mundo"
+    assert _texto_de_html("", limite=10) is None
+    cortado = _texto_de_html("<p>" + "palavra " * 50 + "</p>", limite=30)
+    assert cortado.endswith("…") and len(cortado) <= 32
+
+
+def test_parse_steamspy_traz_donos_e_tags(carregar_fixture):
+    dados = parse_steamspy(carregar_fixture("steam_steamspy_570"))
+    assert ".." in dados["donos_estimados"]  # faixa, nunca numero exato
+    assert isinstance(dados["tags_comunidade"], dict)
+    assert all(v > 0 for v in dados["tags_comunidade"].values())
+
+
+def test_parse_steamspy_jogo_novo_sem_dado_volta_vazio():
+    assert parse_steamspy({"appid": 999, "owners": "0 .. 0", "tags": [], "average_forever": 0}) == {}
+    assert parse_steamspy({}) == {}
+
+
+def test_parse_steamspy_faixa_baixa_ainda_e_dado():
+    # "0 .. 20,000" e o balde mais baixo do SteamSpy, mas e informacao real
+    # ("menos de 20 mil donos") - diferente de nao ter estimativa nenhuma.
+    dados = parse_steamspy({"appid": 999, "owners": "0 .. 20,000", "tags": []})
+    assert dados["donos_estimados"] == "0 .. 20,000"
+
+
+def test_parse_noticias(carregar_fixture):
+    noticias = parse_noticias(carregar_fixture("steam_news_570"), 570)
+    assert len(noticias) == 3
+    n = noticias[0]
+    assert n.gid and n.titulo and n.app_id == 570
+    assert n.publicado_em is not None
+    # o resumo nao tem HTML cru
+    assert n.resumo is None or "<" not in n.resumo
+
+
+def test_parse_noticias_payload_ruim_nao_levanta():
+    assert parse_noticias({}, 570) == []
+    assert parse_noticias({"appnews": {"newsitems": [{"gid": "1"}]}}, 570) == []  # sem titulo
+
+
+def test_transformar_funde_steamspy_e_noticias_no_jogo(carregar_fixture):
+    registros = [
+        _registro(ENDPOINT_DETALHES, 570, carregar_fixture("steam_appdetails_570")),
+        _registro(ENDPOINT_STEAMSPY, 570, carregar_fixture("steam_steamspy_570")),
+        _registro(ENDPOINT_NOTICIAS, 570, carregar_fixture("steam_news_570")),
+    ]
+    resultado = transformar(registros)
+    assert resultado.jogos[0].donos_estimados
+    assert resultado.jogos[0].tags_comunidade
+    assert len(resultado.noticias) == 3

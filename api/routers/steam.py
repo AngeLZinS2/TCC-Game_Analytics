@@ -16,11 +16,13 @@ from sqlalchemy.orm import Session, aliased
 from api.schemas import (
     AgregadoGenero,
     DetalheJogoSteam,
+    FichaJogoSteam,
     JogoSteam,
+    NoticiaSteam,
     PontoSerie,
     PontoSerieTotal,
 )
-from db.models import DimJogoSteam, FatoSnapshotJogoSteam
+from db.models import DimJogoSteam, FatoSnapshotJogoSteam, NoticiaJogoSteam
 from db.session import get_db
 
 router = APIRouter(prefix="/api/steam", tags=["steam"])
@@ -89,6 +91,45 @@ def _variacao(atual: int | None, anterior: int | None) -> float | None:
     if atual is None or not anterior:
         return None
     return round((atual - anterior) / anterior * 100, 2)
+
+
+#: Orgaos de classificacao que a tela mostra. `steam_germany`, `igrs`,
+#: `gmedia` e afins existem no payload mas so poluem - a Steam ja mostra so
+#: os principais na loja.
+_ORGAOS_RELEVANTES = ("esrb", "pegi", "usk", "dejus", "cero", "oflc", "kgrb")
+
+
+def _montar_ficha(jogo: DimJogoSteam) -> FichaJogoSteam:
+    tags = jogo.tags_comunidade or {}
+    classificacoes = {
+        org: nota
+        for org, nota in (jogo.classificacoes or {}).items()
+        if org in _ORGAOS_RELEVANTES and str(nota).lower() not in ("", "banned")
+    }
+    return FichaJogoSteam(
+        tipo=jogo.tipo,
+        recursos=jogo.recursos or [],
+        plataformas=jogo.plataformas or [],
+        idiomas=jogo.idiomas or [],
+        idiomas_com_audio=jogo.idiomas_com_audio or [],
+        faixa_etaria=jogo.faixa_etaria,
+        descritores_conteudo=jogo.descritores_conteudo or [],
+        classificacoes=classificacoes,
+        suporte_controle=jogo.suporte_controle,
+        conquistas_total=jogo.conquistas_total,
+        conquistas_destaque=jogo.conquistas_destaque or [],
+        analises_totais=jogo.analises_totais,
+        dlc_ids=jogo.dlc_ids or [],
+        site_oficial=jogo.site_oficial,
+        imagem_header=jogo.imagem_header,
+        em_breve=jogo.em_breve,
+        requisitos_minimos=jogo.requisitos_minimos,
+        donos_estimados=jogo.donos_estimados,
+        tempo_jogo_medio_min=jogo.tempo_jogo_medio_min,
+        tempo_jogo_mediano_min=jogo.tempo_jogo_mediano_min,
+        tags_comunidade=sorted(tags.items(), key=lambda kv: kv[1], reverse=True)[:20],
+        coletado_ficha_em=jogo.coletado_ficha_em,
+    )
 
 
 def _montar_jogo(
@@ -217,6 +258,15 @@ def detalhar_jogo(app_id: int, sessao: Session = Depends(get_db)) -> DetalheJogo
         )
     )
 
+    noticias = list(
+        sessao.scalars(
+            select(NoticiaJogoSteam)
+            .where(NoticiaJogoSteam.app_id == app_id)
+            .order_by(nulls_last(desc(NoticiaJogoSteam.publicado_em)))
+            .limit(8)
+        )
+    )
+
     return DetalheJogoSteam(
         jogo=_montar_jogo(
             jogo,
@@ -229,6 +279,19 @@ def detalhar_jogo(app_id: int, sessao: Session = Depends(get_db)) -> DetalheJogo
                 snapshots[-2].jogadores_simultaneos if len(snapshots) > 1 else None
             ),
         ),
+        ficha=_montar_ficha(jogo),
+        noticias=[
+            NoticiaSteam(
+                gid=n.gid,
+                titulo=n.titulo,
+                url=n.url,
+                autor=n.autor,
+                feed=n.feed,
+                publicado_em=n.publicado_em,
+                resumo=n.resumo,
+            )
+            for n in noticias
+        ],
         serie=[
             PontoSerie(
                 janela_coleta=s.janela_coleta,
