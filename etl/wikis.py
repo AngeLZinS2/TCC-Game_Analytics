@@ -41,12 +41,38 @@ ARQUIVO_REGISTRO = (
 )
 
 
+#: Genero de esporte -> o substantivo que a serie de um confronto conta.
+#:
+#: A Liquipedia guarda um placar por confronto (`agenda_partida.placar_a/b`),
+#: mas o que ele MEDE muda com o jogo: mapas num FPS, jogos num card game,
+#: pontos no xadrez. `battle-royale` e `corrida` nao tem serie 1-contra-1 -
+#: sao colocacao numa lobby - entao nao ha unidade e o fator de saldo nem
+#: aparece.
+UNIDADE_PLACAR: dict[str, str | None] = {
+    "fps": "mapas",
+    "moba": "jogos",
+    "cartas": "jogos",
+    "autobattler": "jogos",
+    "estrategia": "jogos",
+    "luta": "jogos",
+    "esporte": "jogos",
+    "arena": "jogos",
+    "tabuleiro": "pontos",
+    "battle-royale": None,
+    "corrida": None,
+    "outro": None,
+}
+
+
 @dataclass(frozen=True, slots=True)
 class Wiki:
     """Uma wiki da Liquipedia e o que da para coletar dela."""
 
     codigo: str
     nome: str
+    #: fps, moba, cartas, estrategia, luta, battle-royale, esporte, corrida,
+    #: tabuleiro, arena, autobattler, outro. Ver `UNIDADE_PLACAR`.
+    genero: str
     #: `Liquipedia:Matches` existe nesta wiki.
     agenda: bool
     #: `Category:Teams` tem membros nesta wiki.
@@ -55,6 +81,11 @@ class Wiki:
     @property
     def url_api(self) -> str:
         return f"https://liquipedia.net/{self.codigo}/api.php"
+
+    @property
+    def unidade_placar(self) -> str | None:
+        """Como se chama o que o placar de um confronto conta neste jogo."""
+        return UNIDADE_PLACAR.get(self.genero)
 
 
 @lru_cache(maxsize=1)
@@ -65,6 +96,7 @@ def registro() -> tuple[Wiki, ...]:
         Wiki(
             codigo=item["codigo"],
             nome=item["nome"],
+            genero=item.get("genero", "outro"),
             agenda=bool(item.get("agenda")),
             times=bool(item.get("times")),
         )
@@ -74,6 +106,16 @@ def registro() -> tuple[Wiki, ...]:
 
 def por_codigo(codigo: str) -> Wiki | None:
     return next((w for w in registro() if w.codigo == codigo), None)
+
+
+def unidade_placar(codigo: str) -> str | None:
+    """A unidade do placar de um confronto do jogo - `None` se nao se aplica.
+
+    "mapas" para FPS, "jogos" para card game / MOBA, "pontos" para xadrez.
+    Jogo desconhecido ou de colocacao (battle royale, corrida) devolve `None`.
+    """
+    wiki = por_codigo(codigo)
+    return wiki.unidade_placar if wiki is not None else None
 
 
 def com_agenda() -> tuple[Wiki, ...]:

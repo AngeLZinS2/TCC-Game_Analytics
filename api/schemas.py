@@ -382,6 +382,9 @@ class EquipeConfronto(BaseModel):
     xpm_medio: float | None
     kda_medio: float | None
     duracao_media_segundos: float | None
+    #: Saldo medio de placar por confronto, em [-1, 1] (mapas/jogos/pontos
+    #: conforme o genero). `None` no Dota e em jogo sem serie 1-contra-1.
+    saldo_placar: float | None = None
     #: Posicao e pontos no ranking da Valve (so CS). `None` fora dele.
     posicao_ranking: int | None = None
     pontos_ranking: int | None = None

@@ -1295,6 +1295,30 @@ colunas GPM/KDA só onde há telemetria. E o fator antes rotulado "Força no ran
 posição da Valve, quando é o coeficiente do Bradley-Terry (que, para 3DMAX, #31 na Valve
 mas 4/4 no retrospecto, fica bem acima da posição dela).
 
+E não é só CS — **cada gênero mede diferente**. O registro de wikis
+(`collectors/seeds/liquipedia_wikis.json`) ganhou um campo `genero` para os 73 jogos, e
+`etl/wikis.py::unidade_placar` traduz gênero → o substantivo do placar de um confronto:
+
+| gênero | unidade | jogos com dado |
+|---|---|---|
+| fps | **mapas** | Counter-Strike, VALORANT, Call of Duty, CrossFire, Arena FPS |
+| moba / cartas / estratégia / arena / luta / esporte | **jogos** | Artifact, Clash Royale, Brawl Stars, Clash of Clans, Battlerite |
+| tabuleiro | **pontos** | Chess |
+| battle-royale / corrida | — (colocação numa lobby, não série 1×1) | — |
+
+Com isso `_preencher_saldo_placar` calcula um fator novo: o **saldo de placar** por
+confronto, normalizado a `[-1, 1]` — `(placar_meu − placar_dele) / (placar_meu +
+placar_dele)`, média sobre os confrontos decididos. Independe do formato (um 2-0, um 13-4 e
+um 12-2 dão +1 igual), então compara Bo1 com Bo5 sem distorção. Winrate diz *quantas* o
+time venceu; o saldo diz *como*. No modal ele vira "Saldo de mapas" / "Saldo de jogos" /
+"Saldo de pontos" conforme o jogo; na tabela de ranking, uma coluna "Saldo" que só aparece
+onde há placar de série (todo jogo 1×1 menos Dota, que vem da OpenDota sem placar de
+série). Continua sendo contexto — não entra na conta da probabilidade.
+
+Limite honesto: o placar do Clash of Clans é destruição/estrelas, não "jogos" — o rótulo
+fica aproximado nesses casos. E não há profundidade além do placar da série: a Liquipedia
+não publica estatística por round nem por jogador fora do Dota.
+
 ### Fase 3 — Riot API (LoL)
 
 Próxima fase. O star schema já tem o discriminador (`dim_jogo.codigo`), as rotas de partidas

@@ -10,11 +10,35 @@ from __future__ import annotations
 
 import json
 
-from etl.wikis import ARQUIVO_REGISTRO, Wiki, com_agenda, com_times, por_codigo, registro
+from etl.wikis import (
+    ARQUIVO_REGISTRO,
+    UNIDADE_PLACAR,
+    Wiki,
+    com_agenda,
+    com_times,
+    por_codigo,
+    registro,
+    unidade_placar,
+)
 
 
 def test_o_registro_carrega_e_nao_esta_vazio():
     assert len(registro()) >= 70
+
+
+def test_todo_genero_e_conhecido():
+    """Um genero fora de `UNIDADE_PLACAR` nao teria unidade de placar - e um
+    erro de digitacao no registro passaria despercebido."""
+    invalidos = {w.codigo: w.genero for w in registro() if w.genero not in UNIDADE_PLACAR}
+    assert invalidos == {}
+
+
+def test_unidade_placar_por_genero():
+    assert unidade_placar("counterstrike") == "mapas"  # fps
+    assert unidade_placar("chess") == "pontos"  # tabuleiro
+    assert unidade_placar("clashroyale") == "jogos"  # estrategia
+    assert unidade_placar("fortnite") is None  # battle-royale, sem serie 1v1
+    assert unidade_placar("jogo-que-nao-existe") is None
 
 
 def test_toda_wiki_serve_para_alguma_coisa():
@@ -91,12 +115,12 @@ def test_o_arquivo_e_json_valido_com_as_chaves_esperadas():
     dados = json.loads(ARQUIVO_REGISTRO.read_text(encoding="utf-8"))
     assert isinstance(dados, list)
     for item in dados:
-        assert set(item) == {"codigo", "nome", "agenda", "times"}, item
+        assert set(item) == {"codigo", "nome", "genero", "agenda", "times"}, item
 
 
 def test_wiki_e_imutavel():
     """`registro()` e cacheado; um Wiki mutavel deixaria o cache mentir."""
-    wiki = Wiki(codigo="x", nome="X", agenda=True, times=True)
+    wiki = Wiki(codigo="x", nome="X", genero="outro", agenda=True, times=True)
     try:
         wiki.codigo = "y"  # type: ignore[misc]
     except Exception:

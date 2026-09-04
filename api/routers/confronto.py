@@ -74,6 +74,9 @@ def _para_schema(equipe: motor.Equipe) -> EquipeConfronto:
             if equipe.duracao_media_segundos is not None
             else None
         ),
+        saldo_placar=(
+            round(equipe.saldo_placar, 3) if equipe.saldo_placar is not None else None
+        ),
         posicao_ranking=equipe.posicao_ranking,
         pontos_ranking=equipe.pontos_ranking,
     )

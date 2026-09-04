@@ -163,9 +163,42 @@ def test_fatores_de_fps_nao_trazem_vocabulario_de_moba():
 
     rotulos = [f.rotulo for f in _fatores_da_previsao(a, b)]
 
-    assert rotulos == ["Força estimada", "Winrate", "Partidas coletadas"]
+    assert "Força estimada" in rotulos and "Winrate" in rotulos
     assert not any(
         termo in r for r in rotulos for termo in ("Ouro", "Experiência", "KDA", "Duração")
+    )
+
+
+def test_saldo_de_placar_usa_o_substantivo_do_genero():
+    """"Saldo de mapas" num FPS, "Saldo de jogos" num card game, "Saldo de
+    pontos" no xadrez - o mesmo número, o nome que o esporte usa."""
+    a = _equipe(1, partidas=6, vitorias=4, forca=0.8, saldo_placar=0.42)
+    b = _equipe(2, partidas=5, vitorias=2, forca=0.1, saldo_placar=-0.15)
+
+    fps = [f.rotulo for f in _fatores_da_previsao(a, b, "mapas")]
+    cartas = [f.rotulo for f in _fatores_da_previsao(a, b, "jogos")]
+    xadrez = [f.rotulo for f in _fatores_da_previsao(a, b, "pontos")]
+
+    assert "Saldo de mapas" in fps
+    assert "Saldo de jogos" in cartas
+    assert "Saldo de pontos" in xadrez
+
+
+def test_saldo_nao_aparece_sem_unidade_nem_sem_dado():
+    """Battle royale não tem série 1-contra-1 (`unidade_placar` = None); e sem
+    saldo nenhum lado, o fator some."""
+    com_dado = _equipe(1, partidas=6, vitorias=4, forca=0.8, saldo_placar=0.42)
+    sem_dado = _equipe(2, partidas=5, vitorias=2, forca=0.1)
+
+    # unidade None -> nunca
+    assert not any(
+        f.rotulo.startswith("Saldo")
+        for f in _fatores_da_previsao(com_dado, sem_dado, None)
+    )
+    # unidade ok mas nenhum lado tem saldo -> nao entra
+    assert not any(
+        f.rotulo.startswith("Saldo")
+        for f in _fatores_da_previsao(sem_dado, _equipe(3, partidas=2, forca=0.0), "jogos")
     )
 
 

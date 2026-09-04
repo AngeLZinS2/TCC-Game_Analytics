@@ -132,6 +132,10 @@ class Confronto:
     id_equipe_b: int
     vitoria_a: bool
     liga: str | None
+    #: Placar da serie (mapas/jogos/pontos, conforme o jogo). `None` quando a
+    #: fonte nao publicou - so o vencedor. Ver `_preencher_saldo_placar`.
+    placar_a: int | None = None
+    placar_b: int | None = None
 
 
 @dataclass
@@ -148,6 +152,11 @@ class Equipe:
     xpm_medio: float | None = None
     kda_medio: float | None = None
     duracao_media_segundos: float | None = None
+    #: Saldo medio de placar por confronto decidido, normalizado a [-1, 1]:
+    #: +1 = so venceu por lavada, -1 = so perdeu de lavada. Independe do
+    #: formato (2-0, 13-4 e 12-2 dao o mesmo +1). `None` para Dota (a fonte
+    #: nao da placar de serie) e para jogo sem serie 1-contra-1.
+    saldo_placar: float | None = None
     #: Posicao e pontos no ranking externo mais recente (Valve, so CS por
     #: enquanto). `None` quando a equipe nao aparece nele. Contexto para a
     #: tela - o efeito no modelo ja esta embutido em `forca` (Fase 15).
@@ -259,6 +268,8 @@ def _carregar_confrontos_liquipedia(sessao, jogo: str) -> list[Confronto]:
             AgendaPartida.id_equipe_b,
             AgendaPartida.vitoria_a,
             AgendaPartida.torneio,
+            AgendaPartida.placar_a,
+            AgendaPartida.placar_b,
         )
         .join(DimJogo, DimJogo.id_jogo == AgendaPartida.id_jogo)
         .where(
@@ -278,6 +289,8 @@ def _carregar_confrontos_liquipedia(sessao, jogo: str) -> list[Confronto]:
             id_equipe_b=linha[3],
             vitoria_a=bool(linha[4]),
             liga=linha[5],
+            placar_a=linha[6],
+            placar_b=linha[7],
         )
         for linha in linhas
     ]
@@ -339,6 +352,55 @@ def _preencher_ranking_externo(sessao, jogo: str, equipes: dict[int, Equipe]) ->
             equipe.pontos_ranking = int(pontos) if pontos is not None else None
 
 
+def _preencher_saldo_placar(sessao, jogo: str, equipes: dict[int, Equipe]) -> None:
+    """Media do saldo de placar por confronto, normalizada a [-1, 1].
+
+    Winrate ja diz quantas o time venceu; isto diz COMO. Um 2-0 e um 2-1
+    contam igual no winrate, mas o primeiro e dominio e o segundo e sorte de
+    mapa - `(placar_meu - placar_dele) / (placar_meu + placar_dele)` separa os
+    dois sem depender do formato: 2-0, 13-4 e 12-2 dao +1 igual.
+
+    So faz sentido onde a serie e 1-contra-1 (`unidade_placar` do jogo nao e
+    `None`) - em battle royale o "placar" e colocacao numa lobby, nao ha saldo.
+    """
+    from etl.wikis import unidade_placar
+
+    if unidade_placar(jogo) is None:
+        return
+
+    linhas = sessao.execute(
+        select(
+            AgendaPartida.id_equipe_a,
+            AgendaPartida.id_equipe_b,
+            AgendaPartida.placar_a,
+            AgendaPartida.placar_b,
+        )
+        .join(DimJogo, DimJogo.id_jogo == AgendaPartida.id_jogo)
+        .where(
+            DimJogo.codigo == jogo,
+            AgendaPartida.vitoria_a.is_not(None),
+            AgendaPartida.id_equipe_a.is_not(None),
+            AgendaPartida.id_equipe_b.is_not(None),
+            AgendaPartida.placar_a.is_not(None),
+            AgendaPartida.placar_b.is_not(None),
+        )
+    ).all()
+
+    acumulado: dict[int, list[float]] = {}
+    for id_a, id_b, pa, pb in linhas:
+        total = (pa or 0) + (pb or 0)
+        if total <= 0:
+            continue
+        saldo_a = (pa - pb) / total
+        acumulado.setdefault(id_a, []).append(saldo_a)
+        acumulado.setdefault(id_b, []).append(-saldo_a)
+
+    for id_equipe, saldos in acumulado.items():
+        equipe = equipes.get(id_equipe)
+        if equipe is not None and saldos:
+            equipe.saldo_placar = sum(saldos) / len(saldos)
+
+
 def _carregar_equipes(sessao, jogo: str = "dota2") -> dict[int, Equipe]:
     """As equipes do jogo, com o desempenho medio quando a fonte tem.
 
@@ -366,6 +428,7 @@ def _carregar_equipes(sessao, jogo: str = "dota2") -> dict[int, Equipe]:
 
     if jogo != "dota2":
         _preencher_partidas_liquipedia(sessao, jogo, equipes)
+        _preencher_saldo_placar(sessao, jogo, equipes)
         return equipes
 
     # O lado do fato ("radiant"/"dire") liga o jogador a equipe da partida.
@@ -891,18 +954,31 @@ def prever(id_equipe_a: int, id_equipe_b: int, jogo: str = "dota2") -> Previsao:
         contribuicao_lado=round(lado, 4),
         confrontos_diretos=len(diretos),
         vitorias_diretas_a=vitorias_diretas_a,
-        fatores=_fatores_da_previsao(a, b),
+        fatores=_fatores_da_previsao(a, b, _unidade_placar(jogo)),
     )
 
 
-def _fatores_da_previsao(a: Equipe, b: Equipe) -> list[Fator]:
+def _unidade_placar(jogo: str) -> str | None:
+    from etl.wikis import unidade_placar
+
+    return unidade_placar(jogo)
+
+
+def _fatores_da_previsao(
+    a: Equipe, b: Equipe, unidade_placar: str | None = None
+) -> list[Fator]:
     """Os fatores do 'por que', so os que fazem sentido para este jogo.
 
-    Forca, winrate e numero de partidas existem para qualquer esporte. Ja
-    GPM/XPM/KDA/duracao sao telemetria por jogador da OpenDota - e a OpenDota
-    so cobre Dota 2. Para um confronto de Counter-Strike esses quatro nao tem
-    dado NENHUM e, pior, sao vocabulario de MOBA ("ouro por minuto" num FPS):
-    entram na lista so quando pelo menos um lado tem o numero.
+    Forca, winrate e numero de partidas existem para qualquer esporte. O resto
+    e por genero:
+
+    * GPM/XPM/KDA/duracao sao telemetria por jogador da OpenDota - so Dota 2
+      tem. Num FPS "ouro por minuto" nem e conceito do jogo.
+    * O saldo de placar (`saldo_placar`) vale para todo jogo com serie
+      1-contra-1, mas o substantivo muda: "mapas" num FPS, "jogos" num card
+      game, "pontos" no xadrez. `unidade_placar` vem do registro de wikis.
+
+    Cada bloco so entra quando ha dado - nada de linha com travessao.
     """
     # A forca e o unico fator que entra na conta da probabilidade. Os outros
     # sao contexto que explica de onde ela veio - marca-los como se pesassem
@@ -912,6 +988,13 @@ def _fatores_da_previsao(a: Equipe, b: Equipe) -> list[Fator]:
         _fator("Winrate", a.winrate, b.winrate, "%"),
         _fator("Partidas coletadas", a.partidas, b.partidas, "", casas=0),
     ]
+
+    if unidade_placar and (a.saldo_placar is not None or b.saldo_placar is not None):
+        fatores.append(
+            _fator(
+                f"Saldo de {unidade_placar}", a.saldo_placar, b.saldo_placar, "", casas=2
+            )
+        )
 
     telemetria = [
         _fator("Ouro por minuto", a.gpm_medio, b.gpm_medio, "GPM", casas=0),

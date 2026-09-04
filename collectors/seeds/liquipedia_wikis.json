@@ -2,438 +2,511 @@
   {
     "codigo": "ageofempires",
     "nome": "Age of Empires",
+    "genero": "estrategia",
     "agenda": true,
     "times": true
   },
   {
     "codigo": "apexlegends",
     "nome": "Apex Legends",
+    "genero": "battle-royale",
     "agenda": true,
     "times": true
   },
   {
     "codigo": "arenafps",
     "nome": "Arena FPS",
+    "genero": "fps",
     "agenda": true,
     "times": true
   },
   {
     "codigo": "artifact",
     "nome": "Artifact",
+    "genero": "cartas",
     "agenda": true,
     "times": true
   },
   {
     "codigo": "autochess",
     "nome": "Auto Chess",
+    "genero": "autobattler",
     "agenda": true,
     "times": true
   },
   {
     "codigo": "battalion",
     "nome": "Battalion 1944",
+    "genero": "fps",
     "agenda": true,
     "times": true
   },
   {
     "codigo": "battlerite",
     "nome": "Battlerite",
+    "genero": "arena",
     "agenda": true,
     "times": true
   },
   {
     "codigo": "brawlhalla",
     "nome": "Brawlhalla",
+    "genero": "luta",
     "agenda": false,
     "times": true
   },
   {
     "codigo": "brawlstars",
     "nome": "Brawl Stars",
+    "genero": "arena",
     "agenda": true,
     "times": true
   },
   {
     "codigo": "callofduty",
     "nome": "Call of Duty",
+    "genero": "fps",
     "agenda": true,
     "times": true
   },
   {
     "codigo": "chess",
     "nome": "Chess",
+    "genero": "tabuleiro",
     "agenda": true,
     "times": true
   },
   {
     "codigo": "clashofclans",
     "nome": "Clash of Clans",
+    "genero": "estrategia",
     "agenda": true,
     "times": true
   },
   {
     "codigo": "clashroyale",
     "nome": "Clash Royale",
+    "genero": "estrategia",
     "agenda": true,
     "times": true
   },
   {
     "codigo": "counterstrike",
     "nome": "Counter-Strike",
+    "genero": "fps",
     "agenda": true,
     "times": true
   },
   {
     "codigo": "criticalops",
     "nome": "Critical Ops",
+    "genero": "fps",
     "agenda": true,
     "times": true
   },
   {
     "codigo": "crossfire",
     "nome": "CrossFire",
+    "genero": "fps",
     "agenda": true,
     "times": true
   },
   {
     "codigo": "deadlock",
     "nome": "Deadlock",
+    "genero": "moba",
     "agenda": true,
     "times": true
   },
   {
     "codigo": "deltaforce",
     "nome": "Delta Force",
+    "genero": "fps",
     "agenda": true,
     "times": true
   },
   {
     "codigo": "dota2",
     "nome": "Dota 2",
+    "genero": "moba",
     "agenda": true,
     "times": true
   },
   {
     "codigo": "easportsfc",
     "nome": "EA SPORTS FC",
+    "genero": "esporte",
     "agenda": true,
     "times": true
   },
   {
     "codigo": "eva",
     "nome": "Esports Virtual Arenas",
+    "genero": "fps",
     "agenda": true,
     "times": true
   },
   {
     "codigo": "fighters",
     "nome": "Fighting Games",
+    "genero": "luta",
     "agenda": false,
     "times": true
   },
   {
     "codigo": "formula1",
     "nome": "Formula 1",
+    "genero": "corrida",
     "agenda": false,
     "times": true
   },
   {
     "codigo": "fortnite",
     "nome": "Fortnite",
+    "genero": "battle-royale",
     "agenda": false,
     "times": true
   },
   {
     "codigo": "freefire",
     "nome": "Free Fire",
+    "genero": "battle-royale",
     "agenda": true,
     "times": true
   },
   {
     "codigo": "geoguessr",
     "nome": "GeoGuessr",
+    "genero": "outro",
     "agenda": true,
     "times": true
   },
   {
     "codigo": "goals",
     "nome": "GOALS",
+    "genero": "esporte",
     "agenda": true,
     "times": true
   },
   {
     "codigo": "halo",
     "nome": "Halo",
+    "genero": "fps",
     "agenda": true,
     "times": true
   },
   {
     "codigo": "hearthstone",
     "nome": "Hearthstone",
+    "genero": "cartas",
     "agenda": true,
     "times": true
   },
   {
     "codigo": "heroes",
     "nome": "Heroes of the Storm",
+    "genero": "moba",
     "agenda": true,
     "times": true
   },
   {
     "codigo": "honorofkings",
     "nome": "Honor of Kings",
+    "genero": "moba",
     "agenda": true,
     "times": true
   },
   {
     "codigo": "identityv",
     "nome": "Identity V",
+    "genero": "outro",
     "agenda": true,
     "times": true
   },
   {
     "codigo": "leagueoflegends",
     "nome": "League of Legends",
+    "genero": "moba",
     "agenda": true,
     "times": true
   },
   {
     "codigo": "magic",
     "nome": "Magic: The Gathering",
+    "genero": "cartas",
     "agenda": true,
     "times": true
   },
   {
     "codigo": "marvelrivals",
     "nome": "Marvel Rivals",
+    "genero": "fps",
     "agenda": true,
     "times": true
   },
   {
     "codigo": "mobilelegends",
     "nome": "Mobile Legends: Bang Bang",
+    "genero": "moba",
     "agenda": true,
     "times": true
   },
   {
     "codigo": "naraka",
     "nome": "Naraka",
+    "genero": "battle-royale",
     "agenda": true,
     "times": true
   },
   {
     "codigo": "omegastrikers",
     "nome": "Omega Strikers",
+    "genero": "arena",
     "agenda": true,
     "times": true
   },
   {
     "codigo": "osu",
     "nome": "osu!",
+    "genero": "outro",
     "agenda": true,
     "times": true
   },
   {
     "codigo": "overwatch",
     "nome": "Overwatch",
+    "genero": "fps",
     "agenda": true,
     "times": true
   },
   {
     "codigo": "paladins",
     "nome": "Paladins",
+    "genero": "fps",
     "agenda": true,
     "times": true
   },
   {
     "codigo": "pokemon",
     "nome": "Pokemon",
+    "genero": "moba",
     "agenda": true,
     "times": true
   },
   {
     "codigo": "pubg",
     "nome": "PUBG: Battlegrounds",
+    "genero": "battle-royale",
     "agenda": true,
     "times": true
   },
   {
     "codigo": "pubgmobile",
     "nome": "PUBG Mobile",
+    "genero": "battle-royale",
     "agenda": true,
     "times": true
   },
   {
     "codigo": "rainbowsix",
     "nome": "Rainbow Six",
+    "genero": "fps",
     "agenda": true,
     "times": true
   },
   {
     "codigo": "rematch",
     "nome": "Rematch",
+    "genero": "esporte",
     "agenda": true,
     "times": true
   },
   {
     "codigo": "rocketleague",
     "nome": "Rocket League",
+    "genero": "esporte",
     "agenda": true,
     "times": true
   },
   {
     "codigo": "runeterra",
     "nome": "Legends of Runeterra",
+    "genero": "cartas",
     "agenda": true,
     "times": true
   },
   {
     "codigo": "sideswipe",
     "nome": "Rocket League Sideswipe",
+    "genero": "esporte",
     "agenda": true,
     "times": false
   },
   {
     "codigo": "simracing",
     "nome": "Sim Racing",
+    "genero": "corrida",
     "agenda": true,
     "times": true
   },
   {
     "codigo": "smash",
     "nome": "Smash",
+    "genero": "luta",
     "agenda": false,
     "times": true
   },
   {
     "codigo": "smite",
     "nome": "SMITE",
+    "genero": "moba",
     "agenda": true,
     "times": true
   },
   {
     "codigo": "splatoon",
     "nome": "Splatoon",
+    "genero": "fps",
     "agenda": true,
     "times": true
   },
   {
     "codigo": "splitgate",
     "nome": "Splitgate",
+    "genero": "fps",
     "agenda": true,
     "times": true
   },
   {
     "codigo": "squadrons",
     "nome": "Star Wars: Squadrons",
+    "genero": "outro",
     "agenda": true,
     "times": true
   },
   {
     "codigo": "starcraft",
     "nome": "StarCraft",
+    "genero": "estrategia",
     "agenda": false,
     "times": true
   },
   {
     "codigo": "starcraft2",
     "nome": "StarCraft 2",
+    "genero": "estrategia",
     "agenda": false,
     "times": true
   },
   {
     "codigo": "stormgate",
     "nome": "Stormgate",
+    "genero": "estrategia",
     "agenda": true,
     "times": true
   },
   {
     "codigo": "tarkovarena",
     "nome": "Escape from Tarkov: Arena",
+    "genero": "fps",
     "agenda": true,
     "times": true
   },
   {
     "codigo": "teamfortress",
     "nome": "Team Fortress",
+    "genero": "fps",
     "agenda": true,
     "times": true
   },
   {
     "codigo": "tetris",
     "nome": "Tetris",
+    "genero": "tabuleiro",
     "agenda": true,
     "times": true
   },
   {
     "codigo": "tft",
     "nome": "Teamfight Tactics",
+    "genero": "autobattler",
     "agenda": true,
     "times": true
   },
   {
     "codigo": "thefinals",
     "nome": "The Finals",
+    "genero": "fps",
     "agenda": true,
     "times": true
   },
   {
     "codigo": "trackmania",
     "nome": "TrackMania",
+    "genero": "corrida",
     "agenda": true,
     "times": true
   },
   {
     "codigo": "underlords",
     "nome": "Dota Underlords",
+    "genero": "autobattler",
     "agenda": true,
     "times": true
   },
   {
     "codigo": "valorant",
     "nome": "VALORANT",
+    "genero": "fps",
     "agenda": true,
     "times": true
   },
   {
     "codigo": "warcraft",
     "nome": "Warcraft",
+    "genero": "estrategia",
     "agenda": true,
     "times": true
   },
   {
     "codigo": "warthunder",
     "nome": "War Thunder",
+    "genero": "outro",
     "agenda": true,
     "times": true
   },
   {
     "codigo": "wildcard",
     "nome": "Wildcard",
+    "genero": "outro",
     "agenda": true,
     "times": false
   },
   {
     "codigo": "wildrift",
     "nome": "Wild Rift",
+    "genero": "moba",
     "agenda": true,
     "times": true
   },
   {
     "codigo": "worldoftanks",
     "nome": "World of Tanks",
+    "genero": "outro",
     "agenda": true,
     "times": true
   },
   {
     "codigo": "worldofwarcraft",
     "nome": "World of Warcraft",
+    "genero": "arena",
     "agenda": true,
     "times": true
   },
   {
     "codigo": "zula",
     "nome": "Zula",
+    "genero": "fps",
     "agenda": true,
     "times": true
   }

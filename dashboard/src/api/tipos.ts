@@ -345,6 +345,8 @@ export interface EquipeConfronto {
   xpm_medio: number | null;
   kda_medio: number | null;
   duracao_media_segundos: number | null;
+  /** Saldo médio de placar por confronto, em [-1, 1] (mapas/jogos/pontos). */
+  saldo_placar: number | null;
   /** Posicao e pontos no ranking da Valve (so CS). `null` fora dele. */
   posicao_ranking: number | null;
   pontos_ranking: number | null;

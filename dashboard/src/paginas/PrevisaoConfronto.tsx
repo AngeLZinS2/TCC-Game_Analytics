@@ -226,6 +226,7 @@ function iconeDoFator(rotulo: string): string {
   if (rotulo.startsWith("Força")) return "bolt";
   if (rotulo.startsWith("Winrate")) return "trending_up";
   if (rotulo.startsWith("Partidas")) return "table_rows";
+  if (rotulo.startsWith("Saldo")) return "swap_vert";
   if (rotulo.startsWith("Ouro")) return "payments";
   if (rotulo.startsWith("Experiência")) return "auto_awesome";
   if (rotulo.startsWith("KDA")) return "swords";
@@ -1050,6 +1051,9 @@ export function PrevisaoConfrontoPagina() {
                 const temRankingExterno = lista.some(
                   (e) => e.posicao_ranking !== null,
                 );
+                // Saldo de mapas/jogos/pontos — existe onde a Liquipedia
+                // publica o placar da série (todo jogo 1-contra-1 menos Dota).
+                const temSaldo = lista.some((e) => e.saldo_placar !== null);
 
                 return (
                   <div className="rolagem-discreta overflow-x-auto rounded-lg bg-surface-container-lowest">
@@ -1061,6 +1065,14 @@ export function PrevisaoConfrontoPagina() {
                           <th className="px-space-md py-space-sm">Força</th>
                           <th className="px-space-md py-space-sm text-right">Partidas</th>
                           <th className="px-space-md py-space-sm text-right">Winrate</th>
+                          {temSaldo && (
+                            <th
+                              className="px-space-md py-space-sm text-right"
+                              title="Saldo médio de placar por confronto, de -1 (só perde de lavada) a +1 (só vence de lavada)"
+                            >
+                              Saldo
+                            </th>
+                          )}
                           {temRankingExterno && (
                             <th
                               className="px-space-md py-space-sm text-right"
@@ -1148,6 +1160,26 @@ export function PrevisaoConfrontoPagina() {
                               <td className="px-space-md py-space-sm text-right font-title-code text-title-code tabular-nums text-on-surface">
                                 {fmtPercentual(equipe.winrate)}
                               </td>
+                              {temSaldo && (
+                                <td
+                                  className="px-space-md py-space-sm text-right font-title-code text-title-code tabular-nums"
+                                  style={{
+                                    color:
+                                      equipe.saldo_placar === null
+                                        ? undefined
+                                        : equipe.saldo_placar >= 0
+                                          ? PALETA_POLOS.positivo
+                                          : PALETA_POLOS.negativo,
+                                  }}
+                                >
+                                  {equipe.saldo_placar === null
+                                    ? "—"
+                                    : `${equipe.saldo_placar >= 0 ? "+" : ""}${fmtDecimal(
+                                        equipe.saldo_placar,
+                                        2,
+                                      )}`}
+                                </td>
+                              )}
                               {temRankingExterno && (
                                 <td
                                   className="px-space-md py-space-sm text-right font-title-code text-title-code tabular-nums text-on-surface-variant"
