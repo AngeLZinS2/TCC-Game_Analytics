@@ -46,9 +46,8 @@ export function SeletorDeJogo({
    *
    * O padrão exige partida coletada — vale para Partidas, Heróis e
    * Jogadores, que leem o fato de partida. A Previsão de Confronto passa um
-   * critério mais largo: a agenda (Liquipedia) existe sem nenhuma partida
-   * coletada, porque a coleta de RESULTADO é só da OpenDota, e só cobre
-   * Dota 2 hoje.
+   * critério mais largo: a agenda (Liquipedia) de um jogo pode existir antes
+   * de qualquer confronto decidido dele ter entrado no banco.
    */
   disponivel?: (jogo: JogoDisponivel) => boolean;
 }) {

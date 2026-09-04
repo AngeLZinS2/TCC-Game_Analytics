@@ -121,3 +121,54 @@ def test_dota_continua_pela_openddota_mesmo_com_liquipedia_disponivel(sessao_bd)
     equipes = _carregar_equipes(sessao_bd, "dota2")
     tem_stats = any(e.gpm_medio is not None for e in equipes.values())
     assert tem_stats, "dota2 deveria ter GPM medio vindo da OpenDota"
+
+
+def test_torneios_conhecidos_le_da_agenda(sessao_bd):
+    """`torneios_conhecidos()` nao e uma lista escrita a mao - ela cresce
+    sozinha conforme `agenda_partida.torneio` acumula nomes novos. O teste
+    verifica isso contra o banco de verdade: mesma fonte, sem duplicar a
+    consulta aqui."""
+    from collectors.liquipedia_bracket_collector import torneios_conhecidos
+
+    torneios = torneios_conhecidos(JOGO_NAO_DOTA)
+    if not torneios:
+        pytest.skip(f"nenhum torneio visto ainda para {JOGO_NAO_DOTA!r}")
+
+    assert all(isinstance(t, str) and t for t in torneios)
+    assert len(torneios) == len(set(torneios)), "a lista nao deveria ter repetidos"
+
+
+def test_torneios_conhecidos_de_jogo_sem_agenda_e_vazia():
+    """Um codigo de jogo que nem existe em dim_jogo nao pode levantar - so
+    devolve vazio, porque nao ha o que buscar."""
+    from collectors.liquipedia_bracket_collector import torneios_conhecidos
+
+    assert torneios_conhecidos("jogo-que-nao-existe-xyz") == []
+
+
+def test_partida_decidida_fora_do_dota_nunca_fica_sem_equipe(sessao_bd):
+    """O bug que o usuario apontou: jogos com confronto ja 100% decidido e o
+    sistema "nao consegue trazer". A causa era FK nula - o time da agenda nao
+    estava em `dim_equipe` porque o coletor de paginas ainda nao passou naquela
+    wiki. `load_liquipedia._garantir_equipes` fecha isso: fora do Dota 2, o
+    nome da agenda vira equipe. Entao toda partida DECIDIDA de um jogo que nao
+    e Dota tem que ter as duas FKs - senao ela some do Bradley-Terry."""
+    linhas = sessao_bd.execute(
+        text(
+            """
+            SELECT j.codigo,
+                   COUNT(*) FILTER (
+                       WHERE a.id_equipe_a IS NULL OR a.id_equipe_b IS NULL
+                   ) AS sem_fk
+            FROM agenda_partida a
+            JOIN dim_jogo j ON j.id_jogo = a.id_jogo
+            WHERE a.vitoria_a IS NOT NULL AND j.codigo <> 'dota2'
+            GROUP BY j.codigo
+            """
+        )
+    ).all()
+    if not linhas:
+        pytest.skip("nenhuma partida decidida fora do Dota coletada nesta maquina")
+
+    orfas = {codigo: sem_fk for codigo, sem_fk in linhas if sem_fk}
+    assert not orfas, f"partidas decididas sem equipe resolvida: {orfas}"

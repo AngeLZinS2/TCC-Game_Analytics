@@ -1107,6 +1107,107 @@ tela nunca tinha exercitado, porque nunca tinha existido um segundo jogo com mod
   array filtrado. A correção foi uma guarda (`if (aberto) return`): uma seleção explícita
   do kanban vence o par padrão, que só se aplica quando nada foi escolhido ainda.
 
+### Fase 14 — Fechando as lacunas de previsão fora do Dota
+
+A Fase 13 entregou a previsão para os outros jogos e terminou com uma aposta: *"os demais
+jogos do catálogo devem ganhar `dim_equipe` — e portanto previsão — ao longo dos próximos
+dias, sem intervenção manual"*, via o rodízio de equipes. Na prática não fechou. O relato do
+usuário foi direto: **"tem muitos jogos que já tiveram 100% antes de confronto só que ainda
+o sistema não consegue trazer"** — partidas decididas, times conhecidos, e nenhuma previsão.
+
+#### Medição: o buraco tinha 11 jogos de largura
+
+```
+== agenda_partida: fk / decididos / treináveis (antes) ==
+  counterstrike  decididos=111  treináveis=59
+  dota2          decididos= 55  treináveis=37
+  valorant       decididos= 50  treináveis= 0   ← 50 partidas decididas, zero treináveis
+  brawlstars     decididos= 50  treináveis= 0
+  callofduty     decididos= 50  treináveis= 0
+  clashroyale    decididos= 50  treináveis= 0
+  clashofclans   decididos= 50  treináveis= 0
+  chess          decididos= 37  treináveis= 0
+  … (mais 5 assim)
+```
+
+A causa: `dim_equipe` estava **vazia** para todos esses jogos (só counterstrike e dota2
+tinham equipes — o rodízio de `liquipedia-times` roda 10 wikis/dia e não tinha chegado nas
+outras). E `etl/load_liquipedia.py::carregar` só **casava** nome de agenda com equipe
+_já existente_: sem `dim_equipe`, todo `id_equipe_a`/`id_equipe_b` ficava nulo, e
+`_carregar_confrontos_liquipedia` filtra `id_equipe_a IS NOT NULL` — as 50 partidas
+decididas de VALORANT eram invisíveis ao Bradley-Terry.
+
+#### Correção 1 (estrutural): a agenda passa a criar a equipe que falta
+
+Fora do Dota 2, a identidade de uma equipe na Liquipedia **é** o título da página dela — o
+mesmo texto que o ticker e o bracket usam para nomear os lados. Não há reconciliação a
+fazer. Então `_garantir_equipes` (`etl/load_liquipedia.py`): o que a escada de casamento
+não resolve vira linha nova em `dim_equipe`, com `id_externo = nome = título`. Quando o
+`liquipedia-times` finalmente passar naquela wiki, ele casa pela mesma chave
+(`uq_equipe_jogo_externo`) e só **acrescenta** região, país e datas — não duplica.
+
+É exatamente o que `load_dota` já fazia: a dimensão ganha o time na primeira vez que ele
+aparece, venha do fato (OpenDota) ou da agenda (Liquipedia). O Dota 2 fica de fora da regra
+— lá `id_externo` é o `team_id` numérico da OpenDota, e inventar uma linha de chave textual
+partiria o histórico do time em dois.
+
+O que continua proibido: casar por similaridade aproximada. Uma previsão confiante sobre a
+dupla errada é pior que nenhuma previsão.
+
+#### Correção 2 (fonte mais profunda): coletor de bracket de torneio
+
+O ticker é uma janela de ~5-9 dias. A página de um torneio (`BLAST/Open/2026/Fall`) tem o
+**bracket inteiro** — todas as fases. `collectors/liquipedia_bracket_collector.py` e
+`etl/transform_liquipedia_bracket.py`:
+
+- **A lista de torneios se autoconstrói.** `torneios_conhecidos(jogo)` roda
+  `SELECT DISTINCT agenda_partida.torneio` — sem lista escrita a mão. Um torneio só entra
+  depois que o ticker o mencionou ao menos uma vez, e o nome que o ticker gravou **é** o
+  título da página do bracket.
+- **Parser separado, não reuso.** O bracket usa `div.brkts-match` como raiz, `aria-label`
+  para o nome do time e `.brkts-opponent-win` para o vencedor — markup diferente do ticker
+  (`div.match-info`). Rodar `parse_agenda()` numa página de torneio devolve zero. Mas a
+  função de hash (`_identificador`) é a mesma: se as duas fontes virem a mesma partida, a
+  chave bate e o upsert atualiza a linha em vez de duplicar.
+- **Rodízio no agendador.** Nova tarefa `brackets` (`AGENDADOR_BRACKETS_MINUTOS`, diário):
+  varre `AGENDADOR_BRACKETS_POR_RODADA` wikis por rodada, e para cada uma pede o bracket de
+  cada torneio conhecido, com `sleep` entre wikis (mesma disciplina de rate limit da
+  Fase 13).
+
+#### Um bug de `--from-raw` no caminho
+
+`cli.py::_cmd_collect`, no ramo `--from-raw`, chamava `_carregador(fonte)(resultado)` sem
+`jogo=` — todas as três fontes Liquipedia caíam no padrão `jogo="dota2"` do próprio
+`carregar()`. Um `--from-raw --wiki counterstrike` reprocessava os dados certos e gravava
+tudo como se fosse Dota 2. Corrigido antes de qualquer backfill real usar o caminho.
+
+#### Resultado medido: de 2 jogos com modelo para 13
+
+Reprocessando o raw histórico do ticker e do bracket pelo loader novo (zero rede) e
+retreinando:
+
+```
+== treináveis (depois) ==
+  valorant     0 → 63        callofduty   0 → 50
+  counterstrike 59 → 67      clashroyale  0 → 50
+  clashofclans 0 → 50        arenafps     0 → 50
+  brawlstars   0 → 50        crossfire    0 → 44
+  artifact     0 → 50        chess        0 → 37
+                             battlerite   0 → 24
+```
+
+Todo confronto decidido fora do Dota agora tem as duas FKs — há um teste que trava se algum
+não tiver (`test_partida_decidida_fora_do_dota_nunca_fica_sem_equipe`).
+
+**A honestidade da Fase 13 continua.** Com amostras de 8-15 partidas de teste, a maioria
+dos modelos novos ainda não supera a taxa base — `train-confronto` diz isso em voz alta
+(`AVISO: a acuracia nao supera a taxa base`). Call of Duty deu 78,6% de acurácia
+walk-forward, Battlerite 100% (com 8 partidas — ruído), VALORANT ficou na taxa base. O
+sistema agora **produz** previsão para 13 jogos; ela fica boa quando houver histórico, e
+diz quando não há. Equipes criadas pela agenda entram sem região/país até o
+`liquipedia-times` passar — a previsão não depende desses campos, só o filtro de liga da
+tela de ranking.
+
 ### Fase 3 — Riot API (LoL)
 
 Próxima fase. O star schema já tem o discriminador (`dim_jogo.codigo`), as rotas de partidas
@@ -1137,7 +1238,9 @@ O serviço `agendador` (`agendador.py`, no `docker-compose.yml`) resolve isso:
 |---|---|---|
 | Steam | 60 min | acompanha `SNAPSHOT_BUCKET_MINUTES`: coletar mais rápido cairia na mesma janela e viraria `UPDATE` da linha anterior, não um ponto novo |
 | OpenDota | 6 h | partidas terminam ao longo do dia e só são publicadas depois de encerradas; o limite aqui é cortesia com a API pública |
-| Liquipedia | 12 h | o calendário de campeonato muda em dias, e eles bloqueiam por IP quem abusa |
+| Liquipedia (ticker) | 12 h | o calendário de campeonato muda em dias, e eles bloqueiam por IP quem abusa |
+| Liquipedia (equipes) | 24 h, 10 wikis/rodada | página de equipe muda em meses; uma varredura completa das ~66 wikis leva ~1 semana |
+| Liquipedia (brackets) | 24 h, 10 wikis/rodada | bracket de torneio decidido não muda; o que cresce é a lista de torneios conhecidos e as fases de torneios em andamento |
 
 ```powershell
 docker compose up -d agendador

@@ -745,16 +745,16 @@ export function PrevisaoConfrontoPagina() {
                 <p className="font-body-sm text-body-sm text-on-surface-variant">
                   O calendário deste jogo vem da Liquipedia e aparece abaixo.{" "}
                   <strong className="text-error">A previsão, não:</strong> ela precisa de
-                  partidas com resultado, e a coleta de resultados vem da OpenDota, que
-                  hoje só cobre Dota 2.
+                  partidas com resultado — no Dota 2 vêm da OpenDota, nos outros jogos do
+                  histórico da Liquipedia — e ainda não há o bastante para este jogo.
                 </p>
               )}
             </div>
 
             <div className="flex flex-wrap items-center gap-space-sm">
               {/* Criterio mais largo que o padrao do componente (so partidas):
-                  a agenda existe sem nenhuma partida coletada, porque a coleta
-                  de RESULTADO e so da OpenDota e so cobre Dota 2 hoje. */}
+                  a agenda de um jogo pode existir antes de qualquer confronto
+                  DECIDIDO dele ter sido coletado - e ai ainda nao ha modelo. */}
               <SeletorDeJogo
                 disponivel={(item) =>
                   item.partidas > 0 || item.equipes > 0 || item.agenda > 0
@@ -866,8 +866,8 @@ export function PrevisaoConfrontoPagina() {
 
             <p className="font-body-sm text-body-sm text-outline">
               Um confronto sem previsão é um em que pelo menos um dos times nunca apareceu
-              nas partidas coletadas — a agenda vem da Liquipedia e o histórico vem da
-              OpenDota, e as duas cobrem torneios diferentes.
+              num confronto decidido que coletamos — no Dota 2 o histórico vem da OpenDota,
+              nos outros jogos do próprio ticker da Liquipedia.
             </p>
           </Painel>
 
@@ -900,9 +900,10 @@ export function PrevisaoConfrontoPagina() {
                     <strong className="text-on-surface">
                       Sem previsão para este confronto.
                     </strong>{" "}
-                    {aberto.motivo_sem_previsao}. A agenda vem da Liquipedia; o histórico,
-                    da OpenDota. Um time só recebe força depois de aparecer em partidas
-                    coletadas — coletar mais partidas é o que resolve.
+                    {aberto.motivo_sem_previsao}. O histórico vem da OpenDota no Dota 2 e
+                    do ticker da Liquipedia nos outros jogos. Um time só recebe força
+                    depois de aparecer num confronto decidido — coletar mais é o que
+                    resolve.
                   </div>
                 </div>
 

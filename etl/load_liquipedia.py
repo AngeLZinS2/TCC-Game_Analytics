@@ -16,10 +16,17 @@ A estrategia e uma escada, do mais seguro para o mais frouxo:
 4. **Apelidos declarados a mao** (`APELIDOS`), para o que sobrar: abreviacoes e
    times renomeados.
 
-O que nao casar fica com FK nula, e a partida aparece na tela sem previsao. E
-melhor que o contrario: casar por similaridade aproximada produziria confronto
-entre o time errado, e uma previsao confiante sobre a dupla errada e pior que
-nenhuma previsao.
+O que nao casar por essa escada fica com FK nula NO DOTA 2 - la a identidade da
+equipe e o `team_id` numerico da OpenDota, e inventar uma linha de chave textual
+partiria o historico do time em dois. Nos outros jogos e o contrario: o nome da
+agenda E a identidade (o titulo da pagina da Liquipedia), entao o que a escada
+nao casa vira equipe nova via `_garantir_equipes` - senao uma partida decidida
+com dois times nomeados ficaria eternamente invisivel ao Bradley-Terry so
+porque o coletor de paginas de equipe ainda nao passou por aquela wiki.
+
+O que continua proibido nos dois casos: casar por similaridade aproximada.
+Isso produziria confronto entre o time errado, e uma previsao confiante sobre a
+dupla errada e pior que nenhuma previsao.
 """
 
 from __future__ import annotations
@@ -37,6 +44,12 @@ from db.models import AgendaPartida, DimEquipe, DimJogo
 from db.session import session_scope
 from etl.lotes import em_lotes
 from etl.transform_liquipedia import ResultadoAgenda
+
+#: O jogo cuja identidade de equipe e o `team_id` numerico da OpenDota. So nele
+#: NAO se cria equipe a partir do nome da agenda: la o `dim_equipe` e povoado
+#: pelo fato (partidas da OpenDota) e criar uma linha de chave textual
+#: fragmentaria o historico do time.
+JOGO_COM_ID_NUMERICO = "dota2"
 
 logger = logging.getLogger(__name__)
 
@@ -144,6 +157,43 @@ def _resolver(nome: str, mapa: dict[str, int]) -> int | None:
     return None
 
 
+def _garantir_equipes(
+    sessao: Session, id_jogo: int, mapa: dict[str, int], nomes: set[str]
+) -> dict[str, int]:
+    """Cria em `dim_equipe` os times que a agenda cita e ninguem cadastrou.
+
+    Fora do Dota 2, a identidade de uma equipe na Liquipedia E o titulo da
+    pagina dela - o mesmo texto que o ticker e o bracket usam para nomear os
+    lados do confronto. O coletor `liquipedia-times` povoa `dim_equipe` a
+    partir das paginas de categoria, mas ele roda em rodizio e pode nao ter
+    passado nesta wiki ainda; ate la, uma partida DECIDIDA com dois times
+    nomeados ficava sem FK e o Bradley-Terry nunca a via.
+
+    Aqui a linha nasce so com nome e `id_externo` (ambos o titulo). Quando o
+    `liquipedia-times` finalmente passar, ele casa pela mesma chave
+    (`uq_equipe_jogo_externo`) e so acrescenta regiao, pais e datas - nao
+    duplica. E o mesmo que `load_dota` ja faz: a dimensao ganha o time na
+    primeira vez que ele aparece, venha do fato ou da agenda.
+    """
+    novos = sorted(n for n in nomes if n.strip())
+    if not novos:
+        return mapa
+
+    stmt = pg_insert(DimEquipe).values(
+        [{"id_jogo": id_jogo, "id_externo": nome[:200], "nome": nome[:120]} for nome in novos]
+    )
+    sessao.execute(stmt.on_conflict_do_nothing(constraint="uq_equipe_jogo_externo"))
+    sessao.flush()
+
+    logger.info(
+        "equipes criadas a partir da agenda",
+        extra={"id_jogo": id_jogo, "quantidade": len(novos)},
+    )
+    # Reconstroi o mapa: as linhas novas entram, e a escada de casamento
+    # (tag, sem-enfeites) passa a valer para elas tambem.
+    return _mapa_de_equipes(sessao, id_jogo)
+
+
 def carregar(resultado: ResultadoAgenda, jogo: str = JOGO) -> int:
     """Persiste a agenda, resolvendo as equipes contra a dimensao.
 
@@ -165,6 +215,20 @@ def carregar(resultado: ResultadoAgenda, jogo: str = JOGO) -> int:
             )
 
         mapa = _mapa_de_equipes(sessao, id_jogo)
+
+        # Fora do Dota 2, o que a escada de casamento nao resolve vira equipe
+        # nova - a agenda e a lista de times autoritativa desses jogos ate o
+        # coletor de paginas passar pela wiki. No Dota 2 nao: la a identidade e
+        # o id numerico da OpenDota.
+        if jogo != JOGO_COM_ID_NUMERICO:
+            faltantes = {
+                nome
+                for partida in resultado.partidas
+                for nome in (partida.equipe_a_nome, partida.equipe_b_nome)
+                if _resolver(nome, mapa) is None
+            }
+            if faltantes:
+                mapa = _garantir_equipes(sessao, id_jogo, mapa, faltantes)
 
         linhas = []
         nao_casados: set[str] = set()

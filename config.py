@@ -120,6 +120,22 @@ class Settings(BaseSettings):
     #: cerca de uma semana, que e rapido para um dado que muda em meses.
     agendador_equipes_por_rodada: int = Field(default=10, ge=1, le=80)
 
+    #: Intervalo entre leituras de bracket de torneio, em minutos.
+    #:
+    #: Um torneio decidido nao muda mais - o bracket de "BLAST/Open/2026/Fall"
+    #: sera o mesmo daqui a um mes. O que justifica repetir e a lista de
+    #: torneios CONHECIDOS crescer (o ticker viu um novo desde a ultima
+    #: rodada) e torneios em andamento ganharem mais fases decididas. Diario e
+    #: generoso para os dois casos.
+    agendador_brackets_minutos: int = Field(default=1440, ge=60)
+
+    #: Quantas wikis coletar brackets por rodada do agendador.
+    #:
+    #: Mesma logica do rodizio de equipes: uma wiki pode ter dezenas de
+    #: torneios conhecidos, e cada um e uma chamada. Rodar todas de uma vez
+    #: martelaria a Liquipedia; o rodizio espalha o custo ao longo dos dias.
+    agendador_brackets_por_rodada: int = Field(default=10, ge=1, le=80)
+
     #: Quantas partidas pedir por rodada do agendador.
     agendador_opendota_limite: int = Field(default=100, ge=1, le=500)
 

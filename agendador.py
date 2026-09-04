@@ -249,6 +249,79 @@ def _coletar_equipes(settings: Settings, storage: RawStorage) -> CollectionResul
     return _somar(parciais, "liquipedia")
 
 
+#: Onde o rodizio de brackets parou. Mesmo motivo do de equipes: em memoria,
+#: perde-se no restart, e perder so significa recomecar a varredura.
+_proxima_wiki_de_brackets = 0
+
+
+def _coletar_brackets(settings: Settings, storage: RawStorage) -> CollectionResult:
+    """O bracket de cada torneio ja conhecido, algumas wikis por rodada.
+
+    "Ja conhecido" quer dizer: torneios que `_coletar_liquipedia` (o ticker) ja
+    viu pelo menos uma vez e gravou em `agenda_partida.torneio`. O bracket da
+    o historico INTEIRO daquele torneio - nao so a janela de dias que o ticker
+    enxerga - e e a fonte que alimenta o Bradley-Terry para todo jogo que nao e
+    Dota 2 (Fase 13). Um torneio de 24 confrontos decididos rendeu mais
+    historico sozinho do que semanas de ticker.
+
+    Rodizio pelo mesmo motivo do de equipes: uma wiki pode ter dezenas de
+    torneios conhecidos, e cada um e uma chamada.
+    """
+    global _proxima_wiki_de_brackets
+
+    from collectors.liquipedia_bracket_collector import (
+        LiquipediaBracketCollector,
+        torneios_conhecidos,
+    )
+    from etl.wikis import com_agenda
+
+    todas = com_agenda()
+    if not todas:
+        return CollectionResult(fonte="liquipedia", sucesso=True)
+
+    quantas = min(settings.agendador_brackets_por_rodada, len(todas))
+    lote = [
+        todas[(_proxima_wiki_de_brackets + i) % len(todas)] for i in range(quantas)
+    ]
+    _proxima_wiki_de_brackets = (_proxima_wiki_de_brackets + quantas) % len(todas)
+
+    logger.info(
+        "rodizio de brackets",
+        extra={"wikis": [w.codigo for w in lote], "de": len(todas)},
+    )
+
+    parciais: list[CollectionResult] = []
+    for posicao, wiki in enumerate(lote):
+        torneios = torneios_conhecidos(wiki.codigo)
+        if not torneios:
+            continue
+
+        coletor = LiquipediaBracketCollector(
+            raw_storage=storage,
+            settings=settings,
+            wiki=wiki.codigo,
+            torneios=torneios,
+        )
+        try:
+            parciais.append(coletor.run(carregar=True))
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(
+                "brackets de uma wiki falharam",
+                extra={"wiki": wiki.codigo, "erro": f"{type(exc).__name__}: {exc}"},
+            )
+            parciais.append(CollectionResult(fonte="liquipedia", sucesso=False))
+        finally:
+            coletor.close()
+
+        # O coletor ja pausa ENTRE torneios da mesma wiki (dentro do proprio
+        # `client`, que e reaproveitado ali). O que falta e a pausa ENTRE
+        # wikis deste laco - mesmo motivo dos outros dois sleeps deste arquivo.
+        if posicao < len(lote) - 1:
+            time.sleep(settings.liquipedia_rate_limit_seconds)
+
+    return _somar(parciais, "liquipedia")
+
+
 def montar_tarefas(settings: Settings) -> list[Tarefa]:
     """As tarefas do agendador, na ordem em que rodam quando empatam."""
     return [
@@ -271,6 +344,11 @@ def montar_tarefas(settings: Settings) -> list[Tarefa]:
             nome="equipes",
             intervalo_segundos=settings.agendador_equipes_minutos * 60,
             executar=_coletar_equipes,
+        ),
+        Tarefa(
+            nome="brackets",
+            intervalo_segundos=settings.agendador_brackets_minutos * 60,
+            executar=_coletar_brackets,
         ),
     ]
 

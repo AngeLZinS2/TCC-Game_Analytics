@@ -17,7 +17,7 @@ from dataclasses import asdict
 from config import BASE_DIR, get_settings
 from logging_config import configurar_logging
 
-FONTES = ("steam", "opendota", "liquipedia", "liquipedia-times")
+FONTES = ("steam", "opendota", "liquipedia", "liquipedia-times", "liquipedia-bracket")
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -74,7 +74,9 @@ def _parser() -> argparse.ArgumentParser:
         help="limita o total de apps a coletar (0 = sem limite; util para testes)",
     )
 
-    liquipedia = coletar.add_argument_group("liquipedia / liquipedia-times")
+    liquipedia = coletar.add_argument_group(
+        "liquipedia / liquipedia-times / liquipedia-bracket"
+    )
     liquipedia.add_argument(
         "--wiki",
         default="dota2",
@@ -92,6 +94,18 @@ def _parser() -> argparse.ArgumentParser:
         type=int,
         metavar="N",
         help="le so as N primeiras equipes da categoria (util para testar)",
+    )
+
+    bracket = coletar.add_argument_group("liquipedia-bracket")
+    bracket.add_argument(
+        "--torneio",
+        action="append",
+        metavar="PAGINA",
+        help=(
+            "titulo de uma pagina de torneio a coletar (repita para varios). "
+            "Sem isso, le os torneios distintos ja vistos em agenda_partida "
+            "para esta wiki."
+        ),
     )
 
     opendota = coletar.add_argument_group("opendota")
@@ -185,6 +199,16 @@ def _construir_coletor(args: argparse.Namespace, storage):
             limite_equipes=args.limite_equipes,
         )
 
+    if args.fonte == "liquipedia-bracket":
+        from collectors.liquipedia_bracket_collector import LiquipediaBracketCollector
+
+        return LiquipediaBracketCollector(
+            raw_storage=storage,
+            settings=settings,
+            wiki=args.wiki,
+            torneios=args.torneio,
+        )
+
     from collectors.opendota_collector import OpenDotaCollector
 
     return OpenDotaCollector(
@@ -208,6 +232,10 @@ def _carregador(fonte: str):
         from etl.load_liquipedia_wiki import carregar
 
         return carregar
+    if fonte == "liquipedia-bracket":
+        from etl.load_liquipedia import carregar
+
+        return carregar
     from etl.load_dota import carregar
 
     return carregar
@@ -225,7 +253,17 @@ def _cmd_collect(args: argparse.Namespace) -> int:
             registros = storage.ler_ultima_coleta(coletor.fonte)
             print(f"Reprocessando {len(registros)} payloads do disco...")
             resultado = coletor.parse(registros)
-            carregados = 0 if args.no_load else _carregador(args.fonte)(resultado)
+            if args.no_load:
+                carregados = 0
+            elif args.fonte.startswith("liquipedia"):
+                # As tres fontes da Liquipedia carregam por wiki
+                # (`jogo=args.wiki`). Sem isso, `_carregador` cai no padrao
+                # `jogo="dota2"` do proprio `carregar()` - e um
+                # `--from-raw --wiki counterstrike` reprocessaria os dados
+                # certos, mas gravaria tudo como se fosse Dota 2.
+                carregados = _carregador(args.fonte)(resultado, jogo=args.wiki)
+            else:
+                carregados = _carregador(args.fonte)(resultado)
             print(f"itens normalizados={resultado.total} carregados={carregados}")
             return 0
 
