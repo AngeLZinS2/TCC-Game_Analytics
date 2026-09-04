@@ -1,6 +1,5 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 
-import { BarraLateral } from "./layout/BarraLateral";
 import { BarraSuperior } from "./layout/BarraSuperior";
 import { ProvedorJogo } from "./layout/JogoAtual";
 import { VisaoGeralPagina } from "./paginas/VisaoGeral";
@@ -18,11 +17,10 @@ export function App() {
   return (
     <ProvedorJogo>
       <div className="min-h-screen bg-background font-body-md text-body-md text-on-surface antialiased selection:bg-primary-container selection:text-on-primary-container">
-        <BarraLateral />
         <BarraSuperior />
 
-        {/* pl-72 abre espaco para a lateral fixa; pt-16 para a barra superior. */}
-        <main className="space-y-space-xl px-space-lg pb-space-3xl pl-[calc(18rem+1.5rem)] pr-space-lg pt-[calc(4rem+1.5rem)]">
+        {/* pt-16 abre espaco para a barra superior fixa. */}
+        <main className="space-y-space-xl px-space-lg pb-space-3xl pt-[calc(4rem+1.5rem)]">
           <Routes>
             <Route path="/" element={<VisaoGeralPagina />} />
             <Route path="/steam" element={<SteamPagina />} />
