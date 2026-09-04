@@ -28,6 +28,7 @@ import {
   fmtCurto,
   fmtData,
   fmtDataHora,
+  fmtDecimal,
   fmtMoeda,
   fmtNumero,
   fmtPercentual,
@@ -234,6 +235,9 @@ export function JogoSteamPagina() {
               menor={dados.menor_preco_historico}
               gratuito={jogo.gratuito}
             />
+
+            {/* ==================== TEMPO PRA ZERAR ==================== */}
+            <TempoParaZerar ficha={dados.ficha} nomeSteam={jogo.nome} />
 
             {/* ==================== FICHA ==================== */}
             <FichaDoJogo ficha={dados.ficha} nome={jogo.nome} />
@@ -1075,6 +1079,100 @@ function OndeComprar({
         Preço em BRL para o Brasil. Chave de Steam de loja terceira ativa na sua conta
         normalmente — confira a coluna de DRM. Fonte: isthereanydeal.com
       </p>
+    </Painel>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Quanto tempo leva pra zerar (Fase 18, HowLongToBeat)
+// ---------------------------------------------------------------------------
+
+/**
+ * Diferente do "Tempo de jogo médio" da ficha (SteamSpy: quanto os donos
+ * jogaram de fato, em média, incluindo quem só passou por perto), isto é
+ * quanto uma pessoa leva pra ZERAR — estimativa da comunidade do
+ * HowLongToBeat, curada por quem terminou o jogo.
+ */
+function TempoParaZerar({ ficha, nomeSteam }: { ficha: FichaJogoSteam; nomeSteam: string }) {
+  const temTempo =
+    ficha.hltb_horas_historia !== null ||
+    ficha.hltb_horas_extras !== null ||
+    ficha.hltb_horas_completista !== null;
+
+  if (!temTempo) {
+    return (
+      <Painel
+        icone="hourglass_top"
+        titulo="Quanto tempo leva"
+        descricao="Estimativa da comunidade (HowLongToBeat)."
+      >
+        <p className="rounded-lg bg-surface-container-lowest px-space-base py-space-md font-body-md text-body-sm text-outline">
+          {ficha.coletado_tempo_em
+            ? "Não encontramos tempo suficiente registrado pela comunidade para esse jogo."
+            : "Este jogo ainda não passou pelo coletor de tempo (HowLongToBeat) — a próxima rodada periódica traz a estimativa."}
+        </p>
+      </Painel>
+    );
+  }
+
+  const nomeDivergente =
+    ficha.hltb_nome && ficha.hltb_nome.trim().toLowerCase() !== nomeSteam.trim().toLowerCase()
+      ? ficha.hltb_nome
+      : null;
+
+  return (
+    <Painel
+      icone="hourglass_top"
+      titulo="Quanto tempo leva"
+      descricao="Estimativa da comunidade (HowLongToBeat)."
+      meta={
+        ficha.hltb_id && (
+          <a
+            href={`https://howlongtobeat.com/game/${ficha.hltb_id}`}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-space-xxs rounded-lg bg-surface-container-lowest px-space-sm py-space-xs font-title-code text-title-code text-primary hover:underline"
+          >
+            ver no HowLongToBeat <Icone nome="open_in_new" className="text-[13px]" />
+          </a>
+        )
+      }
+    >
+      <div className="grid grid-cols-1 gap-space-sm rounded-xl bg-surface-container-lowest p-space-base sm:grid-cols-3">
+        <div>
+          <div className="font-label-caps text-label-caps uppercase tracking-widest text-outline">
+            História principal
+          </div>
+          <div className="mt-space-xxs font-headline-kpi text-headline-kpi leading-none text-primary-container">
+            {ficha.hltb_horas_historia !== null ? `${fmtDecimal(ficha.hltb_horas_historia)}h` : "—"}
+          </div>
+        </div>
+        <div>
+          <div className="font-label-caps text-label-caps uppercase tracking-widest text-outline">
+            História + extras
+          </div>
+          <div className="mt-space-xxs font-headline-kpi text-headline-kpi leading-none text-secondary">
+            {ficha.hltb_horas_extras !== null ? `${fmtDecimal(ficha.hltb_horas_extras)}h` : "—"}
+          </div>
+        </div>
+        <div>
+          <div className="font-label-caps text-label-caps uppercase tracking-widest text-outline">
+            Completista (100%)
+          </div>
+          <div className="mt-space-xxs font-headline-kpi text-headline-kpi leading-none text-tertiary-container">
+            {ficha.hltb_horas_completista !== null
+              ? `${fmtDecimal(ficha.hltb_horas_completista)}h`
+              : "—"}
+          </div>
+        </div>
+      </div>
+
+      {nomeDivergente && (
+        <p className="font-body-sm text-body-sm text-outline">
+          Casado como <strong className="text-on-surface-variant">{nomeDivergente}</strong> no
+          HowLongToBeat — o site não tem o mesmo id da Steam, o casamento é por nome.
+        </p>
+      )}
     </Painel>
   );
 }

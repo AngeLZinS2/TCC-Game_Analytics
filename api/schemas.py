@@ -126,6 +126,17 @@ class FichaJogoSteam(BaseModel):
     tags_comunidade: list[tuple[str, int]] = []
     coletado_ficha_em: datetime | None = None
 
+    #: HowLongToBeat - tempo estimado pra zerar. Casado por NOME (Steam e
+    #: HLTB nao compartilham id), por isso `hltb_nome` vem junto: confere se
+    #: o casamento achou o jogo certo. `None` em tudo = ainda nao coletado ou
+    #: nenhum candidato bateu com confianca suficiente.
+    hltb_id: str | None = None
+    hltb_nome: str | None = None
+    hltb_horas_historia: Decimal | None = None
+    hltb_horas_extras: Decimal | None = None
+    hltb_horas_completista: Decimal | None = None
+    coletado_tempo_em: datetime | None = None
+
 
 class NoticiaSteam(BaseModel):
     gid: str

@@ -144,6 +144,12 @@ def _montar_ficha(jogo: DimJogoSteam) -> FichaJogoSteam:
         tempo_jogo_mediano_min=jogo.tempo_jogo_mediano_min,
         tags_comunidade=sorted(tags.items(), key=lambda kv: kv[1], reverse=True)[:20],
         coletado_ficha_em=jogo.coletado_ficha_em,
+        hltb_id=jogo.hltb_id or None,
+        hltb_nome=jogo.hltb_nome,
+        hltb_horas_historia=jogo.hltb_horas_historia,
+        hltb_horas_extras=jogo.hltb_horas_extras,
+        hltb_horas_completista=jogo.hltb_horas_completista,
+        coletado_tempo_em=jogo.coletado_tempo_em,
     )
 
 

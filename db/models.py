@@ -161,6 +161,18 @@ class DimJogoSteam(Base):
     menor_preco_historico_em: Mapped[date | None] = mapped_column(Date)
     coletado_preco_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
+    # --- Tempo pra zerar (Fase 18, HowLongToBeat) ------------------------
+    #: Id do jogo no HLTB, achado por nome (nao ha appid la) e cacheado.
+    #: `""` = ja procurado e nenhum candidato bateu com confianca suficiente.
+    hltb_id: Mapped[str | None] = mapped_column(String(40))
+    #: Nome como aparece no HLTB - existe pra conferir que o casamento por
+    #: nome achou o jogo certo (Steam e HLTB nao compartilham nenhum id).
+    hltb_nome: Mapped[str | None] = mapped_column(Text)
+    hltb_horas_historia: Mapped[Decimal | None] = mapped_column(Numeric(6, 1))
+    hltb_horas_extras: Mapped[Decimal | None] = mapped_column(Numeric(6, 1))
+    hltb_horas_completista: Mapped[Decimal | None] = mapped_column(Numeric(6, 1))
+    coletado_tempo_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
     criado_em: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

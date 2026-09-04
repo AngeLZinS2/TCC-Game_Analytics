@@ -174,6 +174,20 @@ class Settings(BaseSettings):
     #: enorme e ainda cobre centenas de jogos numa rodada.
     itad_rate_limit_seconds: float = Field(default=0.4, gt=0)
 
+    # --- Tempo pra zerar (HowLongToBeat) ---
+    #: Sem API oficial nem chave - da pra desligar aqui se um dia o endpoint
+    #: nao-oficial parar de responder direito, sem mexer em codigo.
+    hltb_enabled: bool = True
+    #: Sem limite documentado (nao e API oficial); 1s e conservador o
+    #: bastante pra nao parecer trafego automatizado martelando o site.
+    hltb_rate_limit_seconds: float = Field(default=1.0, gt=0)
+    #: Intervalo entre rodadas de tempo pra zerar, em minutos.
+    #:
+    #: O dado praticamente nao muda (o tempo medio da comunidade so desloca
+    #: com muitas novas submissoes) - o intervalo generoso e so pra pegar
+    #: jogo novo no catalogo, nao pra acompanhar variacao.
+    agendador_tempo_jogo_minutos: int = Field(default=1440, ge=60)
+
     # --- Assistente (OpenRouter) ---
     #: Sem chave, o endpoint do assistente responde 503 com a instrucao. E um
     #: estado esperado: o resto do projeto funciona sem LLM nenhum.

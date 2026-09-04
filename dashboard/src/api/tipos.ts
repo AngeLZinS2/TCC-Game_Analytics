@@ -96,6 +96,15 @@ export interface FichaJogoSteam {
   /** [tag, votos], já ordenado por votos desc. */
   tags_comunidade: [string, number][];
   coletado_ficha_em: string | null;
+
+  /** HowLongToBeat — casado por nome (Steam e HLTB não compartilham id). */
+  hltb_id: string | null;
+  /** Nome como aparece no HLTB — confere se o casamento achou o jogo certo. */
+  hltb_nome: string | null;
+  hltb_horas_historia: Decimal | null;
+  hltb_horas_extras: Decimal | null;
+  hltb_horas_completista: Decimal | null;
+  coletado_tempo_em: string | null;
 }
 
 export interface NoticiaSteam {

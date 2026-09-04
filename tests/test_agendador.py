@@ -142,7 +142,9 @@ def test_intervalos_vem_da_configuracao():
         agendador_ranking_minutos = 90
         agendador_precos_minutos = 120
         agendador_opendota_limite = 10
+        agendador_tempo_jogo_minutos = 150
         itad_api_key = "chave-de-teste"
+        hltb_enabled = True
 
     tarefas = {t.nome: t.intervalo_segundos for t in montar_tarefas(FakeSettings())}
     assert tarefas == {
@@ -153,6 +155,7 @@ def test_intervalos_vem_da_configuracao():
         "brackets": 4500,
         "ranking": 5400,
         "precos": 7200,
+        "tempo_jogo": 9000,
     }
 
 
@@ -166,14 +169,35 @@ def test_tarefa_de_preco_so_entra_com_chave_do_itad():
         agendador_ranking_minutos = 10080
         agendador_precos_minutos = 720
         agendador_opendota_limite = 100
+        agendador_tempo_jogo_minutos = 1440
         itad_api_key = None
+        hltb_enabled = True
 
     nomes = {t.nome for t in montar_tarefas(SemChave())}
     assert "precos" not in nomes
 
 
+def test_tarefa_de_tempo_jogo_nao_entra_quando_desabilitada():
+    class Desabilitada:
+        agendador_steam_minutos = 60
+        agendador_opendota_minutos = 360
+        agendador_liquipedia_minutos = 720
+        agendador_equipes_minutos = 1440
+        agendador_brackets_minutos = 1440
+        agendador_ranking_minutos = 10080
+        agendador_precos_minutos = 720
+        agendador_opendota_limite = 100
+        agendador_tempo_jogo_minutos = 1440
+        itad_api_key = None
+        hltb_enabled = False
+
+    nomes = {t.nome for t in montar_tarefas(Desabilitada())}
+    assert "tempo_jogo" not in nomes
+
+
 @pytest.mark.parametrize(
-    "fonte", ["steam", "opendota", "liquipedia", "equipes", "brackets", "ranking"]
+    "fonte",
+    ["steam", "opendota", "liquipedia", "equipes", "brackets", "ranking", "tempo_jogo"],
 )
 def test_as_tres_fontes_estao_agendadas(fonte: str):
     from config import get_settings

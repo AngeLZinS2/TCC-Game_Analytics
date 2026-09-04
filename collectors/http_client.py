@@ -78,8 +78,16 @@ class RateLimitedClient:
                 time.sleep(espera)
             self._ultima_chamada = time.monotonic()
 
-    def get_json(self, url: str, params: dict[str, Any] | None = None) -> Any:
+    def get_json(
+        self,
+        url: str,
+        params: dict[str, Any] | None = None,
+        headers: dict[str, str] | None = None,
+    ) -> Any:
         """GET que devolve JSON decodificado, respeitando o rate limit.
+
+        `headers` se soma aos da sessao (User-Agent, Accept) sem substitui-los -
+        e o que o HowLongToBeat precisa para o `x-auth-token` por requisicao.
 
         Raises:
             requests.HTTPError: status final >= 400 apos os retries.
@@ -87,7 +95,9 @@ class RateLimitedClient:
         """
         self._aguardar()
         inicio = time.monotonic()
-        resposta = self.session.get(url, params=params, timeout=self.timeout)
+        resposta = self.session.get(
+            url, params=params, headers=headers, timeout=self.timeout
+        )
         duracao_ms = round((time.monotonic() - inicio) * 1000)
 
         logger.debug(
@@ -110,12 +120,17 @@ class RateLimitedClient:
             ) from exc
 
     def post_json(
-        self, url: str, json: Any, params: dict[str, Any] | None = None
+        self,
+        url: str,
+        json: Any,
+        params: dict[str, Any] | None = None,
+        headers: dict[str, str] | None = None,
     ) -> Any:
         """POST com corpo JSON que devolve JSON, respeitando o rate limit.
 
         O IsThereAnyDeal recebe a lista de ids no corpo e os parametros
-        (`key`, `country`) na query.
+        (`key`, `country`) na query. O HowLongToBeat usa `headers` para o
+        token de sessao por requisicao (`x-auth-token`, `x-hp-key`, `x-hp-val`).
 
         Raises:
             requests.HTTPError: status final >= 400 apos os retries.
@@ -124,7 +139,7 @@ class RateLimitedClient:
         self._aguardar()
         inicio = time.monotonic()
         resposta = self.session.post(
-            url, params=params, json=json, timeout=self.timeout
+            url, params=params, json=json, headers=headers, timeout=self.timeout
         )
         duracao_ms = round((time.monotonic() - inicio) * 1000)
 

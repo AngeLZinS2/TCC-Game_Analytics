@@ -25,6 +25,7 @@ FONTES = (
     "liquipedia-bracket",
     "valve-standings",
     "itad",
+    "hltb",
 )
 
 
@@ -126,12 +127,15 @@ def _parser() -> argparse.ArgumentParser:
         ),
     )
 
-    itad = coletar.add_argument_group("itad")
+    itad = coletar.add_argument_group("itad / hltb")
     itad.add_argument(
         "--limite-jogos",
         type=int,
         metavar="N",
-        help="consulta preco so dos N primeiros jogos pagos (util para testar)",
+        help=(
+            "so os N primeiros jogos pendentes (preco pago no itad, "
+            "tempo pra zerar no hltb) - util para testar"
+        ),
     )
     itad.add_argument(
         "--forcar-lookup",
@@ -259,6 +263,15 @@ def _construir_coletor(args: argparse.Namespace, storage):
             forcar_lookup=args.forcar_lookup,
         )
 
+    if args.fonte == "hltb":
+        from collectors.hltb_collector import HltbCollector
+
+        return HltbCollector(
+            raw_storage=storage,
+            settings=settings,
+            limite=args.limite_jogos,
+        )
+
     from collectors.opendota_collector import OpenDotaCollector
 
     return OpenDotaCollector(
@@ -292,6 +305,10 @@ def _carregador(fonte: str):
         return carregar
     if fonte == "itad":
         from etl.load_itad import carregar
+
+        return carregar
+    if fonte == "hltb":
+        from etl.load_hltb import carregar
 
         return carregar
     from etl.load_dota import carregar

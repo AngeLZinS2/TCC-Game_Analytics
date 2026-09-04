@@ -348,11 +348,24 @@ def _coletar_precos(settings: Settings, storage: RawStorage) -> CollectionResult
         coletor.close()
 
 
+def _coletar_tempo_jogo(settings: Settings, storage: RawStorage) -> CollectionResult:
+    """Tempo estimado pra zerar cada jogo (HowLongToBeat)."""
+    from collectors.hltb_collector import HltbCollector
+
+    coletor = HltbCollector(raw_storage=storage, settings=settings)
+    try:
+        return coletor.run(carregar=True)
+    finally:
+        coletor.close()
+
+
 def montar_tarefas(settings: Settings) -> list[Tarefa]:
     """As tarefas do agendador, na ordem em que rodam quando empatam.
 
     A tarefa de preco (`itad`) so entra quando ha `ITAD_API_KEY` - sem chave
-    ela nao teria o que fazer.
+    ela nao teria o que fazer. A de tempo pra zerar (`hltb`) nao pede chave,
+    mas e engenharia reversa de um endpoint nao-oficial - `hltb_enabled`
+    deixa desligar sem mexer em codigo se um dia parar de responder direito.
     """
     tarefas = [
         Tarefa(
@@ -392,6 +405,14 @@ def montar_tarefas(settings: Settings) -> list[Tarefa]:
                 nome="precos",
                 intervalo_segundos=settings.agendador_precos_minutos * 60,
                 executar=_coletar_precos,
+            )
+        )
+    if settings.hltb_enabled:
+        tarefas.append(
+            Tarefa(
+                nome="tempo_jogo",
+                intervalo_segundos=settings.agendador_tempo_jogo_minutos * 60,
+                executar=_coletar_tempo_jogo,
             )
         )
     return tarefas

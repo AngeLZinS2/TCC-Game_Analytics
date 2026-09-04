@@ -1,0 +1,55 @@
+{
+  "color": "blue",
+  "title": "",
+  "category": "games",
+  "count": 3,
+  "pageCurrent": 1,
+  "pageTotal": 1,
+  "pageSize": 20,
+  "data": [
+    {
+      "game_id": 62941,
+      "game_name": "Hades",
+      "game_alias": "",
+      "game_type": "game",
+      "game_image": "62941_Hades.jpg",
+      "comp_main": 84915,
+      "comp_plus": 174806,
+      "comp_100": 342890,
+      "comp_all": 159610,
+      "review_score": 88,
+      "profile_platform": "Mac, Nintendo Switch, PC, PlayStation 4, PlayStation 5, Xbox One, Xbox Series X/S",
+      "release_world": 2020
+    },
+    {
+      "game_id": 118218,
+      "game_name": "Hades II",
+      "game_alias": "Hades 2",
+      "game_type": "game",
+      "game_image": "118218_Hades_II.jpg",
+      "comp_main": 115398,
+      "comp_plus": 191349,
+      "comp_100": 375683,
+      "comp_all": 200661,
+      "review_score": 90,
+      "profile_platform": "Nintendo Switch, PC, PlayStation 5, Xbox Series X/S",
+      "release_world": 2025
+    },
+    {
+      "game_id": 65615,
+      "game_name": "Hades' Star",
+      "game_alias": "",
+      "game_type": "multi",
+      "game_image": "65615_Hades_Star.jpg",
+      "comp_main": 0,
+      "comp_plus": 0,
+      "comp_100": 0,
+      "comp_all": 0,
+      "review_score": 60,
+      "profile_platform": "Mac, PC",
+      "release_world": 2019
+    }
+  ],
+  "userData": [],
+  "displayModifier": null
+}
