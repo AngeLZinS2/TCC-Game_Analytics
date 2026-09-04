@@ -98,6 +98,14 @@ def _variacao(atual: int | None, anterior: int | None) -> float | None:
 #: os principais na loja.
 _ORGAOS_RELEVANTES = ("esrb", "pegi", "usk", "dejus", "cero", "oflc", "kgrb")
 
+#: Feeds cujo post e do proprio estudio - "atualizacao" de verdade. O resto e
+#: cobertura de imprensa que a Steam agrega no mesmo endpoint.
+_FEEDS_OFICIAIS = (
+    "Community Announcements",
+    "Steam Community Announcements",
+    "Product Update",
+)
+
 
 def _montar_ficha(jogo: DimJogoSteam) -> FichaJogoSteam:
     tags = jogo.tags_comunidade or {}
@@ -262,7 +270,22 @@ def detalhar_jogo(app_id: int, sessao: Session = Depends(get_db)) -> DetalheJogo
         sessao.scalars(
             select(NoticiaJogoSteam)
             .where(NoticiaJogoSteam.app_id == app_id)
-            .order_by(nulls_last(desc(NoticiaJogoSteam.publicado_em)))
+            # Post oficial do estudio primeiro (e o que "atualizacao" quer
+            # dizer), depois a cobertura externa - e, dentro de cada grupo,
+            # do mais recente.
+            .order_by(
+                case(
+                    (
+                        or_(
+                            NoticiaJogoSteam.feed.is_(None),
+                            NoticiaJogoSteam.feed.in_(_FEEDS_OFICIAIS),
+                        ),
+                        0,
+                    ),
+                    else_=1,
+                ),
+                nulls_last(desc(NoticiaJogoSteam.publicado_em)),
+            )
             .limit(8)
         )
     )

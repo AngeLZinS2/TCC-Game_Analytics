@@ -391,18 +391,50 @@ export function JogoSteamPagina() {
 // Ficha do jogo (Fase 16) — metadados que quase não mudam
 // ---------------------------------------------------------------------------
 
-/** Nome amigável dos órgãos de classificação. */
+/** Nome curto e amigável dos órgãos de classificação. */
 const ORGAOS: Record<string, string> = {
   esrb: "ESRB",
   pegi: "PEGI",
   usk: "USK",
-  dejus: "DEJUS (BR)",
-  cero: "CERO (JP)",
-  kgrb: "GRAC (KR)",
+  dejus: "DEJUS",
+  cero: "CERO",
   oflc: "OFLC",
-  nzoflc: "OFLC (NZ)",
-  csrr: "CSRR",
-  mda: "IMDA (SG)",
+  kgrb: "GRAC",
+};
+
+/** Recursos que descrevem COMO se joga — vão em destaque, com ícone. */
+const ICONE_MODO: Record<string, string> = {
+  "Single-player": "person",
+  "Multi-player": "groups",
+  "Co-op": "handshake",
+  "Online Co-op": "handshake",
+  "LAN Co-op": "handshake",
+  "Shared/Split Screen Co-op": "splitscreen",
+  "Shared/Split Screen": "splitscreen",
+  "PvP": "swords",
+  "Online PvP": "swords",
+  "Cross-Platform Multiplayer": "sync_alt",
+  "MMO": "public",
+};
+
+/** Ícone dos outros recursos conhecidos. O que não estiver aqui vira chip liso. */
+const ICONE_RECURSO: Record<string, string> = {
+  "Steam Achievements": "trophy",
+  "Steam Trading Cards": "style",
+  "Steam Cloud": "cloud",
+  "Steam Workshop": "extension",
+  "Full controller support": "stadia_controller",
+  "Partial Controller Support": "stadia_controller",
+  "Valve Anti-Cheat enabled": "shield",
+  "Remote Play on Phone": "smartphone",
+  "Remote Play on Tablet": "tablet",
+  "Remote Play on TV": "tv",
+  "Remote Play Together": "cast",
+  "Family Sharing": "family_restroom",
+  "In-App Purchases": "shopping_cart",
+  "Captions available": "closed_caption",
+  "Steam Timeline": "timeline",
+  "HDR available": "hdr_on",
 };
 
 function tempoDeJogo(minutos: number | null): string | null {
@@ -412,215 +444,331 @@ function tempoDeJogo(minutos: number | null): string | null {
   return h > 0 ? `${h}h${m ? ` ${m}min` : ""}` : `${m}min`;
 }
 
-function LinhaFicha({ rotulo, children }: { rotulo: string; children: React.ReactNode }) {
+/** "1,000,000 .. 2,000,000" -> "1 mi – 2 mi". */
+function faixaDeDonos(bruto: string): string {
+  const nums = bruto.match(/[\d,]+/g)?.map((n) => Number(n.replace(/,/g, ""))) ?? [];
+  if (nums.length < 2) return bruto;
+  return `${fmtCurto(nums[0])} – ${fmtCurto(nums[1])}`;
+}
+
+const FEEDS_OFICIAIS = [
+  "Community Announcements",
+  "Steam Community Announcements",
+  "Product Update",
+];
+
+/** Um dos quatro tiles do resumo da ficha. */
+function TileFicha({
+  icone,
+  rotulo,
+  acento,
+  children,
+}: {
+  icone: string;
+  rotulo: string;
+  acento: "primary" | "secondary" | "tertiary";
+  children: React.ReactNode;
+}) {
+  const glow = {
+    primary: "bg-primary-container/10",
+    secondary: "bg-secondary-container/20",
+    tertiary: "bg-tertiary-container/10",
+  }[acento];
+  const cor = {
+    primary: "text-primary-container",
+    secondary: "text-secondary",
+    tertiary: "text-tertiary-container",
+  }[acento];
+
   return (
-    <div className="border-t border-outline-variant/20 py-space-sm first:border-t-0">
-      <div className="font-label-caps text-label-caps uppercase tracking-widest text-outline">
+    <div className="relative overflow-hidden rounded-xl bg-surface-container-lowest p-space-base">
+      <div
+        className={`pointer-events-none absolute -right-8 -top-8 h-24 w-24 rounded-full blur-2xl ${glow}`}
+        aria-hidden
+      />
+      <div className="relative z-10 flex items-center gap-space-xs font-label-caps text-label-caps uppercase tracking-widest text-outline">
+        <Icone nome={icone} className={`text-[16px] ${cor}`} />
         {rotulo}
       </div>
-      <div className="mt-space-xxs font-body-md text-body-sm text-on-surface-variant">
+      <div className="relative z-10 mt-space-sm font-body-md text-body-sm text-on-surface">
         {children}
       </div>
     </div>
   );
 }
 
-function Chips({ itens }: { itens: string[] }) {
-  return (
-    <div className="flex flex-wrap gap-space-xxs">
-      {itens.map((item) => (
-        <span
-          key={item}
-          className="rounded bg-surface-container-highest px-space-xs py-space-xxs font-title-code text-title-code text-on-surface-variant"
-        >
-          {item}
-        </span>
-      ))}
-    </div>
-  );
-}
-
 function FichaDoJogo({ ficha, nome }: { ficha: FichaJogoSteam; nome: string }) {
-  const nada =
+  const vazia =
     ficha.recursos.length === 0 &&
     ficha.idiomas.length === 0 &&
     !ficha.donos_estimados &&
     ficha.tags_comunidade.length === 0 &&
     !ficha.conquistas_total;
 
-  if (nada) {
+  if (vazia) {
     return (
       <Painel icone="badge" titulo="Ficha do jogo">
-        <p className="font-body-md text-body-sm text-outline">
-          A ficha deste jogo ainda não foi coletada. Ela vem do <code>appdetails</code> e do
-          SteamSpy — o coletor da Steam a preenche na próxima passada.
+        <p className="rounded-lg bg-surface-container-lowest px-space-base py-space-md font-body-md text-body-sm text-outline">
+          A ficha ainda não foi coletada — ela vem do <code>appdetails</code> e do SteamSpy,
+          e o coletor da Steam a preenche na próxima passada.
         </p>
       </Painel>
     );
   }
 
+  const modos = ficha.recursos.filter((r) => r in ICONE_MODO);
+  const outros = ficha.recursos.filter((r) => !(r in ICONE_MODO));
   const orgaos = Object.entries(ficha.classificacoes);
+  const notasNumericas = orgaos
+    .map(([, n]) => parseInt(n, 10))
+    .filter((n) => !Number.isNaN(n));
+  const idadeSelo = ficha.faixa_etaria
+    ? `${ficha.faixa_etaria}+`
+    : notasNumericas.length > 0
+      ? `${Math.max(...notasNumericas)}+`
+      : orgaos.length > 0
+        ? "Classificado"
+        : "Livre";
+  const plataformas = ficha.plataformas.map(
+    (p) => ({ windows: "Windows", mac: "macOS", linux: "Linux" })[p] ?? p,
+  );
+  const maxVotos = Math.max(...ficha.tags_comunidade.map(([, v]) => v), 1);
 
   return (
     <Painel
       icone="badge"
       titulo="Ficha do jogo"
-      descricao="Metadados da loja Steam e estimativas do SteamSpy."
+      descricao="O que a página da Steam informa, mais as estimativas do SteamSpy."
     >
-      <div className="grid grid-cols-1 gap-x-space-lg md:grid-cols-2">
-        <div>
-          {ficha.recursos.length > 0 && (
-            <LinhaFicha rotulo="Recursos">
-              <Chips itens={ficha.recursos} />
-            </LinhaFicha>
-          )}
-          {ficha.plataformas.length > 0 && (
-            <LinhaFicha rotulo="Plataformas">
-              {ficha.plataformas
-                .map((p) => ({ windows: "Windows", mac: "macOS", linux: "Linux" })[p] ?? p)
+      {/* ---------- resumo em quatro tiles ---------- */}
+      <div className="grid grid-cols-2 gap-space-sm lg:grid-cols-4">
+        <TileFicha icone="shield_person" rotulo="Classificação" acento="tertiary">
+          <div className="font-headline-sm text-headline-sm text-on-surface">{idadeSelo}</div>
+          {orgaos.length > 0 && (
+            <div className="mt-space-xxs font-title-code text-title-code text-outline">
+              {orgaos
+                .slice(0, 3)
+                .map(([o, n]) => `${ORGAOS[o] ?? o.toUpperCase()} ${n.toUpperCase()}`)
                 .join(" · ")}
-              {ficha.suporte_controle && (
-                <span className="ml-space-sm text-outline">
-                  · controle {ficha.suporte_controle === "full" ? "total" : "parcial"}
-                </span>
-              )}
-            </LinhaFicha>
+            </div>
           )}
-          {ficha.idiomas.length > 0 && (
-            <LinhaFicha rotulo={`Idiomas (${ficha.idiomas.length})`}>
-              {ficha.idiomas.slice(0, 12).map((idioma) => (
-                <span key={idioma} className="mr-space-sm inline-block">
-                  {idioma}
-                  {ficha.idiomas_com_audio.includes(idioma) && (
-                    <Icone
-                      nome="volume_up"
-                      className="ml-[2px] align-middle text-[13px] text-primary"
-                    />
-                  )}
-                </span>
-              ))}
-              {ficha.idiomas.length > 12 && ` +${ficha.idiomas.length - 12}`}
-              <div className="mt-space-xxs text-outline">
-                <Icone nome="volume_up" className="align-middle text-[12px]" /> ={" "}
-                {ficha.idiomas_com_audio.length} com dublagem
-              </div>
-            </LinhaFicha>
-          )}
-        </div>
+        </TileFicha>
 
-        <div>
-          {(ficha.faixa_etaria !== null || orgaos.length > 0) && (
-            <LinhaFicha rotulo="Classificação etária">
-              {ficha.faixa_etaria ? (
-                <strong className="text-on-surface">{ficha.faixa_etaria}+</strong>
-              ) : null}
-              {orgaos.length > 0 && (
-                <span className="ml-space-sm">
-                  {orgaos
-                    .map(([org, nota]) => `${ORGAOS[org] ?? org.toUpperCase()} ${nota.toUpperCase()}`)
-                    .join(" · ")}
-                </span>
-              )}
-              {ficha.descritores_conteudo.length > 0 && (
-                <div className="mt-space-xxs text-error/80">
-                  {ficha.descritores_conteudo.join(", ")}
-                </div>
-              )}
-            </LinhaFicha>
+        <TileFicha icone="devices" rotulo="Plataformas" acento="primary">
+          <div className="font-headline-sm text-headline-sm text-on-surface">
+            {plataformas.length > 0 ? plataformas.join(" · ") : "—"}
+          </div>
+          {ficha.suporte_controle && (
+            <div className="mt-space-xxs font-title-code text-title-code text-outline">
+              <Icone nome="stadia_controller" className="align-middle text-[13px]" /> controle{" "}
+              {ficha.suporte_controle === "full" ? "total" : "parcial"}
+            </div>
           )}
-          {ficha.conquistas_total ? (
-            <LinhaFicha rotulo="Conquistas">
-              <strong className="text-on-surface">{fmtNumero(ficha.conquistas_total)}</strong>{" "}
-              conquistas
-              {ficha.conquistas_destaque.length > 0 && (
-                <span className="ml-space-sm inline-flex gap-space-xxs align-middle">
-                  {ficha.conquistas_destaque.slice(0, 6).map((c) => (
-                    <img
-                      key={c.nome}
-                      src={c.icone}
-                      alt={c.nome}
-                      title={c.nome}
-                      className="h-5 w-5 rounded"
-                      onError={(e) => (e.currentTarget.style.display = "none")}
-                    />
-                  ))}
-                </span>
-              )}
-            </LinhaFicha>
-          ) : null}
-          {(ficha.donos_estimados || ficha.tempo_jogo_medio_min) && (
-            <LinhaFicha rotulo="Alcance (SteamSpy)">
-              {ficha.donos_estimados && (
-                <div>
-                  Donos estimados:{" "}
-                  <strong className="text-on-surface">{ficha.donos_estimados}</strong>{" "}
-                  <span className="text-outline">(faixa, não número exato)</span>
-                </div>
-              )}
-              {tempoDeJogo(ficha.tempo_jogo_medio_min) && (
-                <div>
-                  Tempo de jogo médio:{" "}
-                  <strong className="text-on-surface">
-                    {tempoDeJogo(ficha.tempo_jogo_medio_min)}
-                  </strong>
-                </div>
-              )}
-            </LinhaFicha>
+        </TileFicha>
+
+        <TileFicha icone="language" rotulo="Idiomas" acento="secondary">
+          <div className="font-headline-sm text-headline-sm text-on-surface">
+            {ficha.idiomas.length || "—"}
+          </div>
+          {ficha.idiomas_com_audio.length > 0 && (
+            <div className="mt-space-xxs font-title-code text-title-code text-outline">
+              {ficha.idiomas_com_audio.length} com dublagem
+            </div>
           )}
-          {(ficha.dlc_ids.length > 0 || ficha.analises_totais !== null || ficha.site_oficial) && (
-            <LinhaFicha rotulo="Mais">
-              {ficha.analises_totais !== null && (
-                <div>{fmtNumero(ficha.analises_totais)} recomendações na loja</div>
-              )}
-              {ficha.dlc_ids.length > 0 && <div>{ficha.dlc_ids.length} DLC(s)</div>}
-              {ficha.site_oficial && (
-                <a
-                  href={ficha.site_oficial}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-primary hover:underline"
-                >
-                  Site oficial ↗
-                </a>
-              )}
-            </LinhaFicha>
+        </TileFicha>
+
+        <TileFicha icone="trophy" rotulo="Conquistas" acento="tertiary">
+          <div className="font-headline-sm text-headline-sm text-on-surface">
+            {ficha.conquistas_total ? fmtNumero(ficha.conquistas_total) : "nenhuma"}
+          </div>
+          {ficha.conquistas_destaque.length > 0 && (
+            <div className="mt-space-xs flex gap-space-xxs">
+              {ficha.conquistas_destaque.slice(0, 5).map((c) => (
+                <img
+                  key={c.nome}
+                  src={c.icone}
+                  alt={c.nome}
+                  title={c.nome}
+                  className="h-5 w-5 rounded"
+                  onError={(e) => (e.currentTarget.style.display = "none")}
+                />
+              ))}
+            </div>
           )}
-        </div>
+        </TileFicha>
       </div>
 
-      {ficha.tags_comunidade.length > 0 && (
-        <div className="mt-space-md border-t border-outline-variant/20 pt-space-sm">
+      {/* ---------- descritores de conteúdo ---------- */}
+      {ficha.descritores_conteudo.length > 0 && (
+        <div className="flex flex-wrap items-center gap-space-xs rounded-lg border border-error/25 bg-error/5 px-space-base py-space-sm">
+          <Icone nome="warning" className="text-[16px] text-error" />
+          <span className="font-title-code text-title-code uppercase tracking-wide text-error/90">
+            {ficha.descritores_conteudo.join(" · ")}
+          </span>
+        </div>
+      )}
+
+      {/* ---------- modos de jogo + recursos ---------- */}
+      {(modos.length > 0 || outros.length > 0) && (
+        <div className="rounded-xl bg-surface-container-lowest p-space-base">
           <div className="font-label-caps text-label-caps uppercase tracking-widest text-outline">
-            Tags da comunidade
+            Modos de jogo e recursos
           </div>
-          <div className="mt-space-xs flex flex-wrap gap-space-xxs">
-            {ficha.tags_comunidade.slice(0, 15).map(([tag, votos]) => (
-              <span
-                key={tag}
-                className="rounded-full bg-surface-container-highest px-space-sm py-space-xxs font-title-code text-title-code text-on-surface-variant"
-                title={`${fmtNumero(votos)} votos`}
-              >
-                {tag}{" "}
-                <span className="text-outline">{fmtCurto(votos)}</span>
-              </span>
+          {modos.length > 0 && (
+            <div className="mt-space-sm flex flex-wrap gap-space-xs">
+              {modos.map((modo) => (
+                <span
+                  key={modo}
+                  className="inline-flex items-center gap-space-xxs rounded-lg bg-primary-container/10 px-space-sm py-space-xs font-title-code text-title-code text-primary-container"
+                >
+                  <Icone nome={ICONE_MODO[modo]} className="text-[15px]" />
+                  {modo}
+                </span>
+              ))}
+            </div>
+          )}
+          {outros.length > 0 && (
+            <div className="mt-space-sm flex flex-wrap gap-space-xxs">
+              {outros.map((r) => (
+                <span
+                  key={r}
+                  className="inline-flex items-center gap-space-xxs rounded bg-surface-container-high px-space-sm py-space-xxs font-title-code text-title-code text-on-surface-variant"
+                >
+                  {ICONE_RECURSO[r] && (
+                    <Icone nome={ICONE_RECURSO[r]} className="text-[13px] text-outline" />
+                  )}
+                  {r}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ---------- alcance (SteamSpy) ---------- */}
+      {(ficha.donos_estimados ||
+        ficha.tempo_jogo_medio_min ||
+        ficha.analises_totais !== null) && (
+        <div className="grid grid-cols-1 gap-space-sm rounded-xl bg-surface-container-lowest p-space-base sm:grid-cols-3">
+          {ficha.donos_estimados && (
+            <div>
+              <div className="font-label-caps text-label-caps uppercase tracking-widest text-outline">
+                Donos estimados
+              </div>
+              <div className="mt-space-xxs font-headline-kpi text-headline-kpi leading-none text-primary-container">
+                {faixaDeDonos(ficha.donos_estimados)}
+              </div>
+              <div className="mt-space-xxs font-title-code text-title-code text-outline">
+                faixa do SteamSpy · não é número exato
+              </div>
+            </div>
+          )}
+          {tempoDeJogo(ficha.tempo_jogo_medio_min) && (
+            <div>
+              <div className="font-label-caps text-label-caps uppercase tracking-widest text-outline">
+                Tempo de jogo médio
+              </div>
+              <div className="mt-space-xxs font-headline-kpi text-headline-kpi leading-none text-secondary">
+                {tempoDeJogo(ficha.tempo_jogo_medio_min)}
+              </div>
+              <div className="mt-space-xxs font-title-code text-title-code text-outline">
+                por dono, no total
+              </div>
+            </div>
+          )}
+          {ficha.analises_totais !== null && (
+            <div>
+              <div className="font-label-caps text-label-caps uppercase tracking-widest text-outline">
+                Recomendações na loja
+              </div>
+              <div className="mt-space-xxs font-headline-kpi text-headline-kpi leading-none text-tertiary-container">
+                {fmtCurto(ficha.analises_totais)}
+              </div>
+              {(ficha.dlc_ids.length > 0 || ficha.site_oficial) && (
+                <div className="mt-space-xxs font-title-code text-title-code text-outline">
+                  {ficha.dlc_ids.length > 0 && `${ficha.dlc_ids.length} DLC`}
+                  {ficha.dlc_ids.length > 0 && ficha.site_oficial && " · "}
+                  {ficha.site_oficial && (
+                    <a
+                      href={ficha.site_oficial}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-primary hover:underline"
+                    >
+                      site oficial ↗
+                    </a>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ---------- tags da comunidade ---------- */}
+      {ficha.tags_comunidade.length > 0 && (
+        <div className="rounded-xl bg-surface-container-lowest p-space-base">
+          <div className="flex items-center gap-space-xs font-label-caps text-label-caps uppercase tracking-widest text-outline">
+            <Icone nome="sell" className="text-[15px] text-secondary" />
+            O que a comunidade marca
+          </div>
+          <div className="mt-space-sm space-y-space-xs">
+            {ficha.tags_comunidade.slice(0, 8).map(([tag, votos]) => (
+              <div key={tag} className="flex items-center gap-space-sm">
+                <span className="w-32 shrink-0 truncate font-title-code text-title-code text-on-surface-variant">
+                  {tag}
+                </span>
+                <div className="h-2 flex-1 overflow-hidden rounded-full bg-surface-container-high">
+                  <div
+                    className="h-full rounded-full bg-gradient-to-r from-primary-container to-secondary"
+                    style={{ width: `${Math.max(4, (votos / maxVotos) * 100)}%` }}
+                  />
+                </div>
+                <span className="w-12 shrink-0 text-right font-title-code text-title-code text-outline">
+                  {fmtCurto(votos)}
+                </span>
+              </div>
             ))}
           </div>
         </div>
       )}
 
-      {ficha.requisitos_minimos && (
-        <details className="mt-space-md border-t border-outline-variant/20 pt-space-sm">
-          <summary className="cursor-pointer font-label-caps text-label-caps uppercase tracking-widest text-outline">
-            Requisitos mínimos
-          </summary>
-          <pre className="mt-space-xs whitespace-pre-wrap font-body-md text-body-sm text-on-surface-variant">
-            {ficha.requisitos_minimos}
-          </pre>
-        </details>
-      )}
+      {/* ---------- idiomas + requisitos, recolhidos ---------- */}
+      <div className="flex flex-col gap-space-sm sm:flex-row">
+        {ficha.idiomas.length > 0 && (
+          <details className="flex-1 rounded-lg bg-surface-container-lowest px-space-base py-space-sm">
+            <summary className="cursor-pointer font-label-caps text-label-caps uppercase tracking-widest text-outline">
+              Idiomas ({ficha.idiomas.length})
+            </summary>
+            <p className="mt-space-xs font-body-md text-body-sm text-on-surface-variant">
+              {ficha.idiomas.map((idioma) => (
+                <span key={idioma} className="mr-space-sm inline-block">
+                  {idioma}
+                  {ficha.idiomas_com_audio.includes(idioma) && (
+                    <Icone
+                      nome="volume_up"
+                      className="ml-[2px] align-middle text-[12px] text-primary"
+                    />
+                  )}
+                </span>
+              ))}
+            </p>
+          </details>
+        )}
+        {ficha.requisitos_minimos && (
+          <details className="flex-1 rounded-lg bg-surface-container-lowest px-space-base py-space-sm">
+            <summary className="cursor-pointer font-label-caps text-label-caps uppercase tracking-widest text-outline">
+              Requisitos mínimos
+            </summary>
+            <pre className="mt-space-xs whitespace-pre-wrap font-body-md text-body-sm text-on-surface-variant">
+              {ficha.requisitos_minimos}
+            </pre>
+          </details>
+        )}
+      </div>
 
-      <p className="mt-space-md font-body-sm text-body-sm text-outline">
-        Fonte: Steam Store API + SteamSpy · ficha de <strong>{nome}</strong>
+      <p className="font-body-sm text-body-sm text-outline">
+        <strong>{nome}</strong> · Steam Store API + SteamSpy
         {ficha.coletado_ficha_em && ` · atualizada ${fmtRelativo(ficha.coletado_ficha_em)}`}
       </p>
     </Painel>
@@ -631,13 +779,70 @@ function FichaDoJogo({ ficha, nome }: { ficha: FichaJogoSteam; nome: string }) {
 // Últimas atualizações (ISteamNews)
 // ---------------------------------------------------------------------------
 
+function CartaoNoticia({ noticia, destaque }: { noticia: NoticiaSteam; destaque: boolean }) {
+  const oficial = !noticia.feed || FEEDS_OFICIAIS.includes(noticia.feed);
+
+  return (
+    <a
+      href={noticia.url ?? undefined}
+      target="_blank"
+      rel="noreferrer"
+      className={`group relative block overflow-hidden rounded-xl border-l-2 bg-surface-container-lowest p-space-base transition-colors hover:bg-surface-container ${
+        oficial ? "border-primary-container" : "border-outline/40"
+      }`}
+    >
+      <div className="flex flex-wrap items-center gap-space-xs">
+        {noticia.feed && (
+          <span
+            className={`rounded px-space-xs py-space-xxs font-badge-status text-badge-status uppercase ${
+              oficial
+                ? "bg-primary-container/15 text-primary-container"
+                : "bg-surface-container-high text-outline"
+            }`}
+          >
+            {oficial ? "Steam · oficial" : noticia.feed}
+          </span>
+        )}
+        <span className="font-title-code text-title-code text-outline">
+          {noticia.publicado_em ? fmtData(noticia.publicado_em) : "—"}
+        </span>
+        {destaque && (
+          <span className="rounded bg-tertiary-container/15 px-space-xs py-space-xxs font-badge-status text-badge-status uppercase text-tertiary-container">
+            mais recente
+          </span>
+        )}
+      </div>
+
+      <h3
+        className={`mt-space-xs font-headline-sm text-on-surface transition-colors group-hover:text-primary ${
+          destaque ? "text-headline-md" : "text-headline-sm"
+        }`}
+      >
+        {noticia.titulo}
+      </h3>
+
+      {noticia.resumo && (
+        <p className="mt-space-xs line-clamp-2 font-body-md text-body-sm text-on-surface-variant">
+          {noticia.resumo}
+        </p>
+      )}
+
+      {noticia.url && (
+        <span className="mt-space-sm inline-flex items-center gap-space-xxs font-title-code text-title-code text-primary opacity-0 transition-opacity group-hover:opacity-100">
+          Abrir na Steam <Icone nome="open_in_new" className="text-[14px]" />
+        </span>
+      )}
+    </a>
+  );
+}
+
 function UltimasAtualizacoes({ noticias }: { noticias: NoticiaSteam[] }) {
   if (noticias.length === 0) {
     return (
       <Painel icone="campaign" titulo="Últimas atualizações">
-        <p className="font-body-md text-body-sm text-outline">
-          Nenhuma notícia coletada ainda. O feed oficial do jogo (patch notes e anúncios do
-          estúdio) entra na próxima coleta da Steam.
+        <p className="rounded-lg bg-surface-container-lowest px-space-base py-space-md font-body-md text-body-sm text-outline">
+          Nenhuma notícia coletada ainda. O feed oficial do jogo — patch notes e anúncios do
+          estúdio — entra na próxima coleta da Steam.
         </p>
       </Painel>
     );
@@ -647,42 +852,18 @@ function UltimasAtualizacoes({ noticias }: { noticias: NoticiaSteam[] }) {
     <Painel
       icone="campaign"
       titulo="Últimas atualizações"
-      descricao="Patch notes e anúncios do feed oficial da Steam (ISteamNews)."
+      descricao="Patch notes e anúncios do feed oficial da Steam."
+      meta={
+        <Selo cor="neutro">
+          {noticias.length} {noticias.length === 1 ? "post" : "posts"}
+        </Selo>
+      }
     >
-      <ul className="space-y-space-sm">
-        {noticias.map((n) => (
-          <li
-            key={n.gid}
-            className="border-t border-outline-variant/20 pt-space-sm first:border-t-0 first:pt-0"
-          >
-            <div className="flex flex-wrap items-baseline gap-space-xs">
-              {n.feed && <Selo cor="neutro">{n.feed}</Selo>}
-              <span className="font-title-code text-title-code text-outline">
-                {n.publicado_em ? fmtData(n.publicado_em) : "—"}
-              </span>
-            </div>
-            {n.url ? (
-              <a
-                href={n.url}
-                target="_blank"
-                rel="noreferrer"
-                className="mt-space-xxs block font-headline-sm text-headline-sm text-on-surface hover:text-primary"
-              >
-                {n.titulo} ↗
-              </a>
-            ) : (
-              <div className="mt-space-xxs font-headline-sm text-headline-sm text-on-surface">
-                {n.titulo}
-              </div>
-            )}
-            {n.resumo && (
-              <p className="mt-space-xxs line-clamp-3 font-body-md text-body-sm text-on-surface-variant">
-                {n.resumo}
-              </p>
-            )}
-          </li>
+      <div className="grid grid-cols-1 gap-space-sm lg:grid-cols-2">
+        {noticias.map((n, i) => (
+          <CartaoNoticia key={n.gid} noticia={n} destaque={i === 0} />
         ))}
-      </ul>
+      </div>
     </Painel>
   );
 }

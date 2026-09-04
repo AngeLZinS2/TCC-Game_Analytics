@@ -281,6 +281,19 @@ def test_texto_de_html_tira_marcacao_e_corta():
     assert cortado.endswith("…") and len(cortado) <= 32
 
 
+def test_texto_de_html_limpa_o_corpo_bbcode_de_uma_noticia():
+    """O feed de noticias vem em BBCode com imagem, token da Steam e lista -
+    nada disso pode sobrar no resumo que a tela mostra."""
+    bruto = (
+        'Hotfix em andamento! [img src="{STEAM_CLAN_IMAGE}/1/a.png"] '
+        "Mudancas: [list][*][p]Corrigido um crash[/p][/*][/list]"
+        "[url=https://ex.com]Notas completas[/url]"
+    )
+    limpo = _texto_de_html(bruto, limite=300)
+    assert "[" not in limpo and "{" not in limpo and "img" not in limpo
+    assert "Corrigido um crash" in limpo and "Notas completas" in limpo
+
+
 def test_parse_steamspy_traz_donos_e_tags(carregar_fixture):
     dados = parse_steamspy(carregar_fixture("steam_steamspy_570"))
     assert ".." in dados["donos_estimados"]  # faixa, nunca numero exato

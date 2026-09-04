@@ -216,15 +216,26 @@ def _juntar(valores: Any) -> str | None:
 
 
 _TAG_HTML = re.compile(r"<[^>]+>")
+#: Blocos de midia do BBCode - imagem, video, tabela - saem INTEIROS, com o
+#: conteudo (a URL nao serve num resumo de texto).
+_BLOCO_MIDIA = re.compile(
+    r"\[(img|previewyoutube|video|table)\b[^\]]*\].*?\[/\1\]"
+    r"|\[img\b[^\]]*\]"  # img costuma vir sem fechamento
+    r"|\[previewyoutube=[^\]]*\]",
+    re.IGNORECASE | re.DOTALL,
+)
 #: BBCode do feed de noticias da Steam (usa BBCode, nao HTML). Lista explicita
 #: de proposito: a Valve escreve secoes como "[ MAPS ]" no corpo das notas, e
-#: isso e conteudo, nao marcacao - um regex generico apagaria.
+#: isso e conteudo, nao marcacao - um regex generico apagaria. Aceita atributo
+#: colado por `=` ou por espaco (`[url=x]` e `[img src="x"]`).
 _TAG_BBCODE = re.compile(
     r"\[/?(?:p|list|olist|\*|b|i|u|s|h[1-6]|url|img|quote|code|spoiler|noparse"
-    r"|table|tr|td|th|strike|hr|previewyoutube|carousel)"
-    r"(?:=[^\]]*)?\]",
+    r"|table|tr|td|th|strike|hr|previewyoutube|carousel|dynamiclink)"
+    r"(?:[=\s][^\]]*)?\]",
     re.IGNORECASE,
 )
+#: Tokens de template da Steam no corpo da noticia (`{STEAM_CLAN_IMAGE}` etc.).
+_TOKEN_STEAM = re.compile(r"\{STEAM_[A-Z_]+\}")
 _ESPACO = re.compile(r"[ \t]*\n[ \t]*")
 
 
@@ -233,12 +244,16 @@ def _texto_de_html(bruto: Any, limite: int | None = None) -> str | None:
     das noticias em marcacao - `<tag>` na loja, `[tag]` no feed de noticias."""
     if not isinstance(bruto, str) or not bruto.strip():
         return None
-    texto = _TAG_BBCODE.sub(" ", _TAG_HTML.sub(" ", bruto))
+    texto = _BLOCO_MIDIA.sub(" ", bruto)
+    texto = _TAG_BBCODE.sub(" ", _TAG_HTML.sub(" ", texto))
+    texto = _TOKEN_STEAM.sub(" ", texto)
     texto = texto.replace("\\[", "[").replace("\\]", "]")  # bracket escapado -> literal
     texto = texto.replace("&nbsp;", " ").replace("&amp;", "&").replace("&lt;", "<")
     texto = texto.replace("&gt;", ">").replace("&quot;", '"').replace("&#39;", "'")
+    # Sobra de URL solta (o [img] ja saiu, mas as vezes a URL vem fora dele).
+    texto = re.sub(r"https?://\S+\.(?:png|jpe?g|gif|webp|mp4)\S*", " ", texto, flags=re.I)
     texto = _ESPACO.sub("\n", texto)
-    texto = re.sub(r"[ \t]{2,}", " ", texto).strip()
+    texto = re.sub(r"[ \t]{2,}", " ", texto).strip(" \t\n\"'")
     if limite and len(texto) > limite:
         texto = texto[:limite].rsplit(" ", 1)[0] + "…"
     return texto or None
