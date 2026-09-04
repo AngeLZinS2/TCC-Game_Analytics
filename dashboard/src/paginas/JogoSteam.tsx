@@ -905,6 +905,9 @@ function OndeComprar({
 }) {
   if (gratuito) return null;
   if (ofertas.length === 0) {
+    // Sem oferta ativa agora - mas se o ITAD ja viu o jogo em promocao algum
+    // dia, essa informacao ainda vale a pena mostrar (ex.: jogo saiu de
+    // linha, ou nenhuma loja tem estoque no momento).
     return (
       <Painel
         icone="sell"
@@ -912,9 +915,22 @@ function OndeComprar({
         descricao="Comparação de preço entre lojas (IsThereAnyDeal)."
       >
         <p className="rounded-lg bg-surface-container-lowest px-space-base py-space-md font-body-md text-body-sm text-outline">
-          Sem ofertas coletadas — configure a <code>ITAD_API_KEY</code> (grátis, em
-          isthereanydeal.com/apps/my) ou o coletor de preço ainda não passou por este jogo.
+          {menor
+            ? "Nenhuma loja com oferta agora."
+            : "Sem dado coletado ainda — configure a "}
+          {!menor && <code>ITAD_API_KEY</code>}
+          {!menor && " (grátis, em isthereanydeal.com/apps/my) ou aguarde o coletor de preço."}
         </p>
+        {menor && (
+          <p className="mt-space-sm font-body-md text-body-sm text-on-surface-variant">
+            Já custou{" "}
+            <strong className="text-tertiary-container">
+              {moedaBr(menor.preco, menor.moeda)}
+            </strong>
+            {menor.loja && ` na ${menor.loja}`}
+            {menor.data && ` (${fmtData(menor.data)})`} — o menor preço já registrado.
+          </p>
+        )}
       </Painel>
     );
   }
