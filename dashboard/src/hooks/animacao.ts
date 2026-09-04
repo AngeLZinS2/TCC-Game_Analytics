@@ -14,20 +14,12 @@
  * caminho. `useContagem` faz o analogo pra numero, sem depender de CSS -
  * anima o proprio valor via `requestAnimationFrame`.
  *
- * As duas respeitam `prefers-reduced-motion`: quem pediu menos movimento ve o
- * valor final direto, sem a fase de transicao.
+ * As duas ignoram `prefers-reduced-motion` de proposito: a animacao e parte
+ * da identidade visual do painel (e da demonstracao da TCC), entao toca
+ * sempre, independente da preferencia de acessibilidade do sistema.
  */
 
 import { useEffect, useRef, useState } from "react";
-
-function preferemMenosMovimento(): boolean {
-  if (typeof window === "undefined" || !window.matchMedia) return false;
-  try {
-    return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  } catch {
-    return false;
-  }
-}
 
 /**
  * `false` no primeiro paint, `true` a partir do paint seguinte - a janela que
@@ -36,14 +28,10 @@ function preferemMenosMovimento(): boolean {
  * dado, refetch): a barra/linha volta a crescer do zero em vez de saltar.
  */
 export function useEntrarNaTela(chave?: unknown): boolean {
-  const [entrou, setEntrou] = useState(preferemMenosMovimento());
+  const [entrou, setEntrou] = useState(false);
   const quadro = useRef<number | undefined>(undefined);
 
   useEffect(() => {
-    if (preferemMenosMovimento()) {
-      setEntrou(true);
-      return;
-    }
     setEntrou(false);
     // Duplo requestAnimationFrame: o primeiro garante que o navegador ja
     // pintou o estado zero: so no segundo e seguro liberar o valor final sem
@@ -77,11 +65,6 @@ export function useContagem(
 
   useEffect(() => {
     if (valorFinal === null || valorFinal === undefined || !Number.isFinite(valorFinal)) {
-      return;
-    }
-    if (preferemMenosMovimento()) {
-      setExibido(valorFinal);
-      anterior.current = valorFinal;
       return;
     }
 
