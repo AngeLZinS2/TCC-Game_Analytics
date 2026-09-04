@@ -53,22 +53,48 @@ const PERIODOS = [
  * Descreve o codigo dos coletores, nao um dado coletado - por isso e constante
  * e nao vem da API. A janela de 60 min do Steam e o `snapshot_bucket_minutes`
  * do `config.py`; a OpenDota nao tem janela porque o grao dela e a partida.
+ *
+ * A chave e `raw_data.fonte`. `liquipedia` cobre os tres coletores da wiki
+ * (agenda, equipes, brackets), que gravam sob a mesma fonte; `valve` e o
+ * Regional Standings de CS2, que vem do GitHub, nao de uma API REST.
  */
 const FONTES: Record<
   string,
-  { etiqueta: string; cor: string; descricao: string; frequencia: string }
+  {
+    etiqueta: string;
+    cor: string;
+    api: string;
+    descricao: string;
+    frequencia: string;
+  }
 > = {
   steam: {
     etiqueta: "STEAM",
     cor: "#66C0F4",
+    api: "Steam Web API",
     descricao: "Jogadores simultâneos, avaliações e preço da loja",
     frequencia: "janela de 60 min",
   },
   opendota: {
     etiqueta: "DOTA 2",
     cor: "#16ef7a",
+    api: "OpenDota API",
     descricao: "Partidas profissionais, heróis e séries minuto a minuto",
     frequencia: "por partida",
+  },
+  liquipedia: {
+    etiqueta: "LIQUIPEDIA",
+    cor: "#a78bfa",
+    api: "Liquipedia (MediaWiki API)",
+    descricao: "Agenda de confrontos, equipes e brackets de torneio — 66 wikis de esports",
+    frequencia: "ticker 2×/dia; equipes e brackets diários",
+  },
+  valve: {
+    etiqueta: "VALVE",
+    cor: "#f59e0b",
+    api: "GitHub (Regional Standings)",
+    descricao: "Ranking mundial oficial de CS2 — pontuação por equipe",
+    frequencia: "mensal (verificado toda semana)",
   },
 };
 
@@ -403,7 +429,7 @@ export function VisaoGeralPagina() {
                             >
                               {meta?.etiqueta ?? coleta.fonte.toUpperCase()}
                             </span>
-                            {coleta.fonte === "steam" ? "Steam Web API" : "OpenDota API"}
+                            {meta?.api ?? coleta.fonte}
                           </div>
                         </td>
 
