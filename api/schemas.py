@@ -458,6 +458,28 @@ class JogoRecomendado(BaseModel):
     gratuito: bool | None
 
 
+class JogoAoVivo(BaseModel):
+    """O jogo citado na pergunta, identificado ao vivo na loja da Steam -
+    existe mesmo quando o jogo nunca passou pelo nosso coletor. `ofertas` e
+    `menor_historico` vem do IsThereAnyDeal, buscado na hora (nao do coletor
+    `itad` em lote), pelo mesmo motivo: o jogo pode nao estar no nosso banco.
+    """
+
+    app_id: int
+    nome: str
+    imagem_header: str | None
+    generos: list[str]
+    desenvolvedora: str | None
+    preco_atual: Decimal | None
+    moeda: str | None
+    gratuito: bool
+    #: Se este jogo ja esta no nosso catalogo (tem serie temporal, avaliacoes
+    #: coletadas etc.) ou se so foi consultado agora, so para esta pergunta.
+    no_nosso_banco: bool
+    ofertas: list[OfertaLoja] = []
+    menor_historico: MenorPrecoHistorico | None = None
+
+
 class RespostaAssistente(BaseModel):
     pergunta: str
     resposta: str
@@ -468,6 +490,8 @@ class RespostaAssistente(BaseModel):
     #: cartao por item em vez de confiar em texto livre pra saber qual jogo foi
     #: recomendado.
     recomendacoes: list[JogoRecomendado] = []
+    #: Preenchido so quando a pergunta citou um jogo que a busca ao vivo achou.
+    jogo_ao_vivo: JogoAoVivo | None = None
     tokens_entrada: int | None
     tokens_saida: int | None
 

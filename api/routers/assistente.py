@@ -12,7 +12,15 @@ import logging
 
 from fastapi import APIRouter, HTTPException
 
-from api.schemas import BlocoContexto, EntradaPergunta, JogoRecomendado, RespostaAssistente
+from api.schemas import (
+    BlocoContexto,
+    EntradaPergunta,
+    JogoAoVivo,
+    JogoRecomendado,
+    MenorPrecoHistorico,
+    OfertaLoja,
+    RespostaAssistente,
+)
 from config import get_settings
 from ml.assistente import AssistenteIndisponivel, perguntar
 
@@ -48,6 +56,47 @@ def responder(entrada: EntradaPergunta) -> RespostaAssistente:
     except AssistenteIndisponivel as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
+    jogo_ao_vivo = None
+    if resposta.jogo_ao_vivo is not None:
+        j = resposta.jogo_ao_vivo
+        # Mesmo criterio de `api/routers/steam.py`: ordena por preco, marca a
+        # primeira como "melhor" - so faz sentido com pelo menos uma oferta.
+        ofertas_ordenadas = sorted(j.ofertas, key=lambda o: o.preco)
+        jogo_ao_vivo = JogoAoVivo(
+            app_id=j.app_id,
+            nome=j.nome,
+            imagem_header=j.imagem_header,
+            generos=j.generos,
+            desenvolvedora=j.desenvolvedora,
+            preco_atual=j.preco_atual,
+            moeda=j.moeda,
+            gratuito=j.gratuito,
+            no_nosso_banco=j.no_nosso_banco,
+            ofertas=[
+                OfertaLoja(
+                    loja=o.loja,
+                    preco=o.preco,
+                    preco_normal=o.preco_normal,
+                    desconto=o.desconto,
+                    moeda=o.moeda,
+                    url=o.url,
+                    drm=o.drm,
+                    melhor=(i == 0),
+                )
+                for i, o in enumerate(ofertas_ordenadas)
+            ],
+            menor_historico=(
+                MenorPrecoHistorico(
+                    preco=j.menor_historico.preco,
+                    loja=j.menor_historico.loja,
+                    moeda=j.menor_historico.moeda,
+                    data=j.menor_historico.data,
+                )
+                if j.menor_historico is not None
+                else None
+            ),
+        )
+
     return RespostaAssistente(
         pergunta=resposta.pergunta,
         resposta=resposta.resposta,
@@ -71,6 +120,7 @@ def responder(entrada: EntradaPergunta) -> RespostaAssistente:
             )
             for j in resposta.recomendacoes
         ],
+        jogo_ao_vivo=jogo_ao_vivo,
         tokens_entrada=resposta.tokens_entrada,
         tokens_saida=resposta.tokens_saida,
     )

@@ -411,6 +411,26 @@ export interface JogoRecomendado {
   gratuito: boolean | null;
 }
 
+/**
+ * O jogo citado na pergunta, identificado ao vivo na loja da Steam — existe
+ * mesmo quando o jogo nunca passou pelo nosso coletor. `ofertas` e
+ * `menor_historico` vêm do IsThereAnyDeal, buscados na hora.
+ */
+export interface JogoAoVivo {
+  app_id: number;
+  nome: string;
+  imagem_header: string | null;
+  generos: string[];
+  desenvolvedora: string | null;
+  preco_atual: Decimal | null;
+  moeda: string | null;
+  gratuito: boolean;
+  /** Se este jogo já está no nosso catálogo, ou só foi consultado agora. */
+  no_nosso_banco: boolean;
+  ofertas: OfertaLoja[];
+  menor_historico: MenorPrecoHistorico | null;
+}
+
 export interface RespostaAssistente {
   pergunta: string;
   resposta: string;
@@ -419,6 +439,8 @@ export interface RespostaAssistente {
   blocos: BlocoContexto[];
   /** Preenchido so quando a pergunta pediu recomendacao de jogo. */
   recomendacoes: JogoRecomendado[];
+  /** Preenchido so quando a pergunta citou um jogo que a busca ao vivo achou. */
+  jogo_ao_vivo: JogoAoVivo | null;
   tokens_entrada: number | null;
   tokens_saida: number | null;
 }

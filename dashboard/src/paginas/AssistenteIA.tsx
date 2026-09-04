@@ -18,11 +18,16 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 
 import { usePerguntarAssistente, useStatusAssistente } from "../api/consultas";
-import type { BlocoContexto, JogoRecomendado, RespostaAssistente } from "../api/tipos";
+import type {
+  BlocoContexto,
+  JogoAoVivo,
+  JogoRecomendado,
+  RespostaAssistente,
+} from "../api/tipos";
 import { Botao, Consulta, Icone, MensagemErro, Selo } from "../componentes/base";
 import { ArteJogo } from "../componentes/CapaJogo";
 import { Painel, Pilula } from "../componentes/hud";
-import { fmtMoeda, fmtNumero, fmtPercentual } from "../utilitarios/formatos";
+import { fmtData, fmtMoeda, fmtNumero, fmtPercentual } from "../utilitarios/formatos";
 
 /** Perguntas que exercitam blocos de contexto diferentes. */
 const SUGESTOES = [
@@ -33,6 +38,7 @@ const SUGESTOES = [
   "Qual é a acurácia do modelo de previsão de confronto?",
   "Qual jogo tem a pior recepção nas avaliações?",
   "O Cyberpunk 2077 está no nosso banco? O que a Steam diz dele?",
+  "Onde encontro o Helldivers 2 pelo menor preço?",
 ];
 
 /**
@@ -142,6 +148,160 @@ function CartaoJogoRecomendado({ jogo }: { jogo: JogoRecomendado }) {
         </div>
       </div>
     </Link>
+  );
+}
+
+/**
+ * O banner de um jogo identificado ao vivo - a resposta a "traga tudo mesmo
+ * não estando no snapshot": imagem real (`imagem_header`, direto do
+ * `appdetails` da Steam) e comparação de preço buscada na hora via
+ * IsThereAnyDeal, iguais às da ficha de um jogo do catálogo - só que para um
+ * jogo que pode nunca ter passado pelo nosso coletor.
+ *
+ * `jogo` vem de `resposta.jogo_ao_vivo` (estruturado, decidido em Python), não
+ * de interpretar o texto do modelo - mesmo motivo de `CartaoJogoRecomendado`.
+ */
+function CartaoJogoAoVivo({ jogo }: { jogo: JogoAoVivo }) {
+  const ofertas = jogo.ofertas;
+  const maisBarata = ofertas[0];
+
+  return (
+    <div className="overflow-hidden rounded-xl bg-surface-container-lowest ring-1 ring-tertiary-container/30">
+      <ArteJogo
+        appId={jogo.app_id}
+        nome={jogo.nome}
+        imagemUrl={jogo.imagem_header}
+        className="h-40 w-full rounded-none sm:h-48"
+      />
+
+      <div className="flex flex-col gap-space-base p-space-base">
+        <div className="flex flex-wrap items-start justify-between gap-space-sm">
+          <div>
+            <h3 className="font-headline-sm text-headline-sm text-on-surface">{jogo.nome}</h3>
+            {jogo.desenvolvedora && (
+              <p className="font-title-code text-title-code text-outline">
+                {jogo.desenvolvedora}
+              </p>
+            )}
+          </div>
+          <span
+            className={`rounded px-space-xs py-space-xxs font-badge-status text-badge-status uppercase ${
+              jogo.no_nosso_banco
+                ? "bg-primary-container/15 text-primary-container"
+                : "bg-surface-container-highest text-outline"
+            }`}
+          >
+            {jogo.no_nosso_banco ? "no nosso catálogo" : "consultado agora, fora do catálogo"}
+          </span>
+        </div>
+
+        {jogo.generos.length > 0 && (
+          <div className="flex flex-wrap gap-space-xxs">
+            {jogo.generos.map((genero) => (
+              <Selo key={genero}>{genero}</Selo>
+            ))}
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 gap-space-sm rounded-lg bg-surface-container p-space-base sm:grid-cols-2">
+          <div>
+            <div className="font-label-caps text-label-caps uppercase tracking-widest text-outline">
+              Preço na Steam
+            </div>
+            <div className="mt-space-xxs font-headline-kpi text-headline-kpi leading-none text-on-surface">
+              {jogo.gratuito ? "Gratuito" : fmtMoeda(jogo.preco_atual, jogo.moeda)}
+            </div>
+          </div>
+          {maisBarata && (
+            <div>
+              <div className="font-label-caps text-label-caps uppercase tracking-widest text-outline">
+                Melhor preço agora
+              </div>
+              <div className="mt-space-xxs font-headline-kpi text-headline-kpi leading-none text-tertiary-container">
+                {fmtMoeda(maisBarata.preco, maisBarata.moeda)}
+              </div>
+              <div className="font-title-code text-title-code text-on-surface-variant">
+                na {maisBarata.loja}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {ofertas.length > 0 && (
+          <div className="rolagem-discreta overflow-x-auto rounded-lg bg-surface-container-lowest">
+            <table className="w-full border-collapse text-left">
+              <thead>
+                <tr className="bg-surface-container font-label-caps text-label-caps uppercase tracking-wider text-outline">
+                  <th className="px-space-md py-space-xs">Loja</th>
+                  <th className="px-space-md py-space-xs text-right">Preço</th>
+                  <th className="px-space-md py-space-xs" />
+                </tr>
+              </thead>
+              <tbody className="font-body-sm text-body-sm">
+                {ofertas.map((o, i) => (
+                  <tr key={o.loja + i} className={i % 2 ? "bg-surface-container/40" : ""}>
+                    <td className="px-space-md py-space-xs text-on-surface">
+                      {o.loja}
+                      {o.melhor && (
+                        <span className="ml-space-xs rounded bg-tertiary/10 px-space-xxs py-[1px] font-badge-status text-badge-status uppercase text-tertiary">
+                          melhor
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-space-md py-space-xs text-right font-title-code text-title-code tabular-nums text-on-surface">
+                      {fmtMoeda(o.preco, o.moeda)}
+                    </td>
+                    <td className="px-space-md py-space-xs text-right">
+                      {o.url && (
+                        <a
+                          href={o.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-space-xxs font-title-code text-title-code text-primary hover:underline"
+                        >
+                          abrir <Icone nome="open_in_new" className="text-[13px]" />
+                        </a>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {jogo.menor_historico && (
+          <p className="font-body-sm text-body-sm text-on-surface-variant">
+            Já custou{" "}
+            <strong className="text-tertiary-container">
+              {fmtMoeda(jogo.menor_historico.preco, jogo.menor_historico.moeda)}
+            </strong>
+            {jogo.menor_historico.loja && ` na ${jogo.menor_historico.loja}`}
+            {jogo.menor_historico.data && ` (${fmtData(jogo.menor_historico.data)})`} — o menor
+            preço já registrado (IsThereAnyDeal).
+          </p>
+        )}
+
+        <div className="flex flex-wrap gap-space-sm border-t border-outline-variant/20 pt-space-sm">
+          {jogo.no_nosso_banco && (
+            <Link
+              to={`/steam/${jogo.app_id}`}
+              className="inline-flex items-center gap-space-xxs font-title-code text-title-code text-primary hover:underline"
+            >
+              Ver ficha completa <Icone nome="arrow_forward" className="text-[14px]" />
+            </Link>
+          )}
+          <a
+            href={`https://store.steampowered.com/app/${jogo.app_id}`}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-space-xxs font-title-code text-title-code text-on-surface-variant hover:text-primary hover:underline"
+          >
+            Página na Steam <Icone nome="open_in_new" className="text-[13px]" />
+          </a>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -256,6 +416,17 @@ export function AssistenteIAPagina() {
                 O contexto já foi montado a partir do banco; o que demora é a resposta do
                 provedor.
               </p>
+            </Painel>
+          )}
+
+          {/* ==================== JOGO IDENTIFICADO AO VIVO ==================== */}
+          {resposta && !assistente.isPending && resposta.jogo_ao_vivo && (
+            <Painel
+              icone="storefront"
+              titulo="Jogo identificado"
+              descricao="Consultado agora na loja da Steam e no IsThereAnyDeal — vale mesmo para um jogo fora do nosso catálogo."
+            >
+              <CartaoJogoAoVivo jogo={resposta.jogo_ao_vivo} />
             </Painel>
           )}
 

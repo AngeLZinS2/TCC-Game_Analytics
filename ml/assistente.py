@@ -49,7 +49,7 @@ from typing import Any, Callable
 import requests
 from sqlalchemy import Integer, cast, desc, func, select
 
-from collectors import steam_loja
+from collectors import itad_loja, steam_loja
 from config import get_settings
 from db.models import (
     DimJogoSteam,
@@ -60,6 +60,7 @@ from db.models import (
     FatoSnapshotJogoSteam,
 )
 from db.session import session_scope
+from etl.transform_itad import MenorHistorico, OfertaItad
 from ml.confronto import carregar_relatorio as relatorio_confronto
 from ml.sentimento import carregar_metricas as metricas_sentimento
 
@@ -115,6 +116,12 @@ Steam inteira, não só os jogos que coletamos. Diga "segundo o SteamSpy" e que 
 é sobre o gênero inteiro, não só o nosso catálogo. Se esse bloco disser que \
 falta um gênero na pergunta, repita esse pedido em vez de responder com os \
 poucos jogos do nosso banco como se fossem "os piores/melhores da Steam".
+10. Se a pergunta pedir onde comprar mais barato e o bloco do jogo ao vivo \
+trouxer "Melhor preço agora, outras lojas" ou "Menor preço já registrado", \
+responda com ESSE número (a loja e o valor), não só o preço da Steam - é \
+exatamente o que "mais barato"/"menor valor" pergunta. Se essas linhas não \
+existirem no bloco (jogo sem oferta encontrada), diga que não achou preço em \
+outra loja agora - não invente uma loja ou um valor.
 """
 
 
@@ -156,6 +163,30 @@ class JogoRecomendado:
 
 
 @dataclass
+class JogoAoVivo:
+    """O jogo identificado por `_bloco_steam_ao_vivo`, com preco de outras
+    lojas - pronto pra tela desenhar o banner, esteja o jogo no nosso banco ou
+    nao (e a resposta ao pedido "traga tudo mesmo nao estando no snapshot"):
+    imagem real (`imagem_header`, vem direto do `appdetails` da Steam) e a
+    mesma comparacao de preco que a ficha de um jogo do nosso catalogo mostra
+    - so que buscada na hora, via IsThereAnyDeal, para um jogo que pode nunca
+    ter passado pelo coletor `itad`.
+    """
+
+    app_id: int
+    nome: str
+    imagem_header: str | None
+    generos: list[str]
+    desenvolvedora: str | None
+    preco_atual: float | None
+    moeda: str | None
+    gratuito: bool
+    no_nosso_banco: bool
+    ofertas: list[OfertaItad] = field(default_factory=list)
+    menor_historico: MenorHistorico | None = None
+
+
+@dataclass
 class Resposta:
     pergunta: str
     resposta: str
@@ -165,6 +196,9 @@ class Resposta:
     #: Vazio fora desse caso. A tela usa isto para desenhar cartao com imagem,
     #: em vez de confiar em texto livre pra saber qual jogo foi recomendado.
     recomendacoes: list[JogoRecomendado] = field(default_factory=list)
+    #: O jogo citado na pergunta, quando `_bloco_steam_ao_vivo` o identificou -
+    #: `None` na maioria das perguntas (que nao citam um jogo especifico).
+    jogo_ao_vivo: JogoAoVivo | None = None
     tokens_entrada: int | None = None
     tokens_saida: int | None = None
 
@@ -178,9 +212,22 @@ class AssistenteIndisponivel(RuntimeError):
 # ---------------------------------------------------------------------------
 
 
+#: A Steam guarda o nome com simbolo de marca colado ("HELLDIVERS™ 2"), que
+#: ninguem digita numa pergunta - sem remover isso, o nome achado na loja
+#: nunca bate com o texto de quem perguntou.
+_SIMBOLOS_MARCA = str.maketrans("", "", "™®©")
+
+
 def _normalizar(texto: str) -> str:
-    """Minuscula e sem acento - para casar 'herói' com 'heroi'."""
-    sem_acento = unicodedata.normalize("NFKD", texto.lower())
+    """Minuscula, sem acento e sem simbolo de marca - para casar 'herói' com
+    'heroi', e "HELLDIVERS™ 2" com "helldivers 2".
+
+    O simbolo de marca sai ANTES do NFKD de proposito: "™" tem decomposicao
+    de compatibilidade pra "TM" (duas letras!), entao normalizar primeiro e
+    so tirar "™"/"®"/"©" depois nunca acha o simbolo - ele ja virou texto.
+    """
+    sem_marca = texto.translate(_SIMBOLOS_MARCA)
+    sem_acento = unicodedata.normalize("NFKD", sem_marca.lower())
     return "".join(c for c in sem_acento if not unicodedata.combining(c))
 
 
@@ -733,6 +780,35 @@ def _termos_de_jogo(pergunta: str) -> list[str]:
     return candidatos[:MAXIMO_DE_TENTATIVAS]
 
 
+#: Numeral romano -> arabico, so I-X (nenhum jogo de sequencia comum passa
+#: disso). Aplicado token a token, nunca como troca de substring solta -
+#: "vix" nao pode virar "9x".
+_ROMANO_PARA_ARABICO = {
+    "i": "1", "ii": "2", "iii": "3", "iv": "4", "v": "5",
+    "vi": "6", "vii": "7", "viii": "8", "ix": "9", "x": "10",
+}
+
+
+def _variantes_numeral(texto: str) -> set[str]:
+    """`texto` e, quando ele tiver um numeral romano OU arabico isolado (I-X /
+    1-10), a mesma string com o numeral trocado pro outro sistema.
+
+    Existe porque o mesmo jogo aparece como "Helldivers 2" na Steam e
+    "Helldivers II" na boca do mundo (e vice-versa: "Diablo IV" na Steam,
+    "Diablo 4" para muita gente) - sem isto, a checagem de conteudo de
+    `_confirma_nome` rejeita um casamento certo por causa so do algarismo.
+    """
+    tokens = texto.split(" ")
+    variantes = {texto}
+    romano_para_arabico = {**_ROMANO_PARA_ARABICO}
+    arabico_para_romano = {v: k for k, v in _ROMANO_PARA_ARABICO.items()}
+    for mapa in (romano_para_arabico, arabico_para_romano):
+        trocado = [mapa.get(tok, tok) for tok in tokens]
+        if trocado != tokens:
+            variantes.add(" ".join(trocado))
+    return variantes
+
+
 def _confirma_nome(nome: str, pergunta: str) -> bool:
     """O nome achado na loja precisa estar DENTRO da pergunta, nao parecer com ela.
 
@@ -740,31 +816,36 @@ def _confirma_nome(nome: str, pergunta: str) -> bool:
     `etl/load_liquipedia.py`: buscar "mais caros" na loja devolve algum app, e
     aceitar esse app produziria uma resposta confiante sobre o jogo errado -
     que e pior que nao responder. Por isso a exigencia e de conter o nome
-    inteiro, contiguo, e nao de parecer.
+    inteiro, contiguo, e nao de parecer - a UNICA folga e o numeral romano vs
+    arabico (`_variantes_numeral`), que e formatacao, nao ambiguidade de jogo.
     """
     alvo = _normalizar(nome)
-    if len(alvo) < MINIMO_DO_TERMO or alvo not in _normalizar(pergunta):
+    if len(alvo) < MINIMO_DO_TERMO:
+        return False
+
+    pergunta_normalizada = _normalizar(pergunta)
+    if not any(variante in pergunta_normalizada for variante in _variantes_numeral(alvo)):
         return False
 
     # Um app chamado "Mais" casaria com quase toda pergunta em portugues.
     return any(t not in PALAVRAS_VAZIAS for t in re.findall(r"[a-z0-9]+", alvo))
 
 
-def _texto_da_lista(itens: Any, campo: str) -> str:
-    """Junta `[{'description': 'Action'}, ...]` num 'Action, Indie'."""
-    if not isinstance(itens, list):
-        return ""
-    nomes = [i.get(campo) for i in itens if isinstance(i, dict) and i.get(campo)]
-    return ", ".join(str(n) for n in nomes)
+def _bloco_steam_ao_vivo(
+    pergunta: str, sessao
+) -> tuple[Bloco | None, JogoAoVivo | None]:
+    """Consulta a loja da Steam (e o ITAD) sobre o jogo citado na pergunta.
 
+    Devolve `(None, None)` sempre que a identificacao nao for segura - sem
+    termo, sem resultado, ou com resultado que nao bate com a pergunta. O
+    assistente entao se comporta como antes, respondendo pelo banco: perder o
+    bloco custa uma resposta mais pobre, enquanto um bloco errado custa uma
+    resposta falsa.
 
-def _bloco_steam_ao_vivo(pergunta: str, sessao) -> Bloco | None:
-    """Consulta a loja da Steam sobre o jogo citado na pergunta.
-
-    Devolve `None` sempre que a identificacao nao for segura - sem termo, sem
-    resultado, ou com resultado que nao bate com a pergunta. O assistente entao
-    se comporta como antes, respondendo pelo banco: perder o bloco custa uma
-    resposta mais pobre, enquanto um bloco errado custa uma resposta falsa.
+    O segundo item devolvido (`JogoAoVivo`) e o que a tela usa pra desenhar o
+    banner com imagem e a comparacao de preco - existe separado do texto do
+    bloco pelo mesmo motivo de `JogoRecomendado`: a tela nunca deveria
+    precisar adivinhar de qual jogo (e quais ofertas) o texto do modelo fala.
     """
     escolhido = None
     for termo in _termos_de_jogo(pergunta):
@@ -781,7 +862,7 @@ def _bloco_steam_ao_vivo(pergunta: str, sessao) -> Bloco | None:
             break
 
     if escolhido is None:
-        return None
+        return None, None
 
     app_id = int(escolhido["id"])
     nome = str(escolhido["name"])
@@ -814,6 +895,10 @@ def _bloco_steam_ao_vivo(pergunta: str, sessao) -> Bloco | None:
     lancamento = dados.get("release_date") or {}
     total = resumo.get("total_reviews")
     positivas = resumo.get("total_positive")
+    gratuito = bool(dados.get("is_free"))
+    generos = [
+        str(g["description"]) for g in (dados.get("genres") or []) if isinstance(g, dict)
+    ]
 
     linhas = [
         "FONTE: loja da Steam, consultada agora (dado externo, nao medido por nos).",
@@ -822,24 +907,69 @@ def _bloco_steam_ao_vivo(pergunta: str, sessao) -> Bloco | None:
         f"Nome: {nome}",
         f"AppID: {app_id}",
         f"Desenvolvedora: {', '.join(dados.get('developers') or [])}",
-        f"Generos: {_texto_da_lista(dados.get('genres'), 'description')}",
+        f"Generos: {', '.join(generos)}",
         f"Lancamento: {lancamento.get('date', '')}",
-        f"Gratuito: {'sim' if dados.get('is_free') else 'nao'}",
-        f"Preco na loja: {preco.get('final_formatted', '')}",
+        f"Gratuito: {'sim' if gratuito else 'nao'}",
+        f"Preco na loja da Steam: {preco.get('final_formatted', '')}",
         f"Avaliacoes na Steam (total): {total if total is not None else ''}",
         f"Avaliacoes positivas: {positivas if positivas is not None else ''}",
         f"Classificacao da Steam: {resumo.get('review_score_desc', '')}",
     ]
 
+    # Preco noutras lojas: SEMPRE tentado, esteja o jogo no nosso banco ou nao
+    # - e exatamente o caso que faltava ("onde encontro mais barato" sobre um
+    # jogo que nunca passou pelo coletor `itad`).
+    ofertas: list[OfertaItad] = []
+    menor_historico: MenorHistorico | None = None
+    if not gratuito:
+        resultado_itad = itad_loja.preco_ao_vivo(app_id)
+        if resultado_itad is not None:
+            ofertas, menor_historico = resultado_itad
+            if ofertas:
+                mais_barata = min(ofertas, key=lambda o: o.preco)
+                linhas.append(
+                    f"Melhor preco agora, outras lojas (IsThereAnyDeal, ao vivo): "
+                    f"{mais_barata.loja} por {mais_barata.moeda or ''} {mais_barata.preco}".strip()
+                )
+                linhas.append(
+                    "Todas as ofertas agora: "
+                    + "; ".join(
+                        f"{o.loja} {o.moeda or ''} {o.preco}".strip() for o in ofertas
+                    )
+                )
+            if menor_historico is not None:
+                linhas.append(
+                    f"Menor preco ja registrado (IsThereAnyDeal): "
+                    f"{menor_historico.moeda or ''} {menor_historico.preco} "
+                    f"na {menor_historico.loja or '-'}"
+                    + (f" em {menor_historico.data}" if menor_historico.data else "")
+                )
+
     # Linha sem valor e ruido que o modelo tenta interpretar; fora.
     conteudo = "\n".join(l for l in linhas if not l.rstrip().endswith(":"))
 
-    return Bloco(
+    bloco = Bloco(
         chave="steam_ao_vivo",
         titulo=f"{nome} - loja da Steam, ao vivo",
         conteudo=conteudo,
         fonte="steam",
     )
+
+    jogo_ao_vivo = JogoAoVivo(
+        app_id=app_id,
+        nome=nome,
+        imagem_header=dados.get("header_image"),
+        generos=generos,
+        desenvolvedora=", ".join(dados.get("developers") or []) or None,
+        preco_atual=(preco.get("final") / 100) if preco.get("final") is not None else None,
+        moeda=preco.get("currency"),
+        gratuito=gratuito,
+        no_nosso_banco=bool(no_banco),
+        ofertas=ofertas,
+        menor_historico=menor_historico,
+    )
+
+    return bloco, jogo_ao_vivo
 
 
 GATILHOS: dict[str, tuple[str, ...]] = {
@@ -860,6 +990,8 @@ class ContextoMontado:
     blocos: list[Bloco]
     #: Populado so quando a pergunta pede recomendacao - ver `_bloco_recomendacao`.
     recomendacoes: list[JogoRecomendado] = field(default_factory=list)
+    #: Populado so quando a pergunta cita um jogo identificavel - ver `_bloco_steam_ao_vivo`.
+    jogo_ao_vivo: JogoAoVivo | None = None
 
 
 def montar_contexto(pergunta: str) -> ContextoMontado:
@@ -897,7 +1029,7 @@ def montar_contexto(pergunta: str) -> ContextoMontado:
             if chave in escolhidos:
                 blocos.append(construtores[chave](sessao))
 
-        ao_vivo = _bloco_steam_ao_vivo(pergunta, sessao)
+        ao_vivo, jogo_ao_vivo = _bloco_steam_ao_vivo(pergunta, sessao)
         if ao_vivo is not None:
             blocos.append(ao_vivo)
 
@@ -916,6 +1048,7 @@ def montar_contexto(pergunta: str) -> ContextoMontado:
     return ContextoMontado(
         blocos=[bloco for bloco in blocos if bloco.conteudo.strip()],
         recomendacoes=recomendacoes,
+        jogo_ao_vivo=jogo_ao_vivo,
     )
 
 
@@ -989,6 +1122,7 @@ def perguntar(pergunta: str) -> Resposta:
         modelo=dados.get("model") or settings.openrouter_model,
         blocos=blocos,
         recomendacoes=contexto_montado.recomendacoes,
+        jogo_ao_vivo=contexto_montado.jogo_ao_vivo,
         tokens_entrada=uso.get("prompt_tokens"),
         tokens_saida=uso.get("completion_tokens"),
     )

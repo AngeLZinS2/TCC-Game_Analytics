@@ -39,6 +39,14 @@ def test_normalizacao_ignora_acento_e_caixa():
     assert _normalizar("Avaliações") == "avaliacoes"
 
 
+def test_normalizacao_remove_simbolo_de_marca():
+    """A Steam guarda o nome com simbolo colado ("HELLDIVERS™ 2") - sem
+    remover, o nome achado na loja nunca bate com o que a pessoa digitou."""
+    assert _normalizar("HELLDIVERS™ 2") == "helldivers 2"
+    assert _normalizar("Apex Legends™") == "apex legends"
+    assert _normalizar("Rocket League®") == "rocket league"
+
+
 @pytest.mark.parametrize(
     "pergunta,esperado",
     [
@@ -147,6 +155,17 @@ def test_nome_precisa_estar_contido_na_pergunta():
 
     assert not _confirma_nome("Dota Underlords", "quantas partidas de dota temos")
     assert not _confirma_nome("Mais", "quais os jogos mais caros")
+
+
+def test_nome_casa_numeral_romano_com_arabico_dos_dois_lados():
+    """O bug relatado: a Steam guarda "HELLDIVERS™ 2" (arabico + simbolo de
+    marca), mas a pessoa escreve "Helldivers II" (romano) - sem tolerar os
+    dois sentidos, a busca acha o jogo certo e o rejeita na confirmacao."""
+    assert _confirma_nome("HELLDIVERS™ 2", "o jogo Helldivers II sabe me dizer o preço?")
+    # E o sentido inverso: titulo em romano na Steam, pergunta em arabico.
+    assert _confirma_nome("Civilization VI", "quanto custa civilization 6?")
+    # Continua rejeitando jogo errado - a folga e so no numeral, nao no nome.
+    assert not _confirma_nome("HELLDIVERS™ 2", "qual o preço de portal 2?")
 
 
 @pytest.mark.parametrize(

@@ -94,7 +94,10 @@ def parse_lookup(payload: Any) -> str | None:
     return str(ident) if ident else None
 
 
-def _ofertas_de(deals: Any) -> list[OfertaItad]:
+def ofertas_de(deals: Any) -> list[OfertaItad]:
+    """Publica de proposito: `collectors.itad_loja` reusa isto para a consulta
+    ao vivo de UM jogo (o assistente perguntando por um jogo fora do banco),
+    em vez de duplicar o parsing do payload `deals` do ITAD."""
     ofertas: list[OfertaItad] = []
     for deal in deals or []:
         if not isinstance(deal, dict):
@@ -120,7 +123,7 @@ def _ofertas_de(deals: Any) -> list[OfertaItad]:
     return ofertas
 
 
-def _historico_de(low: Any) -> MenorHistorico | None:
+def historico_de(low: Any) -> MenorHistorico | None:
     if not isinstance(low, dict):
         return None
     preco = _dinheiro(low.get("price"))
@@ -197,8 +200,8 @@ def transformar(registros: Iterable[RawRecord]) -> ResultadoItad:
             PrecoJogo(
                 app_id=app_id,
                 itad_id=uuid,
-                ofertas=_ofertas_de(item.get("deals")),
-                menor_historico=_historico_de(low.get("low")),
+                ofertas=ofertas_de(item.get("deals")),
+                menor_historico=historico_de(low.get("low")),
             )
         )
 
