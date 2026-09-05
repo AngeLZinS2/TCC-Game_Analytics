@@ -114,3 +114,51 @@ def test_detalhe_da_partida_traz_as_duas_equipes(cliente: TestClient) -> None:
     assert equipes == {"radiant", "dire"}
     # O vencedor sai do fato; se ha vitorioso, ele e uma das duas equipes.
     assert corpo["partida"]["vencedor"] in {"radiant", "dire", None}
+
+
+def test_resumo_de_confrontos_responde_no_grao_do_calendario(
+    cliente: TestClient,
+) -> None:
+    """A tela de Partidas lia so `dim_partida`, que existe apenas para Dota 2.
+
+    Os outros treze esportes abriam a pagina inteira zerada - zero partidas,
+    zero jogadores, duracao nula, graficos vazios - tendo confronto, equipe,
+    torneio e placar no banco. Este endpoint responde no grao que eles tem: a
+    serie, nao a partida dentro dela.
+    """
+    resposta = cliente.get("/api/partidas/resumo-confrontos", params={"jogo": "valorant"})
+
+    assert resposta.status_code == 200
+    corpo = resposta.json()
+
+    # O que a fonte publica.
+    assert corpo["decididos"] >= 0
+    assert corpo["equipes"] >= 0
+    assert set(corpo) >= {
+        "decididos", "futuros", "equipes", "torneios",
+        "vitorias_lado_a", "winrate_lado_a", "por_formato", "por_dia",
+    }
+    # O que ela NAO publica nao aparece disfarcado de zero: nao ha campo de
+    # duracao nem de jogador neste resumo, e isso e a diferenca entre "nao
+    # temos" e "e zero".
+    assert "duracao_media_segundos" not in corpo
+    assert "jogadores_distintos" not in corpo
+
+
+def test_resumo_de_confrontos_de_jogo_inexistente_nao_estoura(
+    cliente: TestClient,
+) -> None:
+    """Jogo sem linha em `agenda_partida` devolve zeros, nao 500.
+
+    A tela pede este resumo para QUALQUER jogo do seletor, inclusive um
+    recem-cadastrado sem coleta - e um estado normal, nao um erro.
+    """
+    resposta = cliente.get(
+        "/api/partidas/resumo-confrontos", params={"jogo": "jogo-que-nao-existe"}
+    )
+
+    assert resposta.status_code == 200
+    corpo = resposta.json()
+    assert corpo["decididos"] == 0
+    assert corpo["winrate_lado_a"] is None
+    assert corpo["por_formato"] == []

@@ -323,6 +323,40 @@ class PartidasPorDia(BaseModel):
     partidas: int
 
 
+class FaixaFormato(BaseModel):
+    """Quantos confrontos de cada formato de serie (Bo1, Bo3, Bo5...)."""
+
+    rotulo: str
+    confrontos: int
+
+
+class ResumoConfrontos(BaseModel):
+    """Estatistica do calendario, para o jogo que nao tem partida detalhada.
+
+    A tela de Partidas lia so `dim_partida`, e ela existe apenas para Dota 2:
+    os outros treze esportes mostravam a pagina inteira zerada tendo confronto,
+    equipe, torneio e placar no banco. Este resumo e o equivalente no grao que
+    esses jogos TEM - a serie, nao a partida dentro dela.
+
+    Nao ha duracao nem jogador aqui, e isso nao e omissao: o ticker publica
+    quem jogou, quando e o placar da serie, nada do que aconteceu dentro dela.
+    Inventar uma duracao media a partir do formato seria numero fabricado.
+    """
+
+    decididos: int
+    futuros: int
+    equipes: int
+    torneios: int
+    #: Quantas vezes o time listado em primeiro venceu - o analogo de
+    #: "vitorias do lado Radiant" para quem nao tem lado fixo.
+    vitorias_lado_a: int
+    winrate_lado_a: float | None
+    primeiro_confronto: datetime | None
+    ultimo_confronto: datetime | None
+    por_formato: list[FaixaFormato]
+    por_dia: list[PartidasPorDia]
+
+
 class ResumoJogador(BaseModel):
     id_jogador: int
     nome: str | None

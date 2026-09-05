@@ -13,6 +13,7 @@ import { useNavigate } from "react-router-dom";
 import {
   useFiltrosPartidas,
   useConfrontos,
+  useResumoConfrontos,
   usePartidas,
   usePartidasPorDia,
   useResumoPartidas,
@@ -31,6 +32,7 @@ import {
   Painel,
   Sparkline,
 } from "../componentes/hud";
+import { EstatisticasConfrontos } from "../componentes/EstatisticasConfrontos";
 import { ListaConfrontos } from "../componentes/ListaConfrontos";
 import { SeletorDeJogo } from "../componentes/SeletorDeJogo";
 import { useJogoAtual } from "../layout/JogoAtual";
@@ -85,6 +87,10 @@ export function PartidasPagina() {
   // Dota 2. Por isso este hook nao depende dos filtros da tabela abaixo -
   // eles falam de partida com detalhe, que os outros jogos nao tem.
   const confrontos = useConfrontos(jogo, paginaConfrontos);
+  const resumoConfrontos = useResumoConfrontos(jogo);
+  // Zero aqui nao e "sem dado": e "a fonte deste jogo nao publica partida,
+  // so a serie". `dim_partida` so tem linha para Dota 2.
+  const temPartidaDetalhada = (resumo.data?.partidas ?? 0) > 0;
 
   // Uma linha a mais do que cabe na pagina: e assim que da para saber se existe
   // proxima pagina sem o backend devolver o total.
@@ -157,9 +163,16 @@ export function PartidasPagina() {
             </span>
           </div>
 
+          {/*
+            A frase do star schema descreve o que a OpenDota entrega, e ela só
+            cobre Dota 2. Deixá-la fixa afirmaria, para os outros treze
+            esportes, um grão de dado que a tela não tem — a mesma classe de
+            erro de dizer a fonte errada num painel de procedência.
+          */}
           <p className="font-body-sm text-body-sm text-on-surface-variant">
-            Star schema de partidas profissionais. Uma partida vira dez linhas de fato —
-            uma por jogador — e as dimensões são compartilhadas entre os jogos.
+            {temPartidaDetalhada
+              ? "Star schema de partidas profissionais. Uma partida vira dez linhas de fato — uma por jogador — e as dimensões são compartilhadas entre os jogos."
+              : "Calendário profissional: quem jogou, quando e o placar da série. Este jogo não tem partida com detalhe por jogador — a fonte publica o resultado do confronto, não o que aconteceu dentro dele."}
           </p>
         </div>
 
@@ -204,6 +217,12 @@ export function PartidasPagina() {
             tendo 67 confrontos e 61 equipes no banco.
           */}
           <SeletorDeJogo disponivel={(j) => j.partidas > 0 || j.agenda > 0} />
+          {/*
+            Torneio, modo e busca filtram a tabela POR PARTIDA. Sem
+            `dim_partida` ela não é renderizada, e um filtro que não filtra
+            nada é pior que filtro nenhum: parece que o recorte foi aplicado.
+          */}
+          {temPartidaDetalhada && (
           <label className="flex items-center gap-space-xs">
             <span className="font-label-caps text-label-caps uppercase tracking-widest text-outline">
               Torneio
@@ -221,7 +240,9 @@ export function PartidasPagina() {
               ))}
             </select>
           </label>
+          )}
 
+          {temPartidaDetalhada && (
           <label className="flex items-center gap-space-xs">
             <span className="font-label-caps text-label-caps uppercase tracking-widest text-outline">
               Modo
@@ -239,7 +260,9 @@ export function PartidasPagina() {
               ))}
             </select>
           </label>
+          )}
 
+          {temPartidaDetalhada && (
           <div className="relative min-w-[16rem] flex-1">
             <Icone
               nome="manage_search"
@@ -254,10 +277,25 @@ export function PartidasPagina() {
               className="w-full rounded bg-surface-container-lowest py-space-sm pl-10 pr-space-sm font-title-code text-title-code text-on-surface shadow-inner placeholder:text-outline focus:bg-surface-container focus:outline-none"
             />
           </div>
+          )}
         </div>
       </section>
 
+      {/*
+        Os blocos entre este comentário e o de "confrontos decididos" leem
+        `dim_partida` — duração, jogador, herói —, e ela só existe para Dota 2:
+        a OpenDota é a única fonte com esse grão. Para os outros treze esportes
+        eles rendiam a tela inteira zerada, então dão lugar à estatística do
+        calendário, que é o que esses jogos têm.
+      */}
+      {!temPartidaDetalhada && (
+        <Consulta estado={resumoConfrontos} altura={160}>
+          {(dados) => <EstatisticasConfrontos dados={dados} />}
+        </Consulta>
+      )}
+
       {/* ==================== QUATRO KPIS ==================== */}
+      {temPartidaDetalhada && (
       <Consulta estado={resumo} altura={160}>
         {(dados: ResumoPartidas) => {
           const winrateRadiant = (dados.winrate_radiant ?? 50) / 100;
@@ -347,8 +385,10 @@ export function PartidasPagina() {
           );
         }}
       </Consulta>
+      )}
 
       {/* ==================== DOIS PAINEIS ==================== */}
+      {temPartidaDetalhada && (
       <section className="grid grid-cols-1 gap-space-base xl:grid-cols-2">
         <Painel
           icone="bar_chart"
@@ -405,6 +445,7 @@ export function PartidasPagina() {
           </Consulta>
         </Painel>
       </section>
+      )}
 
       {/* ==================== CONFRONTOS DECIDIDOS ==================== */}
       <Painel
@@ -450,6 +491,9 @@ export function PartidasPagina() {
       </Painel>
 
       {/* ==================== TABELA DENSA ==================== */}
+      {/* Por PARTIDA: sem `dim_partida` ela nao tem o que listar, e o painel
+          de confrontos acima ja e a lista deste jogo. */}
+      {temPartidaDetalhada && (
       <Painel
         icone="history"
         titulo="Histórico operacional de partidas"
@@ -565,6 +609,7 @@ export function PartidasPagina() {
           </span>
         </div>
       </Painel>
+      )}
     </>
   );
 }

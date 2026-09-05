@@ -25,6 +25,7 @@ import type {
   ComparacaoSentimento,
   ConfrontoAgendado,
   ConfrontoResultado,
+  ResumoConfrontos,
   EquipeConfronto,
   LigaConfronto,
   PanoramaSentimento,
@@ -266,6 +267,20 @@ export function useClassificarSentimento(texto: string, modelo?: string) {
  * Dota 2: para os outros 13 jogos ela ficava vazia embora o banco tivesse 693
  * confrontos com placar. Este hook é o que enche a tela deles.
  */
+/**
+ * Estatística do calendário, para o jogo sem partida detalhada.
+ *
+ * A tela de Partidas lê `dim_partida`, que só existe para Dota 2: os outros
+ * treze esportes abriam tudo zerado tendo confronto e placar no banco.
+ */
+export function useResumoConfrontos(jogo: string) {
+  return useQuery({
+    queryKey: ["partidas", "resumo-confrontos", jogo],
+    queryFn: () =>
+      buscar<ResumoConfrontos>("/api/partidas/resumo-confrontos", { jogo }),
+  });
+}
+
 export function useConfrontos(jogo: string, pagina = 1, limite = 20) {
   return useQuery({
     queryKey: ["partidas", "confrontos", jogo, pagina, limite],

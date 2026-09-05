@@ -602,6 +602,30 @@ export interface RelatorioConfronto {
  * aconteceu dentro dela". Um 3x1 é uma linha, não três partidas — `dim_partida`
  * só existe para Dota 2, onde a OpenDota entrega detalhe por jogador.
  */
+export interface FaixaFormato {
+  rotulo: string;
+  confrontos: number;
+}
+
+/**
+ * Estatística do calendário — o resumo de quem não tem partida detalhada.
+ *
+ * Sem duração e sem jogador, e a ausência é o dado: o ticker publica quem
+ * jogou, quando e o placar da série, nada do que aconteceu dentro dela.
+ */
+export interface ResumoConfrontos {
+  decididos: number;
+  futuros: number;
+  equipes: number;
+  torneios: number;
+  vitorias_lado_a: number;
+  winrate_lado_a: number | null;
+  primeiro_confronto: string | null;
+  ultimo_confronto: string | null;
+  por_formato: FaixaFormato[];
+  por_dia: PartidasPorDia[];
+}
+
 export interface ConfrontoResultado {
   id_externo: string;
   equipe_a_nome: string;

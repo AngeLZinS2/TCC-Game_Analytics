@@ -16,6 +16,8 @@ from sqlalchemy.orm import Session, aliased
 
 from api.schemas import (
     ConfrontoResultado,
+    FaixaFormato,
+    ResumoConfrontos,
     DetalhePartida,
     FaixaDuracao,
     JogadorNaPartida,
@@ -238,6 +240,98 @@ def resumo(sessao: Session = Depends(get_db), jogo: str = "dota2") -> ResumoPart
             )
             for linha in histograma
         ],
+    )
+
+
+@router.get("/resumo-confrontos", response_model=ResumoConfrontos)
+def resumo_confrontos(
+    jogo: str = "dota2", sessao: Session = Depends(get_db)
+) -> ResumoConfrontos:
+    """Estatistica do calendario - o resumo de quem nao tem partida detalhada.
+
+    `/resumo` le `dim_partida`, que so existe para Dota 2: os outros treze
+    esportes recebiam a pagina inteira zerada tendo confronto, equipe, torneio e
+    placar no banco. Este endpoint responde no grao que eles TEM.
+
+    Nao devolve duracao nem jogador, e a ausencia e o dado: o ticker publica
+    quem jogou, quando e o placar da serie - nada do que aconteceu dentro dela.
+    """
+    filtro = DimJogo.codigo == jogo
+    base = select(AgendaPartida).join(DimJogo, DimJogo.id_jogo == AgendaPartida.id_jogo)
+
+    decididos, futuros, primeiro, ultimo, vitorias_a = sessao.execute(
+        select(
+            func.count().filter(AgendaPartida.vitoria_a.is_not(None)),
+            func.count().filter(AgendaPartida.vitoria_a.is_(None)),
+            func.min(AgendaPartida.inicio_previsto),
+            func.max(AgendaPartida.inicio_previsto),
+            func.count().filter(AgendaPartida.vitoria_a.is_(True)),
+        )
+        .select_from(AgendaPartida)
+        .join(DimJogo, DimJogo.id_jogo == AgendaPartida.id_jogo)
+        .where(filtro)
+    ).one()
+
+    # Equipes que aparecem no calendario, pelos DOIS lados. Um `count(distinct)`
+    # sobre uma coluna so esconderia quem nunca foi listado em primeiro, e a
+    # uniao das duas em SQL exigiria subconsulta - com algumas centenas de
+    # linhas por jogo, juntar em Python e mais simples e igualmente barato.
+    nomes = {
+        nome
+        for linha in sessao.execute(
+            select(AgendaPartida.equipe_a_nome, AgendaPartida.equipe_b_nome)
+            .join(DimJogo, DimJogo.id_jogo == AgendaPartida.id_jogo)
+            .where(filtro)
+        )
+        for nome in linha
+        if nome
+    }
+    equipes = len(nomes)
+
+    torneios = sessao.scalar(
+        select(func.count(func.distinct(AgendaPartida.torneio)))
+        .select_from(AgendaPartida)
+        .join(DimJogo, DimJogo.id_jogo == AgendaPartida.id_jogo)
+        .where(filtro, AgendaPartida.torneio.is_not(None))
+    ) or 0
+
+    por_formato = [
+        FaixaFormato(rotulo=rotulo, confrontos=quantos)
+        for rotulo, quantos in sessao.execute(
+            select(AgendaPartida.formato, func.count())
+            .join(DimJogo, DimJogo.id_jogo == AgendaPartida.id_jogo)
+            .where(filtro, AgendaPartida.formato.is_not(None))
+            .group_by(AgendaPartida.formato)
+            # Por NOME e nao por contagem: "Bo1, Bo3, Bo5" e uma escala
+            # ordenada, e reordenar por frequencia embaralharia o eixo.
+            .order_by(AgendaPartida.formato)
+        )
+    ]
+
+    por_dia = [
+        PartidasPorDia(data=dia, partidas=quantos)
+        for dia, quantos in sessao.execute(
+            select(
+                func.date(AgendaPartida.inicio_previsto).label("dia"), func.count()
+            )
+            .join(DimJogo, DimJogo.id_jogo == AgendaPartida.id_jogo)
+            .where(filtro)
+            .group_by("dia")
+            .order_by("dia")
+        )
+    ]
+
+    return ResumoConfrontos(
+        decididos=decididos,
+        futuros=futuros,
+        equipes=equipes,
+        torneios=torneios,
+        vitorias_lado_a=vitorias_a,
+        winrate_lado_a=(100.0 * vitorias_a / decididos) if decididos else None,
+        primeiro_confronto=primeiro,
+        ultimo_confronto=ultimo,
+        por_formato=por_formato,
+        por_dia=por_dia,
     )
 
 
