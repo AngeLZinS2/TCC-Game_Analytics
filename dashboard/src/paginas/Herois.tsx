@@ -222,7 +222,10 @@ export function HeroisPagina() {
           agregada: Valorant tem 29 agentes com HS%, ADR e KDA e zero linha
           em `fato_partida_jogador`.
         */}
-        <SeletorDeJogo disponivel={(j) => j.partidas > 0 || j.personagens > 0} />
+        <SeletorDeJogo
+          disponivel={(j) => j.partidas > 0 || j.personagens > 0}
+          listar={(j) => j.personagens > 0}
+        />
 
         <label className="flex items-center gap-space-xs">
           <span className="font-label-caps text-label-caps uppercase tracking-widest text-outline">

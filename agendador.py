@@ -388,6 +388,17 @@ def _coletar_agentes_valorant(
         coletor.close()
 
 
+def _coletar_campeoes_lol(settings: Settings, storage: RawStorage) -> CollectionResult:
+    """Elenco de campeoes de LoL e o desempenho na rota principal (OP.GG)."""
+    from collectors.lol_campeoes import CampeoesLolCollector
+
+    coletor = CampeoesLolCollector(raw_storage=storage)
+    try:
+        return coletor.run(carregar=True)
+    finally:
+        coletor.close()
+
+
 def _coletar_esports_opgg(
     settings: Settings, storage: RawStorage
 ) -> CollectionResult:
@@ -549,6 +560,14 @@ def montar_tarefas(settings: Settings) -> list[Tarefa]:
             executar=_coletar_agentes_valorant,
         )
     )
+    if settings.opgg_enabled:
+        tarefas.append(
+            Tarefa(
+                nome="campeoes_lol",
+                intervalo_segundos=settings.agendador_agentes_minutos * 60,
+                executar=_coletar_campeoes_lol,
+            )
+        )
     return tarefas
 
 

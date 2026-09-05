@@ -33,6 +33,7 @@ function oQueTem(jogo: JogoDisponivel): string {
     jogo.partidas ? `${jogo.partidas} partidas` : null,
     jogo.equipes ? `${jogo.equipes} equipes` : null,
     jogo.agenda ? `${jogo.agenda} na agenda` : null,
+    jogo.personagens ? `${jogo.personagens} personagens` : null,
   ]
     .filter(Boolean)
     .join(" · ");
@@ -40,6 +41,7 @@ function oQueTem(jogo: JogoDisponivel): string {
 
 export function SeletorDeJogo({
   disponivel = (jogo) => jogo.partidas > 0,
+  listar = () => true,
 }: {
   /**
    * Quando um jogo do catálogo pode ser escolhido nesta tela.
@@ -50,6 +52,17 @@ export function SeletorDeJogo({
    * de qualquer confronto decidido dele ter entrado no banco.
    */
   disponivel?: (jogo: JogoDisponivel) => boolean;
+  /**
+   * Quando o jogo aparece NA LISTA. Diferente de `disponivel`, que decide se
+   * ele pode ser escolhido.
+   *
+   * Os dois existem porque as telas querem coisas diferentes. Partidas mostra
+   * os catorze e desabilita o que não tem nada — ver que o catálogo é grande
+   * ajuda. A tela de personagens não: dos catorze, só três têm elenco, e
+   * listar onze linhas de "nada coletado ainda" transforma o seletor num
+   * inventário de ausências.
+   */
+  listar?: (jogo: JogoDisponivel) => boolean;
 }) {
   const jogos = useJogosDisponiveis();
   const { jogo: atual, definirJogo } = useJogoAtual();
@@ -78,6 +91,10 @@ export function SeletorDeJogo({
 
   if (!jogos.data) return null;
 
+  // O jogo atual entra na lista mesmo que o filtro o excluiria: senão, uma
+  // URL com `?jogo=` fora do recorte abriria um seletor que não mostra o
+  // que está selecionado.
+  const listados = jogos.data.filter((j) => listar(j) || j.codigo === atual);
   const atualDados = jogos.data.find((j) => j.codigo === atual);
 
   return (
@@ -118,7 +135,7 @@ export function SeletorDeJogo({
             aria-label="Selecionar jogo"
             className="rolagem-discreta flex max-h-80 min-w-52 flex-col gap-space-xxs overflow-y-auto rounded-lg border border-outline-variant/30 bg-surface-container-low p-space-xs shadow-2xl"
           >
-            {jogos.data.map((jogo) => {
+            {listados.map((jogo) => {
               const podeEscolher = disponivel(jogo);
               const ativo = jogo.codigo === atual;
 

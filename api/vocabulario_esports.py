@@ -163,6 +163,51 @@ VOCABULARIO: dict[str, PerfilEsporte] = {
     "leagueoflegends": PerfilEsporte(
         substantivo="campeão",
         substantivo_plural="campeões",
+        fonte="OP.GG",
+        nota_fonte=(
+            "Do público geral do OP.GG, na rota principal de cada campeão — "
+            "não é medição nossa nem do cenário profissional."
+        ),
+        metricas=[
+            Metrica(
+                chave="pick_rate",
+                rotulo="Pick%",
+                descricao="Proporção das partidas em que o campeão foi escolhido",
+                unidade="%",
+            ),
+            # Não existe em Dota nem em Valorant, e é das leituras mais fortes
+            # do meta de League: um campeão com 40% de ban está forte mesmo com
+            # winrate mediano - quase metade das partidas não deixa escolhê-lo.
+            Metrica(
+                chave="ban_rate",
+                rotulo="Ban%",
+                descricao=(
+                    "Proporção das partidas em que o campeão foi banido — o "
+                    "quanto o meta o teme"
+                ),
+                unidade="%",
+            ),
+            _KDA,
+            Metrica(
+                chave="role_rate",
+                rotulo="Na rota",
+                descricao=(
+                    "Quanto das partidas do campeão acontecem na rota "
+                    "principal dele"
+                ),
+                unidade="%",
+            ),
+            Metrica(
+                chave="tier",
+                rotulo="Tier",
+                descricao=(
+                    "Escalão que o OP.GG publica — menor é melhor, e 0 "
+                    "marca os campeões acima do tier 1 ('OP')"
+                ),
+                casas=0,
+                maior_melhor=False,
+            ),
+        ],
     ),
 }
 

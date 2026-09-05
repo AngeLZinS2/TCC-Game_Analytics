@@ -36,6 +36,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import threading
 import time
 from typing import Any
@@ -199,6 +200,107 @@ def chamar_ferramenta(nome: str, argumentos: dict[str, Any]) -> Any:
         # JSON). Quem precisar delas que parseie; devolver cru e melhor do que
         # falhar, e nenhum bloco exibe esse texto sem tratar.
         return texto
+
+
+def analisar_notacao_compacta(texto: str, classe: str) -> list[dict[str, Any]]:
+    """Le a notacao propria do OP.GG e devolve dicionarios.
+
+    Varias ferramentas nao respondem JSON. Respondem um formato proprio que
+    declara o schema no cabecalho e usa construtores posicionais no corpo:
+
+        class Mid: champion,win_rate,pick_rate
+        ...
+        LolListLaneMetaChampions(Data(Positions([Mid("Ahri",0.51,0.09), ...])))
+
+    O cabecalho e o que torna isso parseavel sem chutar: a ORDEM dos campos vem
+    declarada, entao um campo novo do lado deles nao desloca os nossos em
+    silencio - ele simplesmente aparece com o nome certo.
+
+    Devolve `[]` quando a classe pedida nao esta no cabecalho, que e o que
+    acontece se a ferramenta mudar de forma. Quem chama fica sem os dados, nao
+    com dados errados.
+    """
+    cabecalho = re.search(rf"^class {re.escape(classe)}: (.+)$", texto, re.M)
+    if not cabecalho:
+        logger.warning("classe ausente na notacao do opgg", extra={"classe": classe})
+        return []
+
+    campos = [c.strip() for c in cabecalho.group(1).split(",")]
+    linhas: list[dict[str, Any]] = []
+
+    # `(?<![A-Za-z_])` evita casar `Mid(` dentro de `SomethingMid(`.
+    for inicio in re.finditer(rf"(?<![A-Za-z_]){re.escape(classe)}\(", texto):
+        argumentos = _argumentos_posicionais(texto, inicio.end())
+        if argumentos is None or len(argumentos) != len(campos):
+            continue
+        linhas.append(dict(zip(campos, argumentos)))
+
+    return linhas
+
+
+def _argumentos_posicionais(texto: str, posicao: int) -> list[Any] | None:
+    """Os argumentos de uma chamada, a partir do caractere apos o parentese.
+
+    Escrito a mao porque `split(",")` quebra em nome com virgula - e ha varios
+    ("Nunu & Willump", "Renata Glasc"). O varredor respeita aspas e o
+    escapamento delas.
+    """
+    argumentos: list[Any] = []
+    atual: list[str] = []
+    dentro_de_aspas = False
+    escapado = False
+
+    while posicao < len(texto):
+        c = texto[posicao]
+        posicao += 1
+
+        if escapado:
+            atual.append(c)
+            escapado = False
+            continue
+        if c == "\\" and dentro_de_aspas:
+            escapado = True
+            continue
+        if c == '"':
+            dentro_de_aspas = not dentro_de_aspas
+            atual.append(c)
+            continue
+        if dentro_de_aspas:
+            atual.append(c)
+            continue
+        if c == ",":
+            argumentos.append(_valor("".join(atual)))
+            atual = []
+            continue
+        if c == ")":
+            argumentos.append(_valor("".join(atual)))
+            return argumentos
+        # Um construtor aninhado no meio dos argumentos significa que esta nao
+        # e a classe folha que o chamador quer - desiste em vez de adivinhar.
+        if c == "(":
+            return None
+        atual.append(c)
+
+    return None
+
+
+def _valor(bruto: str) -> Any:
+    """Converte um argumento cru no tipo dele."""
+    bruto = bruto.strip()
+    if bruto.startswith('"') and bruto.endswith('"'):
+        return bruto[1:-1]
+    if bruto in ("true", "false"):
+        return bruto == "true"
+    if bruto in ("null", "None", ""):
+        return None
+    try:
+        return int(bruto)
+    except ValueError:
+        pass
+    try:
+        return float(bruto)
+    except ValueError:
+        return bruto
 
 
 # ---------------------------------------------------------------------------

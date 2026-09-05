@@ -163,6 +163,7 @@ def test_intervalos_vem_da_configuracao():
         "esports_opgg": 21600,
         "treino_confronto": 28800,
         "agentes_valorant": 604800,
+        "campeoes_lol": 604800,
     }
 
 
