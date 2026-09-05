@@ -211,6 +211,14 @@ class Settings(BaseSettings):
     #: chamadas por rodada.
     agendador_esports_opgg_minutos: int = Field(default=360, ge=30)
 
+    #: Intervalo entre reajustes da previsao de confronto, em minutos.
+    #:
+    #: Oito horas, um pouco atras da coleta mais rapida que o alimenta (a do
+    #: OP.GG, de 6 em 6). O ajuste e barato - centenas de milissegundos por
+    #: jogo, tudo em memoria - e o custo de estar velho e alto: a tela publica
+    #: probabilidade e metrica de validacao de uma amostra que ja mudou.
+    agendador_treino_confronto_minutos: int = Field(default=480, ge=30)
+
     #: Intervalo entre coletas do elenco de agentes do VALORANT, em minutos.
     #:
     #: Semanal. A Riot lanca um agente a cada poucos meses e ajusta funcao mais

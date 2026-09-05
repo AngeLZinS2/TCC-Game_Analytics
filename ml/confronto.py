@@ -723,6 +723,16 @@ def _avaliar_walk_forward(
         reais.append(1 if alvo.vitoria_a else 0)
         avaliadas.append(alvo.id_partida)
 
+    return _metricas(probabilidades, reais)
+
+
+def _metricas(probabilidades: list[float], reais: list[int]) -> dict[str, Any]:
+    """As metricas da validacao, a partir das probabilidades e do que ocorreu.
+
+    Separada do laco walk-forward para ser testavel sozinha: o que se afirma
+    sobre "o modelo supera o chute?" e uma comparacao entre dois numeros deste
+    dicionario, e ela ja saiu errada uma vez por causa de arredondamento.
+    """
     if len(probabilidades) < 5 or len(set(reais)) < 2:
         return {
             "avaliadas": len(probabilidades),
@@ -743,7 +753,16 @@ def _avaliar_walk_forward(
         "roc_auc": float(roc_auc_score(reais, probabilidades)),
         "log_loss": float(log_loss(reais, probabilidades, labels=[0, 1])),
         "brier": float(brier_score_loss(reais, probabilidades)),
-        "taxa_base": round(taxa_base, 4),
+        # SEM arredondar, e isso e correcao de bug, nao estilo. A acuracia ia
+        # em precisao cheia e a taxa base em 4 casas, e quem decide se "o
+        # modelo supera o chute" - na CLI e na tela - compara as duas. Um
+        # empate virava vitoria ou derrota conforme o lado para o qual a quinta
+        # casa arredondou: Call of Duty acertava 11 de 14 (0.785714...) contra
+        # base 0.7857 e era anunciado como preditivo, com ROC-AUC de 0.182 -
+        # pior que aleatorio. Brawl Stars, com o mesmo empate, arredondou para
+        # cima e era corretamente reprovado. Em precisao cheia um empate e um
+        # empate, e empate nao supera.
+        "taxa_base": float(taxa_base),
         # Com poucas dezenas de partidas, o intervalo importa mais que o ponto.
         # E o erro padrao binomial da propria acuracia.
         "margem_erro": round(

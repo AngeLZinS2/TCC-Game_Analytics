@@ -19,6 +19,7 @@ from ml.confronto import (
     _ajustar,
     _fatores_da_previsao,
     _matriz,
+    _metricas,
     _probabilidade,
     arquivo_metricas,
     carregar_relatorio,
@@ -224,3 +225,27 @@ def test_um_lado_com_telemetria_e_o_outro_sem_ainda_mostra_o_fator():
 
     rotulos = [f.rotulo for f in _fatores_da_previsao(a, b)]
     assert "Ouro por minuto" in rotulos
+
+
+def test_taxa_base_nao_e_arredondada():
+    """A taxa base sai em precisao cheia, igual a acuracia.
+
+    Bug real: `taxa_base` ia arredondada em 4 casas e `acuracia` nao, e quem
+    decide se "o modelo supera o chute" - a CLI e a tela - compara as duas com
+    `>`. O empate virava vitoria ou derrota conforme a quinta casa:
+
+      Call of Duty  11/14 = 0.7857142857 contra base 0.7857  -> "supera"
+      Brawl Stars    7/11 = 0.6363636363 contra base 0.6364  -> "nao supera"
+
+    Sao o MESMO caso - modelo que so acerta o lado mais frequente - e um deles
+    era anunciado como preditivo com ROC-AUC de 0.182, pior que aleatorio.
+    """
+    # 11 acertos em 14, todos do lado 1: a acuracia e exatamente a taxa base.
+    reais = [1] * 11 + [0] * 3
+    probabilidades = [0.9] * 14
+
+    metricas = _metricas(probabilidades, reais)
+
+    assert metricas["acuracia"] == metricas["taxa_base"]
+    # E o que o consumidor pergunta: empate NAO supera.
+    assert not (metricas["acuracia"] > metricas["taxa_base"])

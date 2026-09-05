@@ -145,6 +145,7 @@ def test_intervalos_vem_da_configuracao():
         agendador_tempo_jogo_minutos = 150
         agendador_agentes_minutos = 10080
         agendador_esports_opgg_minutos = 360
+        agendador_treino_confronto_minutos = 480
         opgg_enabled = True
         itad_api_key = "chave-de-teste"
         hltb_enabled = True
@@ -160,6 +161,7 @@ def test_intervalos_vem_da_configuracao():
         "precos": 7200,
         "tempo_jogo": 9000,
         "esports_opgg": 21600,
+        "treino_confronto": 28800,
         "agentes_valorant": 604800,
     }
 
@@ -177,6 +179,7 @@ def test_tarefa_de_preco_so_entra_com_chave_do_itad():
         agendador_tempo_jogo_minutos = 1440
         agendador_agentes_minutos = 10080
         agendador_esports_opgg_minutos = 360
+        agendador_treino_confronto_minutos = 480
         opgg_enabled = True
         itad_api_key = None
         hltb_enabled = True
@@ -198,6 +201,7 @@ def test_tarefa_de_tempo_jogo_nao_entra_quando_desabilitada():
         agendador_tempo_jogo_minutos = 1440
         agendador_agentes_minutos = 10080
         agendador_esports_opgg_minutos = 360
+        agendador_treino_confronto_minutos = 480
         opgg_enabled = True
         itad_api_key = None
         hltb_enabled = False

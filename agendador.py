@@ -401,6 +401,76 @@ def _coletar_esports_opgg(
         coletor.close()
 
 
+#: Minimo de confrontos decididos para valer a pena reajustar um jogo.
+#:
+#: O mesmo piso que `ml.confronto.ajustar_e_salvar` exige - abaixo dele ele
+#: levanta `ValueError`, e agendar a falha so encheria o log.
+MINIMO_CONFRONTOS_TREINO = 10
+
+
+def _treinar_confronto(settings: Settings, storage: RawStorage) -> CollectionResult:
+    """Reajusta a previsao de confronto de TODO jogo com historico suficiente.
+
+    **Por que isto e uma tarefa e nao um comando manual.** A coleta roda de 6 em
+    6 horas e o modelo era ajustado a mao: dos treze jogos com modelo, nove
+    tinham artefato de dois dias antes, treinados sobre um historico que ja
+    tinha crescido. A tela mostrava probabilidade e metrica de validacao de uma
+    amostra que nao existia mais.
+
+    Um jogo que falha nao leva os outros: `ajustar_e_salvar` levanta quando o
+    historico e curto demais, e isso e estado normal para um jogo recem-entrado
+    no catalogo - nao motivo para o restante ficar sem reajuste.
+    """
+    from sqlalchemy import func, select
+
+    from db.models import AgendaPartida, DimJogo, DimPartida
+    from db.session import session_scope
+    from ml.confronto import ajustar_e_salvar
+
+    with session_scope() as sessao:
+        # Um jogo entra se tem confronto decidido em QUALQUER uma das duas
+        # fontes: `dim_partida` (OpenDota, so Dota) ou `agenda_partida` (ticker
+        # da Liquipedia e OP.GG). Olhar so uma delas deixaria metade de fora.
+        codigos = [
+            codigo
+            for codigo, agenda, partidas in sessao.execute(
+                select(
+                    DimJogo.codigo,
+                    select(func.count())
+                    .select_from(AgendaPartida)
+                    .where(
+                        AgendaPartida.id_jogo == DimJogo.id_jogo,
+                        AgendaPartida.vitoria_a.is_not(None),
+                    )
+                    .scalar_subquery(),
+                    select(func.count())
+                    .select_from(DimPartida)
+                    .where(DimPartida.id_jogo == DimJogo.id_jogo)
+                    .scalar_subquery(),
+                )
+            )
+            if max(agenda, partidas) >= MINIMO_CONFRONTOS_TREINO
+        ]
+
+    resultado = CollectionResult(fonte="confronto", sucesso=True)
+    for codigo in codigos:
+        try:
+            ajustar_e_salvar(codigo)
+            resultado.registros_carregados += 1
+        except Exception as exc:  # noqa: BLE001 - um jogo nao derruba os outros
+            resultado.falhas += 1
+            logger.warning(
+                "reajuste de confronto falhou",
+                extra={"jogo": codigo, "erro": f"{type(exc).__name__}: {exc}"},
+            )
+
+    resultado.registros_coletados = len(codigos)
+    resultado.registros_processados = len(codigos)
+    # Falhar em todos e falha da tarefa; falhar em um jogo novo, nao.
+    resultado.sucesso = bool(codigos) and resultado.registros_carregados > 0
+    return resultado
+
+
 def montar_tarefas(settings: Settings) -> list[Tarefa]:
     """As tarefas do agendador, na ordem em que rodam quando empatam.
 
@@ -465,6 +535,13 @@ def montar_tarefas(settings: Settings) -> list[Tarefa]:
                 executar=_coletar_esports_opgg,
             )
         )
+    tarefas.append(
+        Tarefa(
+            nome="treino_confronto",
+            intervalo_segundos=settings.agendador_treino_confronto_minutos * 60,
+            executar=_treinar_confronto,
+        )
+    )
     tarefas.append(
         Tarefa(
             nome="agentes_valorant",
