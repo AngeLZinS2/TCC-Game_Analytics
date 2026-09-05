@@ -162,3 +162,54 @@ def test_resumo_de_confrontos_de_jogo_inexistente_nao_estoura(
     assert corpo["decididos"] == 0
     assert corpo["winrate_lado_a"] is None
     assert corpo["por_formato"] == []
+
+
+def test_perfil_declara_o_vocabulario_de_cada_esporte(cliente: TestClient) -> None:
+    """Um MOBA e um tatico nao compartilham estatistica.
+
+    A tela desenhava "KDA / GPM / XPM" fixo - o vocabulario do Dota. Pedir ouro
+    por minuto de um agente de Valorant e pedir um numero que o jogo nao produz,
+    e a coluna vazia sugeriria dado faltando quando ele nem existe naquele
+    esporte.
+    """
+    dota = cliente.get("/api/partidas/perfil", params={"jogo": "dota2"}).json()
+    valorant = cliente.get("/api/partidas/perfil", params={"jogo": "valorant"}).json()
+
+    assert dota["substantivo_plural"] == "heróis"
+    assert valorant["substantivo_plural"] == "agentes"
+
+    rotulos_dota = {m["rotulo"] for m in dota["metricas"]}
+    rotulos_valorant = {m["rotulo"] for m in valorant["metricas"]}
+    assert {"GPM", "XPM"} <= rotulos_dota
+    assert {"HS%", "ADR", "ACS"} <= rotulos_valorant
+    # Ouro por minuto nao existe num tatico, e headshot nao existe num MOBA.
+    assert "GPM" not in rotulos_valorant
+    assert "HS%" not in rotulos_dota
+
+
+def test_perfil_sem_fonte_nao_inventa_metrica(cliente: TestClient) -> None:
+    """Counter-Strike mede HS% e ADR no mundo real - nos nao os coletamos.
+
+    Um perfil vazio faz a tela dizer o que falta. Herdar as metricas de outro
+    esporte renderizaria colunas que nunca teriam valor, e uma coluna sempre
+    vazia se le como "o dado sumiu", nao como "esta fonte nao existe aqui".
+    """
+    corpo = cliente.get(
+        "/api/partidas/perfil", params={"jogo": "counterstrike"}
+    ).json()
+
+    assert corpo["metricas"] == []
+    assert corpo["fonte"] == ""
+    # E o gate da ordenacao acompanha: sem reagregacao no banco, a pilula de
+    # ordenar nao reordena nada.
+    assert corpo["ordenavel"] is False
+
+
+def test_perfil_de_jogo_desconhecido_cai_num_padrao_neutro(
+    cliente: TestClient,
+) -> None:
+    """Nada de assumir MOBA: o padrao nao tem metrica nenhuma."""
+    corpo = cliente.get("/api/partidas/perfil", params={"jogo": "xadrez-3d"}).json()
+
+    assert corpo["substantivo_plural"] == "personagens"
+    assert corpo["metricas"] == []

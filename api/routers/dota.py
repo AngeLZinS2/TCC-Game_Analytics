@@ -16,6 +16,8 @@ from sqlalchemy.orm import Session, aliased
 
 from api.schemas import (
     ConfrontoResultado,
+    MetricaEsporte,
+    PerfilEsporte,
     FaixaFormato,
     ResumoConfrontos,
     DetalhePartida,
@@ -29,6 +31,7 @@ from api.schemas import (
     ResumoPersonagem,
     FiltrosDisponiveis,
 )
+from api import vocabulario_esports
 from db.models import (
     AgendaPartida,
     DimEquipe,
@@ -36,6 +39,7 @@ from db.models import (
     DimJogo,
     DimPartida,
     DimPersonagem,
+    FatoEstatisticaPersonagem,
     FatoPartidaJogador,
 )
 from db.session import get_db
@@ -97,6 +101,11 @@ def listar_jogos(
         .group_by(AgendaPartida.id_jogo)
         .subquery()
     )
+    personagens = (
+        select(DimPersonagem.id_jogo, func.count().label("personagens"))
+        .group_by(DimPersonagem.id_jogo)
+        .subquery()
+    )
 
     consulta = (
         select(
@@ -105,19 +114,27 @@ def listar_jogos(
             func.count(DimPartida.id_partida).label("partidas"),
             func.coalesce(equipes.c.equipes, 0).label("equipes"),
             func.coalesce(agenda.c.agenda, 0).label("agenda"),
+            func.coalesce(personagens.c.personagens, 0).label("personagens"),
         )
         .outerjoin(DimPartida, DimPartida.id_jogo == DimJogo.id_jogo)
         .outerjoin(equipes, equipes.c.id_jogo == DimJogo.id_jogo)
         .outerjoin(agenda, agenda.c.id_jogo == DimJogo.id_jogo)
+        .outerjoin(personagens, personagens.c.id_jogo == DimJogo.id_jogo)
         .group_by(
-            DimJogo.codigo, DimJogo.nome, equipes.c.equipes, agenda.c.agenda
+            DimJogo.codigo,
+            DimJogo.nome,
+            equipes.c.equipes,
+            agenda.c.agenda,
+            personagens.c.personagens,
         )
         .order_by(desc("partidas"), desc("agenda"), desc("equipes"), DimJogo.nome)
     )
 
     linhas = list(sessao.execute(consulta))
     if apenas_com_dados:
-        linhas = [l for l in linhas if l.partidas or l.equipes or l.agenda]
+        linhas = [
+            l for l in linhas if l.partidas or l.equipes or l.agenda or l.personagens
+        ]
 
     return [
         JogoDisponivel(
@@ -126,6 +143,7 @@ def listar_jogos(
             partidas=linha.partidas,
             equipes=linha.equipes,
             agenda=linha.agenda,
+            personagens=linha.personagens,
         )
         for linha in linhas
     ]
@@ -427,6 +445,92 @@ def partidas_por_dia(
     ]
 
 
+@router.get("/perfil", response_model=PerfilEsporte)
+def perfil_do_esporte(jogo: str = "dota2") -> PerfilEsporte:
+    """Como este esporte nomeia e mede seus personagens.
+
+    A tela lia "KDA / GPM / XPM" fixo - o vocabulario do Dota. Pedir ouro por
+    minuto de um agente de Valorant e pedir um numero que o jogo nao produz, e
+    mostrar a coluna vazia sugere que o dado falta quando na verdade ele nao
+    existe naquele esporte.
+    """
+    p = vocabulario_esports.perfil(jogo)
+    return PerfilEsporte(
+        substantivo=p.substantivo,
+        substantivo_plural=p.substantivo_plural,
+        fonte=p.fonte,
+        nota_fonte=p.nota_fonte,
+        ordenavel=p.ordenavel,
+        metricas=[
+            MetricaEsporte(
+                chave=m.chave,
+                rotulo=m.rotulo,
+                descricao=m.descricao,
+                unidade=m.unidade,
+                casas=m.casas,
+                maior_melhor=m.maior_melhor,
+            )
+            for m in p.metricas
+        ],
+    )
+
+
+def _personagens_agregados(
+    sessao: Session, id_jogo: int, min_partidas: int, limite: int
+) -> list[ResumoPersonagem]:
+    """Personagens de um jogo cuja fonte publica AGREGADO, nao partida a partida.
+
+    E o caso do Valorant no OP.GG: nao ha partida individual, ha "este agente,
+    nesta janela, teve estes numeros". Le o snapshot mais recente de cada um.
+    """
+    recente = (
+        select(FatoEstatisticaPersonagem)
+        .distinct(FatoEstatisticaPersonagem.id_personagem)
+        .order_by(
+            FatoEstatisticaPersonagem.id_personagem,
+            desc(FatoEstatisticaPersonagem.janela_coleta),
+        )
+        .subquery()
+    )
+
+    consulta = (
+        select(
+            DimPersonagem.id_personagem,
+            DimPersonagem.nome,
+            DimPersonagem.nome_interno,
+            DimPersonagem.papel,
+            recente.c.partidas,
+            recente.c.vitorias,
+            recente.c.metricas,
+        )
+        .join(recente, recente.c.id_personagem == DimPersonagem.id_personagem)
+        .where(
+            DimPersonagem.id_jogo == id_jogo,
+            func.coalesce(recente.c.partidas, 0) >= min_partidas,
+        )
+        .order_by(desc(recente.c.partidas))
+        .limit(limite)
+    )
+
+    return [
+        ResumoPersonagem(
+            id_personagem=linha.id_personagem,
+            nome=linha.nome,
+            nome_interno=linha.nome_interno,
+            papel=linha.papel,
+            partidas=linha.partidas or 0,
+            vitorias=linha.vitorias or 0,
+            winrate=(
+                round(100.0 * linha.vitorias / linha.partidas, 1)
+                if linha.partidas
+                else 0.0
+            ),
+            metricas=linha.metricas or {},
+        )
+        for linha in sessao.execute(consulta)
+    ]
+
+
 @router.get("/personagens", response_model=list[ResumoPersonagem])
 def listar_personagens(
     sessao: Session = Depends(get_db),
@@ -441,6 +545,18 @@ def listar_personagens(
     winrate e nenhum significado - sem o corte ele lidera qualquer ranking.
     """
     id_jogo = _id_jogo(sessao, jogo)
+
+    # Duas fontes, dois graos. `fato_partida_jogador` (OpenDota) e por jogador
+    # por partida e so existe para Dota; para os outros, a fonte publica o
+    # agregado. O `min_partidas` significa a mesma coisa nos dois: corte de
+    # cauda de amostra pequena.
+    if not sessao.scalar(
+        select(func.count())
+        .select_from(FatoPartidaJogador)
+        .where(FatoPartidaJogador.id_jogo == id_jogo)
+        .limit(1)
+    ):
+        return _personagens_agregados(sessao, id_jogo, min_partidas, limite)
 
     partidas = func.count().label("partidas")
     vitorias = _vitorias().label("vitorias")
@@ -495,12 +611,16 @@ def listar_personagens(
             partidas=linha.partidas,
             vitorias=linha.vitorias,
             winrate=round(float(linha.winrate), 1),
-            kda_medio=_kda(linha.kills, linha.deaths, linha.assists),
-            kills_media=_media(linha.kills),
-            deaths_media=_media(linha.deaths),
-            assists_media=_media(linha.assists),
-            economia_por_minuto_media=_media(linha.gpm),
-            experiencia_por_minuto_media=_media(linha.xpm),
+            # A forma generica: a tela desenha a partir das chaves que o
+            # perfil do esporte declara, sem saber que este jogo e Dota.
+            metricas={
+                "kda": _kda(linha.kills, linha.deaths, linha.assists),
+                "kills_media": _media(linha.kills),
+                "deaths_media": _media(linha.deaths),
+                "assists_media": _media(linha.assists),
+                "economia_por_minuto_media": _media(linha.gpm),
+                "experiencia_por_minuto_media": _media(linha.xpm),
+            },
         )
         for linha in sessao.execute(consulta)
     ]

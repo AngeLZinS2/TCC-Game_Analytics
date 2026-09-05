@@ -25,6 +25,7 @@ import type {
   ComparacaoSentimento,
   ConfrontoAgendado,
   ConfrontoResultado,
+  PerfilEsporte,
   ResumoConfrontos,
   EquipeConfronto,
   LigaConfronto,
@@ -273,6 +274,17 @@ export function useClassificarSentimento(texto: string, modelo?: string) {
  * A tela de Partidas lê `dim_partida`, que só existe para Dota 2: os outros
  * treze esportes abriam tudo zerado tendo confronto e placar no banco.
  */
+/**
+ * O vocabulário de estatística do esporte: como ele chama seus personagens e
+ * o que ele mede. A tela desenha as colunas a partir daqui.
+ */
+export function usePerfilEsporte(jogo: string) {
+  return useQuery({
+    queryKey: ["partidas", "perfil", jogo],
+    queryFn: () => buscar<PerfilEsporte>("/api/partidas/perfil", { jogo }),
+  });
+}
+
 export function useResumoConfrontos(jogo: string) {
   return useQuery({
     queryKey: ["partidas", "resumo-confrontos", jogo],

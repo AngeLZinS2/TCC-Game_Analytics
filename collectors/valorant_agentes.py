@@ -26,6 +26,7 @@ from typing import Any, Sequence
 
 import requests
 
+from collectors import opgg_mcp
 from collectors.base import BaseCollector, RawRecord
 from config import get_settings
 
@@ -47,6 +48,27 @@ class AgentesValorantCollector(BaseCollector[list[dict[str, Any]]]):
     fonte = "valorant_agentes"
 
     def collect(self) -> list[RawRecord]:
+        registros = [self._elenco()]
+
+        # A estatistica e de outra fonte e pode faltar sem levar o elenco
+        # junto: sem ela a tela mostra quem existe e diz que falta o numero,
+        # que e melhor do que nao mostrar agente nenhum.
+        if get_settings().opgg_enabled:
+            try:
+                registros.append(
+                    RawRecord(
+                        fonte=self.fonte,
+                        endpoint="valorant_list_agent_statistics",
+                        identificador="estatisticas",
+                        payload=opgg_mcp.estatisticas_agentes_valorant(),
+                    )
+                )
+            except opgg_mcp.OpggIndisponivel as exc:
+                self.logger.warning("estatistica do opgg falhou", extra={"erro": str(exc)})
+
+        return registros
+
+    def _elenco(self) -> RawRecord:
         settings = get_settings()
         resposta = requests.get(
             URL_AGENTES,
@@ -58,31 +80,49 @@ class AgentesValorantCollector(BaseCollector[list[dict[str, Any]]]):
             headers={"Accept": "application/json"},
         )
         resposta.raise_for_status()
-        return [
-            RawRecord(
-                fonte=self.fonte,
-                endpoint=URL_AGENTES,
-                identificador="agentes",
-                payload=resposta.json(),
-            )
-        ]
+        return RawRecord(
+            fonte=self.fonte,
+            endpoint=URL_AGENTES,
+            identificador="agentes",
+            payload=resposta.json(),
+        )
 
     def parse(self, registros: Sequence[RawRecord]) -> list[dict[str, Any]]:
-        agentes: list[dict[str, Any]] = []
+        agentes: dict[str, dict[str, Any]] = {}
+        estatisticas: dict[str, dict[str, Any]] = {}
+
         for registro in registros:
+            if registro.identificador == "estatisticas":
+                for linha in registro.payload or []:
+                    if isinstance(linha, dict) and linha.get("id_externo"):
+                        estatisticas[linha["id_externo"]] = linha
+                continue
+
             payload = registro.payload
             if not isinstance(payload, dict):
                 continue
             for bruto in payload.get("data") or []:
                 agente = _normalizar_agente(bruto)
                 if agente is not None:
-                    agentes.append(agente)
-        return agentes
+                    agentes[agente["id_externo"]] = agente
+
+        # O casamento e por uuid: o OP.GG usa o MESMO identificador de agente
+        # que a valorant-api.com, entao nao ha heuristica de nome no meio.
+        for id_externo, agente in agentes.items():
+            numeros = estatisticas.get(id_externo)
+            if numeros:
+                agente["partidas"] = numeros.get("partidas")
+                agente["vitorias"] = numeros.get("vitorias")
+                agente["metricas"] = numeros.get("metricas") or {}
+
+        return list(agentes.values())
 
     def load(self, dados: list[dict[str, Any]]) -> int:
-        from etl.load_valorant import carregar_agentes
+        from etl.load_valorant import carregar_agentes, carregar_estatisticas
 
-        return carregar_agentes(dados)
+        carregados = carregar_agentes(dados)
+        carregar_estatisticas(dados)
+        return carregados
 
 
 def _normalizar_agente(bruto: Any) -> dict[str, Any] | None:

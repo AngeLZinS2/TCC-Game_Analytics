@@ -10,11 +10,13 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+from datetime import datetime, timezone
+
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from collectors.valorant_agentes import JOGO
-from db.models import DimJogo, DimPersonagem
+from db.models import DimJogo, DimPersonagem, FatoEstatisticaPersonagem
 from db.session import session_scope
 
 logger = logging.getLogger(__name__)
@@ -63,4 +65,66 @@ def carregar_agentes(agentes: list[dict[str, Any]]) -> int:
         sessao.execute(stmt)
 
     logger.info("agentes de valorant carregados", extra={"agentes": len(linhas)})
+    return len(linhas)
+
+
+def carregar_estatisticas(agentes: list[dict[str, Any]]) -> int:
+    """Snapshot das metricas agregadas de cada agente.
+
+    So grava quem veio COM metrica: agente sem numero nao vira linha de zeros -
+    a diferenca entre "o OP.GG nao publicou" e "e zero" e exatamente o que a
+    tela precisa poder dizer.
+
+    A janela e truncada na hora, como `fato_snapshot_jogo_steam`: duas coletas
+    na mesma hora viram um UPDATE em vez de duas linhas, e a serie fica com o
+    grao que a coleta realmente tem.
+    """
+    com_numero = [a for a in agentes if a.get("metricas")]
+    if not com_numero:
+        return 0
+
+    janela = datetime.now(timezone.utc).replace(minute=0, second=0, microsecond=0)
+
+    with session_scope() as sessao:
+        id_jogo = sessao.scalar(select(DimJogo.id_jogo).where(DimJogo.codigo == JOGO))
+        if id_jogo is None:
+            raise JogoNaoCadastradoError(f"jogo {JOGO!r} ausente em dim_jogo")
+
+        chaves = {
+            id_externo: id_personagem
+            for id_externo, id_personagem in sessao.execute(
+                select(DimPersonagem.id_externo, DimPersonagem.id_personagem).where(
+                    DimPersonagem.id_jogo == id_jogo
+                )
+            )
+        }
+
+        linhas = [
+            {
+                "id_personagem": chaves[agente["id_externo"]],
+                "janela_coleta": janela,
+                "fonte": "opgg",
+                "partidas": agente.get("partidas"),
+                "vitorias": agente.get("vitorias"),
+                "metricas": agente["metricas"],
+            }
+            for agente in com_numero
+            if agente["id_externo"] in chaves
+        ]
+        if not linhas:
+            return 0
+
+        stmt = pg_insert(FatoEstatisticaPersonagem).values(linhas)
+        sessao.execute(
+            stmt.on_conflict_do_update(
+                constraint="uq_estatistica_personagem_janela",
+                set_={
+                    "partidas": stmt.excluded.partidas,
+                    "vitorias": stmt.excluded.vitorias,
+                    "metricas": stmt.excluded.metricas,
+                },
+            )
+        )
+
+    logger.info("estatistica de agentes carregada", extra={"agentes": len(linhas)})
     return len(linhas)

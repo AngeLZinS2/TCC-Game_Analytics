@@ -235,6 +235,17 @@ def estatisticas_agentes_valorant() -> list[dict[str, Any]]:
         decididas = vitorias + derrotas
         if not isinstance(uuid, str) or not decididas:
             continue
+        # As metricas que o genero tatico usa. Sao derivadas dos brutos que o
+        # OP.GG ja manda - nao ha estimativa aqui, so divisao.
+        tiros = (
+            (bruto.get("headShots") or 0)
+            + (bruto.get("bodyShots") or 0)
+            + (bruto.get("legShots") or 0)
+        )
+        rounds = bruto.get("rounds") or 0
+        mortes = bruto.get("deaths") or 0
+        primeiros = (bruto.get("firstKills") or 0) + (bruto.get("firstDeaths") or 0)
+
         agentes.append(
             {
                 # Minusculo: e assim que a valorant-api.com entrega, e e assim
@@ -246,6 +257,43 @@ def estatisticas_agentes_valorant() -> list[dict[str, Any]]:
                 # Empate existe no Valorant e nao cabe em "venceu ou perdeu":
                 # fica fora do denominador em vez de contar como meia derrota.
                 "winrate": round(100 * vitorias / decididas, 1),
+                "metricas": {
+                    # Sobre TIROS DADOS, nao sobre abates: e assim que a
+                    # comunidade do genero le "HS%", e o denominador certo e o
+                    # que a mira controla.
+                    "hs": round(100 * (bruto.get("headShots") or 0) / tiros, 1)
+                    if tiros
+                    else None,
+                    "adr": round((bruto.get("damage") or 0) / rounds, 1)
+                    if rounds
+                    else None,
+                    "acs": round((bruto.get("score") or 0) / rounds, 1)
+                    if rounds
+                    else None,
+                    # Sem morte nenhuma o KDA seria divisao por zero; a
+                    # convencao do genero e dividir por 1.
+                    "kda": round(
+                        ((bruto.get("kills") or 0) + (bruto.get("assists") or 0))
+                        / max(1, mortes),
+                        2,
+                    ),
+                    # Duelo de abertura ganho sobre duelo de abertura disputado.
+                    "entrada": round(
+                        100 * (bruto.get("firstKills") or 0) / primeiros, 1
+                    )
+                    if primeiros
+                    else None,
+                    "spike": round(
+                        (
+                            (bruto.get("bombPlantings") or 0)
+                            + (bruto.get("bombDefusings") or 0)
+                        )
+                        / rounds,
+                        3,
+                    )
+                    if rounds
+                    else None,
+                },
             }
         )
 

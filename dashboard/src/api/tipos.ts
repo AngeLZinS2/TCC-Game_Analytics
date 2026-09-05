@@ -190,6 +190,37 @@ export interface JogoDisponivel {
    */
   equipes: number;
   agenda: number;
+  /** Heróis, agentes ou campeões cadastrados. */
+  personagens: number;
+}
+
+/** Uma coluna de estatística, com o rótulo que o esporte dela usa. */
+export interface MetricaEsporte {
+  chave: string;
+  rotulo: string;
+  descricao: string;
+  unidade: string;
+  casas: number;
+  /** `false` em métricas onde menor é melhor (mortes por partida). */
+  maior_melhor: boolean;
+}
+
+/**
+ * Como um esporte nomeia e mede seus personagens.
+ *
+ * A tela desenhava "KDA / GPM / XPM" fixo, que é o vocabulário do Dota: pedir
+ * ouro por minuto de um agente de Valorant é pedir um número que o jogo não
+ * produz. `metricas` vazio é a declaração honesta de que não há fonte de
+ * estatística por personagem naquele esporte.
+ */
+export interface PerfilEsporte {
+  substantivo: string;
+  substantivo_plural: string;
+  metricas: MetricaEsporte[];
+  fonte: string;
+  nota_fonte: string;
+  /** `true` quando a API reordena de verdade por `ordenar_por`. */
+  ordenavel: boolean;
 }
 
 export interface ResumoPersonagem {
@@ -199,12 +230,10 @@ export interface ResumoPersonagem {
   partidas: number;
   vitorias: number;
   winrate: number;
-  kda_medio: number | null;
-  kills_media: number | null;
-  deaths_media: number | null;
-  assists_media: number | null;
-  economia_por_minuto_media: number | null;
-  experiencia_por_minuto_media: number | null;
+  /** Função no time, quando a fonte declara ("Duelista", "Sentinela"). */
+  papel: string | null;
+  /** As métricas do esporte, pela chave que o perfil declara. */
+  metricas: Record<string, number | null>;
 }
 
 export interface Partida {

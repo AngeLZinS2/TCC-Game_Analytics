@@ -12,7 +12,7 @@
 
 import { useMemo, useState } from "react";
 
-import { usePersonagens, useSaude } from "../api/consultas";
+import { usePerfilEsporte, usePersonagens, useSaude } from "../api/consultas";
 import type { ResumoPersonagem } from "../api/tipos";
 import { Botao, Consulta, Icone, Selo } from "../componentes/base";
 import { RetratoHeroi } from "../componentes/RetratoHeroi";
@@ -124,6 +124,8 @@ export function HeroisPagina() {
   const [ordenacao, setOrdenacao] = useState<Ordenacao>("winrate");
   const [busca, setBusca] = useState("");
 
+  // O vocabulário do esporte: como ele chama seus personagens e o que mede.
+  const perfil = usePerfilEsporte(jogo);
   const personagens = usePersonagens({
     jogo,
     min_partidas: minPartidas,
@@ -143,11 +145,14 @@ export function HeroisPagina() {
   );
 
   const tabela = useMemo(() => {
+    // `kda` pela chave genérica: ela existe em Dota e em Valorant, mas com
+    // origens diferentes, e ler um campo fixo do schema só funcionava enquanto
+    // o schema fosse o do Dota.
     const chave = (h: ResumoPersonagem) =>
       ordenacao === "partidas"
         ? h.partidas
         : ordenacao === "kda"
-          ? (h.kda_medio ?? 0)
+          ? (h.metricas.kda ?? 0)
           : h.winrate;
     return [...filtrados].sort((a, b) => chave(b) - chave(a));
   }, [filtrados, ordenacao]);
@@ -164,7 +169,7 @@ export function HeroisPagina() {
         <div className="flex flex-col gap-space-xs">
           <div className="flex flex-wrap items-center gap-space-sm">
             <h1 className="font-headline-lg text-headline-lg uppercase tracking-wide text-primary drop-shadow-[0_0_12px_rgba(0,229,255,0.4)]">
-              Heróis
+              {(perfil.data?.substantivo_plural ?? "Personagens").toUpperCase()}
             </h1>
             <div className="inline-flex items-center gap-space-xs rounded bg-surface-container-high px-space-sm py-space-xxs shadow-inner">
               <span className="relative flex h-2.5 w-2.5">
@@ -211,7 +216,13 @@ export function HeroisPagina() {
 
       {/* ==================== FILTROS ==================== */}
       <section className="flex flex-wrap items-center gap-space-md rounded-xl bg-surface-container-low/90 p-space-base shadow-lg">
-        <SeletorDeJogo />
+        {/*
+          O padrão exige `partidas > 0`, que é a fonte por jogador. Esta
+          tela também serve o esporte cujo elenco vem com estatística
+          agregada: Valorant tem 29 agentes com HS%, ADR e KDA e zero linha
+          em `fato_partida_jogador`.
+        */}
+        <SeletorDeJogo disponivel={(j) => j.partidas > 0 || j.personagens > 0} />
 
         <label className="flex items-center gap-space-xs">
           <span className="font-label-caps text-label-caps uppercase tracking-widest text-outline">
@@ -259,7 +270,7 @@ export function HeroisPagina() {
           return (
             <section className="grid grid-cols-1 gap-space-base md:grid-cols-2 xl:grid-cols-4">
               <KpiHud
-                etiqueta="Heróis no recorte"
+                etiqueta={`${perfil.data?.substantivo_plural ?? "Personagens"} no recorte`}
                 canto={`MÍN. ${minPartidas}`}
                 valor={fmtNumero(lista.length)}
                 valorNumerico={lista.length}
@@ -277,7 +288,7 @@ export function HeroisPagina() {
                 valor={fmtNumero(acima)}
                 valorNumerico={acima}
                 formatarValor={fmtNumero}
-                rotulo="Heróis com mais vitórias que derrotas"
+                rotulo={`${perfil.data?.substantivo_plural ?? "Personagens"} com mais vitórias que derrotas`}
                 acento="terciaria"
                 notaVariacao={`${fmtNumero(lista.length - acima)} abaixo ou na linha`}
               >
@@ -319,7 +330,7 @@ export function HeroisPagina() {
       {/* ==================== DISTRIBUICAO DIVERGENTE ==================== */}
       <Painel
         icone="compare_arrows"
-        titulo={`Distribuição de winrate // top ${NO_GRAFICO} heróis`}
+        titulo={`Distribuição de winrate // top ${NO_GRAFICO} ${perfil.data?.substantivo_plural ?? "personagens"}`}
         descricao="Distância até os 50%: à direita, mais vitórias que derrotas; à esquerda, o contrário."
         meta={
           <span className="font-badge-status text-badge-status tracking-widest text-outline">
@@ -327,7 +338,12 @@ export function HeroisPagina() {
           </span>
         }
       >
-        <Consulta estado={personagens} vazio="Nenhum herói atinge esse mínimo de partidas.">
+        <Consulta
+          estado={personagens}
+          vazio={`Nenhum ${
+            perfil.data?.substantivo ?? "personagem"
+          } atinge esse mínimo de partidas.`}
+        >
           {() =>
             noGrafico.length === 0 ? (
               <p className="rounded bg-surface-container px-space-base py-space-md font-body-md text-body-md text-on-surface-variant">
@@ -388,10 +404,21 @@ export function HeroisPagina() {
       <Painel
         icone="table_rows"
         titulo="Matriz de telemetria"
-        descricao="Médias por partida jogada, no recorte de filtros acima."
+        // A procedência muda com o esporte, e afirmá-la errada é o mesmo
+        // defeito de rotular dado de terceiro como medição nossa: as
+        // médias do Dota são nossas, as do Valorant são do OP.GG.
+        descricao={
+          perfil.data?.nota_fonte
+            ? `${perfil.data.nota_fonte} No recorte de filtros acima.`
+            : "Médias no recorte de filtros acima."
+        }
         meta={
           <div className="flex flex-wrap items-center gap-space-xs">
-            {ORDENACOES.map((opcao) => (
+            {/* Só onde a API reordena de verdade. No agregado a ordem vem
+                pronta da fonte, por volume, e uma pílula que não reordena
+                nada é pior que pílula nenhuma. */}
+            {(perfil.data?.ordenavel ?? true) &&
+              ORDENACOES.map((opcao) => (
               <Pilula
                 key={opcao.valor}
                 ativa={ordenacao === opcao.valor}
@@ -410,16 +437,27 @@ export function HeroisPagina() {
               <table className="w-full border-collapse text-left">
                 <thead>
                   <tr className="bg-surface-container font-label-caps text-label-caps uppercase tracking-wider text-outline">
-                    <th className="px-space-md py-space-sm">Herói</th>
+                    <th className="px-space-md py-space-sm">
+                      {perfil.data?.substantivo ?? "Personagem"}
+                    </th>
                     <th className="px-space-md py-space-sm text-right">Partidas</th>
                     <th className="px-space-md py-space-sm text-right">Vitórias</th>
                     <th className="px-space-md py-space-sm">Winrate</th>
-                    <th className="px-space-md py-space-sm text-right">KDA</th>
-                    <th className="px-space-md py-space-sm text-right">K</th>
-                    <th className="px-space-md py-space-sm text-right">D</th>
-                    <th className="px-space-md py-space-sm text-right">A</th>
-                    <th className="px-space-md py-space-sm text-right">GPM</th>
-                    <th className="px-space-md py-space-sm text-right">XPM</th>
+                    {/*
+                      As colunas vêm do perfil do esporte. Eram "KDA / K / D / A
+                      / GPM / XPM" fixas — o vocabulário do Dota —, e um agente
+                      de Valorant não tem ouro por minuto: a coluna vazia
+                      sugeriria dado faltando quando o número não existe no jogo.
+                    */}
+                    {(perfil.data?.metricas ?? []).map((m) => (
+                      <th
+                        key={m.chave}
+                        className="px-space-md py-space-sm text-right"
+                        title={m.descricao}
+                      >
+                        {m.rotulo}
+                      </th>
+                    ))}
                   </tr>
                 </thead>
 
@@ -470,24 +508,23 @@ export function HeroisPagina() {
                           </div>
                         </td>
 
-                        <td className="px-space-md py-space-sm text-right font-title-code text-title-code tabular-nums text-primary">
-                          {fmtDecimal(heroi.kda_medio, 2)}
-                        </td>
-                        <td className="px-space-md py-space-sm text-right font-title-code text-title-code tabular-nums text-on-surface-variant">
-                          {fmtDecimal(heroi.kills_media, 1)}
-                        </td>
-                        <td className="px-space-md py-space-sm text-right font-title-code text-title-code tabular-nums text-on-surface-variant">
-                          {fmtDecimal(heroi.deaths_media, 1)}
-                        </td>
-                        <td className="px-space-md py-space-sm text-right font-title-code text-title-code tabular-nums text-on-surface-variant">
-                          {fmtDecimal(heroi.assists_media, 1)}
-                        </td>
-                        <td className="px-space-md py-space-sm text-right font-title-code text-title-code tabular-nums text-on-surface-variant">
-                          {fmtNumero(heroi.economia_por_minuto_media)}
-                        </td>
-                        <td className="px-space-md py-space-sm text-right font-title-code text-title-code tabular-nums text-on-surface-variant">
-                          {fmtNumero(heroi.experiencia_por_minuto_media)}
-                        </td>
+                        {(perfil.data?.metricas ?? []).map((m, i) => {
+                          const valor = heroi.metricas[m.chave];
+                          return (
+                            <td
+                              key={m.chave}
+                              className={`px-space-md py-space-sm text-right font-title-code text-title-code tabular-nums ${
+                                i === 0 ? "text-primary" : "text-on-surface-variant"
+                              }`}
+                            >
+                              {/* Sem valor é "—", não zero: a fonte pode não
+                                  publicar aquela métrica para aquele personagem. */}
+                              {valor === null || valor === undefined
+                                ? "—"
+                                : `${fmtDecimal(valor, m.casas)}${m.unidade}`}
+                            </td>
+                          );
+                        })}
                       </tr>
                     );
                   })}

@@ -415,6 +415,46 @@ class DimPersonagem(Base):
     )
 
 
+class FatoEstatisticaPersonagem(Base):
+    """Agregado por personagem, com as metricas que o esporte dele usa.
+
+    Grao diferente de `fato_partida_jogador`: la e uma linha por jogador por
+    partida (so a OpenDota entrega isso, e so para Dota); aqui e "este agente,
+    nesta janela, teve estes numeros", que e como o OP.GG publica Valorant e
+    League - centenas de milhares de partidas resumidas.
+
+    `metricas` e JSONB porque cada esporte mede o que valoriza: taxa de
+    headshot e dano por round num tatico, ouro e experiencia por minuto num
+    MOBA, taxa de banimento em League. Uma coluna por metrica exigiria
+    migration a cada esporte novo e encheria a tabela de nulo. Quem da sentido
+    as chaves e `api/vocabulario_esports.py`.
+    """
+
+    __tablename__ = "fato_estatistica_personagem"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    id_personagem: Mapped[int] = mapped_column(
+        ForeignKey("dim_personagem.id_personagem"), nullable=False
+    )
+    janela_coleta: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+    #: Quem publicou o numero - "opgg" hoje. Nao e nossa medicao.
+    fonte: Mapped[str] = mapped_column(String(32), nullable=False)
+    partidas: Mapped[int | None] = mapped_column(BigInteger)
+    vitorias: Mapped[int | None] = mapped_column(BigInteger)
+    metricas: Mapped[dict] = mapped_column(JSONB, nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint(
+            "id_personagem", "janela_coleta", name="uq_estatistica_personagem_janela"
+        ),
+        Index(
+            "ix_estatistica_personagem_janela", "id_personagem", "janela_coleta"
+        ),
+    )
+
+
 class DimEquipe(Base):
     """Equipes profissionais, compartilhadas entre os jogos.
 

@@ -231,6 +231,40 @@ class JogoDisponivel(BaseModel):
     partidas: int
     equipes: int = 0
     agenda: int = 0
+    #: Herois, agentes ou campeoes cadastrados. A tela de personagens usa
+    #: isto no lugar de `partidas`: Valorant tem 29 agentes com estatistica
+    #: e zero linha em `fato_partida_jogador`, e o gate por partida o
+    #: deixava de fora da propria tela que o mostra.
+    personagens: int = 0
+
+
+class MetricaEsporte(BaseModel):
+    """Uma coluna de estatistica, com o rotulo que o esporte dela usa."""
+
+    chave: str
+    rotulo: str
+    descricao: str
+    unidade: str = ""
+    casas: int = 1
+    maior_melhor: bool = True
+
+
+class PerfilEsporte(BaseModel):
+    """Como um esporte nomeia e mede seus personagens.
+
+    A tela desenhava "KDA / GPM / XPM" fixo, que e o vocabulario do Dota:
+    pedir ouro por minuto de um agente de Valorant e pedir um numero que o
+    jogo nao produz. Cada esporte declara o seu, e `metricas` vazio e a
+    declaracao honesta de que nao ha fonte de estatistica por personagem.
+    """
+
+    substantivo: str
+    substantivo_plural: str
+    metricas: list[MetricaEsporte] = []
+    fonte: str = ""
+    nota_fonte: str = ""
+    #: `True` quando a API reordena de verdade por `ordenar_por`.
+    ordenavel: bool = False
 
 
 class ResumoPersonagem(BaseModel):
@@ -242,12 +276,17 @@ class ResumoPersonagem(BaseModel):
     partidas: int
     vitorias: int
     winrate: float
-    kda_medio: float | None
-    kills_media: float | None
-    deaths_media: float | None
-    assists_media: float | None
-    economia_por_minuto_media: float | None
-    experiencia_por_minuto_media: float | None
+    #: Funcao dentro do time, quando a fonte declara ("Duelista", "Sentinela").
+    papel: str | None = None
+    #: As metricas do esporte, pela chave que o perfil declara.
+    #:
+    #: Substituiu os campos nomeados que existiam aqui (`kda_medio`,
+    #: `economia_por_minuto_media`...). Eles eram o vocabulario do Dota escrito
+    #: no schema compartilhado: para um agente de Valorant nao ha ouro por
+    #: minuto, e deixa-los como nulo obrigatorio quebrava a resposta inteira.
+    #: Duas formas de expressar a mesma coisa tambem significavam dois lugares
+    #: para esquecer de preencher.
+    metricas: dict[str, float | None] = {}
 
 
 class Partida(BaseModel):
