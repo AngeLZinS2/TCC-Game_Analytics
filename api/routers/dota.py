@@ -476,12 +476,24 @@ def perfil_do_esporte(jogo: str = "dota2") -> PerfilEsporte:
 
 
 def _personagens_agregados(
-    sessao: Session, id_jogo: int, min_partidas: int, limite: int
+    sessao: Session,
+    id_jogo: int,
+    min_partidas: int,
+    limite: int,
+    ordenar_por: "OrdenarHeroi",
 ) -> list[ResumoPersonagem]:
     """Personagens de um jogo cuja fonte publica AGREGADO, nao partida a partida.
 
     E o caso do Valorant no OP.GG: nao ha partida individual, ha "este agente,
     nesta janela, teve estes numeros". Le o snapshot mais recente de cada um.
+
+    A ordenacao acontece em Python porque `winrate` e `kda` sao derivados (o
+    primeiro de vitorias/partidas, o segundo de dentro do JSONB `metricas`) e a
+    lista tem ~170 linhas - nao vale um `ORDER BY` sobre expressao/cast quando
+    ordenar em memoria e trivial. O importante e que ela HONRE `ordenar_por`: a
+    versao anterior devolvia sempre por `partidas`, e a tela - que assume a
+    lista ja em ordem de winrate - mostrava "maior winrate: Kai'Sa 49,4%" (o
+    mais jogado) ao lado de uma tabela liderada por outro campeao a 52,7%.
     """
     recente = (
         select(FatoEstatisticaPersonagem)
@@ -508,11 +520,9 @@ def _personagens_agregados(
             DimPersonagem.id_jogo == id_jogo,
             func.coalesce(recente.c.partidas, 0) >= min_partidas,
         )
-        .order_by(desc(recente.c.partidas))
-        .limit(limite)
     )
 
-    return [
+    personagens = [
         ResumoPersonagem(
             id_personagem=linha.id_personagem,
             nome=linha.nome,
@@ -529,6 +539,23 @@ def _personagens_agregados(
         )
         for linha in sessao.execute(consulta)
     ]
+
+    def _kda(p: ResumoPersonagem) -> float:
+        valor = p.metricas.get("kda")
+        return float(valor) if isinstance(valor, (int, float)) else 0.0
+
+    chave = {
+        "winrate": lambda p: p.winrate,
+        "partidas": lambda p: p.partidas,
+        "kda": _kda,
+        # `economia` nao existe fora de Dota; cai em winrate em vez de dar 500.
+        "economia": lambda p: p.winrate,
+    }[ordenar_por]
+
+    # Desempate por volume: entre dois winrates iguais, o de amostra maior
+    # primeiro - a estatistica dele e a que se sustenta.
+    personagens.sort(key=lambda p: (chave(p), p.partidas), reverse=True)
+    return personagens[:limite]
 
 
 @router.get("/personagens", response_model=list[ResumoPersonagem])
@@ -556,7 +583,9 @@ def listar_personagens(
         .where(FatoPartidaJogador.id_jogo == id_jogo)
         .limit(1)
     ):
-        return _personagens_agregados(sessao, id_jogo, min_partidas, limite)
+        return _personagens_agregados(
+            sessao, id_jogo, min_partidas, limite, ordenar_por
+        )
 
     partidas = func.count().label("partidas")
     vitorias = _vitorias().label("vitorias")

@@ -104,6 +104,36 @@ def test_min_partidas_corta_a_cauda(cliente: TestClient) -> None:
         assert heroi["partidas"] >= 15
 
 
+@pytest.mark.parametrize("jogo", ["dota2", "valorant", "leagueoflegends"])
+def test_personagens_honram_ordenar_por(cliente: TestClient, jogo: str) -> None:
+    """A lista tem que voltar na ordem pedida, nos DOIS caminhos.
+
+    O caminho agregado (Valorant, LoL) ignorava `ordenar_por` e devolvia sempre
+    por numero de partidas. A tela de Herois assume a lista ja ordenada por
+    winrate e mostrava "maior winrate: Kai'Sa 49,4%" (a mais jogada) contra uma
+    tabela liderada por outro campeao a 52,7% - a contradicao que o usuario
+    achou.
+    """
+    por_wr = cliente.get(
+        "/api/partidas/personagens",
+        params={"jogo": jogo, "ordenar_por": "winrate", "limite": 200},
+    ).json()
+    if len(por_wr) < 2:
+        pytest.skip(f"{jogo} sem personagem suficiente")
+
+    winrates = [p["winrate"] for p in por_wr]
+    assert winrates == sorted(winrates, reverse=True)
+
+    por_vol = cliente.get(
+        "/api/partidas/personagens",
+        params={"jogo": jogo, "ordenar_por": "partidas", "limite": 200},
+    ).json()
+    partidas = [p["partidas"] for p in por_vol]
+    assert partidas == sorted(partidas, reverse=True)
+    # E os dois recortes contem o mesmo conjunto - so a ordem muda.
+    assert {p["id_personagem"] for p in por_wr} == {p["id_personagem"] for p in por_vol}
+
+
 def test_detalhe_da_partida_traz_as_duas_equipes(cliente: TestClient) -> None:
     partidas = cliente.get("/api/partidas", params={"limite": 1}).json()
     if not partidas:

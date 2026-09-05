@@ -28,7 +28,20 @@ import {
 import { SeletorDeJogo } from "../componentes/SeletorDeJogo";
 import { useJogoAtual } from "../layout/JogoAtual";
 import { PALETA_POLOS } from "../tema";
+import { desvioConfiavel, intervaloWilson } from "../utilitarios/estatistica";
 import { fmtDecimal, fmtNumero, fmtPercentual } from "../utilitarios/formatos";
+
+/** "IC 95%: 52,2–53,2% · 35.616 partidas" — o rótulo de incerteza de um KPI. */
+function rotuloIntervalo(personagem: ResumoPersonagem): string {
+  const { minimo, maximo } = intervaloWilson(
+    personagem.vitorias,
+    personagem.partidas,
+  );
+  return (
+    `IC 95%: ${fmtDecimal(minimo * 100, 1)}–${fmtDecimal(maximo * 100, 1)}% · ` +
+    `${fmtNumero(personagem.partidas)} partidas`
+  );
+}
 
 const NO_GRAFICO = 10;
 
@@ -45,11 +58,26 @@ type Ordenacao = (typeof ORDENACOES)[number]["valor"];
  *
  * Mostrar so os mais vitoriosos encheria um lado so do eixo e desperdicaria a
  * forma - o que interessa e ver os dois extremos em torno dos 50%.
+ *
+ * `itens` chega ordenado por winrate (a API ordena). Antes de fatiar as
+ * pontas, tira quem NAO se afasta dos 50% com confianca: um heroi a 78% em 9
+ * partidas tem intervalo [45%, 94%] e o ponto dele so parece extremo. Sem esse
+ * filtro o grafico virava um ranking de amostras pequenas com sorte.
+ *
+ * Filtra SEMPRE, mesmo que sobrem menos de `quantidade`: com a coleta atual de
+ * Dota (17 partidas no maximo por heroi) o grafico honesto tem 5 barras, nao
+ * 10. Zero barras cai no estado vazio, que explica o porque.
  */
 function extremos(itens: ResumoPersonagem[], quantidade: number): ResumoPersonagem[] {
-  if (itens.length <= quantidade) return itens;
+  const confiaveis = itens.filter(
+    (h) => desvioConfiavel(h.vitorias, h.partidas) !== 0,
+  );
+  if (confiaveis.length <= quantidade) return confiaveis;
   const metade = Math.floor(quantidade / 2);
-  return [...itens.slice(0, quantidade - metade), ...itens.slice(-metade)];
+  return [
+    ...confiaveis.slice(0, quantidade - metade),
+    ...confiaveis.slice(-metade),
+  ];
 }
 
 /** Uma linha do grafico divergente: nome + retrato de um lado, barra do outro. */
@@ -92,10 +120,16 @@ function LinhaDivergente({
     </div>
   );
 
+  const intervalo = intervaloWilson(heroi.vitorias, heroi.partidas);
+
   return (
     <div
       className="group flex h-8 w-full items-center"
-      title={`${heroi.nome}: ${fmtPercentual(heroi.winrate)} em ${heroi.partidas} partidas`}
+      title={
+        `${heroi.nome}: ${fmtPercentual(heroi.winrate)} em ` +
+        `${fmtNumero(heroi.partidas)} partidas — IC 95%: ` +
+        `${fmtDecimal(intervalo.minimo * 100, 1)}–${fmtDecimal(intervalo.maximo * 100, 1)}%`
+      }
     >
       {positivo ? (
         <>
@@ -270,6 +304,18 @@ export function HeroisPagina() {
           const acima = lista.filter((h) => h.winrate > 50).length;
           const escolhas = lista.reduce((t, h) => t + h.partidas, 0);
 
+          // argmax/argmin explicitos, nao `lista[0]`/`lista.at(-1)`: a KPI de
+          // superlativo tem que bater com a linha de topo da tabela SEMPRE,
+          // independente da ordem em que a API devolveu. Foi o descasamento
+          // exato que a tela mostrava - "maior winrate: Kai'Sa 49,4%" (o mais
+          // jogado) contra a tabela liderada por outro campeao a 52,7%.
+          const maiorWr = lista.length
+            ? lista.reduce((a, b) => (b.winrate > a.winrate ? b : a))
+            : null;
+          const menorWr = lista.length
+            ? lista.reduce((a, b) => (b.winrate < a.winrate ? b : a))
+            : null;
+
           return (
             <section className="grid grid-cols-1 gap-space-base md:grid-cols-2 xl:grid-cols-4">
               <KpiHud
@@ -305,25 +351,19 @@ export function HeroisPagina() {
               <KpiHud
                 etiqueta="Maior winrate"
                 canto="TOPO"
-                valor={lista.length ? fmtPercentual(lista[0].winrate) : "—"}
-                rotulo={lista.length ? lista[0].nome : "sem dados"}
+                valor={maiorWr ? fmtPercentual(maiorWr.winrate) : "—"}
+                rotulo={maiorWr ? maiorWr.nome : "sem dados"}
                 acento="secundaria"
-                notaVariacao={
-                  lista.length ? `${fmtNumero(lista[0].partidas)} partidas` : undefined
-                }
+                notaVariacao={maiorWr ? rotuloIntervalo(maiorWr) : undefined}
               />
 
               <KpiHud
                 etiqueta="Menor winrate"
                 canto="CAUDA"
-                valor={lista.length ? fmtPercentual(lista.at(-1)!.winrate) : "—"}
-                rotulo={lista.length ? lista.at(-1)!.nome : "sem dados"}
+                valor={menorWr ? fmtPercentual(menorWr.winrate) : "—"}
+                rotulo={menorWr ? menorWr.nome : "sem dados"}
                 acento="primaria"
-                notaVariacao={
-                  lista.length
-                    ? `${fmtNumero(lista.at(-1)!.partidas)} partidas`
-                    : undefined
-                }
+                notaVariacao={menorWr ? rotuloIntervalo(menorWr) : undefined}
               />
             </section>
           );
@@ -333,8 +373,10 @@ export function HeroisPagina() {
       {/* ==================== DISTRIBUICAO DIVERGENTE ==================== */}
       <Painel
         icone="compare_arrows"
-        titulo={`Distribuição de winrate // top ${NO_GRAFICO} ${perfil.data?.substantivo_plural ?? "personagens"}`}
-        descricao="Distância até os 50%: à direita, mais vitórias que derrotas; à esquerda, o contrário."
+        titulo={`Distribuição de winrate // ${
+          noGrafico.length && noGrafico.length < NO_GRAFICO ? noGrafico.length : `top ${NO_GRAFICO}`
+        } ${perfil.data?.substantivo_plural ?? "personagens"}`}
+        descricao="Distância até os 50%: à direita, mais vitórias que derrotas; à esquerda, o contrário. Só entram os que se afastam dos 50% com 95% de confiança — winrate alto em poucas partidas fica de fora."
         meta={
           <span className="font-badge-status text-badge-status tracking-widest text-outline">
             LOC: {jogo.toUpperCase()}-META // H-01
@@ -350,7 +392,9 @@ export function HeroisPagina() {
           {() =>
             noGrafico.length === 0 ? (
               <p className="rounded bg-surface-container px-space-base py-space-md font-body-md text-body-md text-on-surface-variant">
-                Nenhum herói bate com a busca.
+                {filtrados.length === 0
+                  ? "Nenhum personagem bate com a busca."
+                  : "Nenhum se afasta dos 50% com 95% de confiança neste recorte — as amostras são pequenas demais. Aumente o mínimo de partidas para um recorte mais estável, ou aguarde mais coleta."}
               </p>
             ) : (
               <div className="relative w-full pt-space-lg">
@@ -396,9 +440,17 @@ export function HeroisPagina() {
               Abaixo de 50%
             </span>
           </span>
-          <span>
-            Escala simétrica · ±
-            <span className="text-primary">{fmtDecimal(limite, 1)} pontos</span>
+          <span className="flex items-center gap-space-base">
+            {noGrafico.length < NO_GRAFICO && (
+              <span>
+                <span className="text-primary">{noGrafico.length}</span> com
+                margem — os demais têm amostra curta
+              </span>
+            )}
+            <span>
+              Escala simétrica · ±
+              <span className="text-primary">{fmtDecimal(limite, 1)} pontos</span>
+            </span>
           </span>
         </div>
       </Painel>
