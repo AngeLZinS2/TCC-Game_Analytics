@@ -828,7 +828,13 @@ export function PrevisaoConfrontoPagina() {
           <Painel
             icone="view_kanban"
             titulo="Próximos confrontos"
-            descricao="Calendário da Liquipedia, uma coluna por dia. Clique num card para ver as estatísticas e o porquê."
+            // Era "Calendário da Liquipedia" fixo. Deixou de ser verdade
+            // quando League of Legends passou a vir do OP.GG: a frase é uma
+            // afirmação de procedência, e afirmar a fonte errada é o mesmo
+            // defeito que marcar dado de terceiro como medição nossa.
+            descricao={`Calendário ${
+              jogo === "leagueoflegends" ? "do OP.GG" : "da Liquipedia"
+            }, uma coluna por dia. Clique num card para ver as estatísticas e o porquê.`}
             meta={
               <Pilula
                 ativa={soComPrevisao}

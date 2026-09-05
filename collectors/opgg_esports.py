@@ -48,10 +48,23 @@ JOGO = "leagueoflegends"
 #: Prefixo de namespace - ver o docstring do modulo.
 PREFIXO = "opgg:"
 
-#: O servidor devolve a janela inteira de jogos por vir (~67) independente do
-#: valor, mas trava os resultados em 50. Pedir mais nao custa nem traz mais;
-#: o historico cresce pela repeticao das rodadas, nao pelo tamanho do pedido.
+#: O teto por chamada. O servidor ignora valores maiores.
 LIMITE = 50
+
+#: Ligas conhecidas, usadas como semente da varredura.
+#:
+#: **A varredura por liga e o que torna esta fonte util para previsao.** Sem
+#: filtro, `mode=result` devolve 50 confrontos e para - com 61 equipes, cada
+#: time ficava com uma ou duas partidas e o Bradley-Terry nao superava a taxa
+#: base (ROC-AUC 0.30). Pedindo liga por liga, cada uma devolve os SEUS 50: sao
+#: 500 confrontos unicos, dez vezes mais, e ai cada time tem historico de
+#: verdade.
+#:
+#: A lista e semente, nao limite: `_ligas()` a une com o que aparece na janela
+#: sem filtro, entao uma liga nova entra sozinha na rodada seguinte.
+LIGAS_CONHECIDAS = (
+    "LCK", "LPL", "LEC", "LCS", "LCP", "CBLOL", "TCL", "LJL", "VCS", "AL",
+)
 
 
 @dataclass
@@ -99,28 +112,56 @@ class OpggEsportsCollector(BaseCollector[ResultadoOpggEsports]):
 
     fonte = "opgg_esports"
 
-    def collect(self) -> list[RawRecord]:
-        registros: list[RawRecord] = []
-        for modo in ("schedule", "result"):
-            try:
-                dados = opgg_mcp.chamar_ferramenta(
-                    FERRAMENTA, {"mode": modo, "limit": LIMITE}
-                )
-            except opgg_mcp.OpggIndisponivel as exc:
-                # Uma das duas janelas pode falhar sem levar a outra junto: ter
-                # so os resultados ja e melhor do que nao ter nada.
-                self.logger.warning(
-                    "janela do opgg falhou", extra={"modo": modo, "erro": str(exc)}
-                )
-                continue
-            registros.append(
-                RawRecord(
-                    fonte=self.fonte,
-                    endpoint=FERRAMENTA,
-                    identificador=modo,
-                    payload=dados,
-                )
+    def _janela(self, modo: str, liga: str | None) -> RawRecord | None:
+        """Uma chamada. Devolve `None` quando ela falha, sem levar as outras."""
+        argumentos: dict[str, Any] = {"mode": modo, "limit": LIMITE}
+        if liga:
+            argumentos["league"] = liga
+        try:
+            dados = opgg_mcp.chamar_ferramenta(FERRAMENTA, argumentos)
+        except opgg_mcp.OpggIndisponivel as exc:
+            # Uma liga fora do ar nao pode custar as outras nove: ter parte do
+            # historico e melhor do que nao ter nenhum.
+            self.logger.warning(
+                "janela do opgg falhou",
+                extra={"modo": modo, "liga": liga, "erro": str(exc)},
             )
+            return None
+        return RawRecord(
+            fonte=self.fonte,
+            endpoint=FERRAMENTA,
+            identificador=f"{modo}:{liga or 'todas'}",
+            payload=dados,
+        )
+
+    def _ligas(self, registros: list[RawRecord]) -> list[str]:
+        """As ligas conhecidas mais as que apareceram nas janelas sem filtro.
+
+        A descoberta acontece a partir do que ja foi baixado, sem chamada
+        extra: uma liga nova (um regional que estreia) entra sozinha na rodada
+        seguinte, em vez de esperar alguem editar a constante.
+        """
+        vistas = set(LIGAS_CONHECIDAS)
+        for registro in registros:
+            for partida in registro.payload or []:
+                if isinstance(partida, dict) and isinstance(partida.get("league"), str):
+                    vistas.add(partida["league"])
+        return sorted(vistas)
+
+    def collect(self) -> list[RawRecord]:
+        # Primeiro sem filtro: e o que descobre liga nova e ja traz a janela
+        # geral de jogos por vir.
+        registros = [
+            registro
+            for modo in ("schedule", "result")
+            if (registro := self._janela(modo, None)) is not None
+        ]
+
+        for liga in self._ligas(registros):
+            registro = self._janela("result", liga)
+            if registro is not None:
+                registros.append(registro)
+
         return registros
 
     def parse(self, registros: Sequence[RawRecord]) -> ResultadoOpggEsports:

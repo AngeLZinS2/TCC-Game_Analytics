@@ -8,6 +8,7 @@ tela, e placar errado e pior do que tela vazia.
 from __future__ import annotations
 
 from collectors.opgg_esports import (
+    LIGAS_CONHECIDAS,
     OpggEsportsCollector,
     ResultadoOpggEsports,
     _converter,
@@ -128,3 +129,41 @@ def test_total_e_o_atributo_que_a_cli_le():
     resultado = ResultadoOpggEsports()
     assert resultado.total == 0
     assert hasattr(resultado, "total")
+
+
+def test_ligas_une_a_semente_com_o_que_apareceu():
+    """A varredura por liga e o que da volume - e a lista nao pode ser fixa.
+
+    Sem filtro, `mode=result` devolve 50 confrontos e para; pedindo liga por
+    liga sao ~500, e com 99 equipes isso e a diferenca entre cada time ter duas
+    partidas e ter dez. A constante e semente: uma liga nova precisa entrar
+    sozinha, sem alguem editar codigo.
+    """
+    coletor = OpggEsportsCollector(raw_storage=None)
+    registros = [
+        RawRecord(
+            fonte="opgg_esports",
+            endpoint="x",
+            identificador="schedule:todas",
+            payload=[_partida(league="NOVA_LIGA"), _partida(league="LCK")],
+        )
+    ]
+
+    ligas = coletor._ligas(registros)
+
+    assert "NOVA_LIGA" in ligas
+    # As conhecidas continuam, mesmo sem aparecer na janela desta rodada.
+    assert {"LCK", "LPL", "LEC", "CBLOL"} <= set(ligas)
+    # Sem repetir: a liga vista E conhecida entra uma vez so.
+    assert len(ligas) == len(set(ligas))
+
+
+def test_ligas_ignora_payload_estranho():
+    """Uma janela que falhou vira payload vazio, nao excecao no meio da varredura."""
+    coletor = OpggEsportsCollector(raw_storage=None)
+    registros = [
+        RawRecord(fonte="f", endpoint="x", identificador="i", payload=None),
+        RawRecord(fonte="f", endpoint="x", identificador="i", payload=["lixo", 42]),
+    ]
+
+    assert set(coletor._ligas(registros)) == set(LIGAS_CONHECIDAS)
