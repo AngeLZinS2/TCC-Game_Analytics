@@ -163,6 +163,30 @@ class JogoRecomendado:
 
 
 @dataclass
+class PontoSerie:
+    rotulo: str
+    valor: float
+    detalhe: str | None = None
+
+
+@dataclass
+class SerieAssistente:
+    """Os numeros de um bloco, estruturados - o que permite a tela desenhar
+    grafico sem inventar nada.
+
+    Nasce da MESMA consulta que escreve o texto do bloco, nao de reler o texto
+    depois: interpretar de volta o que nos mesmos formatamos seria fragil, e
+    interpretar a resposta do modelo seria pior ainda. O texto e a serie sao
+    duas saidas da mesma linha de SQL.
+    """
+
+    chave: str
+    titulo: str
+    unidade: str
+    itens: list[PontoSerie] = field(default_factory=list)
+
+
+@dataclass
 class JogoAoVivo:
     """O jogo identificado por `_bloco_steam_ao_vivo`, com preco de outras
     lojas - pronto pra tela desenhar o banner, esteja o jogo no nosso banco ou
@@ -203,6 +227,9 @@ class Resposta:
     #: O jogo citado na pergunta, quando `_bloco_steam_ao_vivo` o identificou -
     #: `None` na maioria das perguntas (que nao citam um jogo especifico).
     jogo_ao_vivo: JogoAoVivo | None = None
+    #: Os numeros dos blocos usados, estruturados. A tela so desenha grafico
+    #: se isto vier preenchido - nunca lendo de volta o texto da resposta.
+    series: list[SerieAssistente] = field(default_factory=list)
     tokens_entrada: int | None = None
     tokens_saida: int | None = None
 
@@ -256,7 +283,7 @@ def _bloco_geral(sessao) -> Bloco:
     return Bloco("geral", "Volumes do banco", "\n".join(l for l in linhas if l))
 
 
-def _bloco_steam(sessao) -> Bloco:
+def _bloco_steam(sessao) -> tuple[Bloco, SerieAssistente]:
     recentes = (
         select(FatoSnapshotJogoSteam)
         .distinct(FatoSnapshotJogoSteam.app_id)
@@ -267,6 +294,7 @@ def _bloco_steam(sessao) -> Bloco:
     )
 
     linhas = []
+    pontos: list[PontoSerie] = []
     for nome, generos, jogadores, nota, preco, moeda in sessao.execute(
         select(
             DimJogoSteam.nome,
@@ -289,12 +317,27 @@ def _bloco_steam(sessao) -> Bloco:
             f"{jogadores or 0} jogadores simultaneos, "
             f"{nota or '-'}% de avaliacoes positivas, {preco_texto}"
         )
+        if jogadores:
+            pontos.append(
+                PontoSerie(
+                    rotulo=nome,
+                    valor=float(jogadores),
+                    detalhe=f"{nota}% positivas" if nota is not None else None,
+                )
+            )
 
-    return Bloco(
+    bloco = Bloco(
         "steam",
         "Catalogo da Steam (ultimo snapshot de cada jogo)",
         "\n".join(linhas) or "Nenhum jogo coletado.",
     )
+    serie = SerieAssistente(
+        chave="steam",
+        titulo="Jogadores simultâneos agora",
+        unidade="jogadores",
+        itens=pontos[:8],
+    )
+    return bloco, serie
 
 
 # ---------------------------------------------------------------------------
@@ -553,7 +596,7 @@ def _bloco_extremo_avaliacao(pergunta: str) -> Bloco | None:
     )
 
 
-def _bloco_partidas(sessao) -> Bloco:
+def _bloco_partidas(sessao) -> tuple[Bloco, None]:
     total = sessao.scalar(select(func.count()).select_from(DimPartida)) or 0
     duracao = sessao.scalar(select(func.avg(DimPartida.duracao_segundos)))
     # Contar linhas de fato daria dez vezes o numero de partidas - cada partida
@@ -580,10 +623,17 @@ def _bloco_partidas(sessao) -> Bloco:
         f"Partidas vencidas pelo lado Radiant: {vitorias_radiant} ({percentual}%)",
         "Torneios: " + ", ".join(f"{nome.strip()} ({n} partidas)" for nome, n in ligas),
     ]
-    return Bloco("partidas", "Dominio de partidas (Dota 2)", "\n".join(l for l in linhas if l))
+    bloco = Bloco(
+        "partidas", "Dominio de partidas (Dota 2)", "\n".join(l for l in linhas if l)
+    )
+    # Sem serie: o bloco e um resumo (total, media, torneios), nao um ranking
+    # comparavel - grafico aqui nao diria nada. A lista de ligas ate seria
+    # plotavel, mas "quantas partidas por torneio" nunca e a pergunta que traz
+    # alguem a este bloco.
+    return bloco, None
 
 
-def _bloco_herois(sessao) -> Bloco:
+def _bloco_herois(sessao) -> tuple[Bloco, SerieAssistente]:
     vitorias = func.sum(cast(FatoPartidaJogador.vitoria, Integer))
     partidas = func.count()
 
@@ -609,13 +659,27 @@ def _bloco_herois(sessao) -> Bloco:
             for nome, n, winrate in grupo
         )
 
-    return Bloco(
+    bloco = Bloco(
         "herois",
         "Herois com 5+ partidas (melhores e piores winrates)",
         formatar(linhas[:8]) + "\n...\n" + formatar(linhas[-8:])
         if len(linhas) > 16
         else formatar(linhas),
     )
+    serie = SerieAssistente(
+        chave="herois",
+        titulo="Winrate por herói (5+ partidas)",
+        unidade="%",
+        itens=[
+            PontoSerie(
+                rotulo=nome,
+                valor=round(float(winrate), 1),
+                detalhe=f"{n} partidas",
+            )
+            for nome, n, winrate in linhas[:8]
+        ],
+    )
+    return bloco, serie
 
 
 def _bloco_modelos() -> Bloco:
@@ -676,7 +740,7 @@ def _bloco_modelos() -> Bloco:
     return Bloco("modelos", "Modelo de confronto entre equipes", "\n".join(linhas))
 
 
-def _bloco_sentimento(sessao) -> Bloco:
+def _bloco_sentimento(sessao) -> tuple[Bloco, SerieAssistente]:
     relatorio = metricas_sentimento()
     linhas: list[str] = []
 
@@ -712,11 +776,25 @@ def _bloco_sentimento(sessao) -> Bloco:
                 f"em {total} avaliacoes"
             )
 
-    return Bloco(
+    bloco = Bloco(
         "sentimento",
         "Sentimento das avaliacoes",
         "\n".join(linhas) or "Nenhuma avaliacao coletada.",
     )
+    serie = SerieAssistente(
+        chave="sentimento",
+        titulo="Avaliações positivas por jogo (coletadas)",
+        unidade="%",
+        itens=[
+            PontoSerie(
+                rotulo=nome,
+                valor=round(100 * float(pos or 0) / total, 1),
+                detalhe=f"{total} avaliações",
+            )
+            for nome, total, pos in por_jogo[:8]
+        ],
+    )
+    return bloco, serie
 
 
 #: Palavras que ligam cada bloco. O roteamento e por palavra-chave de proposito:
@@ -1010,6 +1088,8 @@ class ContextoMontado:
     recomendacoes: list[JogoRecomendado] = field(default_factory=list)
     #: Populado so quando a pergunta cita um jogo identificavel - ver `_bloco_steam_ao_vivo`.
     jogo_ao_vivo: JogoAoVivo | None = None
+    #: Os numeros dos blocos, estruturados - a tela desenha grafico com eles.
+    series: list[SerieAssistente] = field(default_factory=list)
 
 
 def montar_contexto(pergunta: str) -> ContextoMontado:
@@ -1026,7 +1106,7 @@ def montar_contexto(pergunta: str) -> ContextoMontado:
     """
     normalizada = _normalizar(pergunta)
 
-    construtores: dict[str, Callable[[Any], Bloco]] = {
+    construtores: dict[str, Callable[[Any], tuple[Bloco, SerieAssistente | None]]] = {
         "steam": _bloco_steam,
         "partidas": _bloco_partidas,
         "herois": _bloco_herois,
@@ -1043,9 +1123,13 @@ def montar_contexto(pergunta: str) -> ContextoMontado:
 
     with session_scope() as sessao:
         blocos = [_bloco_geral(sessao)]
+        series: list[SerieAssistente] = []
         for chave in ("steam", "partidas", "herois", "sentimento"):
             if chave in escolhidos:
-                blocos.append(construtores[chave](sessao))
+                bloco, serie = construtores[chave](sessao)
+                blocos.append(bloco)
+                if serie is not None and serie.itens:
+                    series.append(serie)
 
         ao_vivo, jogo_ao_vivo = _bloco_steam_ao_vivo(pergunta, sessao)
         if ao_vivo is not None:
@@ -1067,6 +1151,7 @@ def montar_contexto(pergunta: str) -> ContextoMontado:
         blocos=[bloco for bloco in blocos if bloco.conteudo.strip()],
         recomendacoes=recomendacoes,
         jogo_ao_vivo=jogo_ao_vivo,
+        series=series,
     )
 
 
@@ -1141,6 +1226,7 @@ def perguntar(pergunta: str) -> Resposta:
         blocos=blocos,
         recomendacoes=contexto_montado.recomendacoes,
         jogo_ao_vivo=contexto_montado.jogo_ao_vivo,
+        series=contexto_montado.series,
         tokens_entrada=uso.get("prompt_tokens"),
         tokens_saida=uso.get("completion_tokens"),
     )

@@ -21,8 +21,14 @@ from ml.assistente import (
     GATILHOS,
     INSTRUCAO,
     Bloco,
+    PontoSerie,
+    SerieAssistente,
     _bloco_extremo_avaliacao,
+    _bloco_herois,
+    _bloco_partidas,
     _bloco_recomendacao,
+    _bloco_sentimento,
+    _bloco_steam,
     _confirma_nome,
     _extremo_avaliacao_pedido,
     _genero_pedido,
@@ -336,3 +342,29 @@ def test_bloco_do_banco_e_bloco_da_loja_se_declaram():
     """
     assert Bloco(chave="x", titulo="t", conteudo="c").fonte == "banco"
     assert Bloco(chave="x", titulo="t", conteudo="c", fonte="steam").fonte == "steam"
+
+
+def test_todo_construtor_de_bloco_devolve_par_bloco_serie():
+    """O contrato do laco de `montar_contexto`: os quatro construtores da lista
+    devolvem `(Bloco, SerieAssistente | None)`.
+
+    Existe porque a violacao ja aconteceu: `_bloco_partidas` ficou devolvendo
+    um `Bloco` solto depois da mudanca, e o `bloco, serie = ...` estourou
+    `TypeError: cannot unpack non-iterable Bloco object` - em producao, na
+    primeira pergunta que citava "partidas". Nenhum teste passava pelo laco,
+    entao a suite inteira ficou verde com a rota quebrada.
+    """
+    construtores = (_bloco_steam, _bloco_partidas, _bloco_herois, _bloco_sentimento)
+
+    with session_scope() as sessao:
+        for construtor in construtores:
+            resultado = construtor(sessao)
+
+            assert isinstance(resultado, tuple), f"{construtor.__name__} nao devolveu tupla"
+            bloco, serie = resultado
+            assert isinstance(bloco, Bloco)
+            assert serie is None or isinstance(serie, SerieAssistente)
+            if serie is not None:
+                # Uma serie sem unidade nao da pra rotular no eixo do grafico.
+                assert serie.chave and serie.titulo and serie.unidade
+                assert all(isinstance(p, PontoSerie) for p in serie.itens)

@@ -461,6 +461,27 @@ export interface JogoAoVivo {
   menor_historico: MenorPrecoHistorico | null;
 }
 
+export interface PontoSerieAssistente {
+  rotulo: string;
+  valor: number;
+  detalhe: string | null;
+}
+
+/**
+ * Os numeros de um bloco de contexto, ja estruturados pelo backend.
+ *
+ * Existe pra tela poder desenhar grafico sem reler o texto da resposta: a serie
+ * nasce da mesma consulta que escreveu o bloco. Quando a pergunta nao trouxe
+ * nenhum bloco com ranking numerico a lista vem vazia - e ai a tela nao desenha
+ * nada, em vez de inventar pontos.
+ */
+export interface SerieAssistente {
+  chave: string;
+  titulo: string;
+  unidade: string;
+  itens: PontoSerieAssistente[];
+}
+
 export interface RespostaAssistente {
   pergunta: string;
   resposta: string;
@@ -471,6 +492,8 @@ export interface RespostaAssistente {
   recomendacoes: JogoRecomendado[];
   /** Preenchido so quando a pergunta citou um jogo que a busca ao vivo achou. */
   jogo_ao_vivo: JogoAoVivo | null;
+  /** Os numeros dos blocos usados. Vazia quando nada era comparavel. */
+  series: SerieAssistente[];
   tokens_entrada: number | null;
   tokens_saida: number | null;
 }

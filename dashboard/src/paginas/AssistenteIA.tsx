@@ -1,577 +1,476 @@
 /**
- * Assistente de dados.
+ * Assistente de dados - o espaco de trabalho.
  *
- * Porte da tela "Assistente de IA" do Stitch.
- *
- * A diferenca em relacao ao mockup e o painel "Dados consultados", que o
- * desenho nao tem. Ele existe porque o modelo de linguagem e o unico componente
- * do projeto capaz de inventar um numero: mostrar exatamente o contexto que ele
- * recebeu transforma cada resposta em algo conferivel sem sair da pagina.
+ * Tres areas: historico (esquerda), consulta e resultado (centro), contexto e
+ * base da resposta (direita). O painel de contexto nao e enfeite de layout: o
+ * modelo de linguagem e o unico componente do projeto capaz de inventar um
+ * numero, e mostrar exatamente o que ele recebeu transforma cada resposta em
+ * algo conferivel sem sair da pagina.
  *
  * O modelo NAO consulta o banco. O backend monta o contexto com SQL escrito a
  * mao e manda junto da pergunta - a tela deixa isso explicito, porque um
  * assistente que parece ter acesso ao banco e um assistente em que se confia
  * demais.
- */
-
-import { useState } from "react";
-import { Link } from "react-router-dom";
-
-import { usePerguntarAssistente, useStatusAssistente } from "../api/consultas";
-import type {
-  BlocoContexto,
-  JogoAoVivo,
-  JogoRecomendado,
-  RespostaAssistente,
-} from "../api/tipos";
-import { Botao, Consulta, Icone, MensagemErro, Selo } from "../componentes/base";
-import { ArteJogo } from "../componentes/CapaJogo";
-import { Painel, Pilula } from "../componentes/hud";
-import { fmtData, fmtMoeda, fmtNumero, fmtPercentual } from "../utilitarios/formatos";
-
-/** Perguntas que exercitam blocos de contexto diferentes. */
-const SUGESTOES = [
-  "Que jogo de ação você recomenda?",
-  "Quantos jogos da Steam estão sendo monitorados?",
-  "Qual jogo tem mais jogadores simultâneos e quantos?",
-  "Qual herói tem o pior winrate e em quantas partidas?",
-  "Qual é a acurácia do modelo de previsão de confronto?",
-  "Qual jogo tem a pior recepção nas avaliações?",
-  "O Cyberpunk 2077 está no nosso banco? O que a Steam diz dele?",
-  "Onde encontro o Helldivers 2 pelo menor preço?",
-];
-
-/**
- * Um bloco do contexto, recolhido por padrão.
  *
- * O ícone e o chip dizem a procedência. Não é decoração: o contexto existe para
- * que cada número da resposta possa ser conferido, e conferir um número do
- * banco (consultável de novo, igual) é diferente de conferir um número da loja
- * (lido uma vez, e que muda). Sem a marca, os dois chegariam iguais a quem lê.
- */
-function BlocoDeContexto({ bloco }: { bloco: BlocoContexto }) {
-  const [aberto, setAberto] = useState(false);
-  const daLoja = bloco.fonte === "steam";
-
-  return (
-    <div
-      className={`overflow-hidden rounded bg-surface-container-lowest ${
-        daLoja ? "ring-1 ring-tertiary-container/40" : ""
-      }`}
-    >
-      <button
-        type="button"
-        onClick={() => setAberto((atual) => !atual)}
-        aria-expanded={aberto}
-        className="flex w-full items-center justify-between gap-space-sm px-space-md py-space-sm text-left transition-colors hover:bg-surface-container"
-      >
-        <span className="flex min-w-0 items-center gap-space-xs font-title-code text-title-code text-on-surface">
-          <Icone
-            nome={daLoja ? "storefront" : "database"}
-            className={`text-[16px] ${daLoja ? "text-tertiary" : "text-primary"}`}
-          />
-          <span className="truncate">{bloco.titulo}</span>
-          {daLoja && (
-            <span className="shrink-0 rounded bg-tertiary/10 px-space-xs py-space-xxs font-badge-status text-badge-status uppercase text-tertiary">
-              fora do banco
-            </span>
-          )}
-        </span>
-        <span className="flex items-center gap-space-xs">
-          <span className="font-label-caps text-label-caps uppercase text-outline">
-            {bloco.conteudo.split("\n").length} linhas
-          </span>
-          <Icone
-            nome={aberto ? "expand_less" : "expand_more"}
-            className="text-[18px] text-outline"
-          />
-        </span>
-      </button>
-
-      {aberto && (
-        <pre className="rolagem-discreta max-h-64 overflow-auto whitespace-pre-wrap border-t border-outline-variant/30 px-space-md py-space-sm font-body-sm text-body-sm text-on-surface-variant">
-          {bloco.conteudo}
-        </pre>
-      )}
-    </div>
-  );
-}
-
-/**
- * O cartão de um jogo recomendado - imagem, gêneros e os três números que
- * justificam a escolha, em vez de exigir que quem lê procure isso no texto.
+ * O que o desenho pedia e nao esta aqui, de proposito:
  *
- * `jogo` vem de `resposta.recomendacoes`, não de interpretar a resposta do
- * modelo: é o Python (`ml.assistente._recomendacoes`) quem decide o ranking,
- * então o cartão mostra exatamente o candidato que o sistema escolheu, nunca
- * um jogo que o texto livre "pareceu" estar recomendando.
+ * - "92% de confianca": o backend nao devolve score. O painel classifica o
+ *   CONTEXTO (blocos, linhas, valores comparaveis) e diz que criterio usou.
+ * - "Ver consulta" com SQL: as consultas vivem no Python e nunca sobem na
+ *   resposta. O botao exigiria inventar o SQL, entao nao existe - "Ver dados"
+ *   abre o contexto real.
+ * - Historico com perguntas de exemplo: nao ha persistencia no servidor, e a
+ *   lista comeca vazia de verdade (`assistente/historico.ts`).
  */
-function CartaoJogoRecomendado({ jogo }: { jogo: JogoRecomendado }) {
-  return (
-    <Link
-      to={`/steam/${jogo.app_id}`}
-      className="group flex flex-col overflow-hidden rounded-xl bg-surface-container-lowest ring-1 ring-outline-variant/20 transition-all hover:-translate-y-0.5 hover:ring-primary/50 hover:shadow-lg"
-    >
-      <ArteJogo appId={jogo.app_id} nome={jogo.nome} className="h-32 w-full rounded-none" />
 
-      <div className="flex flex-1 flex-col gap-space-sm p-space-base">
-        <h3 className="font-headline-sm text-headline-sm text-on-surface transition-colors group-hover:text-primary">
-          {jogo.nome}
-        </h3>
+import { useMemo, useState } from "react";
 
-        {jogo.generos.length > 0 && (
-          <div className="flex flex-wrap gap-space-xxs">
-            {jogo.generos.slice(0, 3).map((genero) => (
-              <Selo key={genero}>{genero}</Selo>
-            ))}
-          </div>
-        )}
-
-        <div className="mt-auto flex items-center justify-between gap-space-xs border-t border-outline-variant/20 pt-space-sm font-title-code text-title-code">
-          <span
-            className="flex items-center gap-space-xxs text-tertiary"
-            title="Avaliações positivas"
-          >
-            <Icone nome="thumb_up" className="text-[14px]" />
-            {fmtPercentual(jogo.nota_avaliacoes)}
-          </span>
-          <span
-            className="flex items-center gap-space-xxs text-on-surface-variant"
-            title="Jogadores simultâneos agora"
-          >
-            <Icone nome="groups" className="text-[14px]" />
-            {fmtNumero(jogo.jogadores_simultaneos)}
-          </span>
-          <span className="text-primary-container">
-            {jogo.gratuito ? "Gratuito" : fmtMoeda(jogo.preco, jogo.moeda)}
-          </span>
-        </div>
-      </div>
-    </Link>
-  );
-}
-
-/**
- * O banner de um jogo identificado ao vivo - a resposta a "traga tudo mesmo
- * não estando no snapshot": imagem real (`imagem_header`, direto do
- * `appdetails` da Steam) e comparação de preço buscada na hora via
- * IsThereAnyDeal, iguais às da ficha de um jogo do catálogo - só que para um
- * jogo que pode nunca ter passado pelo nosso coletor.
- *
- * `jogo` vem de `resposta.jogo_ao_vivo` (estruturado, decidido em Python), não
- * de interpretar o texto do modelo - mesmo motivo de `CartaoJogoRecomendado`.
- */
-function CartaoJogoAoVivo({ jogo }: { jogo: JogoAoVivo }) {
-  const ofertas = jogo.ofertas;
-  const maisBarata = ofertas[0];
-
-  return (
-    <div className="overflow-hidden rounded-xl bg-surface-container-lowest ring-1 ring-tertiary-container/30">
-      {/*
-        Fundo borrado + capa nítida por cima, em vez de uma imagem só esticada
-        na largura toda. A capa da Steam tem 460x215 e fica pixelada se
-        crescer além disso; a arte de fundo é grande, mas em vários jogos a
-        própria Valve já entrega escurecida e borrada (Call of Duty) enquanto
-        em outros vem viva (Helldivers). Cada uma no papel em que funciona:
-        a de fundo preenche a largura, a capa fica nítida no tamanho nativo.
-      */}
-      <div className="relative flex items-center justify-center overflow-hidden bg-surface-container-high px-space-base py-space-lg">
-        {jogo.imagem_fundo && (
-          <>
-            <div
-              className="absolute inset-0 scale-110 bg-cover bg-center opacity-60 blur-md"
-              style={{ backgroundImage: `url(${jogo.imagem_fundo})` }}
-              aria-hidden
-            />
-            <div
-              className="absolute inset-0 bg-gradient-to-t from-surface-container-lowest/90 to-transparent"
-              aria-hidden
-            />
-          </>
-        )}
-
-        <ArteJogo
-          appId={jogo.app_id}
-          nome={jogo.nome}
-          imagemUrl={jogo.imagem_header}
-          className="relative h-auto max-h-[215px] w-full max-w-[460px] shadow-2xl"
-        />
-      </div>
-
-      <div className="flex flex-col gap-space-base p-space-base">
-        <div className="flex flex-wrap items-start justify-between gap-space-sm">
-          <div>
-            <h3 className="font-headline-sm text-headline-sm text-on-surface">{jogo.nome}</h3>
-            {jogo.desenvolvedora && (
-              <p className="font-title-code text-title-code text-outline">
-                {jogo.desenvolvedora}
-              </p>
-            )}
-          </div>
-          <span
-            className={`rounded px-space-xs py-space-xxs font-badge-status text-badge-status uppercase ${
-              jogo.no_nosso_banco
-                ? "bg-primary-container/15 text-primary-container"
-                : "bg-surface-container-highest text-outline"
-            }`}
-          >
-            {jogo.no_nosso_banco ? "no nosso catálogo" : "consultado agora, fora do catálogo"}
-          </span>
-        </div>
-
-        {jogo.generos.length > 0 && (
-          <div className="flex flex-wrap gap-space-xxs">
-            {jogo.generos.map((genero) => (
-              <Selo key={genero}>{genero}</Selo>
-            ))}
-          </div>
-        )}
-
-        <div className="grid grid-cols-1 gap-space-sm rounded-lg bg-surface-container p-space-base sm:grid-cols-2">
-          <div>
-            <div className="font-label-caps text-label-caps uppercase tracking-widest text-outline">
-              Preço na Steam
-            </div>
-            <div className="mt-space-xxs font-headline-kpi text-headline-kpi leading-none text-on-surface">
-              {jogo.gratuito ? "Gratuito" : fmtMoeda(jogo.preco_atual, jogo.moeda)}
-            </div>
-          </div>
-          {maisBarata && (
-            <div>
-              <div className="font-label-caps text-label-caps uppercase tracking-widest text-outline">
-                Melhor preço agora
-              </div>
-              <div className="mt-space-xxs font-headline-kpi text-headline-kpi leading-none text-tertiary-container">
-                {fmtMoeda(maisBarata.preco, maisBarata.moeda)}
-              </div>
-              <div className="font-title-code text-title-code text-on-surface-variant">
-                na {maisBarata.loja}
-              </div>
-            </div>
-          )}
-        </div>
-
-        {ofertas.length > 0 && (
-          <div className="rolagem-discreta overflow-x-auto rounded-lg bg-surface-container-lowest">
-            <table className="w-full border-collapse text-left">
-              <thead>
-                <tr className="bg-surface-container font-label-caps text-label-caps uppercase tracking-wider text-outline">
-                  <th className="px-space-md py-space-xs">Loja</th>
-                  <th className="px-space-md py-space-xs text-right">Preço</th>
-                  <th className="px-space-md py-space-xs" />
-                </tr>
-              </thead>
-              <tbody className="font-body-sm text-body-sm">
-                {ofertas.map((o, i) => (
-                  <tr key={o.loja + i} className={i % 2 ? "bg-surface-container/40" : ""}>
-                    <td className="px-space-md py-space-xs text-on-surface">
-                      {o.loja}
-                      {o.melhor && (
-                        <span className="ml-space-xs rounded bg-tertiary/10 px-space-xxs py-[1px] font-badge-status text-badge-status uppercase text-tertiary">
-                          melhor
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-space-md py-space-xs text-right font-title-code text-title-code tabular-nums text-on-surface">
-                      {fmtMoeda(o.preco, o.moeda)}
-                    </td>
-                    <td className="px-space-md py-space-xs text-right">
-                      {o.url && (
-                        <a
-                          href={o.url}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="inline-flex items-center gap-space-xxs font-title-code text-title-code text-primary hover:underline"
-                        >
-                          abrir <Icone nome="open_in_new" className="text-[13px]" />
-                        </a>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-
-        {jogo.menor_historico && (
-          <p className="font-body-sm text-body-sm text-on-surface-variant">
-            Já custou{" "}
-            <strong className="text-tertiary-container">
-              {fmtMoeda(jogo.menor_historico.preco, jogo.menor_historico.moeda)}
-            </strong>
-            {jogo.menor_historico.loja && ` na ${jogo.menor_historico.loja}`}
-            {jogo.menor_historico.data && ` (${fmtData(jogo.menor_historico.data)})`} — o menor
-            preço já registrado (IsThereAnyDeal).
-          </p>
-        )}
-
-        <div className="flex flex-wrap gap-space-sm border-t border-outline-variant/20 pt-space-sm">
-          {jogo.no_nosso_banco && (
-            <Link
-              to={`/steam/${jogo.app_id}`}
-              className="inline-flex items-center gap-space-xxs font-title-code text-title-code text-primary hover:underline"
-            >
-              Ver ficha completa <Icone nome="arrow_forward" className="text-[14px]" />
-            </Link>
-          )}
-          <a
-            href={`https://store.steampowered.com/app/${jogo.app_id}`}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex items-center gap-space-xxs font-title-code text-title-code text-on-surface-variant hover:text-primary hover:underline"
-          >
-            Página na Steam <Icone nome="open_in_new" className="text-[13px]" />
-          </a>
-        </div>
-      </div>
-    </div>
-  );
-}
+import { usePerguntarAssistente, useStatusAssistente, useVisaoGeral } from "../api/consultas";
+import type { RespostaAssistente } from "../api/tipos";
+import { Icone, MensagemErro } from "../componentes/base";
+import { Painel } from "../componentes/hud";
+import { Modal } from "../componentes/Modal";
+import { AcoesResposta } from "./assistente/AcoesResposta";
+import { BlocoDeContexto, CartaoJogoAoVivo, CartaoJogoRecomendado } from "./assistente/cartoes";
+import { CartaoResultado } from "./assistente/CartaoResultado";
+import { ComoChegamos } from "./assistente/ComoChegamos";
+import { Compositor, SUGESTOES } from "./assistente/Compositor";
+import { GraficoSerie } from "./assistente/GraficoSerie";
+import { useHistoricoAssistente } from "./assistente/historico";
+import { CartaoConfianca, PainelFontes } from "./assistente/PainelContexto";
+import { PainelHistorico } from "./assistente/PainelHistorico";
+import { Processando } from "./assistente/Processando";
+import { fmtNumero, fmtRelativo } from "../utilitarios/formatos";
 
 export function AssistenteIAPagina() {
   const [pergunta, setPergunta] = useState("");
+  const [gavetaHistorico, setGavetaHistorico] = useState(false);
+  const [verDados, setVerDados] = useState(false);
+
   const status = useStatusAssistente();
+  const visaoGeral = useVisaoGeral();
   const assistente = usePerguntarAssistente();
+  const historico = useHistoricoAssistente();
 
   const resposta: RespostaAssistente | undefined = assistente.data;
+  // A primeira serie e a do bloco mais relevante para a pergunta - a ordem
+  // dos blocos vem do backend, nao de reordenar aqui por tamanho.
+  const serie = resposta?.series[0];
+
+  const ultimaColeta = useMemo(
+    () =>
+      visaoGeral.data?.coletas
+        .map((c) => c.ultima_coleta)
+        .filter((data): data is string => Boolean(data))
+        .sort()
+        .at(-1) ?? null,
+    [visaoGeral.data],
+  );
+
+  /** As sugestoes que ainda nao foram a pergunta atual. */
+  const continuar = useMemo(
+    () => SUGESTOES.filter((s) => s.pergunta !== resposta?.pergunta).slice(0, 5),
+    [resposta],
+  );
 
   function enviar(texto: string) {
     const limpo = texto.trim();
     if (limpo.length < 3) return;
     setPergunta(limpo);
+    historico.registrar(limpo);
+    setGavetaHistorico(false);
     assistente.mutate(limpo);
+  }
+
+  const utilAtual =
+    historico.entradas.find((e) => e.pergunta === resposta?.pergunta)?.util ?? null;
+
+  // Sem chave o resto da tela nao tem o que fazer - e um estado esperado, nao
+  // um erro: o projeto inteiro funciona sem provedor externo.
+  if (status.data && !status.data.configurado) {
+    return (
+      <Painel icone="key_off" titulo="Assistente não configurado">
+        <p className="font-body-md text-body-md text-on-surface-variant">
+          Defina <code className="text-primary">OPENROUTER_API_KEY</code> no{" "}
+          <code className="text-primary">.env</code> e reinicie a API. O resto do
+          projeto funciona sem isso — o assistente é a única parte que depende de um
+          provedor externo.
+        </p>
+      </Painel>
+    );
   }
 
   return (
     <>
       {/* ==================== CABECALHO ==================== */}
-      <section className="flex flex-col gap-space-base pt-space-base lg:flex-row lg:items-center lg:justify-between">
-        <div className="flex flex-col gap-space-xs">
-          <div className="flex flex-wrap items-center gap-space-sm">
-            <h1 className="font-headline-lg text-headline-lg uppercase tracking-wide text-primary drop-shadow-[0_0_12px_rgba(0,229,255,0.4)]">
-              Assistente de Dados
-            </h1>
-            <Selo cor="primario">LLM</Selo>
-            <span className="hidden font-label-caps text-label-caps uppercase tracking-wider text-outline sm:inline">
-              ML // Deck 08
-            </span>
-          </div>
-
-          <p className="font-body-sm text-body-sm text-on-surface-variant">
-            Perguntas em português sobre jogos e esports. O modelo{" "}
-            <strong>não consulta nada sozinho</strong>: o backend monta o contexto —
-            do nosso banco e, quando a pergunta cita um jogo, da loja da Steam na
-            hora — e manda junto da pergunta. O contexto vem na resposta, com a
-            fonte de cada bloco, para todo número poder ser conferido.
-          </p>
+      <header className="flex flex-wrap items-center justify-between gap-space-sm">
+        <div className="flex items-center gap-space-sm">
+          <button
+            type="button"
+            onClick={() => setGavetaHistorico(true)}
+            className="flex items-center gap-space-xxs rounded bg-surface-container px-space-sm py-space-xs font-title-code text-title-code text-on-surface-variant transition-colors hover:text-primary lg:hidden"
+            aria-label="Abrir histórico"
+          >
+            <Icone nome="history" className="text-[16px]" />
+            Histórico
+          </button>
+          <h1 className="flex items-center gap-space-xs font-headline-sm text-headline-sm uppercase tracking-wide text-primary">
+            <span aria-hidden>✦</span> Assistente de Dados
+          </h1>
         </div>
 
         {status.data && (
-          <div className="flex flex-wrap items-center gap-space-xs">
-            <Selo cor={status.data.configurado ? "positivo" : "negativo"}>
-              {status.data.configurado ? "Configurado" : "Sem chave"}
-            </Selo>
-            <span className="font-title-code text-title-code text-outline">
-              {status.data.provedor} · {status.data.modelo}
+          <div className="flex flex-wrap items-center gap-space-xs font-badge-status text-badge-status uppercase tracking-wider">
+            <span className="flex items-center gap-space-xxs rounded bg-surface-container px-space-sm py-space-xxs text-tertiary">
+              <span
+                className="h-1.5 w-1.5 rounded-full bg-tertiary shadow-[0_0_6px_rgba(22,239,122,0.8)]"
+                aria-hidden
+              />
+              IA online
+            </span>
+            <span
+              className="rounded bg-surface-container px-space-sm py-space-xxs text-outline"
+              title={`${status.data.provedor} · ${status.data.modelo}`}
+            >
+              {status.data.modelo.split("/").pop()?.replace(":free", "")}
+            </span>
+            <span className="hidden rounded bg-surface-container px-space-sm py-space-xxs text-outline sm:inline">
+              {status.data.provedor}
             </span>
           </div>
         )}
-      </section>
+      </header>
 
-      {status.data && !status.data.configurado ? (
-        <Painel icone="key_off" titulo="Assistente não configurado">
-          <p className="font-body-md text-body-md text-on-surface-variant">
-            Defina <code className="text-primary">OPENROUTER_API_KEY</code> no{" "}
-            <code className="text-primary">.env</code> e reinicie a API. O resto do
-            projeto funciona sem isso — o assistente é a única parte que depende de um
-            provedor externo.
-          </p>
-        </Painel>
-      ) : (
-        <>
-          {/* ==================== PERGUNTA ==================== */}
-          <Painel
-            icone="smart_toy"
-            titulo="Pergunte sobre os dados"
-            descricao="Volumes coletados, catálogo da Steam, partidas, heróis, avaliações e as métricas dos modelos."
-          >
-            <div className="flex flex-col gap-space-sm sm:flex-row">
-              <input
-                type="text"
-                value={pergunta}
-                onChange={(evento) => setPergunta(evento.target.value)}
-                onKeyDown={(evento) => {
-                  if (evento.key === "Enter") enviar(pergunta);
-                }}
-                placeholder="Ex.: qual herói tem o melhor winrate?"
-                aria-label="Pergunta"
-                className="flex-1 rounded bg-surface-container-lowest px-space-md py-space-sm font-body-md text-body-md text-on-surface shadow-inner placeholder:text-outline focus:bg-surface-container focus:outline-none"
-              />
-              <Botao
-                icone="send"
-                variante="primario"
-                aoClicar={() => enviar(pergunta)}
-                desabilitado={assistente.isPending || pergunta.trim().length < 3}
-              >
-                {assistente.isPending ? "Consultando…" : "Perguntar"}
-              </Botao>
-            </div>
+      {/* ==================== TRES AREAS ==================== */}
+      <div className="grid grid-cols-1 items-start gap-space-base lg:grid-cols-[240px_minmax(0,1fr)] xl:grid-cols-[240px_minmax(0,1fr)_290px]">
+        <aside className="hidden lg:sticky lg:top-[calc(4rem+1.5rem)] lg:block lg:max-h-[calc(100vh-7rem)]">
+          <PainelHistorico
+            entradas={historico.entradas}
+            carregando={historico.carregando}
+            perguntaAtual={resposta?.pergunta ?? null}
+            aoEscolher={(texto) => setPergunta(texto)}
+            aoLimpar={historico.limpar}
+          />
+        </aside>
 
-            <div className="flex flex-wrap gap-space-xs">
-              {SUGESTOES.map((sugestao) => (
-                <Pilula
-                  key={sugestao}
-                  desabilitada={assistente.isPending}
-                  aoClicar={() => enviar(sugestao)}
-                >
-                  {sugestao}
-                </Pilula>
-              ))}
-            </div>
-          </Painel>
+        <main className="flex min-w-0 flex-col gap-space-base">
+          <div>
+            <h2 className="font-headline-lg text-headline-lg text-on-surface">
+              Pergunte aos seus dados
+            </h2>
+            <p className="font-body-sm text-body-sm text-outline">
+              Converse com o Nexus e descubra insights reais — do nosso banco e, quando a
+              pergunta cita um jogo, da loja da Steam na hora.
+            </p>
+          </div>
 
-          {assistente.isError && <MensagemErro erro={assistente.error} />}
+          <Compositor
+            valor={pergunta}
+            aoMudar={setPergunta}
+            aoEnviar={() => enviar(pergunta)}
+            ocupado={assistente.isPending}
+            fontesDisponiveis={visaoGeral.data?.coletas.length ?? null}
+            atualizadoEm={ultimaColeta ? fmtRelativo(ultimaColeta) : null}
+          />
 
-          {assistente.isPending && (
-            <Painel icone="hourglass_top" titulo="Consultando o modelo">
-              <div className="h-24 animate-pulse rounded bg-surface-container-high/60" />
-              <p className="font-body-sm text-body-sm text-outline">
-                O contexto já foi montado a partir do banco; o que demora é a resposta do
-                provedor.
-              </p>
-            </Painel>
-          )}
-
-          {/* ==================== JOGO IDENTIFICADO AO VIVO ==================== */}
-          {resposta && !assistente.isPending && resposta.jogo_ao_vivo && (
-            <Painel
-              icone="storefront"
-              titulo="Jogo identificado"
-              descricao="Consultado agora na loja da Steam e no IsThereAnyDeal — vale mesmo para um jogo fora do nosso catálogo."
-            >
-              <CartaoJogoAoVivo jogo={resposta.jogo_ao_vivo} />
-            </Painel>
-          )}
-
-          {/* ==================== JOGOS RECOMENDADOS ==================== */}
-          {resposta && !assistente.isPending && resposta.recomendacoes.length > 0 && (
-            <Painel
-              icone="stadia_controller"
-              titulo="Jogos recomendados"
-              descricao="Escolhidos pelo sistema a partir do catálogo — nota de avaliação e popularidade agora, não pelo modelo."
-            >
-              <div className="grid grid-cols-1 gap-space-base sm:grid-cols-2 lg:grid-cols-3">
-                {resposta.recomendacoes.map((jogo) => (
-                  <CartaoJogoRecomendado key={jogo.app_id} jogo={jogo} />
-                ))}
+          {assistente.isError && (
+            <div className="flex flex-col gap-space-sm rounded-xl bg-surface-container-low/90 p-space-lg shadow-2xl">
+              <div className="flex items-center gap-space-xs font-headline-sm text-headline-sm text-error">
+                <Icone nome="error" className="text-[20px]" />
+                Não foi possível analisar os dados
               </div>
-            </Painel>
+              <p className="font-body-sm text-body-sm text-on-surface-variant">
+                Não conseguimos obter uma resposta agora. O contexto sai do nosso banco,
+                mas a redação depende de um provedor externo.
+              </p>
+              <MensagemErro erro={assistente.error} />
+              <button
+                type="button"
+                onClick={() => enviar(pergunta)}
+                className="self-start rounded bg-primary-container px-space-base py-space-xs font-title-code text-title-code text-on-primary transition-all hover:brightness-110"
+              >
+                Tentar novamente
+              </button>
+            </div>
           )}
 
-          {/* ==================== RESPOSTA + CONTEXTO ==================== */}
+          {assistente.isPending && <Processando />}
+
+          {/* ---------- ESTADO VAZIO ---------- */}
+          {!resposta && !assistente.isPending && !assistente.isError && (
+            <div className="flex flex-col items-center gap-space-sm rounded-xl bg-surface-container-low/60 px-space-lg py-space-3xl text-center">
+              <span className="text-[32px] text-primary drop-shadow-[0_0_16px_rgba(0,229,255,0.5)]" aria-hidden>
+                ✦
+              </span>
+              <h3 className="font-headline-sm text-headline-sm uppercase tracking-wide text-on-surface">
+                Seus dados têm respostas
+              </h3>
+              <p className="max-w-md font-body-sm text-body-sm text-outline">
+                Pergunte sobre jogos da Steam, partidas, heróis, preços e as métricas dos
+                modelos. {visaoGeral.data && (
+                  <>
+                    Agora há {fmtNumero(visaoGeral.data.jogos_steam)} jogos e{" "}
+                    {fmtNumero(visaoGeral.data.partidas)} partidas no banco.
+                  </>
+                )}
+              </p>
+            </div>
+          )}
+
+          {/* ---------- RESULTADO ---------- */}
           {resposta && !assistente.isPending && (
-            <section className="grid grid-cols-1 gap-space-base xl:grid-cols-3">
-              <Painel
-                icone="chat"
-                titulo="Resposta"
-                descricao={resposta.pergunta}
-                className="xl:col-span-2"
-                meta={
-                  <span className="font-label-caps text-label-caps uppercase tracking-widest text-outline">
-                    {fmtNumero(resposta.tokens_entrada)} →{" "}
-                    {fmtNumero(resposta.tokens_saida)} tokens
+            <>
+              {serie && (
+                <div className="grid grid-cols-1 gap-space-base lg:grid-cols-2">
+                  <section className="rounded-xl bg-surface-container-low/90 p-space-lg shadow-2xl">
+                    <CartaoResultado serie={serie} pergunta={resposta.pergunta} />
+                  </section>
+                  {/* `justify-center`: o cartao ao lado costuma ser mais alto
+                      (tem a lista inteira), e o grafico ancorado no topo
+                      deixaria um vazio grande embaixo. */}
+                  <section className="flex min-w-0 flex-col justify-center rounded-xl bg-surface-container-low/90 p-space-lg shadow-2xl">
+                    <GraficoSerie serie={serie} />
+                  </section>
+                </div>
+              )}
+
+              <section className="flex flex-col gap-space-base rounded-xl bg-surface-container-low/90 p-space-lg shadow-2xl">
+                <div className="flex flex-wrap items-center justify-between gap-space-xs">
+                  <span className="flex items-center gap-space-xs font-label-caps text-label-caps uppercase tracking-widest text-primary">
+                    <Icone nome="chat" className="text-[16px]" />
+                    Resposta
                   </span>
-                }
-              >
+                  <span className="font-badge-status text-badge-status uppercase tracking-wider text-outline">
+                    {fmtNumero(resposta.tokens_entrada)} → {fmtNumero(resposta.tokens_saida)}{" "}
+                    tokens
+                  </span>
+                </div>
+
                 <p className="whitespace-pre-line font-body-lg text-body-lg text-on-surface">
                   {resposta.resposta}
                 </p>
 
-                <p className="flex items-start gap-space-xs border-t border-outline-variant/30 pt-space-sm font-body-sm text-body-sm text-outline">
+                <p className="flex items-start gap-space-xs font-body-sm text-body-sm text-outline">
                   <Icone nome="info" className="mt-[2px] text-[16px] text-primary" />
-                  Gerado por <span className="text-on-surface">{resposta.modelo}</span> a
-                  partir dos blocos ao lado. Se um número não aparece no contexto, ele não
+                  Redigido por <span className="text-on-surface">{resposta.modelo}</span> a
+                  partir do contexto ao lado. Se um número não aparece no contexto, ele não
                   deveria aparecer na resposta — confira.
                 </p>
-              </Painel>
 
-              <Painel
-                icone="database"
-                titulo="Dados consultados"
-                descricao="O contexto exato que o modelo recebeu. O chip FORA DO BANCO marca o que veio da loja da Steam, não da nossa coleta."
-                meta={<Selo>{resposta.blocos.length} blocos</Selo>}
-              >
-                <div className="space-y-space-xs">
-                  {resposta.blocos.map((bloco) => (
-                    <BlocoDeContexto key={bloco.chave} bloco={bloco} />
+                <AcoesResposta
+                  resposta={resposta}
+                  util={utilAtual}
+                  aoAvaliar={(util) => historico.avaliar(resposta.pergunta, util)}
+                  aoVerDados={() => setVerDados(true)}
+                />
+              </section>
+
+              {resposta.jogo_ao_vivo && (
+                <Painel
+                  icone="storefront"
+                  titulo="Jogo identificado"
+                  descricao="Consultado agora na loja da Steam e no IsThereAnyDeal — vale mesmo para um jogo fora do nosso catálogo."
+                >
+                  <CartaoJogoAoVivo jogo={resposta.jogo_ao_vivo} />
+                </Painel>
+              )}
+
+              {resposta.recomendacoes.length > 0 && (
+                <Painel
+                  icone="stadia_controller"
+                  titulo="Jogos recomendados"
+                  descricao="Escolhidos pelo sistema a partir do catálogo — nota de avaliação e popularidade agora, não pelo modelo."
+                >
+                  <div className="grid grid-cols-1 gap-space-base sm:grid-cols-2 xl:grid-cols-3">
+                    {resposta.recomendacoes.map((jogo) => (
+                      <CartaoJogoRecomendado key={jogo.app_id} jogo={jogo} />
+                    ))}
+                  </div>
+                </Painel>
+              )}
+
+              <ComoChegamos resposta={resposta} />
+
+              {/*
+                "Continuar explorando" e nao "perguntas relacionadas": elas sao
+                fixas, escolhidas por exercitarem blocos de contexto
+                diferentes. Gerar variacoes sobre a resposta exigiria pedir ao
+                modelo - outra chamada, e outra chance de inventar entidade.
+              */}
+              <section className="flex flex-col gap-space-sm rounded-xl bg-surface-container-low/90 p-space-lg shadow-2xl">
+                <span className="font-label-caps text-label-caps uppercase tracking-widest text-outline">
+                  Continuar explorando
+                </span>
+                <div className="grid grid-cols-1 gap-space-xs sm:grid-cols-2 xl:grid-cols-3">
+                  {continuar.map((sugestao) => (
+                    <button
+                      key={sugestao.rotulo}
+                      type="button"
+                      onClick={() => enviar(sugestao.pergunta)}
+                      className="flex items-center justify-between gap-space-sm rounded-lg bg-surface-container-lowest px-space-base py-space-sm text-left font-body-sm text-body-sm text-on-surface-variant transition-colors hover:bg-surface-container hover:text-on-surface"
+                    >
+                      {sugestao.pergunta}
+                      <Icone nome="arrow_forward" className="shrink-0 text-[16px] text-primary" />
+                    </button>
                   ))}
                 </div>
-              </Painel>
-            </section>
+              </section>
+            </>
           )}
 
-          {/* ==================== COMO FUNCIONA ==================== */}
-          <Painel
-            icone="account_tree"
-            titulo="Como esta tela funciona"
-            descricao="A arquitetura foi decidida por um teste, não por preferência."
-          >
-            <div className="grid grid-cols-1 gap-space-base md:grid-cols-3">
-              {[
-                {
-                  icone: "search",
-                  titulo: "1. Recuperação",
-                  texto:
-                    "O backend escolhe os blocos relevantes pela pergunta e os monta com SQL escrito à mão. Não há texto-para-SQL nem consulta gerada pelo modelo.",
-                },
-                {
-                  icone: "smart_toy",
-                  titulo: "2. Redação",
-                  texto:
-                    "O modelo recebe o contexto e a instrução de responder só com ele. Temperatura baixa: a tarefa é reproduzir números, não variar a redação.",
-                },
-                {
-                  icone: "fact_check",
-                  titulo: "3. Verificação",
-                  texto:
-                    "O contexto volta junto da resposta e aparece ao lado. Qualquer número inventado fica visível na hora.",
-                },
-              ].map((passo) => (
-                <div
-                  key={passo.titulo}
-                  className="rounded-lg bg-surface-container-lowest p-space-base"
-                >
-                  <div className="flex items-center gap-space-xs font-label-caps text-label-caps uppercase tracking-widest text-primary">
-                    <Icone nome={passo.icone} className="text-[16px]" />
-                    {passo.titulo}
-                  </div>
-                  <p className="mt-space-xs font-body-sm text-body-sm text-on-surface-variant">
-                    {passo.texto}
-                  </p>
-                </div>
-              ))}
+          {/* Contexto vira secao no lugar da lateral quando ela nao cabe. */}
+          <div className="flex flex-col gap-space-base xl:hidden">
+            <PainelFontes
+              resposta={resposta}
+              visaoGeral={visaoGeral.data}
+              aoVerDados={() => setVerDados(true)}
+            />
+            {resposta && !assistente.isPending && <CartaoConfianca resposta={resposta} />}
+          </div>
+
+          <ComoFunciona />
+        </main>
+
+        <aside className="hidden xl:sticky xl:top-[calc(4rem+1.5rem)] xl:flex xl:flex-col xl:gap-space-base">
+          <PainelFontes
+            resposta={resposta}
+            visaoGeral={visaoGeral.data}
+            aoVerDados={() => setVerDados(true)}
+          />
+          {resposta && !assistente.isPending && <CartaoConfianca resposta={resposta} />}
+
+          <div className="rounded-xl bg-surface-container-low/60 p-space-base">
+            <div className="flex items-center gap-space-xs font-label-caps text-label-caps uppercase tracking-widest text-primary">
+              <Icone nome="lightbulb" className="text-[16px]" />
+              Dica
             </div>
-
-            <p className="font-body-sm text-body-sm text-outline">
-              A primeira tentativa foi dar ferramentas ao modelo e deixá-lo consultar o
-              que precisasse. Os modelos gratuitos do OpenRouter ignoram{" "}
-              <code className="text-on-surface-variant">tools</code> — e ignoram até{" "}
-              <code className="text-on-surface-variant">tool_choice: "required"</code>.
-              Perguntado quantos jogos da Steam estavam sendo monitorados, um deles
-              respondeu <strong className="text-error">20.285</strong> sem chamar nada. O
-              número verdadeiro é 12. Num projeto cujo propósito é a integridade do dado,
-              isso decidiu a arquitetura.
+            <p className="mt-space-xs font-body-sm text-body-sm text-outline">
+              Cite o nome do jogo na pergunta: o backend busca na loja da Steam na hora,
+              mesmo para um jogo que nunca passou pelo nosso coletor.
             </p>
-          </Painel>
-        </>
+          </div>
+        </aside>
+      </div>
+
+      {/* ==================== GAVETA DO HISTORICO (mobile) ==================== */}
+      {gavetaHistorico && (
+        <div
+          className="fixed inset-0 z-[90] flex bg-background/80 backdrop-blur-sm lg:hidden"
+          role="dialog"
+          aria-modal
+          aria-label="Histórico de perguntas"
+          onClick={() => setGavetaHistorico(false)}
+        >
+          <div
+            className="h-full w-[85%] max-w-xs p-space-sm"
+            onClick={(evento) => evento.stopPropagation()}
+          >
+            <PainelHistorico
+              entradas={historico.entradas}
+              carregando={historico.carregando}
+              perguntaAtual={resposta?.pergunta ?? null}
+              aoEscolher={(texto) => {
+                setPergunta(texto);
+                setGavetaHistorico(false);
+              }}
+              aoLimpar={historico.limpar}
+            />
+          </div>
+        </div>
       )}
 
-      {status.isError && (
-        <Consulta estado={status} altura={120}>
-          {() => null}
-        </Consulta>
-      )}
+      {/* ==================== O CONTEXTO INTEIRO ==================== */}
+      <Modal
+        aberto={verDados && Boolean(resposta)}
+        titulo="Dados consultados"
+        descricao="O contexto exato que o modelo recebeu. O chip FORA DO BANCO marca o que veio da loja da Steam, não da nossa coleta."
+        aoFechar={() => setVerDados(false)}
+      >
+        <div className="space-y-space-xs">
+          {resposta?.blocos.map((bloco) => (
+            <BlocoDeContexto key={bloco.chave} bloco={bloco} />
+          ))}
+        </div>
+      </Modal>
     </>
+  );
+}
+
+/**
+ * A decisao de arquitetura, recolhida.
+ *
+ * Continua na tela porque explica por que o assistente e assim - foi um teste
+ * que decidiu, nao preferencia - mas recolhida, porque quem vem perguntar nao
+ * precisa ler isso antes.
+ */
+function ComoFunciona() {
+  const [aberto, setAberto] = useState(false);
+
+  return (
+    <div className="rounded-xl bg-surface-container-low/60">
+      <button
+        type="button"
+        onClick={() => setAberto((atual) => !atual)}
+        aria-expanded={aberto}
+        className="flex w-full items-center justify-between gap-space-sm rounded-xl px-space-lg py-space-base text-left transition-colors hover:bg-surface-container/40"
+      >
+        <span className="flex items-center gap-space-xs font-label-caps text-label-caps uppercase tracking-widest text-outline">
+          <Icone nome="account_tree" className="text-[16px]" />
+          Como esta tela funciona
+        </span>
+        <Icone
+          nome={aberto ? "expand_less" : "expand_more"}
+          className="text-[20px] text-outline"
+        />
+      </button>
+
+      {aberto && (
+        <div className="space-y-space-base px-space-lg pb-space-lg">
+          <div className="grid grid-cols-1 gap-space-base md:grid-cols-3">
+            {[
+              {
+                icone: "search",
+                titulo: "1. Recuperação",
+                texto:
+                  "O backend escolhe os blocos relevantes pela pergunta e os monta com SQL escrito à mão. Não há texto-para-SQL nem consulta gerada pelo modelo.",
+              },
+              {
+                icone: "smart_toy",
+                titulo: "2. Redação",
+                texto:
+                  "O modelo recebe o contexto e a instrução de responder só com ele. Temperatura baixa: a tarefa é reproduzir números, não variar a redação.",
+              },
+              {
+                icone: "fact_check",
+                titulo: "3. Verificação",
+                texto:
+                  "O contexto volta junto da resposta e aparece ao lado. Qualquer número inventado fica visível na hora.",
+              },
+            ].map((passo) => (
+              <div key={passo.titulo} className="rounded-lg bg-surface-container-lowest p-space-base">
+                <div className="flex items-center gap-space-xs font-label-caps text-label-caps uppercase tracking-widest text-primary">
+                  <Icone nome={passo.icone} className="text-[16px]" />
+                  {passo.titulo}
+                </div>
+                <p className="mt-space-xs font-body-sm text-body-sm text-on-surface-variant">
+                  {passo.texto}
+                </p>
+              </div>
+            ))}
+          </div>
+
+          <p className="font-body-sm text-body-sm text-outline">
+            A primeira tentativa foi dar ferramentas ao modelo e deixá-lo consultar o que
+            precisasse. Os modelos gratuitos do OpenRouter ignoram{" "}
+            <code className="text-on-surface-variant">tools</code> — e ignoram até{" "}
+            <code className="text-on-surface-variant">tool_choice: "required"</code>.
+            Perguntado quantos jogos da Steam estavam sendo monitorados, um deles respondeu{" "}
+            <strong className="text-error">20.285</strong> sem chamar nada. O número
+            verdadeiro é 12. Num projeto cujo propósito é a integridade do dado, isso
+            decidiu a arquitetura.
+          </p>
+        </div>
+      )}
+    </div>
   );
 }

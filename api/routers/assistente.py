@@ -19,7 +19,9 @@ from api.schemas import (
     JogoRecomendado,
     MenorPrecoHistorico,
     OfertaLoja,
+    PontoSerieAssistente,
     RespostaAssistente,
+    SerieAssistente,
 )
 from config import get_settings
 from ml.assistente import AssistenteIndisponivel, perguntar
@@ -122,6 +124,20 @@ def responder(entrada: EntradaPergunta) -> RespostaAssistente:
             for j in resposta.recomendacoes
         ],
         jogo_ao_vivo=jogo_ao_vivo,
+        series=[
+            SerieAssistente(
+                chave=s.chave,
+                titulo=s.titulo,
+                unidade=s.unidade,
+                itens=[
+                    PontoSerieAssistente(
+                        rotulo=i.rotulo, valor=i.valor, detalhe=i.detalhe
+                    )
+                    for i in s.itens
+                ],
+            )
+            for s in resposta.series
+        ],
         tokens_entrada=resposta.tokens_entrada,
         tokens_saida=resposta.tokens_saida,
     )

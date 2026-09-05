@@ -509,6 +509,27 @@ class JogoAoVivo(BaseModel):
     menor_historico: MenorPrecoHistorico | None = None
 
 
+class PontoSerieAssistente(BaseModel):
+    rotulo: str
+    valor: float
+    detalhe: str | None = None
+
+
+class SerieAssistente(BaseModel):
+    """Os numeros de um bloco de contexto, estruturados.
+
+    Existe para a tela poder desenhar grafico SEM reler o texto da resposta:
+    nasce da mesma consulta que escreveu o bloco. Vazio quando a pergunta nao
+    trouxe nenhum bloco com ranking numerico - e ai a tela nao desenha nada,
+    em vez de inventar uma serie.
+    """
+
+    chave: str
+    titulo: str
+    unidade: str
+    itens: list[PontoSerieAssistente] = []
+
+
 class RespostaAssistente(BaseModel):
     pergunta: str
     resposta: str
@@ -521,6 +542,8 @@ class RespostaAssistente(BaseModel):
     recomendacoes: list[JogoRecomendado] = []
     #: Preenchido so quando a pergunta citou um jogo que a busca ao vivo achou.
     jogo_ao_vivo: JogoAoVivo | None = None
+    #: Os numeros dos blocos usados. A tela so desenha grafico com isto.
+    series: list[SerieAssistente] = []
     tokens_entrada: int | None
     tokens_saida: int | None
 
