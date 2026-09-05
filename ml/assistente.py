@@ -76,6 +76,15 @@ INSTRUCAO = """\
 Você é o assistente de dados do Gaming Analytics, uma plataforma de coleta e \
 análise de dados de jogos e esports.
 
+REGRA 0, acima de todas: você SÓ responde sobre o mundo dos jogos e esports - \
+jogos (de qualquer plataforma), lojas e preços, partidas, torneios, times, \
+jogadores, personagens/heróis/agentes, patches, meta, streamers, e a própria \
+plataforma Gaming Analytics. Se a pergunta for de qualquer outro assunto \
+(história, política, ciência, geografia, celebridades fora dos games, \
+conselhos de vida, matemática, etc.), responda EXATAMENTE isto e nada mais: \
+"Só respondo sobre o mundo dos jogos e esports - essa pergunta está fora do \
+que o Gaming Analytics cobre."
+
 O CONTEXTO abaixo vem em blocos, e cada bloco declara a FONTE dele:
 
 - NOSSO BANCO: dados que a plataforma coletou, mediu e armazenou.
@@ -1851,6 +1860,9 @@ class ContextoMontado:
     #: `True` quando nenhum bloco NOSSO respondeu uma pergunta do mundo dos
     #: jogos - `perguntar` entao libera a busca na web do OpenRouter.
     web_sugerida: bool = False
+    #: `True` quando a pergunta e do mundo dos jogos/esports. `False` recusa a
+    #: pergunta (fora do escopo) e nao deixa a web buscar.
+    no_dominio: bool = True
 
 
 def montar_contexto(pergunta: str) -> ContextoMontado:
@@ -1965,13 +1977,63 @@ def montar_contexto(pergunta: str) -> ContextoMontado:
     )
     web_sugerida = not fecha_a_pergunta
 
+    # Escopo: a pergunta e do mundo dos jogos? Sim se um gatilho nosso casou, se
+    # um bloco que so entra por NOME DE JOGO/PERSONAGEM apareceu, se ela cita um
+    # jogo do banco, ou se tem vocabulario do dominio. (Recomendacao NAO conta:
+    # "recomenda um livro" dispara o mesmo caminho de "recomenda um jogo".)
+    blocos_de_jogo = any(
+        b.chave in ("steam_ao_vivo", "elenco", "guia")
+        for b in blocos
+    )
+    # `\b` dos dois lados: "br" nao casa dentro de "sobre", "meta" nao casa em
+    # "cometa" - mas "esports?" e "meta." casam.
+    tem_vocabulario = any(
+        re.search(rf"\b{re.escape(_normalizar(t))}\b", normalizada)
+        for t in TERMOS_DOMINIO
+    )
+    no_dominio = bool(
+        gatilhos_explicitos
+        or blocos_de_jogo
+        or jogo_ao_vivo is not None
+        or _codigos_citados(pergunta)
+        or tem_vocabulario
+    )
+
     return ContextoMontado(
         blocos=blocos,
         recomendacoes=recomendacoes,
         jogo_ao_vivo=jogo_ao_vivo,
         series=series,
         web_sugerida=web_sugerida,
+        no_dominio=no_dominio,
     )
+
+
+#: Vocabulario que marca a pergunta como sendo do mundo dos jogos/esports - o
+#: unico assunto que este assistente cobre. Fora disso ele recusa, e a busca na
+#: web NAO dispara (senao "qual o pior rei da Espanha" viraria uma aula de
+#: historia). Lista ampla de proposito: e melhor deixar passar uma pergunta de
+#: jogo obscura do que responder sobre qualquer coisa.
+TERMOS_DOMINIO = (
+    "jogo", "jogos", "game", "gamer", "gaming", "videogame", "steam", "epic",
+    "console", "pc gamer", "playstation", "xbox", "nintendo", "switch",
+    "esport", "esports", "e-sport", "torneio", "campeonato", "mundial", "major",
+    "liga", "playoff", "bracket", "chave", "confronto", "partida", "partidas",
+    "scrim", "lan", "meta", "patch", "atualizacao do jogo", "nerf", "buff",
+    "heroi", "herói", "campeao", "campeão", "agente", "personagem", "build",
+    "itemizacao", "runa", "skin", "elo", "rank", "ranqueada", "matchmaking",
+    "dota", "valorant", "lol", "league of legends", "counter", "cs2", "csgo",
+    "fps", "moba", "rpg", "battle royale", "br", "mmorpg", "tft", "wild rift",
+    "riot", "valve", "blizzard", "steam deck", "twitch", "streamer", "speedrun",
+    "dlc", "early access", "beta", "review", "avaliacao", "preco do jogo",
+    "lancamento", "gameplay", "campanha", "modo online", "multiplayer",
+    "co-op", "coop", "pvp", "pve", "raid", "boss", "loot", "grind",
+    "plataforma", "nosso sistema", "nosso site", "nosso banco", "dashboard",
+    "coleta", "modelo de previsao", "winrate", "pick rate", "kda",
+    "jogador", "jogadora", "pro player", "atleta", "roster", "escalacao",
+    "midlane", "toplane", "jungle", "jungler", "adc", "carry", "igl",
+    "draft", "clutch", "headshot",
+)
 
 
 #: A pergunta pede a web explicitamente - a busca ja vai na primeira tentativa,
@@ -2066,6 +2128,20 @@ def perguntar(pergunta: str) -> Resposta:
 
     contexto_montado = montar_contexto(pergunta)
     blocos = contexto_montado.blocos
+
+    # Fora do escopo: nem chama o modelo. A recusa e fixa, e a web NAO busca -
+    # "qual o pior rei da Espanha" nao vira aula de historia.
+    if not contexto_montado.no_dominio:
+        return Resposta(
+            pergunta=pergunta,
+            resposta=(
+                "Só respondo sobre o mundo dos jogos e esports - essa pergunta "
+                "está fora do que o Gaming Analytics cobre."
+            ),
+            modelo=settings.openrouter_model,
+            blocos=[b for b in blocos if b.chave == "geral"],
+        )
+
     contexto = "\n\n".join(
         f"### {bloco.titulo}\n{bloco.conteudo}" for bloco in blocos
     )
@@ -2122,7 +2198,9 @@ def perguntar(pergunta: str) -> Resposta:
         }
 
     web_liberada = (
-        settings.assistente_web_habilitada and contexto_montado.web_sugerida
+        settings.assistente_web_habilitada
+        and contexto_montado.web_sugerida
+        and contexto_montado.no_dominio
     )
     web_na_primeira = web_liberada and _pede_web(pergunta)
 

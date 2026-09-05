@@ -603,6 +603,24 @@ def test_web_arma_quando_nenhuma_recomendacao_fecha(pergunta, esperado):
     assert montar_contexto(pergunta).web_sugerida is esperado
 
 
+@pytest.mark.parametrize(
+    "pergunta,no_dominio",
+    [
+        ("qual foi o pior rei da Espanha?", False),
+        ("qual a capital da Franca?", False),
+        ("me da uma receita de bolo de cenoura", False),
+        ("quem venceu o Mundial de League of Legends em 2023?", True),
+        ("qual o melhor agente do valorant?", True),
+        ("qual o patch atual de dota 2?", True),
+        ("quantos jogos da steam voces monitoram?", True),
+        ("me recomenda um fps cooperativo", True),
+        ("qual a build da Kaisa?", True),
+    ],
+)
+def test_escopo_so_o_mundo_dos_jogos(pergunta, no_dominio):
+    assert montar_contexto(pergunta).no_dominio is no_dominio
+
+
 def test_pede_web_so_com_termo_explicito():
     assert _pede_web("pesquisa na web o patch atual de dota")
     assert _pede_web("procure na internet quem ganhou o major")
