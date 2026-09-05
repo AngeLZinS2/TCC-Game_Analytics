@@ -260,6 +260,27 @@ export function AssistenteIAPagina() {
                   deveria aparecer na resposta — confira.
                 </p>
 
+                {resposta.fontes_web.length > 0 && (
+                  <div className="flex flex-col gap-space-xs border-t border-outline-variant/20 pt-space-base">
+                    <span className="flex items-center gap-space-xs font-label-caps text-label-caps uppercase tracking-widest text-outline">
+                      <Icone nome="travel_explore" className="text-[15px]" />
+                      Fontes da web (a base não tinha a resposta)
+                    </span>
+                    {resposta.fontes_web.map((f) => (
+                      <a
+                        key={f.url}
+                        href={f.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-space-xs font-body-sm text-body-sm text-on-surface-variant transition-colors hover:text-primary"
+                      >
+                        <Icone nome="open_in_new" className="text-[13px] text-outline" />
+                        <span className="truncate">{f.titulo}</span>
+                      </a>
+                    ))}
+                  </div>
+                )}
+
                 <AcoesResposta
                   resposta={resposta}
                   util={utilAtual}

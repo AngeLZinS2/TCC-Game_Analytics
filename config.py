@@ -234,6 +234,13 @@ class Settings(BaseSettings):
     #: Modelo do OpenRouter. O padrao e gratuito e responde bem em portugues.
     openrouter_model: str = "minimax/minimax-m3:free"
     openrouter_timeout_seconds: float = Field(default=60.0, gt=0)
+    #: Quando a nossa base e as APIs nao respondem uma pergunta do mundo dos
+    #: jogos, o assistente deixa o OpenRouter buscar na web (plugin `web`) e
+    #: responde com o resultado, citando a fonte. Custa por busca no OpenRouter,
+    #: entao so dispara quando NENHUM bloco nosso trouxe resposta.
+    assistente_web_habilitada: bool = True
+    #: Quantos resultados a busca da web traz. Mais e mais contexto e mais custo.
+    assistente_web_max_resultados: int = Field(default=5, ge=1, le=10)
 
     #: Quantos jogos do ranking oficial de MAIS JOGADOS entram no catalogo a
     #: cada rodada da Steam (o mesmo "Most Played" que o SteamDB espelha).

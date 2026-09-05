@@ -36,6 +36,12 @@ const CONHECIDAS: Record<string, DescricaoFonte> = {
     rotulo: "OP.GG, agora",
     chip: "OP.GG",
   },
+  web: {
+    interna: false,
+    icone: "travel_explore",
+    rotulo: "busca na web, agora",
+    chip: "web",
+  },
 };
 
 export function descreverFonte(fonte: string): DescricaoFonte {

@@ -14,6 +14,7 @@ from fastapi import APIRouter, HTTPException
 
 from api.schemas import (
     BlocoContexto,
+    FonteWeb,
     EntradaPergunta,
     JogoAoVivo,
     JogoRecomendado,
@@ -109,6 +110,9 @@ def responder(entrada: EntradaPergunta) -> RespostaAssistente:
                 chave=b.chave, titulo=b.titulo, conteudo=b.conteudo, fonte=b.fonte
             )
             for b in resposta.blocos
+        ],
+        fontes_web=[
+            FonteWeb(url=f["url"], titulo=f["titulo"]) for f in resposta.fontes_web
         ],
         recomendacoes=[
             JogoRecomendado(

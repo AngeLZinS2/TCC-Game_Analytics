@@ -142,6 +142,9 @@ avisa. O que está confirmado é que cada um tem modo online.
 13. Quando houver um bloco "Elenco e desempenho de X - OP.GG", ele responde "melhor campeão/agente" e "meta" desse jogo. Use os números dele, diga "segundo o OP.GG" e que é do público geral com classificação, NÃO do cenário profissional. Se a pergunta for sobre o meta PROFISSIONAL/competitivo, diga que esse recorte não responde isso. Se o mapa de capacidade diz que o jogo TEM desempenho por personagem mas NENHUM bloco com esses números veio no contexto, NÃO invente winrate, pick rate ou nomes: diga que o dado existe na tela /herois e que nesta resposta ele não foi carregado.
 14. Quando houver um bloco "Guia de build - X", ele responde "como jogar / o que buildar / ordem de subir a habilidade / runas" desse personagem. Liste os itens por fase, a prioridade de habilidade e as runas COMO ESTÃO no bloco. É dado do OP.GG/OpenDota (público geral), não do cenário profissional, e é da última coleta - não é ao vivo.
 15. Quando houver um bloco "Modelo de confronto", ele diz para quais jogos existe modelo de previsão ajustado. Se a pergunta pedir previsão de um confronto de um jogo SEM modelo na lista, diga que ainda não há modelo para esse jogo. Se o bloco disser que a acurácia não supera a taxa base, a resposta precisa dizer isso - não venda a previsão como confiável.
+16. BUSCA NA WEB. Antes de responder, decida: o CONTEXTO tem como responder esta pergunta? Se NÃO, e a pergunta pede um fato do mundo real que a web resolveria (resultado ou campeão de um torneio, notícia, data de lançamento, patch atual, quem é uma pessoa, comparação entre jogos que não temos), então sua resposta inteira deve ser SÓ esta linha, sem mais nada: PRECISA_WEB
+   Se o CONTEXTO responde, ignore isto e responda normalmente pelas regras acima.
+17. Numa resposta em MODO WEB (o sistema avisa), os resultados da busca já vêm no contexto. Use-os, inclusive números, MAS: (a) atribua cada afirmação à fonte - "segundo <site/página>", nunca como medição nossa; (b) se os resultados forem rasos, velhos ou se contradisserem, diga que a web não deu resposta firme; (c) não vá além do que os resultados dizem. Sem nada útil na web, aí sim a regra 3.
 """
 
 
@@ -255,6 +258,10 @@ class Resposta:
     #: Os numeros dos blocos usados, estruturados. A tela so desenha grafico
     #: se isto vier preenchido - nunca lendo de volta o texto da resposta.
     series: list[SerieAssistente] = field(default_factory=list)
+    #: As paginas que a busca da web trouxe (quando ela disparou): `{url,
+    #: titulo}`. A tela mostra como links - a resposta cita, a fonte fica a um
+    #: clique.
+    fontes_web: list[dict[str, str]] = field(default_factory=list)
     tokens_entrada: int | None = None
     tokens_saida: int | None = None
 
@@ -1815,12 +1822,20 @@ GATILHOS: dict[str, tuple[str, ...]] = {
               "jogadores simultaneos", "ccu", "genero", "gênero", "desconto"),
     "partidas": ("partida", "partidas", "dota", "torneio", "liga", "duracao",
                  "duração", "radiant", "dire", "esport"),
-    "herois": ("heroi", "herói", "herois", "heróis", "winrate", "personagem", "meta"),
+    "herois": ("heroi", "herói", "herois", "heróis", "winrate", "personagem", "meta",
+               "agente", "agentes", "campeao", "campeão", "campeoes", "campeões",
+               "pick rate", "taxa de escolha", "tier"),
     "modelos": ("modelo", "modelos", "previsao", "previsão", "prever", "acuracia",
                 "acurácia", "roc", "auc", "treino", "machine learning", "ml",
                 "confronto", "confrontos", "quem ganha", "quem vence", "favorito"),
     "sentimento": ("sentimento", "avaliacao", "avaliação", "avaliacoes", "avaliações",
                    "review", "reviews", "positiva", "negativa", "nlp"),
+    # Sem construtor no laco de `montar_contexto` (o bloco de guia se monta
+    # sozinho); serve para marcar a pergunta como "e da nossa base" e nao
+    # disparar a busca na web a toa.
+    "guia": ("build", "buildar", "buildo", "itemizacao", "itens do", "montar no",
+             "ordem de habilidade", "ordem de skill", "upar", "runa", "runas",
+             "feitico de invocador", "como jogar", "como jogo de"),
 }
 
 
@@ -1833,6 +1848,9 @@ class ContextoMontado:
     jogo_ao_vivo: JogoAoVivo | None = None
     #: Os numeros dos blocos, estruturados - a tela desenha grafico com eles.
     series: list[SerieAssistente] = field(default_factory=list)
+    #: `True` quando nenhum bloco NOSSO respondeu uma pergunta do mundo dos
+    #: jogos - `perguntar` entao libera a busca na web do OpenRouter.
+    web_sugerida: bool = False
 
 
 def montar_contexto(pergunta: str) -> ContextoMontado:
@@ -1932,12 +1950,105 @@ def montar_contexto(pergunta: str) -> ContextoMontado:
     if extremo is not None:
         blocos.append(extremo)
 
+    blocos = [bloco for bloco in blocos if bloco.conteudo.strip()]
+
+    # Web: quando a nossa base nao respondeu de fato. Um bloco que fecha a
+    # pergunta (jogo identificado na loja, recomendacao, extremo de avaliacao)
+    # ja e resposta - nao busca. `elenco` e `guia` NAO contam aqui: eles
+    # disparam so por citar um jogo ou personagem, e "quem venceu o mundial de
+    # LoL" traz o bloco de elenco sem responder nada. Dai o filtro real e o
+    # gatilho: se nenhuma palavra da nossa base casou (ou a pergunta pediu a
+    # web na cara), a web entra.
+    fecha_a_pergunta = any(
+        b.chave in ("descoberta", "recomendacao", "extremo_avaliacao")
+        for b in blocos
+    )
+    web_sugerida = not fecha_a_pergunta
+
     return ContextoMontado(
-        blocos=[bloco for bloco in blocos if bloco.conteudo.strip()],
+        blocos=blocos,
         recomendacoes=recomendacoes,
         jogo_ao_vivo=jogo_ao_vivo,
         series=series,
+        web_sugerida=web_sugerida,
     )
+
+
+#: A pergunta pede a web explicitamente - a busca ja vai na primeira tentativa,
+#: sem esperar a primeira resposta "nao tenho isso".
+TERMOS_WEB = (
+    "pesquisa na web", "busca na web", "pesquise na web", "busque na web",
+    "na internet", "pesquisa na internet", "procura na internet", "procure na internet",
+    "pesquise online", "busca online", "pesquisar online", "search",
+)
+
+
+def _pede_web(pergunta: str) -> bool:
+    normalizada = _normalizar(pergunta)
+    return any(_normalizar(t) in normalizada for t in TERMOS_WEB)
+
+
+#: O sinal que o modelo emite (regra 16) quando o CONTEXTO nao responde e a web
+#: resolveria. `perguntar` intercepta e refaz a chamada com a busca ligada.
+SINAL_WEB = "PRECISA_WEB"
+
+#: Rede de seguranca: se o modelo nao emitiu o sinal mas a resposta curta e so
+#: uma recusa, tambem vale como "sem resposta".
+_RECUSA = re.compile(
+    r"fora dos dados"
+    r"|n[aã]o (?:d[aá] pra?|temos|tenho|h[aá]|consigo|e poss[ií]vel|foi poss[ií]vel|"
+    r"cobre|aparece|consta|est[aá] no|encontr)"
+    r"|(?:nenhum|nao ha fonte)[^.!?:]*\bcobre"
+    r"|falta(?:m)? (?:esse|este|o |a |dados?|informa)"
+    r"|sem (?:esse|esses|o |os )?dados?",
+    re.I,
+)
+
+
+def _parece_sem_resposta(texto: str) -> bool:
+    limpo = (texto or "").strip()
+    if SINAL_WEB in limpo.upper():
+        return True
+    # Sem o sinal, so conta se a resposta e curta E abre com a recusa - uma
+    # resposta longa com ressalva no fim ja respondeu.
+    if len(limpo) > 320:
+        return False
+    primeira = re.split(r"(?<=[.!?:])\s", limpo, maxsplit=1)[0]
+    return bool(_RECUSA.search(primeira))
+
+
+def _chamar_modelo(corpo: dict[str, Any], settings) -> dict[str, Any]:
+    """Um POST ao OpenRouter. Devolve `{texto, annotations, modelo, uso}`."""
+    try:
+        resposta = requests.post(
+            f"{settings.openrouter_base_url}/chat/completions",
+            headers={
+                "Authorization": f"Bearer {settings.openrouter_api_key}",
+                "Content-Type": "application/json",
+            },
+            json=corpo,
+            timeout=settings.openrouter_timeout_seconds,
+        )
+    except requests.RequestException as exc:
+        raise AssistenteIndisponivel(
+            f"nao foi possivel falar com o OpenRouter: {type(exc).__name__}"
+        ) from exc
+
+    if resposta.status_code != 200:
+        raise AssistenteIndisponivel(
+            f"OpenRouter respondeu {resposta.status_code}: {resposta.text[:200]}"
+        )
+    dados = resposta.json()
+    if "error" in dados:
+        raise AssistenteIndisponivel(str(dados["error"])[:200])
+
+    mensagem = ((dados.get("choices") or [{}])[0].get("message")) or {}
+    return {
+        "texto": (mensagem.get("content") or "").strip(),
+        "annotations": mensagem.get("annotations"),
+        "modelo": dados.get("model") or settings.openrouter_model,
+        "uso": dados.get("usage") or {},
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -1959,59 +2070,136 @@ def perguntar(pergunta: str) -> Resposta:
         f"### {bloco.titulo}\n{bloco.conteudo}" for bloco in blocos
     )
 
-    corpo = {
-        "model": settings.openrouter_model,
-        "max_tokens": 700,
-        # Temperatura baixa: a tarefa e reproduzir numeros do contexto, nao
-        # variar a redacao. Criatividade aqui so aumenta a chance de inventar.
-        "temperature": 0.2,
-        "messages": [
-            {"role": "system", "content": INSTRUCAO},
-            {
-                "role": "user",
-                "content": f"CONTEXTO:\n{contexto}\n\nPERGUNTA: {pergunta}",
-            },
-        ],
-    }
+    def _corpo(mensagem_extra: str = "") -> dict[str, Any]:
+        return {
+            "model": settings.openrouter_model,
+            "max_tokens": 700,
+            # Temperatura baixa: a tarefa e reproduzir numeros do contexto, nao
+            # variar a redacao. Criatividade aqui so aumenta a chance de inventar.
+            "temperature": 0.2,
+            "messages": [
+                {"role": "system", "content": INSTRUCAO},
+                {
+                    "role": "user",
+                    "content": (
+                        f"CONTEXTO:\n{contexto}\n\nPERGUNTA: {pergunta}"
+                        + mensagem_extra
+                    ),
+                },
+            ],
+        }
 
-    try:
-        resposta = requests.post(
-            f"{settings.openrouter_base_url}/chat/completions",
-            headers={
-                "Authorization": f"Bearer {settings.openrouter_api_key}",
-                "Content-Type": "application/json",
-            },
-            json=corpo,
-            timeout=settings.openrouter_timeout_seconds,
+    # A chamada da web leva SO a pergunta na mensagem do usuario: a query da
+    # busca do OpenRouter sai dai, e mandar a ficha de Steam/Dota (ou ate o
+    # mapa de capacidade, cheio de "Liquipedia", "OP.GG", "esports") junto
+    # sujava a busca - voltavam repositorios de analytics em vez da resposta.
+    # O que a nossa base tem vai no system, para o modelo situar sem poluir a
+    # busca.
+    def _corpo_web() -> dict[str, Any]:
+        return {
+            "model": settings.openrouter_model,
+            "max_tokens": 700,
+            "temperature": 0.2,
+            "messages": [
+                {
+                    "role": "system",
+                    "content": (
+                        INSTRUCAO
+                        + "\n\nMODO WEB: a nossa base nao respondeu esta "
+                        "pergunta. Responda pelos resultados da web, citando a "
+                        "fonte (site/pagina) de cada afirmacao. Se a web nao "
+                        "trouxer, use a regra 3."
+                    ),
+                },
+                {"role": "user", "content": pergunta},
+            ],
+            # O plugin `web`: o OpenRouter busca, injeta os resultados e devolve
+            # as citacoes em `annotations`. O modelo nao escolhe buscar - o
+            # Python decidiu, pelo motivo de sempre (`collectors/opgg_mcp`).
+            "plugins": [
+                {"id": "web", "max_results": settings.assistente_web_max_resultados}
+            ],
+        }
+
+    web_liberada = (
+        settings.assistente_web_habilitada and contexto_montado.web_sugerida
+    )
+    web_na_primeira = web_liberada and _pede_web(pergunta)
+
+    usou_web = web_na_primeira
+    saida = _chamar_modelo(_corpo_web() if web_na_primeira else _corpo(), settings)
+
+    # Segunda tentativa COM a busca, quando a primeira nao achou nos nossos
+    # dados. So aqui - assim a maioria das perguntas (que a base responde)
+    # custa uma chamada, nao duas nem uma busca paga.
+    if (
+        web_liberada
+        and not web_na_primeira
+        and _parece_sem_resposta(saida["texto"])
+    ):
+        segunda = _chamar_modelo(_corpo_web(), settings)
+        if segunda["texto"]:
+            saida = segunda
+            usou_web = True
+
+    # O sinal `PRECISA_WEB` nao pode vazar para a tela (a web nao respondeu, ou
+    # esta desligada) - vira a recusa normal.
+    texto = saida["texto"]
+    if SINAL_WEB in texto.upper():
+        texto = (
+            "Não tenho esse dado no nosso banco e não consegui completar com a "
+            "busca na web agora. Tente reformular ou consulte a fonte oficial "
+            "do jogo/torneio."
         )
-    except requests.RequestException as exc:
-        raise AssistenteIndisponivel(
-            f"nao foi possivel falar com o OpenRouter: {type(exc).__name__}"
-        ) from exc
+        usou_web = False
 
-    if resposta.status_code != 200:
-        raise AssistenteIndisponivel(
-            f"OpenRouter respondeu {resposta.status_code}: {resposta.text[:200]}"
-        )
-
-    dados = resposta.json()
-    if "error" in dados:
-        raise AssistenteIndisponivel(str(dados["error"])[:200])
-
-    escolha = (dados.get("choices") or [{}])[0]
-    texto = (escolha.get("message") or {}).get("content") or ""
-    if not texto.strip():
+    if not texto:
         raise AssistenteIndisponivel("o modelo devolveu resposta vazia")
 
-    uso = dados.get("usage") or {}
+    fontes_web = _fontes_da_web(saida["annotations"])
+    if fontes_web:
+        linhas = [
+            "Estas paginas o OpenRouter buscou na web AGORA para esta pergunta. "
+            "Nao sao medicao nossa. A resposta cita a fonte de cada afirmacao:",
+        ]
+        linhas += [f"- {f['titulo']} ({f['url']})" for f in fontes_web]
+        blocos = [
+            *blocos,
+            Bloco("web", "Busca na web (resultado externo)", "\n".join(linhas), fonte="web"),
+        ]
+
+    # A resposta veio da web: o grafico dos NOSSOS blocos (pick rate de campeao,
+    # etc.) nao e sobre ela - fora.
+    series = [] if usou_web else contexto_montado.series
+
+    uso = saida["uso"]
     return Resposta(
         pergunta=pergunta,
-        resposta=texto.strip(),
-        modelo=dados.get("model") or settings.openrouter_model,
+        resposta=texto,
+        modelo=saida["modelo"],
         blocos=blocos,
         recomendacoes=contexto_montado.recomendacoes,
         jogo_ao_vivo=contexto_montado.jogo_ao_vivo,
-        series=contexto_montado.series,
+        series=series,
+        fontes_web=fontes_web,
         tokens_entrada=uso.get("prompt_tokens"),
         tokens_saida=uso.get("completion_tokens"),
     )
+
+
+def _fontes_da_web(annotations: Any) -> list[dict[str, str]]:
+    """As citacoes `url_citation` da resposta do OpenRouter, sem repetir URL."""
+    if not isinstance(annotations, list):
+        return []
+    vistos: set[str] = set()
+    fontes: list[dict[str, str]] = []
+    for anotacao in annotations:
+        if not isinstance(anotacao, dict) or anotacao.get("type") != "url_citation":
+            continue
+        cit = anotacao.get("url_citation") or {}
+        url = cit.get("url")
+        if not isinstance(url, str) or url in vistos:
+            continue
+        vistos.add(url)
+        fontes.append({"url": url, "titulo": cit.get("title") or url})
+    return fontes

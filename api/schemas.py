@@ -731,12 +731,21 @@ class SerieAssistente(BaseModel):
     itens: list[PontoSerieAssistente] = []
 
 
+class FonteWeb(BaseModel):
+    """Uma pagina que a busca na web trouxe - a tela mostra como link."""
+
+    url: str
+    titulo: str
+
+
 class RespostaAssistente(BaseModel):
     pergunta: str
     resposta: str
     modelo: str
     #: O que o modelo recebeu. E o que permite conferir cada numero da resposta.
     blocos: list[BlocoContexto]
+    #: As paginas da busca na web, quando ela disparou (a base nao respondeu).
+    fontes_web: list[FonteWeb] = []
     #: Preenchido so quando a pergunta pediu recomendacao - a tela desenha um
     #: cartao por item em vez de confiar em texto livre pra saber qual jogo foi
     #: recomendado.

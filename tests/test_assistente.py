@@ -32,6 +32,9 @@ from ml.assistente import (
     _bloco_herois,
     _bloco_modelos,
     _bloco_partidas,
+    _fontes_da_web,
+    _parece_sem_resposta,
+    _pede_web,
     _bloco_recomendacao,
     _bloco_sentimento,
     _bloco_steam,
@@ -583,6 +586,64 @@ def test_bloco_guia_so_com_gatilho_e_nome():
     if dota is not None:
         # Dota nao tem ordem de skill agregada - e a nota diz isso.
         assert "OpenDota" in dota.conteudo
+
+
+@pytest.mark.parametrize(
+    "pergunta,esperado",
+    [
+        # A base responde -> a web fica so ARMADA (dispara se a resposta falhar).
+        ("quem venceu o mundial de LoL em 2023?", True),
+        ("qual o melhor agente do valorant?", True),
+        ("quantos jogos da steam voces monitoram?", True),
+        # Recomendacao FECHA a pergunta - nao arma a web.
+        ("me recomenda um fps cooperativo pra jogar com amigos", False),
+    ],
+)
+def test_web_arma_quando_nenhuma_recomendacao_fecha(pergunta, esperado):
+    assert montar_contexto(pergunta).web_sugerida is esperado
+
+
+def test_pede_web_so_com_termo_explicito():
+    assert _pede_web("pesquisa na web o patch atual de dota")
+    assert _pede_web("procure na internet quem ganhou o major")
+    assert not _pede_web("qual o melhor heroi de dota?")
+
+
+@pytest.mark.parametrize(
+    "texto,sem_resposta",
+    [
+        ("Falta esse dado. Nao temos essa informacao no contexto.", True),
+        ("Fora dos dados: Hades e um roguelike da Supergiant.", True),
+        ("Nao da pra responder com o que temos. O banco e de outra coisa.", True),
+        ("Nao da pra responder com esses dados - o contexto e sobre Dota.", True),
+        ("Nenhum dos dois cobre o placar do Worlds 2023.", True),
+        ("Segundo o OP.GG, Rammus tem 52,7% de winrate em 36.721 partidas.", False),
+        ("O jogo com mais jogadores agora e Counter-Strike 2, com 1.104.332.", False),
+        # Uma ressalva NO FIM nao e recusa - a pergunta foi respondida.
+        (
+            "A T1 lidera com 60% de winrate. Nao temos o recorte profissional, "
+            "so o publico geral.",
+            False,
+        ),
+    ],
+)
+def test_parece_sem_resposta_le_so_a_abertura(texto, sem_resposta):
+    assert _parece_sem_resposta(texto) is sem_resposta
+
+
+def test_fontes_da_web_pega_url_citation_sem_repetir():
+    anot = [
+        {"type": "url_citation", "url_citation": {"url": "https://a.com", "title": "A"}},
+        {"type": "url_citation", "url_citation": {"url": "https://a.com", "title": "dup"}},
+        {"type": "file", "file": {}},
+        {"type": "url_citation", "url_citation": {"url": "https://b.com"}},
+    ]
+    fontes = _fontes_da_web(anot)
+    assert fontes == [
+        {"url": "https://a.com", "titulo": "A"},
+        {"url": "https://b.com", "titulo": "https://b.com"},
+    ]
+    assert _fontes_da_web(None) == []
 
 
 def test_bloco_modelos_nomeia_o_jogo_e_lista_a_cobertura():

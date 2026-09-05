@@ -602,12 +602,19 @@ export interface SerieAssistente {
   itens: PontoSerieAssistente[];
 }
 
+export interface FonteWeb {
+  url: string;
+  titulo: string;
+}
+
 export interface RespostaAssistente {
   pergunta: string;
   resposta: string;
   modelo: string;
   /** O que o modelo recebeu - permite conferir cada numero da resposta. */
   blocos: BlocoContexto[];
+  /** As paginas da busca na web, quando a base nao respondeu. */
+  fontes_web: FonteWeb[];
   /** Preenchido so quando a pergunta pediu recomendacao de jogo. */
   recomendacoes: JogoRecomendado[];
   /** Preenchido so quando a pergunta citou um jogo que a busca ao vivo achou. */
