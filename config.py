@@ -188,6 +188,21 @@ class Settings(BaseSettings):
     #: jogo novo no catalogo, nao pra acompanhar variacao.
     agendador_tempo_jogo_minutos: int = Field(default=1440, ge=60)
 
+    # --- OP.GG (servidor MCP publico) ---
+    #: Servidor MCP do OP.GG - LoL, TFT e VALORANT. Sem chave, licenca MIT.
+    #:
+    #: Quem chama e o PYTHON, nunca o modelo: o servidor e uma fonte de dados
+    #: como a loja da Steam, nao uma capacidade do assistente. Ver
+    #: `collectors/opgg_mcp.py` para o motivo.
+    opgg_mcp_url: str = "https://mcp-api.op.gg/mcp"
+    #: Desligar aqui derruba os blocos que dependem dele sem quebrar o resto -
+    #: mesmo contrato do `hltb_enabled`.
+    opgg_enabled: bool = True
+    #: Segundos entre chamadas. O OP.GG nao documenta limite nenhum, e isso
+    #: nao e permissao: e a mesma situacao da Liquipedia antes da politica
+    #: escrita. Conservador de proposito - o servico e gratuito e de terceiros.
+    opgg_rate_limit_seconds: float = Field(default=1.0, gt=0)
+
     #: Intervalo entre coletas do elenco de agentes do VALORANT, em minutos.
     #:
     #: Semanal. A Riot lanca um agente a cada poucos meses e ajusta funcao mais

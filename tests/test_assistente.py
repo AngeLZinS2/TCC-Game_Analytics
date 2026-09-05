@@ -552,7 +552,7 @@ def test_bloco_geral_lista_os_jogos_cobertos():
     assert "Dado de PARTIDA" in bloco.conteudo
 
 
-def test_elenco_so_entra_para_jogo_sem_partida():
+def test_elenco_so_entra_para_jogo_sem_partida(sem_opgg):
     """Para Dota quem responde e o bloco de herois, com winrate medido.
 
     Listar o elenco ali seria repetir pior o que ja existe - e, pior, colocaria
@@ -571,12 +571,17 @@ def test_elenco_so_entra_para_jogo_sem_partida():
     assert "Duelista" in valorant.conteudo
 
 
-def test_elenco_carrega_a_recusa_junto_com_o_dado():
-    """Elenco responde "quem existe", nunca "quem esta forte agora".
+def test_elenco_recusa_o_meta_quando_nao_ha_fonte_de_desempenho(sem_opgg):
+    """Elenco sozinho responde "quem existe", nunca "quem esta forte agora".
 
     A pergunta que originou tudo pedia o meta atual. Com 29 agentes listados e
     sem esta frase, o modelo ordenaria os oito duelistas por conta propria - e
     o numero sairia com a mesma cara dos que a plataforma mede.
+
+    O `sem_opgg` nao e conveniencia de teste: e o cenario real de uma fonte
+    externa fora do ar, e o comportamento nele tem que continuar sendo o de
+    antes de ela existir. Com o OP.GG respondendo, quem cobre o outro caminho e
+    `test_elenco_ordena_por_escolha_e_marca_a_procedencia`, em test_opgg.py.
     """
     with session_scope() as sessao:
         bloco, serie = _bloco_elenco("melhor agente do valorant no meta atual", sessao)

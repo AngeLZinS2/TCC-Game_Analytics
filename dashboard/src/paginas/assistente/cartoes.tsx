@@ -13,6 +13,7 @@ import type { BlocoContexto, JogoAoVivo, JogoRecomendado } from "../../api/tipos
 import { Icone, Selo } from "../../componentes/base";
 import { ArteJogo } from "../../componentes/CapaJogo";
 import { fmtData, fmtMoeda, fmtNumero, fmtPercentual } from "../../utilitarios/formatos";
+import { descreverFonte } from "./fontes";
 
 /**
  * Um bloco do contexto, recolhido por padrão.
@@ -24,12 +25,13 @@ import { fmtData, fmtMoeda, fmtNumero, fmtPercentual } from "../../utilitarios/f
  */
 export function BlocoDeContexto({ bloco }: { bloco: BlocoContexto }) {
   const [aberto, setAberto] = useState(false);
-  const daLoja = bloco.fonte === "steam";
+  const fonte = descreverFonte(bloco.fonte);
+  const externa = !fonte.interna;
 
   return (
     <div
       className={`overflow-hidden rounded bg-surface-container-lowest ${
-        daLoja ? "ring-1 ring-tertiary-container/40" : ""
+        externa ? "ring-1 ring-tertiary-container/40" : ""
       }`}
     >
       <button
@@ -40,13 +42,13 @@ export function BlocoDeContexto({ bloco }: { bloco: BlocoContexto }) {
       >
         <span className="flex min-w-0 items-center gap-space-xs font-title-code text-title-code text-on-surface">
           <Icone
-            nome={daLoja ? "storefront" : "database"}
-            className={`text-[16px] ${daLoja ? "text-tertiary" : "text-primary"}`}
+            nome={fonte.icone}
+            className={`text-[16px] ${externa ? "text-tertiary" : "text-primary"}`}
           />
           <span className="truncate">{bloco.titulo}</span>
-          {daLoja && (
+          {externa && (
             <span className="shrink-0 rounded bg-tertiary/10 px-space-xs py-space-xxs font-badge-status text-badge-status uppercase text-tertiary">
-              fora do banco
+              {fonte.chip}
             </span>
           )}
         </span>

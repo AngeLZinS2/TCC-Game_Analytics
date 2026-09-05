@@ -1,0 +1,259 @@
+"""Cliente do servidor MCP do OP.GG - chamado por Python, nunca pelo modelo.
+
+O OP.GG publica 29 ferramentas sobre League of Legends, TFT e VALORANT
+(estatistica de agente, tier de campeao por rota, composicao por mapa, perfil
+de invocador). E a fonte que faltava: ate aqui o projeto tinha partida so de
+Dota 2, e "qual o melhor agente do Valorant" nao tinha resposta com dado.
+
+**Por que o modelo nao fala com este servidor.**
+
+MCP existe para dar ferramentas a um modelo de linguagem. Ligar assim seria o
+caminho natural - e seria repetir o erro que definiu a arquitetura deste
+projeto. Os modelos gratuitos do OpenRouter ignoram `tools`, e ignoram ate
+`tool_choice: "required"`: perguntados quantos jogos da Steam eram monitorados,
+respondiam "20.285" com toda a confianca, sem chamar nada. O numero era 12.
+
+Mas MCP e so JSON-RPC sobre HTTP. Nada obriga o cliente a ser um modelo. Este
+modulo chama `tools/call` de forma deterministica, com os argumentos que o
+Python escolheu, e o resultado vira bloco de contexto - do mesmo jeito que
+`steam_loja` e `itad_loja`. O modelo recebe numeros ja buscados; ele nao
+escolhe o que buscar, nao sabe que este servidor existe e nao pode inventar uma
+chamada.
+
+**Sobre a sessao.** O transporte "streamable HTTP" exige um aperto de mao:
+`initialize` devolve um `mcp-session-id` no cabecalho, e toda chamada seguinte
+precisa dele. A sessao e reaproveitada entre chamadas do mesmo processo e
+refeita sozinha quando o servidor a expira - o custo dela e de tres viagens,
+e pagar isso por pergunta seria desperdicio.
+
+**Sobre o limite de taxa.** O OP.GG nao documenta nenhum. Isso nao e permissao:
+e a mesma situacao da Liquipedia antes da politica escrita, e o projeto trata
+igual - um intervalo minimo entre chamadas, configuravel, conservador por
+padrao. O servidor e gratuito e mantido por terceiros.
+"""
+
+from __future__ import annotations
+
+import json
+import logging
+import threading
+import time
+from typing import Any
+
+import requests
+
+from config import get_settings
+
+logger = logging.getLogger(__name__)
+
+#: O aperto de mao e a versao do protocolo que o servidor anunciou na conexao
+#: de teste. Fixa de proposito: subir sem verificar quebraria em silencio.
+VERSAO_PROTOCOLO = "2025-06-18"
+
+_CABECALHOS = {
+    "Content-Type": "application/json",
+    # Os dois: o servidor responde JSON puro em algumas ferramentas e
+    # `text/event-stream` em outras, e recusa quem so aceita um dos dois.
+    "Accept": "application/json, text/event-stream",
+}
+
+#: Sessao viva do processo. O lock existe porque o agendador roda tarefas em
+#: sequencia mas a API responde perguntas em paralelo (FastAPI usa threadpool):
+#: duas perguntas simultaneas fariam dois `initialize` e um sobrescreveria o
+#: outro no meio do uso.
+_sessao: str | None = None
+_trava = threading.Lock()
+_ultimo_pedido = 0.0
+
+
+class OpggIndisponivel(RuntimeError):
+    """O servidor nao respondeu ou recusou. Quem chama segue sem o bloco."""
+
+
+def _esperar_a_vez() -> None:
+    """Segura a chamada ate o intervalo minimo desde a anterior."""
+    global _ultimo_pedido
+    intervalo = get_settings().opgg_rate_limit_seconds
+    espera = intervalo - (time.monotonic() - _ultimo_pedido)
+    if espera > 0:
+        time.sleep(espera)
+    _ultimo_pedido = time.monotonic()
+
+
+def _postar(corpo: dict[str, Any], sessao: str | None) -> requests.Response:
+    settings = get_settings()
+    cabecalhos = dict(_CABECALHOS)
+    if sessao:
+        cabecalhos["mcp-session-id"] = sessao
+    _esperar_a_vez()
+    return requests.post(
+        settings.opgg_mcp_url,
+        headers=cabecalhos,
+        json=corpo,
+        timeout=settings.http_timeout_seconds,
+    )
+
+
+def _abrir_sessao() -> str:
+    """Aperto de mao. Devolve o id da sessao."""
+    resposta = _postar(
+        {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "initialize",
+            "params": {
+                "protocolVersion": VERSAO_PROTOCOLO,
+                "capabilities": {},
+                "clientInfo": {"name": "gaming-analytics", "version": "0.1"},
+            },
+        },
+        sessao=None,
+    )
+    resposta.raise_for_status()
+
+    sessao = resposta.headers.get("mcp-session-id")
+    if not sessao:
+        raise OpggIndisponivel("servidor nao devolveu mcp-session-id")
+
+    # Sem esta notificacao o servidor considera o aperto de mao incompleto e
+    # recusa `tools/call`. Nao tem `id`: e notificacao, nao pedido.
+    _postar({"jsonrpc": "2.0", "method": "notifications/initialized"}, sessao)
+    return sessao
+
+
+def _corpo_json(resposta: requests.Response) -> dict[str, Any]:
+    """O JSON-RPC de dentro da resposta, seja ela JSON puro ou SSE.
+
+    Em `text/event-stream` o payload vem em linhas `data: {...}`; a ultima e a
+    resposta final. Tratar as duas formas aqui evita que cada chamador
+    descubra sozinho qual ferramenta responde em qual formato.
+    """
+    texto = resposta.text
+    if "data: " in texto:
+        blocos = [
+            linha[len("data: ") :]
+            for linha in texto.splitlines()
+            if linha.startswith("data: ")
+        ]
+        if not blocos:
+            raise OpggIndisponivel("fluxo SSE sem linha de dados")
+        texto = blocos[-1]
+    try:
+        return json.loads(texto)
+    except ValueError as exc:
+        raise OpggIndisponivel(f"resposta nao era JSON: {texto[:120]}") from exc
+
+
+def chamar_ferramenta(nome: str, argumentos: dict[str, Any]) -> Any:
+    """Executa uma ferramenta e devolve o conteudo ja desempacotado.
+
+    Levanta `OpggIndisponivel` em qualquer falha - de rede, de protocolo ou
+    logica (o MCP sinaliza erro de ferramenta com `isError`, dentro de uma
+    resposta HTTP 200, entao olhar so o status esconderia a falha).
+    """
+    global _sessao
+
+    with _trava:
+        if _sessao is None:
+            _sessao = _abrir_sessao()
+        sessao = _sessao
+
+    pedido = {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "method": "tools/call",
+        "params": {"name": nome, "arguments": argumentos},
+    }
+
+    try:
+        resposta = _postar(pedido, sessao)
+        # 400/404 aqui e sessao expirada, nao ferramenta errada: refaz o aperto
+        # de mao uma vez. Sem isso, um processo de vida longa (a API) pararia
+        # de responder sobre Valorant depois de horas ociosas.
+        if resposta.status_code in (400, 404):
+            with _trava:
+                _sessao = _abrir_sessao()
+                sessao = _sessao
+            resposta = _postar(pedido, sessao)
+        resposta.raise_for_status()
+    except requests.RequestException as exc:
+        raise OpggIndisponivel(f"{type(exc).__name__}: {exc}") from exc
+
+    corpo = _corpo_json(resposta)
+    if "error" in corpo:
+        raise OpggIndisponivel(str(corpo["error"])[:200])
+
+    resultado = corpo.get("result") or {}
+    if resultado.get("isError"):
+        raise OpggIndisponivel(f"ferramenta {nome} recusou: {str(resultado)[:200]}")
+
+    partes = resultado.get("content") or []
+    if not partes:
+        raise OpggIndisponivel(f"ferramenta {nome} devolveu conteudo vazio")
+
+    texto = partes[0].get("text") or ""
+    try:
+        return json.loads(texto)
+    except ValueError:
+        # Varias ferramentas respondem numa notacao compacta propria (nao
+        # JSON). Quem precisar delas que parseie; devolver cru e melhor do que
+        # falhar, e nenhum bloco exibe esse texto sem tratar.
+        return texto
+
+
+# ---------------------------------------------------------------------------
+# VALORANT
+# ---------------------------------------------------------------------------
+
+
+def estatisticas_agentes_valorant() -> list[dict[str, Any]]:
+    """Desempenho agregado por agente: partidas, vitorias, derrotas, abates.
+
+    A chave e `characterId`, o MESMO uuid que a valorant-api.com usa - entao a
+    estatistica casa com `dim_personagem` sem heuristica de nome.
+
+    Estes numeros sao do publico geral do OP.GG (centenas de milhares de
+    partidas por agente), NAO do cenario profissional. A distincao importa na
+    resposta: "melhor agente no meta" costuma querer dizer pro play, e dizer
+    "58% de vitorias" sem essa marca entregaria um numero certo respondendo
+    outra pergunta.
+    """
+    dados = chamar_ferramenta("valorant_list_agent_statistics", {})
+    if isinstance(dados, dict):
+        dados = dados.get("data")
+    if not isinstance(dados, list):
+        raise OpggIndisponivel("estatistica de agente veio em formato inesperado")
+
+    agentes: list[dict[str, Any]] = []
+    for bruto in dados:
+        if not isinstance(bruto, dict):
+            continue
+        uuid = bruto.get("characterId")
+        partidas = bruto.get("gameCount") or 0
+        vitorias = bruto.get("wins") or 0
+        derrotas = bruto.get("defeats") or 0
+        decididas = vitorias + derrotas
+        if not isinstance(uuid, str) or not decididas:
+            continue
+        agentes.append(
+            {
+                # Minusculo: e assim que a valorant-api.com entrega, e e assim
+                # que esta gravado em `dim_personagem.id_externo`.
+                "id_externo": uuid.lower(),
+                "partidas": partidas,
+                "vitorias": vitorias,
+                "derrotas": derrotas,
+                # Empate existe no Valorant e nao cabe em "venceu ou perdeu":
+                # fica fora do denominador em vez de contar como meia derrota.
+                "winrate": round(100 * vitorias / decididas, 1),
+            }
+        )
+
+    total = sum(a["partidas"] for a in agentes)
+    for agente in agentes:
+        # Taxa de escolha sobre o total de PARTIDAS-agente da amostra. Nao e o
+        # mesmo que "porcentagem de partidas em que apareceu" (cada partida tem
+        # dez agentes), e o bloco precisa dizer isso.
+        agente["pick_rate"] = round(100 * agente["partidas"] / total, 1) if total else 0.0
+
+    return agentes

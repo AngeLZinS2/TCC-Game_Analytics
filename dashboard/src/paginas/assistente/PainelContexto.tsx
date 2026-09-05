@@ -17,6 +17,7 @@
 import type { RespostaAssistente, VisaoGeral } from "../../api/tipos";
 import { Icone } from "../../componentes/base";
 import { fmtNumero, fmtRelativo } from "../../utilitarios/formatos";
+import { descreverFonte } from "./fontes";
 
 /** Uma linha do painel de fontes: rotulo, numero real, icone. */
 function LinhaFonte({
@@ -69,10 +70,10 @@ export function PainelFontes({
           resposta.blocos.map((bloco) => (
             <LinhaFonte
               key={bloco.chave}
-              icone={bloco.fonte === "steam" ? "storefront" : "database"}
+              icone={descreverFonte(bloco.fonte).icone}
               rotulo={bloco.titulo}
               valor={`${bloco.conteudo.split("\n").length} linhas · ${
-                bloco.fonte === "steam" ? "loja, agora" : "nosso banco"
+                descreverFonte(bloco.fonte).rotulo
               }`}
             />
           ))

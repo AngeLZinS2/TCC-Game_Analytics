@@ -49,7 +49,7 @@ from typing import Any, Callable
 import requests
 from sqlalchemy import Integer, cast, desc, func, select
 
-from collectors import itad_loja, steam_descoberta, steam_loja
+from collectors import itad_loja, opgg_mcp, steam_descoberta, steam_loja
 from config import get_settings
 from db.models import (
     AgendaPartida,
@@ -81,6 +81,10 @@ pode ser um jogo que não está no nosso banco.
 - STEAMSPY: um terceiro (não é a Steam, não somos nós) consultado agora sobre \
 TODO um gênero da Steam - milhares de jogos, não só os do nosso banco. Os \
 números dele são estimativas, não medição oficial.
+- OP.GG: um terceiro consultado agora sobre League of Legends, TFT e VALORANT - \
+jogos que não são da Steam e cujas partidas nós não coletamos. São partidas \
+públicas com classificação, do público geral, NÃO do cenário profissional. \
+Diga "segundo o OP.GG" e diga que é do público geral.
 
 REGRAS, em ordem de prioridade:
 
@@ -633,6 +637,7 @@ def _bloco_elenco(pergunta: str, sessao) -> tuple[Bloco | None, SerieAssistente 
     candidatos = sessao.execute(
         select(
             DimJogo.id_jogo,
+            DimJogo.codigo,
             DimJogo.nome,
             select(func.count())
             .select_from(DimPartida)
@@ -642,43 +647,150 @@ def _bloco_elenco(pergunta: str, sessao) -> tuple[Bloco | None, SerieAssistente 
     ).all()
 
     alvo = None
-    for id_jogo, nome, partidas in candidatos:
+    for id_jogo, codigo, nome, partidas in candidatos:
         if partidas:
             continue
         if _normalizar(nome) in trechos:
-            alvo = (id_jogo, nome)
+            alvo = (id_jogo, codigo, nome)
             break
     if alvo is None:
         return None, None
 
-    id_jogo, nome_jogo = alvo
+    id_jogo, codigo_jogo, nome_jogo = alvo
     elenco = sessao.execute(
-        select(DimPersonagem.nome, DimPersonagem.papel)
+        select(DimPersonagem.nome, DimPersonagem.papel, DimPersonagem.id_externo)
         .where(DimPersonagem.id_jogo == id_jogo)
         .order_by(DimPersonagem.papel, DimPersonagem.nome)
     ).all()
     if not elenco:
         return None, None
 
+    desempenho = _desempenho_externo(codigo_jogo)
+    if desempenho:
+        return _elenco_com_desempenho(nome_jogo, elenco, desempenho)
+    return _elenco_sem_desempenho(nome_jogo, elenco), None
+
+
+def _desempenho_externo(codigo_jogo: str) -> dict[str, dict[str, Any]]:
+    """Desempenho por personagem vindo do OP.GG, indexado por `id_externo`.
+
+    Devolve `{}` quando a fonte esta desligada, nao cobre o jogo ou falhou - e
+    ai o bloco volta a ser so o elenco. Uma fonte externa fora do ar nao pode
+    virar pergunta sem resposta.
+
+    Quem chama e o Python. O servidor do OP.GG e MCP, feito para modelos
+    chamarem, mas o modelo deste projeto nao escolhe consulta - ver
+    `collectors/opgg_mcp`.
+    """
+    if not get_settings().opgg_enabled or codigo_jogo != "valorant":
+        return {}
+
+    try:
+        agentes = opgg_mcp.estatisticas_agentes_valorant()
+    except opgg_mcp.OpggIndisponivel as exc:
+        logger.warning("opgg indisponivel", extra={"erro": str(exc)})
+        return {}
+
+    return {agente["id_externo"]: agente for agente in agentes}
+
+
+def _elenco_sem_desempenho(nome_jogo: str, elenco: list[Any]) -> Bloco:
+    """Só quem existe e de que função - e a recusa explicita do resto."""
     por_papel: dict[str, list[str]] = {}
-    for nome_personagem, papel in elenco:
+    for nome_personagem, papel, _ in elenco:
         por_papel.setdefault(papel or "sem funcao declarada", []).append(nome_personagem)
 
     linhas = [f"Elenco de {nome_jogo} no nosso banco, por funcao:"]
     for papel, nomes in sorted(por_papel.items()):
         linhas.append(f"- {papel} ({len(nomes)}): {', '.join(nomes)}")
     linhas.append(
-        f"NAO temos nenhuma partida de {nome_jogo} coletada. Sem partida nao ha "
-        "taxa de escolha, taxa de vitoria nem desempenho por personagem - "
-        "entao NAO existe resposta com dado para 'melhor personagem', 'mais "
-        "forte' ou 'meta atual' deste jogo. Diga isso e diga o que temos "
-        "(elenco, funcao, equipes, agenda). Se for falar do meta mesmo assim, "
-        "use o prefixo 'Fora dos dados: ' e nao escreva numero nenhum."
+        f"NAO temos nenhuma partida de {nome_jogo} coletada e nao ha fonte "
+        "externa de desempenho para este jogo agora. Sem isso NAO existe "
+        "resposta com dado para 'melhor personagem', 'mais forte' ou 'meta "
+        "atual'. Diga isso e diga o que temos (elenco, funcao, equipes, "
+        "agenda). Se for falar do meta mesmo assim, use o prefixo 'Fora dos "
+        "dados: ' e nao escreva numero nenhum."
+    )
+    return Bloco("elenco", f"Elenco de {nome_jogo}", "\n".join(linhas))
+
+
+def _elenco_com_desempenho(
+    nome_jogo: str, elenco: list[Any], desempenho: dict[str, dict[str, Any]]
+) -> tuple[Bloco, SerieAssistente | None]:
+    """Elenco + taxa de vitoria e de escolha, do OP.GG.
+
+    O casamento e por `id_externo`: o OP.GG devolve o mesmo uuid de agente que
+    a valorant-api.com, entao nao ha heuristica de nome no meio - o risco de
+    colar a estatistica no agente errado simplesmente nao existe aqui.
+
+    A ordem e por taxa de ESCOLHA, nao por vitoria, e isso e uma escolha de
+    leitura: em Valorant as vitorias ficam todas entre 48% e 52% (o jogo e
+    equilibrado por design), entao ranquear por elas poria em primeiro lugar um
+    agente pouco jogado por meio ponto de diferenca. Taxa de escolha varia de
+    12% a menos de 1% e e o que a palavra "meta" costuma querer dizer.
+    """
+    linhas_ordenadas = sorted(
+        (
+            (nome, papel, desempenho.get((id_externo or "").lower()))
+            for nome, papel, id_externo in elenco
+        ),
+        key=lambda item: (item[2] or {}).get("pick_rate", -1),
+        reverse=True,
     )
 
-    # Sem serie: o elenco e uma lista nominal, nao uma grandeza. Um grafico de
-    # "8 duelistas, 7 sentinelas" contaria o nosso recorte, nao o jogo.
-    return Bloco("elenco", f"Elenco de {nome_jogo}", "\n".join(linhas)), None
+    total_partidas = sum(d["partidas"] for d in desempenho.values())
+    linhas = [
+        f"Desempenho por agente de {nome_jogo}, do OP.GG (consultado agora). "
+        f"Amostra: {total_partidas} participacoes de agente em partidas "
+        "publicas com classificacao. Ordem por taxa de escolha:",
+    ]
+    pontos: list[PontoSerie] = []
+    for nome, papel, dados in linhas_ordenadas:
+        if dados is None:
+            linhas.append(f"- {nome} ({papel or 'sem funcao'}): sem estatistica no OP.GG")
+            continue
+        linhas.append(
+            f"- {nome} ({papel or 'sem funcao'}): {dados['pick_rate']}% de taxa de "
+            f"escolha, {dados['winrate']}% de vitorias em {dados['partidas']} partidas"
+        )
+        pontos.append(
+            PontoSerie(
+                rotulo=nome,
+                valor=float(dados["pick_rate"]),
+                detalhe=f"{dados['winrate']}% de vitorias",
+            )
+        )
+
+    linhas.append(
+        "Estes numeros sao do OP.GG, um terceiro - nao sao medicao nossa e nao "
+        "sao do cenario profissional: sao partidas publicas com classificacao. "
+        "Diga 'segundo o OP.GG' e diga que e do publico geral. Se a pergunta "
+        "for sobre o meta PROFISSIONAL, avise que este recorte nao responde "
+        "isso. A taxa de escolha e sobre o total de participacoes de agente, "
+        "nao sobre partidas (cada partida tem dez agentes)."
+    )
+    linhas.append(
+        "As taxas de vitoria de Valorant ficam quase todas entre 48% e 52% - "
+        "meio ponto de diferenca NAO faz um agente 'melhor'. Se a pergunta "
+        "pedir o melhor, responda pelo conjunto (escolha + vitoria) e diga que "
+        "a diferenca de vitoria e pequena."
+    )
+
+    serie = SerieAssistente(
+        chave="elenco",
+        titulo=f"Taxa de escolha — {nome_jogo} (OP.GG)",
+        unidade="%",
+        itens=pontos[:8],
+    )
+    return (
+        Bloco(
+            "elenco",
+            f"Elenco e desempenho de {nome_jogo} - OP.GG agora",
+            "\n".join(linhas),
+            fonte="opgg",
+        ),
+        serie,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -1472,9 +1584,14 @@ def montar_contexto(pergunta: str) -> ContextoMontado:
                 if serie is not None and serie.itens:
                     series.append(serie)
 
-        elenco, _ = _bloco_elenco(pergunta, sessao)
+        elenco, serie_elenco = _bloco_elenco(pergunta, sessao)
         if elenco is not None:
             blocos.append(elenco)
+            if serie_elenco is not None and serie_elenco.itens:
+                # Na frente pelo mesmo motivo da descoberta: a tela desenha
+                # `series[0]`, e quem pergunta de agente do Valorant nao quer o
+                # grafico de winrate de heroi de Dota ao lado da resposta.
+                series.insert(0, serie_elenco)
 
         ao_vivo, jogo_ao_vivo = _bloco_steam_ao_vivo(pergunta, sessao)
         if ao_vivo is not None:
