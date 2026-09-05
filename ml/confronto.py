@@ -873,6 +873,21 @@ def carregar_relatorio(jogo: str = "dota2") -> dict[str, Any] | None:
     return json.loads(caminho.read_text(encoding="utf-8"))
 
 
+def jogos_com_modelo() -> list[str]:
+    """Os codigos de jogo que ja tem um modelo de confronto ajustado.
+
+    Um por arquivo `metricas_confronto_<jogo>.json`. Serve ao assistente: ele
+    precisa saber para quais jogos "quem ganha o confronto?" tem resposta com
+    modelo, e para quais ainda nao.
+    """
+    if not PASTA.exists():
+        return []
+    return sorted(
+        caminho.stem.removeprefix("metricas_confronto_")
+        for caminho in PASTA.glob("metricas_confronto_*.json")
+    )
+
+
 # ---------------------------------------------------------------------------
 # Consulta
 # ---------------------------------------------------------------------------

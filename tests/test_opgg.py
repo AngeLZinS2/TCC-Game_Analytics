@@ -13,6 +13,7 @@ import json
 import pytest
 
 from collectors import opgg_mcp
+from db.session import session_scope
 from ml.assistente import _desempenho_externo, _elenco_com_desempenho
 
 
@@ -89,23 +90,26 @@ def test_agente_sem_partida_decidida_e_descartado(monkeypatch):
     assert opgg_mcp.estatisticas_agentes_valorant() == []
 
 
-def test_fonte_fora_do_ar_nao_derruba_a_pergunta(monkeypatch):
-    """Uma fonte externa indisponivel e um bloco a menos, nao um erro.
-
-    O bloco de elenco volta a ser so o elenco, com a recusa explicita - que e
-    exatamente o comportamento de antes do OP.GG existir.
-    """
-    def explode():
-        raise opgg_mcp.OpggIndisponivel("timeout")
+def test_desempenho_le_do_banco_e_nao_chama_o_opgg(monkeypatch):
+    """O assistente responde com o que ja foi coletado, nao com uma chamada ao
+    vivo. `_desempenho_externo` le `fato_estatistica_personagem`; o servidor MCP
+    e assunto do coletor, numa rodada agendada."""
+    def explode(*_a, **_k):
+        raise AssertionError("o assistente nao pode chamar o OP.GG ao vivo")
 
     monkeypatch.setattr(opgg_mcp, "estatisticas_agentes_valorant", explode)
-    assert _desempenho_externo("valorant") == {}
+    monkeypatch.setattr(opgg_mcp, "chamar_ferramenta", explode)
 
-
-def test_desempenho_so_para_jogo_coberto():
-    """Chamar o OP.GG por causa de Counter-Strike gastaria rede a toa - e o
-    servidor so cobre LoL, TFT e Valorant."""
-    assert _desempenho_externo("counterstrike") == {}
+    with session_scope() as sessao:
+        # Counter-Strike nao tem `fato_estatistica_personagem` - devolve vazio,
+        # sem tocar na rede.
+        assert _desempenho_externo(sessao, "counterstrike") == {}
+        # Um jogo com coleta devolve dicionario indexado por id_externo.
+        valorant = _desempenho_externo(sessao, "valorant")
+        assert isinstance(valorant, dict)
+        for chave, dados in valorant.items():
+            assert chave == chave.lower()
+            assert {"nome", "partidas", "vitorias", "winrate", "metricas"} <= dados.keys()
 
 
 def test_elenco_ordena_por_escolha_e_marca_a_procedencia():
@@ -123,18 +127,22 @@ def test_elenco_ordena_por_escolha_e_marca_a_procedencia():
         ("Vyse", "Sentinela", "ccc"),
     ]
     desempenho = {
-        "aaa": {"partidas": 100, "winrate": 50.0, "pick_rate": 4.0},
-        "bbb": {"partidas": 300, "winrate": 51.9, "pick_rate": 12.2},
+        "aaa": {"nome": "Jett", "partidas": 100, "vitorias": 50, "winrate": 50.0,
+                "metricas": {"pick_rate": 4.0, "hs": 24.0}},
+        "bbb": {"nome": "Clove", "partidas": 300, "vitorias": 156, "winrate": 51.9,
+                "metricas": {"pick_rate": 12.2, "hs": 21.0}},
     }
 
-    bloco, serie = _elenco_com_desempenho("VALORANT", elenco, desempenho)
+    bloco, serie = _elenco_com_desempenho("VALORANT", "valorant", elenco, desempenho)
 
     assert bloco.fonte == "opgg"
     corpo = bloco.conteudo
     assert corpo.index("Clove") < corpo.index("Jett")
     # Sem estatistica nao vira zero: vira ausencia declarada.
     assert "Vyse (Sentinela): sem estatistica no OP.GG" in corpo
-    assert "NAO do cenario profissional" in corpo or "nao sao do cenario profissional" in corpo
+    # A metrica sai com o rotulo do proprio esporte.
+    assert "HS% 21.0%" in corpo
+    assert "nao sao do cenario profissional" in corpo
     assert "meio ponto de diferenca NAO faz um agente 'melhor'" in corpo
 
     assert serie is not None

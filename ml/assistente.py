@@ -49,6 +49,7 @@ from typing import Any, Callable
 import requests
 from sqlalchemy import Integer, cast, desc, func, select
 
+from api import vocabulario_esports
 from collectors import itad_loja, opgg_mcp, steam_descoberta, steam_loja
 from config import get_settings
 from db.models import (
@@ -59,12 +60,14 @@ from db.models import (
     DimPartida,
     DimPersonagem,
     FatoAvaliacaoSteam,
+    FatoEstatisticaPersonagem,
     FatoPartidaJogador,
     FatoSnapshotJogoSteam,
 )
 from db.session import session_scope
 from etl.transform_itad import MenorHistorico, OfertaItad
 from ml.confronto import carregar_relatorio as relatorio_confronto
+from ml.confronto import jogos_com_modelo as _jogos_com_modelo_confronto
 from ml.sentimento import carregar_metricas as metricas_sentimento
 
 logger = logging.getLogger(__name__)
@@ -135,7 +138,10 @@ e diga que a busca foi feita na loja neste momento e que esses jogos não são \
 do nosso banco. NUNCA afirme quantos jogadores cabem numa partida, tamanho de \
 grupo ou "suporta squad de N" - a loja não informa isso, e o próprio bloco \
 avisa. O que está confirmado é que cada um tem modo online.
-12. O bloco "Volumes do banco" lista os jogos de esports que cobrimos. NUNCA diga que um jogo listado ali "não está no nosso banco" - diga o que temos dele (equipes, agenda, elenco) e o que falta. A última linha desse bloco diz para quais jogos existe dado de PARTIDA: só para esses cabe falar de winrate, pick rate, desempenho ou "meta". Para os outros, responder "o melhor personagem é X" seria opinião com cara de medição - diga que falta a coleta de partidas desse jogo.
+12. O bloco "Volumes do banco" lista os jogos de esports que cobrimos e é um MAPA DE CAPACIDADE. NUNCA diga que um jogo listado ali "não está no nosso banco". Ele tem três linhas-chave: (a) para quais jogos existe dado de PARTIDA nosso; (b) para quais existe DESEMPENHO por personagem - winrate, pick rate, meta - e de que fonte (nosso, para Dota; OP.GG, público geral com classificação, para LoL e Valorant); (c) para quais existe GUIA de build. Responda "melhor personagem / meta" só para os jogos da linha (b), sempre dizendo a fonte. Para um jogo fora dela, "o melhor é X" seria opinião com cara de medição - diga que falta essa coleta.
+13. Quando houver um bloco "Elenco e desempenho de X - OP.GG", ele responde "melhor campeão/agente" e "meta" desse jogo. Use os números dele, diga "segundo o OP.GG" e que é do público geral com classificação, NÃO do cenário profissional. Se a pergunta for sobre o meta PROFISSIONAL/competitivo, diga que esse recorte não responde isso.
+14. Quando houver um bloco "Guia de build - X", ele responde "como jogar / o que buildar / ordem de subir a habilidade / runas" desse personagem. Liste os itens por fase, a prioridade de habilidade e as runas COMO ESTÃO no bloco. É dado do OP.GG/OpenDota (público geral), não do cenário profissional, e é da última coleta - não é ao vivo.
+15. Quando houver um bloco "Modelo de confronto", ele diz para quais jogos existe modelo de previsão ajustado. Se a pergunta pedir previsão de um confronto de um jogo SEM modelo na lista, diga que ainda não há modelo para esse jogo. Se o bloco disser que a acurácia não supera a taxa base, a resposta precisa dizer isso - não venda a previsão como confiável.
 """
 
 
@@ -318,13 +324,15 @@ def _linhas_cobertura(sessao) -> list[str]:
     tinha como saber: nenhum bloco falava dos outros jogos, e o unico bloco de
     personagem consultava herois de Dota.
 
-    A ultima linha e a mais importante das duas dezenas: ela separa "temos o
-    jogo" de "temos partida do jogo". Sem ela, ver "VALORANT: 29 agentes" faria
-    o modelo achar que da pra ranquear agente por desempenho - e nao da, porque
-    nenhuma partida de Valorant foi coletada.
+    As tres ultimas linhas sao um mapa de capacidade: separam "temos o jogo" de
+    "temos partida", "temos estatistica por personagem" e "temos modelo de
+    previsao". Sem elas, ver "VALORANT: 29 agentes" faria o modelo achar que da
+    pra ranquear agente sem saber de onde sai o numero - ou negar que da, agora
+    que sai (do OP.GG, em `fato_estatistica_personagem`).
     """
     contagens = sessao.execute(
         select(
+            DimJogo.codigo,
             DimJogo.nome,
             select(func.count())
             .select_from(DimEquipe)
@@ -345,15 +353,40 @@ def _linhas_cobertura(sessao) -> list[str]:
         ).order_by(DimJogo.nome)
     ).all()
 
-    cobertos = [linha for linha in contagens if any(linha[1:])]
+    cobertos = [linha for linha in contagens if any(linha[2:])]
     if not cobertos:
         return []
+
+    # Jogos com estatistica agregada por personagem (OP.GG) e com guia de build.
+    com_estatistica = set(
+        sessao.scalars(
+            select(DimJogo.codigo)
+            .join(DimPersonagem, DimPersonagem.id_jogo == DimJogo.id_jogo)
+            .join(
+                FatoEstatisticaPersonagem,
+                FatoEstatisticaPersonagem.id_personagem
+                == DimPersonagem.id_personagem,
+            )
+            .distinct()
+        )
+    )
+    com_guia = set(
+        sessao.scalars(
+            select(DimJogo.codigo)
+            .join(DimPersonagem, DimPersonagem.id_jogo == DimJogo.id_jogo)
+            .where(DimPersonagem.metadados.has_key("guia"))
+            .distinct()
+        )
+    )
+    com_modelo = set(_jogos_com_modelo_confronto())
 
     linhas = [
         "Jogos de esports no nosso banco (equipes e agenda vem da Liquipedia):"
     ]
     com_partida: list[str] = []
-    for nome, equipes, agenda, partidas, personagens in cobertos:
+    com_desempenho: list[str] = []
+    com_guia_nomes: list[str] = []
+    for codigo, nome, equipes, agenda, partidas, personagens in cobertos:
         partes = []
         if equipes:
             partes.append(f"{equipes} equipes")
@@ -364,12 +397,32 @@ def _linhas_cobertura(sessao) -> list[str]:
             com_partida.append(nome)
         if personagens:
             partes.append(f"{personagens} personagens/agentes")
+        if codigo in com_estatistica:
+            partes.append("estatistica por personagem do OP.GG")
+        if codigo in com_guia:
+            partes.append("guia de build (itens, ordem de habilidade)")
+            com_guia_nomes.append(nome)
+        if codigo in com_modelo:
+            partes.append("modelo de previsao de confronto ajustado")
+        if partidas or codigo in com_estatistica:
+            com_desempenho.append(nome)
         linhas.append(f"- {nome}: {', '.join(partes)}")
 
     linhas.append(
-        "Dado de PARTIDA (quem jogou, com qual personagem, quem venceu) existe "
-        f"so para: {', '.join(com_partida) or 'nenhum jogo'}. Nos outros da pra "
-        "falar de equipes, agenda e elenco - nao de winrate, pick rate nem meta."
+        "Dado de PARTIDA nosso (quem jogou, com qual personagem, quem venceu) "
+        f"existe so para: {', '.join(com_partida) or 'nenhum jogo'}."
+    )
+    linhas.append(
+        "DESEMPENHO por personagem (winrate, pick rate, meta) tem resposta com "
+        f"dado para: {', '.join(com_desempenho) or 'nenhum jogo'} - para Dota e "
+        "medicao nossa das partidas; para LoL e Valorant e o OP.GG (publico "
+        "geral com classificacao, NAO cenario profissional). Nos demais jogos "
+        "da pra falar de equipes, agenda e elenco, nao de meta."
+    )
+    linhas.append(
+        "GUIA de como jogar um personagem (build de item, ordem de subir a "
+        f"habilidade, runas): {', '.join(com_guia_nomes) or 'nenhum jogo'} - "
+        "a tela de detalhe do personagem (/herois) mostra a ficha completa."
     )
     return linhas
 
@@ -665,33 +718,71 @@ def _bloco_elenco(pergunta: str, sessao) -> tuple[Bloco | None, SerieAssistente 
     if not elenco:
         return None, None
 
-    desempenho = _desempenho_externo(codigo_jogo)
+    desempenho = _desempenho_externo(sessao, codigo_jogo)
     if desempenho:
-        return _elenco_com_desempenho(nome_jogo, elenco, desempenho)
+        return _elenco_com_desempenho(nome_jogo, codigo_jogo, elenco, desempenho)
     return _elenco_sem_desempenho(nome_jogo, elenco), None
 
 
-def _desempenho_externo(codigo_jogo: str) -> dict[str, dict[str, Any]]:
-    """Desempenho por personagem vindo do OP.GG, indexado por `id_externo`.
+def _desempenho_externo(sessao, codigo_jogo: str) -> dict[str, dict[str, Any]]:
+    """Desempenho agregado por personagem, do ULTIMO snapshot ARMAZENADO de
+    `fato_estatistica_personagem` (LoL e Valorant, fonte OP.GG).
 
-    Devolve `{}` quando a fonte esta desligada, nao cobre o jogo ou falhou - e
-    ai o bloco volta a ser so o elenco. Uma fonte externa fora do ar nao pode
-    virar pergunta sem resposta.
+    Le o banco, nao chama o OP.GG: quem fala com o servidor MCP e o coletor,
+    numa rodada agendada. O assistente responde uma pergunta com o que ja foi
+    coletado - uma fonte externa lenta no caminho da pergunta seria o defeito
+    que a arquitetura deste modulo evita.
 
-    Quem chama e o Python. O servidor do OP.GG e MCP, feito para modelos
-    chamarem, mas o modelo deste projeto nao escolhe consulta - ver
-    `collectors/opgg_mcp`.
+    Indexado por `id_externo` em minusculo (o uuid do agente, o id numerico do
+    campeao) - a mesma chave que casa `dim_personagem` com a fonte sem
+    heuristica de nome. Vazio quando o jogo nao tem essa coleta, e ai o bloco
+    volta a ser so o elenco.
     """
-    if not get_settings().opgg_enabled or codigo_jogo != "valorant":
+    janela = sessao.scalar(
+        select(func.max(FatoEstatisticaPersonagem.janela_coleta))
+        .select_from(FatoEstatisticaPersonagem)
+        .join(
+            DimPersonagem,
+            DimPersonagem.id_personagem == FatoEstatisticaPersonagem.id_personagem,
+        )
+        .join(DimJogo, DimJogo.id_jogo == DimPersonagem.id_jogo)
+        .where(DimJogo.codigo == codigo_jogo)
+    )
+    if janela is None:
         return {}
 
-    try:
-        agentes = opgg_mcp.estatisticas_agentes_valorant()
-    except opgg_mcp.OpggIndisponivel as exc:
-        logger.warning("opgg indisponivel", extra={"erro": str(exc)})
-        return {}
+    linhas = sessao.execute(
+        select(
+            DimPersonagem.id_externo,
+            DimPersonagem.nome,
+            FatoEstatisticaPersonagem.partidas,
+            FatoEstatisticaPersonagem.vitorias,
+            FatoEstatisticaPersonagem.metricas,
+        )
+        .join(
+            DimPersonagem,
+            DimPersonagem.id_personagem == FatoEstatisticaPersonagem.id_personagem,
+        )
+        .join(DimJogo, DimJogo.id_jogo == DimPersonagem.id_jogo)
+        .where(
+            DimJogo.codigo == codigo_jogo,
+            FatoEstatisticaPersonagem.janela_coleta == janela,
+            FatoEstatisticaPersonagem.mapa == "",  # `""` = o agregado geral
+        )
+    ).all()
 
-    return {agente["id_externo"]: agente for agente in agentes}
+    saida: dict[str, dict[str, Any]] = {}
+    for id_externo, nome, partidas, vitorias, metricas in linhas:
+        p = int(partidas or 0)
+        v = int(vitorias or 0)
+        saida[(id_externo or "").lower()] = {
+            "nome": nome,
+            "partidas": p,
+            "vitorias": v,
+            "winrate": round(100 * v / p, 1) if p else 0.0,
+            "metricas": metricas or {},
+        }
+    return saida
 
 
 def _elenco_sem_desempenho(nome_jogo: str, elenco: list[Any]) -> Bloco:
@@ -715,66 +806,89 @@ def _elenco_sem_desempenho(nome_jogo: str, elenco: list[Any]) -> Bloco:
 
 
 def _elenco_com_desempenho(
-    nome_jogo: str, elenco: list[Any], desempenho: dict[str, dict[str, Any]]
+    nome_jogo: str,
+    codigo_jogo: str,
+    elenco: list[Any],
+    desempenho: dict[str, dict[str, Any]],
 ) -> tuple[Bloco, SerieAssistente | None]:
-    """Elenco + taxa de vitoria e de escolha, do OP.GG.
+    """Elenco + desempenho por personagem, do snapshot que coletamos do OP.GG.
 
     O casamento e por `id_externo`: o OP.GG devolve o mesmo uuid de agente que
-    a valorant-api.com, entao nao ha heuristica de nome no meio - o risco de
-    colar a estatistica no agente errado simplesmente nao existe aqui.
+    a valorant-api.com e o mesmo id de campeao que o Data Dragon - nao ha
+    heuristica de nome no meio, o risco de colar a estatistica no personagem
+    errado simplesmente nao existe.
 
-    A ordem e por taxa de ESCOLHA, nao por vitoria, e isso e uma escolha de
-    leitura: em Valorant as vitorias ficam todas entre 48% e 52% (o jogo e
-    equilibrado por design), entao ranquear por elas poria em primeiro lugar um
-    agente pouco jogado por meio ponto de diferenca. Taxa de escolha varia de
-    12% a menos de 1% e e o que a palavra "meta" costuma querer dizer.
+    Cada metrica sai com o rotulo do proprio esporte (`vocabulario_esports`):
+    "HS% / ADR" para o agente, "Pick% / Ban% / Tier" para o campeao. A ordem e
+    por taxa de ESCOLHA - em jogo equilibrado a vitoria varia pouco e ranquear
+    por ela poria em primeiro um personagem pouco jogado por meio ponto; taxa
+    de escolha e o que a palavra "meta" costuma querer dizer.
     """
+    perfil = vocabulario_esports.perfil(codigo_jogo)
+
+    def _pick(dados: dict[str, Any] | None) -> float:
+        if not dados:
+            return -1.0
+        taxa = (dados.get("metricas") or {}).get("pick_rate")
+        return float(taxa) if isinstance(taxa, (int, float)) else -1.0
+
     linhas_ordenadas = sorted(
         (
             (nome, papel, desempenho.get((id_externo or "").lower()))
             for nome, papel, id_externo in elenco
         ),
-        key=lambda item: (item[2] or {}).get("pick_rate", -1),
+        key=lambda item: _pick(item[2]),
         reverse=True,
     )
 
     total_partidas = sum(d["partidas"] for d in desempenho.values())
+    colunas = ", ".join(m.rotulo for m in perfil.metricas) or "winrate"
     linhas = [
-        f"Desempenho por agente de {nome_jogo}, do OP.GG (consultado agora). "
-        f"Amostra: {total_partidas} participacoes de agente em partidas "
-        "publicas com classificacao. Ordem por taxa de escolha:",
+        f"Desempenho por {perfil.substantivo} de {nome_jogo}, do OP.GG (ultimo "
+        f"snapshot que coletamos). Amostra somada: {total_partidas} "
+        f"participacoes em partidas publicas com classificacao. "
+        f"Metricas: {colunas}. Ordem por taxa de escolha:",
     ]
     pontos: list[PontoSerie] = []
     for nome, papel, dados in linhas_ordenadas:
         if dados is None:
-            linhas.append(f"- {nome} ({papel or 'sem funcao'}): sem estatistica no OP.GG")
-            continue
-        linhas.append(
-            f"- {nome} ({papel or 'sem funcao'}): {dados['pick_rate']}% de taxa de "
-            f"escolha, {dados['winrate']}% de vitorias em {dados['partidas']} partidas"
-        )
-        pontos.append(
-            PontoSerie(
-                rotulo=nome,
-                valor=float(dados["pick_rate"]),
-                detalhe=f"{dados['winrate']}% de vitorias",
+            linhas.append(
+                f"- {nome} ({papel or 'sem funcao'}): sem estatistica no OP.GG"
             )
+            continue
+        metricas = dados["metricas"]
+        partes = [f"{dados['winrate']}% de vitorias"]
+        for metrica in perfil.metricas:
+            valor = metricas.get(metrica.chave)
+            if isinstance(valor, (int, float)):
+                partes.append(f"{metrica.rotulo} {valor}{metrica.unidade}")
+        linhas.append(
+            f"- {nome} ({papel or 'sem funcao'}): {', '.join(partes)}, "
+            f"em {dados['partidas']} partidas"
         )
+        taxa = metricas.get("pick_rate")
+        if isinstance(taxa, (int, float)):
+            pontos.append(
+                PontoSerie(
+                    rotulo=nome,
+                    valor=float(taxa),
+                    detalhe=f"{dados['winrate']}% de vitorias",
+                )
+            )
 
     linhas.append(
         "Estes numeros sao do OP.GG, um terceiro - nao sao medicao nossa e nao "
         "sao do cenario profissional: sao partidas publicas com classificacao. "
         "Diga 'segundo o OP.GG' e diga que e do publico geral. Se a pergunta "
-        "for sobre o meta PROFISSIONAL, avise que este recorte nao responde "
-        "isso. A taxa de escolha e sobre o total de participacoes de agente, "
-        "nao sobre partidas (cada partida tem dez agentes)."
+        "for sobre o meta PROFISSIONAL, avise que este recorte nao responde isso."
     )
-    linhas.append(
-        "As taxas de vitoria de Valorant ficam quase todas entre 48% e 52% - "
-        "meio ponto de diferenca NAO faz um agente 'melhor'. Se a pergunta "
-        "pedir o melhor, responda pelo conjunto (escolha + vitoria) e diga que "
-        "a diferenca de vitoria e pequena."
-    )
+    if codigo_jogo == "valorant":
+        linhas.append(
+            "As taxas de vitoria de Valorant ficam quase todas entre 48% e 52% - "
+            "meio ponto de diferenca NAO faz um agente 'melhor'. Se a pergunta "
+            "pedir o melhor, responda pelo conjunto (escolha + vitoria) e diga "
+            "que a diferenca de vitoria e pequena."
+        )
 
     serie = SerieAssistente(
         chave="elenco",
@@ -785,7 +899,7 @@ def _elenco_com_desempenho(
     return (
         Bloco(
             "elenco",
-            f"Elenco e desempenho de {nome_jogo} - OP.GG agora",
+            f"Elenco e desempenho de {nome_jogo} - OP.GG",
             "\n".join(linhas),
             fonte="opgg",
         ),
@@ -1135,21 +1249,40 @@ def _bloco_herois(sessao) -> tuple[Bloco, SerieAssistente]:
     return bloco, serie
 
 
-def _bloco_modelos() -> Bloco:
-    """As metricas do modelo de confronto entre equipes.
+def _jogo_citado(pergunta: str, sessao) -> tuple[str, str] | None:
+    """`(codigo, nome)` do jogo de `dim_jogo` cujo nome aparece na pergunta.
 
-    Este bloco descrevia o modelo de previsao por minuto, removido do projeto
-    junto das telas que o serviam. O gatilho continua o mesmo - perguntas sobre
-    "modelo", "acuracia", "ROC-AUC" - porque a pergunta nao mudou; mudou qual
-    modelo responde por ela. Sao dois os que restaram, e o de sentimento ja vai
-    no bloco proprio dele.
-
-    A validacao vem inteira, inclusive quando e ruim. O relatorio deste modelo
-    diz que ele NAO bate a taxa base, e omitir isso aqui faria o assistente
-    vender uma confianca que o numero nao sustenta.
+    O casamento e por n-grama (o mesmo de `_bloco_elenco`), do nome mais longo
+    para o mais curto - "League of Legends" ganha de "League" se os dois
+    existissem. Serve aos blocos que precisam saber "de que jogo e a pergunta"
+    sem repetir a deteccao.
     """
-    relatorio = relatorio_confronto()
-    if relatorio is None:
+    normalizada = _normalizar(pergunta)
+    jogos = sessao.execute(select(DimJogo.codigo, DimJogo.nome)).all()
+    achados = [
+        (codigo, nome)
+        for codigo, nome in jogos
+        if _normalizar(nome) in normalizada
+    ]
+    if not achados:
+        return None
+    return max(achados, key=lambda par: len(par[1]))
+
+
+def _bloco_modelos(pergunta: str, sessao) -> Bloco:
+    """As metricas do modelo de previsao de confronto entre equipes.
+
+    Ha UM modelo por jogo (`ml/confronto`, um arquivo por jogo). O bloco
+    responde pelo jogo citado na pergunta; sem jogo citado, pelo Dota, que e o
+    de historico mais fundo. E lista para quais jogos existe modelo - a
+    pergunta "voces preveem CS?" precisa dessa resposta.
+
+    A validacao vem inteira, inclusive quando e ruim: se a acuracia nao supera
+    a taxa base, o bloco manda dizer isso. Vender confianca que o numero nao
+    sustenta e o oposto do proposito da plataforma.
+    """
+    disponiveis = _jogos_com_modelo_confronto()
+    if not disponiveis:
         return Bloco(
             "modelos",
             "Modelo de confronto",
@@ -1157,8 +1290,29 @@ def _bloco_modelos() -> Bloco:
             "(rode `python cli.py train-confronto`).",
         )
 
+    citado = _jogo_citado(pergunta, sessao)
+    nomes = {codigo: nome for codigo, nome in sessao.execute(select(DimJogo.codigo, DimJogo.nome))}
+    if citado and citado[0] in disponiveis:
+        alvo = citado[0]
+    elif "dota2" in disponiveis:
+        alvo = "dota2"
+    else:
+        alvo = disponiveis[0]
+    nome_alvo = nomes.get(alvo, alvo)
+
+    relatorio = relatorio_confronto(alvo)
+    if relatorio is None:
+        return Bloco(
+            "modelos",
+            "Modelo de confronto",
+            f"Nenhum modelo de confronto ajustado para {nome_alvo}.",
+        )
+
     validacao = relatorio.get("validacao") or {}
+    lista_jogos = ", ".join(sorted(nomes.get(j, j) for j in disponiveis))
     linhas = [
+        f"Modelo de previsao de confronto de {nome_alvo}.",
+        f"Existe modelo ajustado para: {lista_jogos}.",
         "Alvo: qual das duas equipes vence um confronto profissional.",
         f"Metodo: {relatorio['metodo']}.",
         f"Ajustado sobre {relatorio['confrontos']} confrontos entre "
@@ -1191,6 +1345,83 @@ def _bloco_modelos() -> Bloco:
         )
 
     return Bloco("modelos", "Modelo de confronto entre equipes", "\n".join(linhas))
+
+
+#: Palavras que dizem "quero saber COMO JOGAR o personagem", nao "como ele
+#: esta". Guia responde build e ordem de skill; desempenho responde meta.
+GATILHOS_GUIA = (
+    "build", "buildar", "buildo", "item", "itens", "itemizacao", "montar",
+    "ordem", "upar", "subir habilidade", "skill order", "runa", "runas",
+    "feitico", "feiticos", "como jogar", "como jogo", "como usar", "guia",
+)
+
+
+def _bloco_guia(pergunta: str, sessao) -> Bloco | None:
+    """A build do meta e a ordem de habilidade do personagem que a pergunta cita.
+
+    So entra quando a pergunta pede COMO JOGAR (build, item, ordem de skill,
+    runa) E nomeia um personagem que tem guia coletado. Sem os dois, o bloco
+    fica de fora - "qual o melhor campeao?" nao e pergunta de build.
+
+    A fonte e o OP.GG (LoL) ou a OpenDota (Dota), pela coleta agendada, gravada
+    em `dim_personagem.metadados`. Nao ha chamada externa aqui.
+    """
+    normalizada = _normalizar(pergunta)
+    if not any(_normalizar(termo) in normalizada for termo in GATILHOS_GUIA):
+        return None
+
+    candidatos = sessao.execute(
+        select(DimPersonagem.nome, DimJogo.nome, DimPersonagem.metadados)
+        .join(DimJogo, DimJogo.id_jogo == DimPersonagem.id_jogo)
+        .where(DimPersonagem.metadados.has_key("guia"))
+    ).all()
+
+    alvo = None
+    for nome_p, nome_jogo, metadados in candidatos:
+        if _normalizar(nome_p) in normalizada:
+            alvo = (nome_p, nome_jogo, (metadados or {}).get("guia") or {})
+            break
+    if alvo is None or not alvo[2]:
+        return None
+
+    nome_p, nome_jogo, guia = alvo
+    fonte = guia.get("fonte") or "OP.GG"
+    rota = guia.get("rota")
+    linhas = [
+        f"Guia de {nome_p} ({nome_jogo}), do {fonte}"
+        + (f", rota {rota}" if rota else "")
+        + (f" - coleta de {guia['atualizado_em']}." if guia.get("atualizado_em") else "."),
+    ]
+
+    for grupo in guia.get("grupos") or []:
+        itens = ", ".join(i.get("nome", "") for i in grupo.get("itens") or [] if i.get("nome"))
+        if itens:
+            nota = f" ({grupo['nota']})" if grupo.get("nota") else ""
+            linhas.append(f"{grupo.get('titulo', 'Itens')}: {itens}{nota}")
+
+    ordem = guia.get("ordem_habilidades") or []
+    prioridade = guia.get("prioridade_habilidades") or []
+    if prioridade:
+        linhas.append(f"Prioridade de subir: {' > '.join(prioridade)}.")
+    if ordem:
+        linhas.append("Ordem por nivel: " + " ".join(ordem) + ".")
+    if guia.get("nota_habilidades"):
+        linhas.append(guia["nota_habilidades"])
+
+    feiticos = guia.get("feiticos") or []
+    if feiticos:
+        linhas.append("Feiticos de invocador: " + ", ".join(feiticos) + ".")
+    for chave_runa, rotulo in (("runa_primaria", "Runa primaria"), ("runa_secundaria", "Runa secundaria")):
+        runa = guia.get(chave_runa)
+        if runa and runa.get("escolhas"):
+            linhas.append(f"{rotulo} ({runa.get('pagina', '?')}): " + ", ".join(runa["escolhas"]) + ".")
+
+    linhas.append(
+        f"Estes numeros e escolhas sao do {fonte}, do publico geral com "
+        "classificacao - nao e cenario profissional. A tela /herois mostra a "
+        "ficha completa, com icone e video das habilidades."
+    )
+    return Bloco("guia", f"Guia de build - {nome_p}", "\n".join(linhas), fonte="opgg")
 
 
 def _bloco_sentimento(sessao) -> tuple[Bloco, SerieAssistente]:
@@ -1528,7 +1759,8 @@ GATILHOS: dict[str, tuple[str, ...]] = {
                  "duração", "radiant", "dire", "esport"),
     "herois": ("heroi", "herói", "herois", "heróis", "winrate", "personagem", "meta"),
     "modelos": ("modelo", "modelos", "previsao", "previsão", "prever", "acuracia",
-                "acurácia", "roc", "auc", "treino", "machine learning", "ml"),
+                "acurácia", "roc", "auc", "treino", "machine learning", "ml",
+                "confronto", "confrontos", "quem ganha", "quem vence", "favorito"),
     "sentimento": ("sentimento", "avaliacao", "avaliação", "avaliacoes", "avaliações",
                    "review", "reviews", "positiva", "negativa", "nlp"),
 }
@@ -1593,6 +1825,13 @@ def montar_contexto(pergunta: str) -> ContextoMontado:
                 # grafico de winrate de heroi de Dota ao lado da resposta.
                 series.insert(0, serie_elenco)
 
+        guia = _bloco_guia(pergunta, sessao)
+        if guia is not None:
+            blocos.append(guia)
+
+        if "modelos" in escolhidos:
+            blocos.append(_bloco_modelos(pergunta, sessao))
+
         ao_vivo, jogo_ao_vivo = _bloco_steam_ao_vivo(pergunta, sessao)
         if ao_vivo is not None:
             blocos.append(ao_vivo)
@@ -1622,9 +1861,6 @@ def montar_contexto(pergunta: str) -> ContextoMontado:
     extremo = _bloco_extremo_avaliacao(pergunta)
     if extremo is not None:
         blocos.append(extremo)
-
-    if "modelos" in escolhidos:
-        blocos.append(_bloco_modelos())
 
     return ContextoMontado(
         blocos=[bloco for bloco in blocos if bloco.conteudo.strip()],

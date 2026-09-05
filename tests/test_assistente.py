@@ -28,11 +28,14 @@ from ml.assistente import (
     _bloco_elenco,
     _bloco_extremo_avaliacao,
     _bloco_geral,
+    _bloco_guia,
     _bloco_herois,
+    _bloco_modelos,
     _bloco_partidas,
     _bloco_recomendacao,
     _bloco_sentimento,
     _bloco_steam,
+    _elenco_sem_desempenho,
     _confirma_nome,
     _extremo_avaliacao_pedido,
     _genero_pedido,
@@ -571,29 +574,21 @@ def test_elenco_so_entra_para_jogo_sem_partida(sem_opgg):
     assert "Duelista" in valorant.conteudo
 
 
-def test_elenco_recusa_o_meta_quando_nao_ha_fonte_de_desempenho(sem_opgg):
-    """Elenco sozinho responde "quem existe", nunca "quem esta forte agora".
+def test_elenco_sem_desempenho_recusa_o_meta():
+    """Elenco sem estatistica responde "quem existe", nunca "quem esta forte".
 
-    A pergunta que originou tudo pedia o meta atual. Com 29 agentes listados e
-    sem esta frase, o modelo ordenaria os oito duelistas por conta propria - e
-    o numero sairia com a mesma cara dos que a plataforma mede.
-
-    O `sem_opgg` nao e conveniencia de teste: e o cenario real de uma fonte
-    externa fora do ar, e o comportamento nele tem que continuar sendo o de
-    antes de ela existir. Com o OP.GG respondendo, quem cobre o outro caminho e
-    `test_elenco_ordena_por_escolha_e_marca_a_procedencia`, em test_opgg.py.
+    A pergunta que originou tudo pedia o meta atual. Com os agentes listados e
+    sem esta frase, o modelo ordenaria os duelistas por conta propria - e o
+    numero sairia com a mesma cara dos que a plataforma mede. Este caminho vale
+    para jogo com elenco mas SEM `fato_estatistica_personagem` (Counter-Strike,
+    hoje); o caminho com estatistica esta em test_opgg.py.
     """
-    with session_scope() as sessao:
-        bloco, serie = _bloco_elenco("melhor agente do valorant no meta atual", sessao)
+    elenco = [("Jett", "Duelista", "aaa"), ("Sova", "Iniciador", "bbb")]
+    bloco = _elenco_sem_desempenho("VALORANT", elenco)
 
-    if bloco is None:
-        pytest.skip("elenco de valorant ainda nao coletado neste banco")
     assert "NAO temos nenhuma partida" in bloco.conteudo
-    assert "meta atual" in bloco.conteudo
+    assert "meta" in bloco.conteudo
     assert "Fora dos dados: " in bloco.conteudo
-    # Sem serie: elenco e lista nominal, nao grandeza. Um grafico de "8
-    # duelistas, 7 sentinelas" contaria o nosso recorte, nao o jogo.
-    assert serie is None
 
 
 def test_instrucao_proibe_negar_jogo_coberto():
