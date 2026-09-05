@@ -71,6 +71,20 @@ export interface ConquistaDestaque {
   icone: string;
 }
 
+/**
+ * Um item da galeria da loja: um trailer ou uma captura de tela.
+ *
+ * `tipo` decide como o carrossel se comporta: `video` toca (HLS, mudo) e passa
+ * pro próximo quando acaba; `imagem` fica alguns segundos e troca.
+ */
+export interface MidiaJogo {
+  tipo: "video" | "imagem";
+  url: string;
+  /** Só no vídeo: o frame de capa, enquanto o player não começa. */
+  cartaz: string;
+  titulo: string;
+}
+
 /** Metadados quase estáticos do jogo — a "ficha" estilo SteamDB. */
 export interface FichaJogoSteam {
   tipo: string | null;
@@ -90,6 +104,8 @@ export interface FichaJogoSteam {
   imagem_header: string | null;
   em_breve: boolean | null;
   requisitos_minimos: string | null;
+  /** Trailers e capturas da loja, na ordem do carrossel do topo da ficha. */
+  midias: MidiaJogo[];
   donos_estimados: string | null;
   tempo_jogo_medio_min: number | null;
   tempo_jogo_mediano_min: number | null;

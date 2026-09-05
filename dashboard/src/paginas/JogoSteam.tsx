@@ -21,6 +21,7 @@ import type {
 } from "../api/tipos";
 import { Botao, Consulta, Icone, Selo } from "../componentes/base";
 import { CapaJogo } from "../componentes/CapaJogo";
+import { CarrosselMidia } from "../componentes/CarrosselMidia";
 import { AreaNeon } from "../componentes/graficos/AreaNeon";
 import { BarraFina, KpiHud, Painel } from "../componentes/hud";
 import {
@@ -149,6 +150,14 @@ export function JogoSteamPagina() {
                   </div>
                 )}
               </div>
+
+              {/* A galeria da loja: trailer primeiro, capturas depois. */}
+              {ficha.midias.length > 0 && (
+                <CarrosselMidia
+                  midias={ficha.midias}
+                  className="relative z-10 mt-space-base w-full max-w-3xl"
+                />
+              )}
             </section>
 
             {/* ==================== KPIS ==================== */}

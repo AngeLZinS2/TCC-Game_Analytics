@@ -20,6 +20,7 @@ from etl.transform_steam import (
     ENDPOINT_NOTICIAS,
     ENDPOINT_STEAMSPY,
     _parse_idiomas,
+    _parse_midias,
     _texto_de_html,
     parse_appdetails,
     parse_appreviews,
@@ -338,3 +339,64 @@ def test_transformar_funde_steamspy_e_noticias_no_jogo(carregar_fixture):
     assert resultado.jogos[0].donos_estimados
     assert resultado.jogos[0].tags_comunidade
     assert len(resultado.noticias) == 3
+
+
+# ---------------------------------------------------------------------- midias
+
+
+def test_midias_poem_video_antes_de_imagem():
+    """O carrossel abre pelo trailer - a captura entra como continuacao."""
+    midias = _parse_midias(
+        {
+            "screenshots": [{"path_full": "https://img/1.jpg"}],
+            "movies": [
+                {
+                    "name": "Trailer",
+                    "thumbnail": "https://img/cartaz.jpg",
+                    "hls_h264": "https://video/hls.m3u8",
+                }
+            ],
+        }
+    )
+
+    assert [m["tipo"] for m in midias] == ["video", "imagem"]
+    assert midias[0] == {
+        "tipo": "video",
+        "url": "https://video/hls.m3u8",
+        "cartaz": "https://img/cartaz.jpg",
+        "titulo": "Trailer",
+    }
+
+
+def test_midias_ignoram_video_sem_hls():
+    """A Steam nao publica mais mp4/webm; video sem HLS nao toca em navegador
+    nenhum, entao nao entra no carrossel (ficaria um slot morto)."""
+    midias = _parse_midias(
+        {
+            "movies": [
+                {"name": "So dash", "dash_h264": "https://video/x.mpd"},
+                {"name": "Com hls", "hls_h264": "https://video/ok.m3u8"},
+            ]
+        }
+    )
+
+    assert [m["titulo"] for m in midias] == ["Com hls"]
+
+
+def test_midias_respeitam_o_teto_por_tipo():
+    midias = _parse_midias(
+        {
+            "movies": [
+                {"name": f"v{i}", "hls_h264": f"https://video/{i}.m3u8"} for i in range(5)
+            ],
+            "screenshots": [{"path_full": f"https://img/{i}.jpg"} for i in range(20)],
+        }
+    )
+
+    tipos = [m["tipo"] for m in midias]
+    assert tipos.count("video") == 2
+    assert tipos.count("imagem") == 8
+
+
+def test_midias_vazias_quando_o_jogo_nao_tem_galeria():
+    assert _parse_midias({}) == []

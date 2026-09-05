@@ -79,6 +79,9 @@ class JogoSteam(BaseModel):
     imagem_header: str | None = None
     em_breve: bool | None = None
     requisitos_minimos: str | None = None
+    #: Trailers e capturas de tela, na ordem em que o carrossel da ficha
+    #: mostra: [{"tipo": "video"|"imagem", "url", "cartaz", "titulo"}].
+    midias: list[dict[str, str]] = Field(default_factory=list)
 
     # --- SteamSpy (Fase 16), preenchido pelo endpoint proprio -----------
     donos_estimados: str | None = None
@@ -308,6 +311,51 @@ def _parse_conquistas_destaque(bruto: Any) -> list[dict[str, str]]:
     ]
 
 
+#: Quantas midias guardar por jogo. O carrossel da ficha mostra uma de cada
+#: vez; passar disso so engorda o JSONB com o que ninguem chega a ver.
+_MAXIMO_VIDEOS = 2
+_MAXIMO_IMAGENS = 8
+
+
+def _parse_midias(dados: dict[str, Any]) -> list[dict[str, str]]:
+    """`screenshots` + `movies` do appdetails numa lista unica pro carrossel.
+
+    Video primeiro, e de proposito: o trailer e a melhor abertura da ficha, e
+    a captura de tela entra depois como continuacao.
+
+    **So HLS.** A Steam parou de publicar mp4/webm direto - hoje o payload traz
+    `dash_h264` e `hls_h264` (testado: as URLs antigas `movie480.mp4` dao 404).
+    Guardamos o HLS porque e o que o `hls.js` da tela consome, e porque o CDN
+    da Valve responde com `Access-Control-Allow-Origin: *` nele.
+    """
+    midias: list[dict[str, str]] = []
+
+    for filme in (dados.get("movies") or [])[:_MAXIMO_VIDEOS]:
+        if not isinstance(filme, dict):
+            continue
+        fonte = filme.get("hls_h264")
+        if not fonte:
+            continue
+        midias.append(
+            {
+                "tipo": "video",
+                "url": str(fonte),
+                "cartaz": str(filme.get("thumbnail") or ""),
+                "titulo": str(filme.get("name") or ""),
+            }
+        )
+
+    for captura in (dados.get("screenshots") or [])[:_MAXIMO_IMAGENS]:
+        if not isinstance(captura, dict):
+            continue
+        cheia = captura.get("path_full") or captura.get("path_thumbnail")
+        if not cheia:
+            continue
+        midias.append({"tipo": "imagem", "url": str(cheia), "cartaz": "", "titulo": ""})
+
+    return midias
+
+
 def _extrair_dados_appdetails(payload: Any, app_id: int) -> dict[str, Any] | None:
     """A resposta vem como {"<app_id>": {"success": bool, "data": {...}}}.
 
@@ -390,6 +438,7 @@ def parse_appdetails(payload: Any, app_id: int) -> JogoSteam | None:
         imagem_header=dados.get("header_image") or None,
         em_breve=lancamento.get("coming_soon"),
         requisitos_minimos=_texto_de_html(requisitos.get("minimum"), limite=1200),
+        midias=_parse_midias(dados),
     )
 
 

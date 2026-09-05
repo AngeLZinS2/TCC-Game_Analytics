@@ -133,6 +133,10 @@ class DimJogoSteam(Base):
     em_breve: Mapped[bool | None] = mapped_column(Boolean)
     #: Requisitos minimos de PC, ja em texto puro (o payload vem em HTML).
     requisitos_minimos: Mapped[str | None] = mapped_column(Text)
+    #: Trailers e capturas da pagina da loja, na ordem do carrossel da ficha:
+    #: [{"tipo": "video"|"imagem", "url", "cartaz", "titulo"}]. Video em HLS -
+    #: a Steam nao publica mais mp4/webm direto (ver `_parse_midias`).
+    midias: Mapped[list | None] = mapped_column(JSONB)
 
     # --- SteamSpy (Fase 16) ---------------------------------------------
     #: Faixa de donos estimada ("1,000,000 .. 2,000,000"). O plano gratuito

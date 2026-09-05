@@ -139,6 +139,7 @@ def _montar_ficha(jogo: DimJogoSteam) -> FichaJogoSteam:
         imagem_header=jogo.imagem_header,
         em_breve=jogo.em_breve,
         requisitos_minimos=jogo.requisitos_minimos,
+        midias=jogo.midias or [],
         donos_estimados=jogo.donos_estimados,
         tempo_jogo_medio_min=jogo.tempo_jogo_medio_min,
         tempo_jogo_mediano_min=jogo.tempo_jogo_mediano_min,

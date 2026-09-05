@@ -93,6 +93,20 @@ class ConquistaDestaque(BaseModel):
     icone: str
 
 
+class MidiaJogo(BaseModel):
+    """Um item da galeria da loja: um trailer ou uma captura de tela.
+
+    `tipo` decide como a tela mostra: `video` toca (HLS, mudo, e passa pro
+    proximo quando acaba), `imagem` fica alguns segundos e troca.
+    """
+
+    tipo: str
+    url: str
+    #: So no video: o frame de capa, exibido enquanto o player nao comeca.
+    cartaz: str = ""
+    titulo: str = ""
+
+
 class FichaJogoSteam(BaseModel):
     """Metadados do jogo que quase nao mudam - a "ficha" estilo SteamDB.
 
@@ -118,6 +132,9 @@ class FichaJogoSteam(BaseModel):
     imagem_header: str | None = None
     em_breve: bool | None = None
     requisitos_minimos: str | None = None
+    #: Trailers e capturas da pagina da loja, na ordem do carrossel do topo
+    #: da ficha. Video vem em HLS (a Steam nao publica mais mp4/webm direto).
+    midias: list[MidiaJogo] = []
     #: SteamSpy - faixa, nunca numero exato.
     donos_estimados: str | None = None
     tempo_jogo_medio_min: int | None = None
