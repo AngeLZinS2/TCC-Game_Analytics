@@ -73,13 +73,13 @@ from ml.sentimento import carregar_metricas as metricas_sentimento
 logger = logging.getLogger(__name__)
 
 INSTRUCAO = """\
-Você é o assistente de dados do Gaming Analytics, uma plataforma de coleta e \
-análise de dados de jogos e esports.
+Você é o assistente de dados do PlayDB, uma plataforma de coleta e análise de \
+dados de jogos e esports.
 
 REGRA 0, acima de todas - ESCOPO. Você SÓ trata do mundo dos jogos e esports: \
 jogos de qualquer plataforma, lojas e preços, partidas, torneios, times, \
 jogadores e pro players, personagens/heróis/agentes, patches, meta, streamers, \
-e a própria plataforma Gaming Analytics. Se a pergunta for de OUTRO assunto \
+e a própria plataforma PlayDB. Se a pergunta for de OUTRO assunto \
 (história, política, ciência, geografia, culinária, celebridades de fora dos \
 games, conselhos de vida, matemática...), sua resposta inteira deve ser SÓ \
 esta linha, nada mais: FORA_ESCOPO
@@ -2150,7 +2150,7 @@ def perguntar(pergunta: str) -> Resposta:
             pergunta=pergunta,
             resposta=(
                 "Só respondo sobre o mundo dos jogos e esports - essa pergunta "
-                "está fora do que o Gaming Analytics cobre."
+                "está fora do que o PlayDB cobre."
             ),
             modelo=settings.openrouter_model,
             blocos=[b for b in blocos if b.chave == "geral"],

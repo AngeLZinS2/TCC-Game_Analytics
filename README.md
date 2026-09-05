@@ -1,6 +1,7 @@
-# Gaming Analytics
+# PlayDB
 
 Sistema de coleta, armazenamento e análise de dados do universo gamer/esports, desenvolvido como TCC.
+Domínio: [playdb.info](https://playdb.info).
 
 Não é um jogo: é uma plataforma de dados que coleta periodicamente de quatro fontes, normaliza em
 PostgreSQL, expõe uma API analítica própria e alimenta um dashboard.

@@ -97,7 +97,7 @@ class HeroisDotaCollector(BaseCollector[list[dict[str, Any]]]):
             URL_LISTA,
             params={"language": "brazilian"},
             timeout=settings.http_timeout_seconds,
-            headers={"User-Agent": "Mozilla/5.0 (GamingAnalyticsTCC)"},
+            headers={"User-Agent": "Mozilla/5.0 (PlayDB-TCC; +https://playdb.info)"},
         )
         lista.raise_for_status()
         ids = [
@@ -133,7 +133,7 @@ class HeroisDotaCollector(BaseCollector[list[dict[str, Any]]]):
                     URL_HEROI,
                     params={"language": "brazilian", "hero_id": hero_id},
                     timeout=settings.http_timeout_seconds,
-                    headers={"User-Agent": "Mozilla/5.0 (GamingAnalyticsTCC)"},
+                    headers={"User-Agent": "Mozilla/5.0 (PlayDB-TCC; +https://playdb.info)"},
                 )
                 resposta.raise_for_status()
                 heroi_payload = resposta.json()
@@ -178,7 +178,7 @@ class HeroisDotaCollector(BaseCollector[list[dict[str, Any]]]):
             URL_ITENS_VALVE,
             params={"language": "brazilian"},
             timeout=settings.http_timeout_seconds,
-            headers={"User-Agent": "Mozilla/5.0 (GamingAnalyticsTCC)"},
+            headers={"User-Agent": "Mozilla/5.0 (PlayDB-TCC; +https://playdb.info)"},
         )
         resposta.raise_for_status()
         nomes: dict[str, str] = {}

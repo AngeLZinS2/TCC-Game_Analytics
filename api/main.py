@@ -39,7 +39,7 @@ async def lifespan(_app: FastAPI):
 
 
 app = FastAPI(
-    title="Gaming Analytics API",
+    title="PlayDB API",
     description="Coleta e analise de dados de esports (Dota 2, LoL, Valorant) e do catalogo Steam.",
     version="0.2.0",
     lifespan=lifespan,

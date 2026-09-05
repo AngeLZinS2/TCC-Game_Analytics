@@ -42,7 +42,7 @@ function useTituloDaRota(): string {
   if (pathname.startsWith("/partidas/")) return "Detalhe da Partida";
 
   const item = NAVEGACAO.find((i) => i.rota === pathname);
-  return item?.rotulo ?? "Gaming Analytics";
+  return item?.rotulo ?? "PlayDB";
 }
 
 /**
@@ -108,7 +108,7 @@ export function BarraSuperior() {
       <Link to="/" className="flex shrink-0 items-center gap-space-sm">
         <Icone nome="stadia_controller" className="text-[24px] text-primary-container" />
         <span className="hidden font-title-code text-title-code uppercase tracking-wider text-primary sm:inline">
-          Nexus // Hub
+          PlayDB
         </span>
       </Link>
 

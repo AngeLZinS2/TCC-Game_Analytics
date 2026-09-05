@@ -162,8 +162,8 @@ export function AssistenteIAPagina() {
               Pergunte aos seus dados
             </h2>
             <p className="font-body-sm text-body-sm text-outline">
-              Converse com o Nexus e descubra insights reais — do nosso banco e, quando a
-              pergunta cita um jogo, da loja da Steam na hora.
+              Converse com o assistente do PlayDB e descubra insights reais — do nosso banco
+              e, quando a pergunta cita um jogo, da loja da Steam na hora.
             </p>
           </div>
 

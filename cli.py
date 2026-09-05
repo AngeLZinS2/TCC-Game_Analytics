@@ -34,7 +34,7 @@ FONTES = (
 
 
 def _parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="gaming-analytics")
+    parser = argparse.ArgumentParser(prog="playdb")
     sub = parser.add_subparsers(dest="comando", required=True)
 
     sub.add_parser("init-db", help="aplica as migrations (alembic upgrade head)")

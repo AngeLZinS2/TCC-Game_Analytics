@@ -38,7 +38,7 @@ class RateLimitedClient:
         intervalo_minimo: float = 1.0,
         max_retries: int = 5,
         timeout: float = 30.0,
-        user_agent: str = "gaming-analytics-tcc/0.1 (+https://github.com/)",
+        user_agent: str = "playdb-tcc/0.1 (+https://playdb.info)",
     ) -> None:
         self.nome = nome
         self.intervalo_minimo = intervalo_minimo

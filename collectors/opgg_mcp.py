@@ -105,7 +105,7 @@ def _abrir_sessao() -> str:
             "params": {
                 "protocolVersion": VERSAO_PROTOCOLO,
                 "capabilities": {},
-                "clientInfo": {"name": "gaming-analytics", "version": "0.1"},
+                "clientInfo": {"name": "playdb", "version": "0.1"},
             },
         },
         sessao=None,

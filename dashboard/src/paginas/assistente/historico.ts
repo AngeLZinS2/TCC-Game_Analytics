@@ -24,7 +24,7 @@ export interface EntradaHistorico {
   util: boolean | null;
 }
 
-const CHAVE = "nexus.assistente.historico";
+const CHAVE = "playdb.assistente.historico";
 
 /**
  * Teto de itens guardados.
