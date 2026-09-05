@@ -24,6 +24,7 @@ import type {
   CandidatoJogo,
   ComparacaoSentimento,
   ConfrontoAgendado,
+  ConfrontoResultado,
   EquipeConfronto,
   LigaConfronto,
   PanoramaSentimento,
@@ -257,6 +258,26 @@ export function useClassificarSentimento(texto: string, modelo?: string) {
 }
 
 // --- Assistente de dados (Fase 8) ---
+
+/**
+ * Confrontos já decididos do calendário, para qualquer jogo cadastrado.
+ *
+ * Existe porque a tela de Partidas lê `dim_partida`, que só tem linha para
+ * Dota 2: para os outros 13 jogos ela ficava vazia embora o banco tivesse 693
+ * confrontos com placar. Este hook é o que enche a tela deles.
+ */
+export function useConfrontos(jogo: string, pagina = 1, limite = 20) {
+  return useQuery({
+    queryKey: ["partidas", "confrontos", jogo, pagina, limite],
+    queryFn: () =>
+      buscar<ConfrontoResultado[]>("/api/partidas/confrontos", {
+        jogo,
+        pagina,
+        limite,
+      }),
+    placeholderData: (anterior) => anterior,
+  });
+}
 
 export function useStatusAssistente() {
   return useQuery({

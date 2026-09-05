@@ -12,9 +12,10 @@ from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import Float, and_, case, cast, desc, func, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, aliased
 
 from api.schemas import (
+    ConfrontoResultado,
     DetalhePartida,
     FaixaDuracao,
     JogadorNaPartida,
@@ -238,6 +239,78 @@ def resumo(sessao: Session = Depends(get_db), jogo: str = "dota2") -> ResumoPart
             for linha in histograma
         ],
     )
+
+
+@router.get("/confrontos", response_model=list[ConfrontoResultado])
+def listar_confrontos(
+    jogo: str = "dota2",
+    limite: int = Query(30, ge=1, le=100),
+    pagina: int = Query(1, ge=1),
+    sessao: Session = Depends(get_db),
+) -> list[ConfrontoResultado]:
+    """Confrontos JA DECIDIDOS do calendario, do mais recente para o mais antigo.
+
+    **Por que existe.** A tela de Partidas le `dim_partida`, que so tem linha
+    para Dota 2 - a OpenDota e a unica fonte que entrega partida com detalhe de
+    jogador. Para os outros 13 jogos cadastrados a tela ficava vazia, embora o
+    banco tivesse 693 confrontos COM PLACAR em `agenda_partida`, coletados da
+    Liquipedia e do OP.GG. O dado estava la; faltava rota.
+
+    O grao e outro e a tela precisa dizer isso: aqui e "quem venceu a serie",
+    nao "o que aconteceu dentro dela". Um 3x1 nao vira tres partidas.
+
+    Ordena por horario decrescente porque a pergunta e "o que aconteceu?", e a
+    resposta util comeca pelo ultimo resultado, nao pelo primeiro da temporada.
+    """
+    equipe_a = aliased(DimEquipe)
+    equipe_b = aliased(DimEquipe)
+
+    consulta = (
+        select(
+            AgendaPartida.id_externo,
+            AgendaPartida.equipe_a_nome,
+            AgendaPartida.equipe_b_nome,
+            AgendaPartida.inicio_previsto,
+            AgendaPartida.torneio,
+            AgendaPartida.formato,
+            AgendaPartida.placar_a,
+            AgendaPartida.placar_b,
+            AgendaPartida.vitoria_a,
+            equipe_a.logo_url,
+            equipe_b.logo_url,
+            equipe_a.tag,
+            equipe_b.tag,
+        )
+        .join(DimJogo, DimJogo.id_jogo == AgendaPartida.id_jogo)
+        .outerjoin(equipe_a, equipe_a.id_equipe == AgendaPartida.id_equipe_a)
+        .outerjoin(equipe_b, equipe_b.id_equipe == AgendaPartida.id_equipe_b)
+        .where(DimJogo.codigo == jogo)
+        # `vitoria_a` nulo e confronto sem resultado publicado - e o que a tela
+        # de Proximos Confrontos mostra. Aqui e o oposto dela.
+        .where(AgendaPartida.vitoria_a.is_not(None))
+        .order_by(desc(AgendaPartida.inicio_previsto))
+        .limit(limite)
+        .offset((pagina - 1) * limite)
+    )
+
+    return [
+        ConfrontoResultado(
+            id_externo=linha[0],
+            equipe_a_nome=linha[1],
+            equipe_b_nome=linha[2],
+            inicio_previsto=linha[3],
+            torneio=linha[4],
+            formato=linha[5],
+            placar_a=linha[6],
+            placar_b=linha[7],
+            vitoria_a=linha[8],
+            equipe_a_logo=linha[9],
+            equipe_b_logo=linha[10],
+            equipe_a_tag=linha[11],
+            equipe_b_tag=linha[12],
+        )
+        for linha in sessao.execute(consulta)
+    ]
 
 
 @router.get("/por-dia", response_model=list[PartidasPorDia])

@@ -12,6 +12,7 @@ import { useNavigate } from "react-router-dom";
 
 import {
   useFiltrosPartidas,
+  useConfrontos,
   usePartidas,
   usePartidasPorDia,
   useResumoPartidas,
@@ -30,6 +31,7 @@ import {
   Painel,
   Sparkline,
 } from "../componentes/hud";
+import { ListaConfrontos } from "../componentes/ListaConfrontos";
 import { SeletorDeJogo } from "../componentes/SeletorDeJogo";
 import { useJogoAtual } from "../layout/JogoAtual";
 import { corDoJogo, PALETA_POLOS } from "../tema";
@@ -67,6 +69,7 @@ export function PartidasPagina() {
   const [periodo, setPeriodo] = useState<number | null>(null);
   const [busca, setBusca] = useState("");
   const [pagina, setPagina] = useState(1);
+  const [paginaConfrontos, setPaginaConfrontos] = useState(1);
   const [porPagina, setPorPagina] = useState(25);
 
   const desde = useMemo(() => {
@@ -78,6 +81,10 @@ export function PartidasPagina() {
   const resumo = useResumoPartidas(jogo);
   const porDia = usePartidasPorDia(jogo);
   const saude = useSaude();
+  // O calendario decidido existe para os 14 jogos; `dim_partida`, so para
+  // Dota 2. Por isso este hook nao depende dos filtros da tabela abaixo -
+  // eles falam de partida com detalhe, que os outros jogos nao tem.
+  const confrontos = useConfrontos(jogo, paginaConfrontos);
 
   // Uma linha a mais do que cabe na pagina: e assim que da para saber se existe
   // proxima pagina sem o backend devolver o total.
@@ -91,6 +98,7 @@ export function PartidasPagina() {
 
   // Qualquer troca de filtro volta para a primeira pagina - continuar na pagina
   // 7 de um recorte novo mostraria uma tela vazia sem explicacao.
+  useEffect(() => setPaginaConfrontos(1), [jogo]);
   useEffect(() => setPagina(1), [jogo, liga, modo, periodo, busca, porPagina]);
 
   const online = saude.data?.status === "ok";
@@ -187,7 +195,15 @@ export function PartidasPagina() {
       {/* ==================== BARRA DE FILTROS ==================== */}
       <section className="space-y-space-md rounded-xl bg-surface-container-low/90 p-space-base shadow-lg">
         <div className="flex flex-wrap items-center gap-space-sm">
-          <SeletorDeJogo />
+          {/*
+            O padrão do seletor exige `partidas > 0`, e vale para Heróis e
+            Jogadores — eles leem o fato por jogador, que só a OpenDota
+            entrega. Esta tela não: desde que ela mostra confrontos com placar
+            do calendário, um jogo com agenda tem conteúdo aqui. Com o gate
+            padrão, League of Legends aparecia como "nada coletado ainda"
+            tendo 67 confrontos e 61 equipes no banco.
+          */}
+          <SeletorDeJogo disponivel={(j) => j.partidas > 0 || j.agenda > 0} />
           <label className="flex items-center gap-space-xs">
             <span className="font-label-caps text-label-caps uppercase tracking-widest text-outline">
               Torneio
@@ -389,6 +405,49 @@ export function PartidasPagina() {
           </Consulta>
         </Painel>
       </section>
+
+      {/* ==================== CONFRONTOS DECIDIDOS ==================== */}
+      <Painel
+        icone="scoreboard"
+        titulo="Confrontos com resultado"
+        descricao="Placar da série, do calendário — Liquipedia e OP.GG. Grão diferente da tabela abaixo: um 3x1 é um confronto, não três partidas."
+        meta={
+          <Selo>{confrontos.data?.length ?? 0} em tela</Selo>
+        }
+      >
+        <Consulta
+          estado={confrontos}
+          altura={200}
+          vazio="Nenhum confronto decidido no calendário deste jogo."
+        >
+          {(lista) => (
+            <>
+              <ListaConfrontos confrontos={lista} />
+              <div className="flex items-center justify-between gap-space-sm pt-space-sm">
+                <Botao
+                  icone="chevron_left"
+                  aoClicar={() => setPaginaConfrontos((p) => Math.max(1, p - 1))}
+                  desabilitado={paginaConfrontos === 1}
+                >
+                  Anteriores
+                </Botao>
+                <span className="font-badge-status text-badge-status uppercase tracking-wider text-outline">
+                  página {paginaConfrontos}
+                </span>
+                <Botao
+                  icone="chevron_right"
+                  aoClicar={() => setPaginaConfrontos((p) => p + 1)}
+                  // Sem total no endpoint: a página cheia é o único sinal de
+                  // que pode haver mais. Melhor que inventar uma contagem.
+                  desabilitado={lista.length < 20}
+                >
+                  Seguintes
+                </Botao>
+              </div>
+            </>
+          )}
+        </Consulta>
+      </Painel>
 
       {/* ==================== TABELA DENSA ==================== */}
       <Painel

@@ -27,6 +27,7 @@ FONTES = (
     "itad",
     "hltb",
     "valorant-agentes",
+    "opgg-esports",
 )
 
 
@@ -287,6 +288,11 @@ def _construir_coletor(args: argparse.Namespace, storage):
             forcar_lookup=args.forcar_lookup,
         )
 
+    if args.fonte == "opgg-esports":
+        from collectors.opgg_esports import OpggEsportsCollector
+
+        return OpggEsportsCollector(raw_storage=storage)
+
     if args.fonte == "valorant-agentes":
         from collectors.valorant_agentes import AgentesValorantCollector
 
@@ -346,6 +352,10 @@ def _carregador(fonte: str):
         from etl.load_valorant import carregar_agentes
 
         return carregar_agentes
+    if fonte == "opgg-esports":
+        from etl.load_opgg_esports import carregar
+
+        return carregar
     from etl.load_dota import carregar
 
     return carregar

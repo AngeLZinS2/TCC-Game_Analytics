@@ -654,6 +654,36 @@ class RelatorioConfronto(BaseModel):
     forcas: dict[str, float]
 
 
+class ConfrontoResultado(BaseModel):
+    """Um confronto JA DECIDIDO, do calendario.
+
+    Vem de `agenda_partida`, nao de `dim_partida`: a granularidade e "quem
+    venceu a serie", nao "o que aconteceu na partida". Sao dois graos
+    diferentes e o schema nao os mistura - `dim_partida` so existe para Dota 2,
+    onde a OpenDota entrega o detalhe por jogador.
+
+    Existe porque 693 confrontos com placar estavam no banco sem nenhuma tela
+    que os mostrasse: a de Partidas le `dim_partida` e ficava vazia para 13 dos
+    14 jogos, e a de Proximos Confrontos so olha para a frente.
+    """
+
+    id_externo: str
+    equipe_a_nome: str
+    equipe_b_nome: str
+    #: Escudo e sigla quando a equipe foi reconciliada com a dimensao.
+    equipe_a_logo: str | None
+    equipe_b_logo: str | None
+    equipe_a_tag: str | None
+    equipe_b_tag: str | None
+    inicio_previsto: datetime
+    torneio: str | None
+    formato: str | None
+    placar_a: int | None
+    placar_b: int | None
+    #: `None` em empate - existe em fase de grupos de alguns formatos.
+    vitoria_a: bool | None
+
+
 class ConfrontoAgendado(BaseModel):
     """Um jogo do calendario, com a previsao quando ela e possivel."""
 

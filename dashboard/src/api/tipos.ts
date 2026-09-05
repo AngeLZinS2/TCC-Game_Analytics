@@ -595,6 +595,30 @@ export interface RelatorioConfronto {
   forcas: Record<string, number>;
 }
 
+/**
+ * Um confronto já decidido do calendário.
+ *
+ * Grão diferente do de `Partida`: aqui é "quem venceu a série", não "o que
+ * aconteceu dentro dela". Um 3x1 é uma linha, não três partidas — `dim_partida`
+ * só existe para Dota 2, onde a OpenDota entrega detalhe por jogador.
+ */
+export interface ConfrontoResultado {
+  id_externo: string;
+  equipe_a_nome: string;
+  equipe_b_nome: string;
+  equipe_a_logo: string | null;
+  equipe_b_logo: string | null;
+  equipe_a_tag: string | null;
+  equipe_b_tag: string | null;
+  inicio_previsto: string;
+  torneio: string | null;
+  formato: string | null;
+  placar_a: number | null;
+  placar_b: number | null;
+  /** `null` em empate — existe em fase de grupos de alguns formatos. */
+  vitoria_a: boolean | null;
+}
+
 export interface ConfrontoAgendado {
   id_externo: string;
   equipe_a_nome: string;

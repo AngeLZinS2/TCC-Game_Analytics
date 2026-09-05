@@ -203,6 +203,14 @@ class Settings(BaseSettings):
     #: escrita. Conservador de proposito - o servico e gratuito e de terceiros.
     opgg_rate_limit_seconds: float = Field(default=1.0, gt=0)
 
+    #: Intervalo entre coletas de confrontos de LoL no OP.GG, em minutos.
+    #:
+    #: Seis horas. A janela de resultados do OP.GG trava em 50 confrontos, e e
+    #: por REPETICAO que o historico cresce - um dia de campeonato passa dos 50
+    #: facil, entao esperar 24h perderia partida decidida no meio. Sao duas
+    #: chamadas por rodada.
+    agendador_esports_opgg_minutos: int = Field(default=360, ge=30)
+
     #: Intervalo entre coletas do elenco de agentes do VALORANT, em minutos.
     #:
     #: Semanal. A Riot lanca um agente a cada poucos meses e ajusta funcao mais

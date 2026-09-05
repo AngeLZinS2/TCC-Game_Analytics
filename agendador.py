@@ -388,6 +388,19 @@ def _coletar_agentes_valorant(
         coletor.close()
 
 
+def _coletar_esports_opgg(
+    settings: Settings, storage: RawStorage
+) -> CollectionResult:
+    """Agenda e resultados do cenario profissional de LoL (OP.GG)."""
+    from collectors.opgg_esports import OpggEsportsCollector
+
+    coletor = OpggEsportsCollector(raw_storage=storage)
+    try:
+        return coletor.run(carregar=True)
+    finally:
+        coletor.close()
+
+
 def montar_tarefas(settings: Settings) -> list[Tarefa]:
     """As tarefas do agendador, na ordem em que rodam quando empatam.
 
@@ -442,6 +455,14 @@ def montar_tarefas(settings: Settings) -> list[Tarefa]:
                 nome="tempo_jogo",
                 intervalo_segundos=settings.agendador_tempo_jogo_minutos * 60,
                 executar=_coletar_tempo_jogo,
+            )
+        )
+    if settings.opgg_enabled:
+        tarefas.append(
+            Tarefa(
+                nome="esports_opgg",
+                intervalo_segundos=settings.agendador_esports_opgg_minutos * 60,
+                executar=_coletar_esports_opgg,
             )
         )
     tarefas.append(
