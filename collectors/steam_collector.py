@@ -57,6 +57,55 @@ URL_GETAPPLIST = "https://api.steampowered.com/IStoreService/GetAppList/v1/"
 
 ARQUIVO_SEMENTE = Path(__file__).resolve().parent / "seeds" / "steam_apps.json"
 
+#: O ranking oficial de mais jogados AGORA - a mesma fonte que alimenta o
+#: grafico da propria Steam e o "Most Played" que o SteamDB espelha. Publico e
+#: sem chave. Devolve 100 posicoes; quantas viram catalogo e configuravel.
+URL_MAIS_JOGADOS = (
+    "https://api.steampowered.com/ISteamChartsService/GetMostPlayedGames/v1/"
+)
+
+
+def top_mais_jogados(limite: int, settings: Settings | None = None) -> list[int]:
+    """Os `limite` primeiros app_ids do ranking de mais jogados agora.
+
+    Existe como funcao de modulo, e nao como metodo do coletor, porque quem
+    chama precisa da lista ANTES de construir o coletor - e ela que decide
+    quais apps ele vai coletar.
+
+    Devolve `[]` quando a chamada falha. Quem chama entao segue com os apps
+    que ja monitorava: perder uma rodada de descoberta e melhor do que a
+    rodada inteira falhar por causa dela.
+    """
+    settings = settings or get_settings()
+    cliente = RateLimitedClient(
+        nome="steam-charts",
+        intervalo_minimo=settings.steam_api_rate_limit_seconds,
+        max_retries=settings.http_max_retries,
+        timeout=settings.http_timeout_seconds,
+    )
+    try:
+        dados = cliente.get_json(URL_MAIS_JOGADOS)
+    except Exception as exc:  # noqa: BLE001 - descoberta e opcional, ver docstring
+        logger.warning(
+            "ranking de mais jogados falhou",
+            extra={"erro": f"{type(exc).__name__}: {exc}"},
+        )
+        return []
+    finally:
+        cliente.close()
+
+    ranks = ((dados or {}).get("response") or {}).get("ranks")
+    if not isinstance(ranks, list):
+        return []
+
+    # A API ja devolve ordenado por posicao, mas o `rank` e explicito - ordenar
+    # por ele evita depender da ordem do JSON.
+    ordenados = sorted(
+        (r for r in ranks if isinstance(r, dict) and r.get("appid")),
+        key=lambda r: r.get("rank") or 10**6,
+    )
+    return [int(r["appid"]) for r in ordenados[:limite]]
+
 
 def carregar_apps_semente(caminho: Path = ARQUIVO_SEMENTE) -> list[int]:
     """Le a lista fixa de app_ids monitorados."""

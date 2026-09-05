@@ -197,6 +197,19 @@ class Settings(BaseSettings):
     openrouter_model: str = "minimax/minimax-m3:free"
     openrouter_timeout_seconds: float = Field(default=60.0, gt=0)
 
+    #: Quantos jogos do ranking oficial de MAIS JOGADOS entram no catalogo a
+    #: cada rodada da Steam (o mesmo "Most Played" que o SteamDB espelha).
+    #:
+    #: Eles SOMAM ao que ja e monitorado, nunca substituem - um jogo trazido
+    #: pela busca da tela continua sendo coletado mesmo que saia do top, senao
+    #: a serie temporal dele morreria no dia em que caisse do ranking.
+    #:
+    #: O teto existe por custo: sao ~5 chamadas por jogo por rodada
+    #: (appdetails, avaliacoes, jogadores, noticias, SteamSpy) e a loja aceita
+    #: ~200 a cada 5 min. Puxar as 100 posicoes seriam 500 chamadas so de
+    #: descoberta. 0 desliga a descoberta e volta ao comportamento antigo.
+    steam_top_jogados: int = Field(default=25, ge=0, le=100)
+
     steam_country: str = "br"
     steam_language: str = "english"
 

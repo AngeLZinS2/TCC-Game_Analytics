@@ -102,12 +102,28 @@ def _apps_monitorados() -> list[int]:
 
 
 def _coletar_steam(settings: Settings, storage: RawStorage) -> CollectionResult:
-    from collectors.steam_collector import SteamCollector
+    from collectors.steam_collector import SteamCollector, top_mais_jogados
 
     monitorados = _apps_monitorados()
+
+    # O ranking oficial de mais jogados entra a cada rodada, SOMANDO aos que ja
+    # sao monitorados. E o que faz o catalogo acompanhar o que esta em alta sem
+    # ninguem cadastrar nada - e a uniao (em vez da substituicao) e o que
+    # garante que um jogo trazido pela busca da tela continue com a serie
+    # crescendo mesmo depois de cair do top.
+    descobertos: list[int] = []
+    if settings.steam_top_jogados:
+        do_ranking = top_mais_jogados(settings.steam_top_jogados, settings)
+        ja_conhecidos = set(monitorados)
+        descobertos = [app for app in do_ranking if app not in ja_conhecidos]
+        monitorados = monitorados + descobertos
+
     logger.info(
         "apps monitorados",
-        extra={"quantidade": len(monitorados) or "semente"},
+        extra={
+            "quantidade": len(monitorados) or "semente",
+            "novos_do_ranking": len(descobertos),
+        },
     )
 
     # `app_ids=None` faz o coletor usar a semente - o que so vale numa base

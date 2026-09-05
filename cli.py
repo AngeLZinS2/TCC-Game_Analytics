@@ -51,6 +51,15 @@ def _parser() -> argparse.ArgumentParser:
         "--apps", help="lista de app_ids separados por virgula (sobrepoe a semente)"
     )
     steam.add_argument(
+        "--top-jogados",
+        type=int,
+        metavar="N",
+        help=(
+            "soma ao catalogo os N jogos do ranking oficial de MAIS JOGADOS "
+            "agora (o mesmo Most Played que o SteamDB espelha)"
+        ),
+    )
+    steam.add_argument(
         "--steamspy-top",
         type=int,
         metavar="N",
@@ -204,8 +213,22 @@ def _construir_coletor(args: argparse.Namespace, storage):
         coletor = SteamCollector(
             raw_storage=storage, app_ids=app_ids, settings=settings
         )
-        # Prioridade: --apps > --steamspy-top > --all-apps > semente
-        if args.steamspy_top:
+        # Prioridade: --apps > --top-jogados > --steamspy-top > --all-apps
+        if args.top_jogados:
+            from collectors.steam_collector import top_mais_jogados
+            from db.models import DimJogoSteam
+            from db.session import session_scope
+            from sqlalchemy import select
+
+            # Soma ao que ja esta no banco, nunca substitui: um jogo que
+            # caiu do ranking nao pode parar de ter serie coletada.
+            with session_scope() as sessao:
+                ja_tem = list(sessao.scalars(select(DimJogoSteam.app_id)))
+            do_ranking = top_mais_jogados(args.top_jogados, settings)
+            novos = [a for a in do_ranking if a not in set(ja_tem)]
+            print(f"Ranking: {len(do_ranking)} jogos, {len(novos)} novos para o catalogo.")
+            coletor.app_ids = ja_tem + novos
+        elif args.steamspy_top:
             coletor.app_ids = coletor.apps_mais_jogados(args.steamspy_top)
         elif args.all_apps:
             coletor.app_ids = coletor.todos_os_apps(

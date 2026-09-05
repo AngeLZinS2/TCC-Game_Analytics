@@ -22,6 +22,7 @@ import {
   useJogosSteam,
   useSaude,
   useSerieTotalSteam,
+  useVisaoGeral,
 } from "../api/consultas";
 import type {
   AgregadoGenero,
@@ -116,6 +117,11 @@ export function SteamPagina() {
     limite: 200,
   });
   const generos = useGenerosSteam();
+  // O total do catalogo vem da contagem real da dimensao. Antes saia de
+  // `Math.max` das contagens por genero - e um jogo conta em TODOS os
+  // generos dele, entao o maior genero nunca foi o catalogo. Com 45 jogos
+  // e 37 de Action, a tela dizia "exibindo 45 de 37".
+  const visaoGeral = useVisaoGeral();
   const serieTotal = useSerieTotalSteam();
   const saude = useSaude();
 
@@ -199,9 +205,7 @@ export function SteamPagina() {
     });
   }
 
-  const totalCatalogo = generos.data
-    ? Math.max(...generos.data.map((g) => g.jogos), 0)
-    : 0;
+  const totalCatalogo = visaoGeral.data?.jogos_steam ?? 0;
 
   return (
     <>
