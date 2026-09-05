@@ -21,26 +21,35 @@ publica (1 e o melhor), e vem junto por ser o resumo que a comunidade usa.
 **O guia de build.** Alem de "como esse campeao esta?", a tela de detalhe
 responde "como jogar?": item inicial, botas, nucleo, ordem de subir a
 habilidade, feiticos e as runas - tudo do meta atual, na rota principal do
-campeao. Vem de `lol_get_champion_analysis`, uma chamada por campeao (~170 na
-rodada), cada uma isolada num try/except: um campeao sem guia mostra so os
-numeros. Os combos que o OP.GG traz sao demonstracoes em video no YouTube,
-conteudo da comunidade - entram como link, com a origem marcada, nao embutidos.
+campeao. Vem de `lol_get_champion_analysis`, uma chamada por campeao.
 
-Sao ~180 chamadas por rodada: uma do elenco, cinco de rota e uma por campeao.
+**Por que a rodada NAO busca os 170 de uma vez.** O `lol_get_champion_analysis`
+tem um teto por janela (algo horario): passado ~110 numa rajada, o OP.GG passa
+a devolver, em vez de erro, um payload de forma certa e arrays vazios. Entao a
+rodada busca so os campeoes SEM guia ou com guia velho (`GUIA_VALIDADE_DIAS`);
+o resto e pulado. Com a carga que MESCLA o `metadados` (ver
+`etl/load_personagens`), a cobertura so cresce: em duas ou tres rodadas
+semanais os 170 estao cobertos, e dai cada rodada so renova os que venceram.
+
+Os combos que o OP.GG traz sao demonstracoes em video no YouTube, conteudo da
+comunidade - entram como link, com a origem marcada, nao embutidos.
 """
 
 from __future__ import annotations
 
 import logging
 import time
-from datetime import date
+from datetime import date, datetime, timedelta, timezone
 from typing import Any, Sequence
 
 import requests
+from sqlalchemy import select
 
 from collectors import opgg_mcp
 from collectors.base import BaseCollector, RawRecord
 from config import get_settings
+from db.models import DimJogo, DimPersonagem
+from db.session import session_scope
 
 logger = logging.getLogger(__name__)
 
@@ -77,6 +86,14 @@ POSICAO_GUIA: dict[str, str] = {
 # array vazio para a resposta completa. A completa tem ~5 KB e o nosso parser
 # navega por chave, entao os ramos extras (counters, synergies, trends) so sao
 # ignorados.
+
+#: Folga entre as chamadas do guia, alem do rate limit padrao do cliente.
+PAUSA_GUIA = 1.5
+
+#: Um guia mais velho que isto e recoletado; mais novo, e pulado. Mantem o
+#: numero de chamadas por rodada baixo (so os que faltam ou venceram) e o dado
+#: fresco o bastante - build de campeao muda a cada patch, ~2 semanas.
+GUIA_VALIDADE_DIAS = 12
 
 #: Os feiticos de invocador. O OP.GG devolve so o id numerico - a Riot nunca
 #: muda esses ids, entao a tabela e fixa e em pt-BR.
@@ -207,12 +224,14 @@ class CampeoesLolCollector(BaseCollector[list[dict[str, Any]]]):
         )
 
     def _guias(self, registros: Sequence[RawRecord]) -> list[RawRecord]:
-        """Uma chamada de `lol_get_champion_analysis` por campeao, na rota dele.
+        """Uma chamada de `lol_get_champion_analysis` por campeao SEM guia fresco.
 
         A rota principal sai das tabelas de rota ja coletadas (maior
-        `role_rate`). Cada chamada e isolada: um campeao sem guia, ou o OP.GG
-        fora do ar no meio, deixa os demais intactos.
+        `role_rate`). Campeao que ja tem guia com menos de `GUIA_VALIDADE_DIAS`
+        e pulado - isso segura o numero de chamadas dentro do teto por janela do
+        OP.GG. Cada chamada e isolada.
         """
+        frescos = self._guias_frescos()
         # `key` interno da Riot ("MonkeyKing", "LeeSin") - o `champion` do guia
         # aceita nome, key ou UPPER_SNAKE, mas a key e a forma canonica.
         chave: dict[str, str] = {}
@@ -249,8 +268,18 @@ class CampeoesLolCollector(BaseCollector[list[dict[str, Any]]]):
                     melhor_taxa[juncao] = taxa
                     posicao[juncao] = POSICAO_GUIA.get(rota, "mid")
 
+        pendentes = [
+            (juncao, pos)
+            for juncao, pos in sorted(posicao.items())
+            if juncao not in frescos
+        ]
+        self.logger.info(
+            "guias a coletar",
+            extra={"pendentes": len(pendentes), "frescos": len(frescos)},
+        )
+
         guias: list[RawRecord] = []
-        for juncao, pos in sorted(posicao.items()):
+        for i, (juncao, pos) in enumerate(pendentes):
             texto = self._guia_do_opgg(chave.get(juncao, juncao), pos, juncao)
             if texto is not None:
                 guias.append(
@@ -261,7 +290,40 @@ class CampeoesLolCollector(BaseCollector[list[dict[str, Any]]]):
                         payload=texto,
                     )
                 )
+            if i + 1 < len(pendentes):
+                time.sleep(PAUSA_GUIA)
         return guias
+
+    def _guias_frescos(self) -> set[str]:
+        """Os campeoes cujo guia foi coletado ha menos de `GUIA_VALIDADE_DIAS`.
+
+        Chave no formato de `_juntar_nome`, para casar com o laco de `_guias`.
+        Falha de banco devolve conjunto vazio - a rodada tenta todos, e o teto
+        do OP.GG corta o excesso.
+        """
+        limite = (
+            datetime.now(timezone.utc) - timedelta(days=GUIA_VALIDADE_DIAS)
+        ).date().isoformat()
+        try:
+            with session_scope() as sessao:
+                linhas = sessao.execute(
+                    select(DimPersonagem.nome, DimPersonagem.metadados)
+                    .join(DimJogo, DimJogo.id_jogo == DimPersonagem.id_jogo)
+                    .where(
+                        DimJogo.codigo == JOGO,
+                        DimPersonagem.metadados.has_key("guia"),
+                    )
+                ).all()
+        except Exception as exc:  # noqa: BLE001 - sem banco, recoleta tudo
+            self.logger.warning("nao consultou guias frescos", extra={"erro": str(exc)})
+            return set()
+
+        frescos: set[str] = set()
+        for nome, metadados in linhas:
+            guia = (metadados or {}).get("guia") or {}
+            if str(guia.get("atualizado_em") or "") >= limite:
+                frescos.add(_juntar_nome(nome))
+        return frescos
 
     def _guia_do_opgg(self, champion: str, pos: str, rotulo: str) -> str | None:
         """Uma chamada do guia, com uma nova tentativa para a resposta vazia.
