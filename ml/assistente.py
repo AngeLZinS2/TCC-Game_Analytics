@@ -139,7 +139,7 @@ do nosso banco. NUNCA afirme quantos jogadores cabem numa partida, tamanho de \
 grupo ou "suporta squad de N" - a loja não informa isso, e o próprio bloco \
 avisa. O que está confirmado é que cada um tem modo online.
 12. O bloco "Volumes do banco" lista os jogos de esports que cobrimos e é um MAPA DE CAPACIDADE. NUNCA diga que um jogo listado ali "não está no nosso banco". Ele tem três linhas-chave: (a) para quais jogos existe dado de PARTIDA nosso; (b) para quais existe DESEMPENHO por personagem - winrate, pick rate, meta - e de que fonte (nosso, para Dota; OP.GG, público geral com classificação, para LoL e Valorant); (c) para quais existe GUIA de build. Responda "melhor personagem / meta" só para os jogos da linha (b), sempre dizendo a fonte. Para um jogo fora dela, "o melhor é X" seria opinião com cara de medição - diga que falta essa coleta.
-13. Quando houver um bloco "Elenco e desempenho de X - OP.GG", ele responde "melhor campeão/agente" e "meta" desse jogo. Use os números dele, diga "segundo o OP.GG" e que é do público geral com classificação, NÃO do cenário profissional. Se a pergunta for sobre o meta PROFISSIONAL/competitivo, diga que esse recorte não responde isso.
+13. Quando houver um bloco "Elenco e desempenho de X - OP.GG", ele responde "melhor campeão/agente" e "meta" desse jogo. Use os números dele, diga "segundo o OP.GG" e que é do público geral com classificação, NÃO do cenário profissional. Se a pergunta for sobre o meta PROFISSIONAL/competitivo, diga que esse recorte não responde isso. Se o mapa de capacidade diz que o jogo TEM desempenho por personagem mas NENHUM bloco com esses números veio no contexto, NÃO invente winrate, pick rate ou nomes: diga que o dado existe na tela /herois e que nesta resposta ele não foi carregado.
 14. Quando houver um bloco "Guia de build - X", ele responde "como jogar / o que buildar / ordem de subir a habilidade / runas" desse personagem. Liste os itens por fase, a prioridade de habilidade e as runas COMO ESTÃO no bloco. É dado do OP.GG/OpenDota (público geral), não do cenário profissional, e é da última coleta - não é ao vivo.
 15. Quando houver um bloco "Modelo de confronto", ele diz para quais jogos existe modelo de previsão ajustado. Se a pergunta pedir previsão de um confronto de um jogo SEM modelo na lista, diga que ainda não há modelo para esse jogo. Se o bloco disser que a acurácia não supera a taxa base, a resposta precisa dizer isso - não venda a previsão como confiável.
 """
@@ -662,6 +662,38 @@ def _bloco_recomendacao(
 # ---------------------------------------------------------------------------
 
 
+#: Apelido -> `dim_jogo.codigo`. "qual o melhor campeao de LoL" nunca escreve
+#: "League of Legends" por extenso, e sem isto o bloco de desempenho nao
+#: disparava - e o modelo, vendo no mapa de capacidade que LoL TEM desempenho,
+#: inventava os numeros.
+APELIDOS_JOGO: dict[str, str] = {
+    "lol": "leagueoflegends",
+    "league": "leagueoflegends",
+    "league of legends": "leagueoflegends",
+    "valorant": "valorant",
+    "valo": "valorant",
+    "val": "valorant",
+    "dota": "dota2",
+    "dota 2": "dota2",
+    "cs": "counterstrike",
+    "csgo": "counterstrike",
+    "cs2": "counterstrike",
+    "cs go": "counterstrike",
+    "counter strike": "counterstrike",
+    "counter-strike": "counterstrike",
+}
+
+
+def _codigos_citados(pergunta: str) -> set[str]:
+    """Os `dim_jogo.codigo` que a pergunta cita, por nome ou apelido."""
+    normalizada = _normalizar(pergunta)
+    return {
+        codigo
+        for apelido, codigo in APELIDOS_JOGO.items()
+        if re.search(rf"\b{re.escape(apelido)}\b", normalizada)
+    }
+
+
 def _bloco_elenco(pergunta: str, sessao) -> tuple[Bloco | None, SerieAssistente | None]:
     """O elenco do jogo que a pergunta cita, quando o elenco e tudo que temos.
 
@@ -699,11 +731,12 @@ def _bloco_elenco(pergunta: str, sessao) -> tuple[Bloco | None, SerieAssistente 
         )
     ).all()
 
+    codigos_apelido = _codigos_citados(pergunta)
     alvo = None
     for id_jogo, codigo, nome, partidas in candidatos:
         if partidas:
             continue
-        if _normalizar(nome) in trechos:
+        if _normalizar(nome) in trechos or codigo in codigos_apelido:
             alvo = (id_jogo, codigo, nome)
             break
     if alvo is None:
@@ -1258,11 +1291,12 @@ def _jogo_citado(pergunta: str, sessao) -> tuple[str, str] | None:
     sem repetir a deteccao.
     """
     normalizada = _normalizar(pergunta)
+    codigos_apelido = _codigos_citados(pergunta)
     jogos = sessao.execute(select(DimJogo.codigo, DimJogo.nome)).all()
     achados = [
         (codigo, nome)
         for codigo, nome in jogos
-        if _normalizar(nome) in normalizada
+        if _normalizar(nome) in normalizada or codigo in codigos_apelido
     ]
     if not achados:
         return None
