@@ -92,7 +92,13 @@ export function JogoSteamPagina() {
                 Voltar para o catálogo
               </Link>
 
-              <div className="relative z-10 mt-space-sm flex flex-col justify-between gap-space-base lg:flex-row lg:items-start">
+              {/*
+                Duas colunas: identidade a esquerda, galeria a direita. Antes a
+                galeria ficava ABAIXO do titulo, o que deixava metade da largura
+                vazia e empurrava os KPIs pra fora da primeira tela - o cabecalho
+                sozinho passava de 550px de altura.
+              */}
+              <div className="relative z-10 mt-space-sm grid grid-cols-1 items-center gap-space-lg lg:grid-cols-[minmax(0,1fr)_minmax(0,24rem)]">
                 <div className="flex min-w-0 items-start gap-space-base">
                   <CapaJogo
                     appId={jogo.app_id}
@@ -122,7 +128,7 @@ export function JogoSteamPagina() {
                       <span className="text-on-surface-variant">{jogo.app_id}</span>
                     </p>
 
-                    <div className="mt-space-sm flex flex-wrap gap-space-xs">
+                    <div className="mt-space-sm flex flex-wrap items-center gap-space-xs">
                       {jogo.gratuito && <Selo cor="positivo">Gratuito</Selo>}
                       {jogo.generos.map((genero) => (
                         <span
@@ -132,32 +138,28 @@ export function JogoSteamPagina() {
                           {genero}
                         </span>
                       ))}
+
+                      {/* O Metacritic vira pilula na mesma linha dos generos:
+                          como bloco proprio ele forcava uma coluna so pra si e
+                          brigava com a galeria pelo mesmo espaco. */}
+                      {jogo.nota_metacritic !== null && (
+                        <span
+                          className="inline-flex items-center gap-space-xxs rounded border border-tertiary/30 px-space-xs py-space-xxs font-badge-status text-badge-status uppercase text-outline"
+                          title="Nota da crítica no Metacritic"
+                        >
+                          Metacritic
+                          <strong className="font-title-code text-title-code text-tertiary">
+                            {jogo.nota_metacritic}
+                          </strong>
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>
 
-                {jogo.nota_metacritic !== null && (
-                  <div
-                    className="shrink-0 rounded-lg border border-tertiary/30 bg-surface-container px-space-lg py-space-sm text-center"
-                    title="Nota da crítica no Metacritic"
-                  >
-                    <div className="font-label-caps text-label-caps uppercase tracking-widest text-outline">
-                      Metacritic
-                    </div>
-                    <div className="font-headline-kpi text-headline-kpi leading-none text-tertiary">
-                      {jogo.nota_metacritic}
-                    </div>
-                  </div>
-                )}
+                {/* A galeria da loja: trailer primeiro, capturas depois. */}
+                {ficha.midias.length > 0 && <CarrosselMidia midias={ficha.midias} />}
               </div>
-
-              {/* A galeria da loja: trailer primeiro, capturas depois. */}
-              {ficha.midias.length > 0 && (
-                <CarrosselMidia
-                  midias={ficha.midias}
-                  className="relative z-10 mt-space-base w-full max-w-3xl"
-                />
-              )}
             </section>
 
             {/* ==================== KPIS ==================== */}

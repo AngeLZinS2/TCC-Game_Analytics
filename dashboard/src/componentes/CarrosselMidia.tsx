@@ -1,5 +1,5 @@
 /**
- * O carrossel do topo da ficha: um slot só, que se troca sozinho.
+ * A galeria da loja no cabeçalho da ficha: um slot só, que se troca sozinho.
  *
  * A regra de avanço depende do que está na tela, e é essa a razão de o
  * componente existir em vez de um `setInterval` genérico:
@@ -8,9 +8,10 @@
  * * **Vídeo** toca até o fim e só então passa - cortar um trailer no meio para
  *   cumprir um cronômetro seria pior que não ter vídeo nenhum.
  *
- * Sempre mudo (`muted`), e não é só decisão de gosto: navegador nenhum deixa
- * um vídeo com som começar sozinho, então autoplay com áudio simplesmente não
- * tocaria. Quem quiser som tem o controle de volume no player.
+ * Começa sempre mudo, e não é só decisão de gosto: navegador nenhum deixa um
+ * vídeo com som começar sozinho, então autoplay com áudio simplesmente não
+ * tocaria. O botão de som fica no canto, e a escolha de quem clicou sobrevive
+ * à troca de trailer (por isso o estado mora aqui, não dentro do `Video`).
  *
  * **Por que `hls.js`.** A Steam parou de publicar mp4/webm: o `appdetails` hoje
  * traz só DASH e HLS, e o Chrome não toca nenhum dos dois nativamente (o
@@ -36,8 +37,24 @@ const SEGUNDOS_POR_IMAGEM = 6;
  * Fica em componente próprio de propósito: assim cada troca de mídia monta um
  * `<video>` novo, e o `useEffect` de limpeza destrói a instância do `hls.js`
  * junto. Reaproveitar um player só entre trocas vazaria buffer de vídeo.
+ *
+ * Sem `controls`: a barra nativa do Chrome (play, tempo, tela cheia, menu) é
+ * alta demais e destoa do resto do painel num bloco deste tamanho. O que ela
+ * tinha de útil aqui virou gesto - clicar alterna pausa - e o botão de som,
+ * que é o único controle que alguém realmente procura num trailer que já
+ * começou sozinho.
  */
-function Video({ midia, onFim }: { midia: MidiaJogo; onFim: () => void }) {
+function Video({
+  midia,
+  mudo,
+  onFim,
+  onProgresso,
+}: {
+  midia: MidiaJogo;
+  mudo: boolean;
+  onFim: () => void;
+  onProgresso: (fracao: number) => void;
+}) {
   const referencia = useRef<HTMLVideoElement>(null);
   const [falhou, setFalhou] = useState(false);
 
@@ -79,9 +96,7 @@ function Video({ midia, onFim }: { midia: MidiaJogo; onFim: () => void }) {
   }, [falhou, onFim]);
 
   if (falhou) {
-    return (
-      <img src={midia.cartaz} alt="" className="h-full w-full object-cover" />
-    );
+    return <img src={midia.cartaz} alt="" className="h-full w-full object-cover" />;
   }
 
   return (
@@ -89,12 +104,20 @@ function Video({ midia, onFim }: { midia: MidiaJogo; onFim: () => void }) {
       ref={referencia}
       poster={midia.cartaz || undefined}
       autoPlay
-      muted
+      muted={mudo}
       playsInline
-      controls
       onEnded={onFim}
       onError={() => setFalhou(true)}
-      className="h-full w-full bg-black object-cover"
+      onTimeUpdate={(evento) => {
+        const el = evento.currentTarget;
+        if (el.duration) onProgresso(el.currentTime / el.duration);
+      }}
+      onClick={(evento) => {
+        const el = evento.currentTarget;
+        if (el.paused) void el.play();
+        else el.pause();
+      }}
+      className="h-full w-full cursor-pointer bg-black object-cover"
     />
   );
 }
@@ -107,6 +130,8 @@ export function CarrosselMidia({
   className?: string;
 }) {
   const [indice, setIndice] = useState(0);
+  const [mudo, setMudo] = useState(true);
+  const [progresso, setProgresso] = useState(0);
 
   // Volta pro começo quando a lista muda (navegar de um jogo para outro).
   useEffect(() => {
@@ -114,16 +139,18 @@ export function CarrosselMidia({
   }, [midias]);
 
   const atual = midias[indice];
+  const eVideo = atual?.tipo === "video";
 
   // A imagem avança por tempo; o vídeo, no `onEnded` (ver `Video`).
   useEffect(() => {
-    if (!atual || atual.tipo === "video" || midias.length < 2) return;
+    setProgresso(0);
+    if (!atual || eVideo || midias.length < 2) return;
     const relogio = setTimeout(
       () => setIndice((i) => (i + 1) % midias.length),
       SEGUNDOS_POR_IMAGEM * 1000,
     );
     return () => clearTimeout(relogio);
-  }, [atual, indice, midias.length]);
+  }, [atual, eVideo, indice, midias.length]);
 
   if (!atual) return null;
 
@@ -132,46 +159,69 @@ export function CarrosselMidia({
   }
 
   return (
-    <div className={`overflow-hidden rounded-xl bg-black/60 ${className}`}>
+    <div
+      className={`overflow-hidden rounded-xl bg-black shadow-lg ring-1 ring-outline-variant/25 ${className}`}
+    >
       <div className="relative aspect-video w-full">
-        {atual.tipo === "video" ? (
-          <Video key={atual.url} midia={atual} onFim={avancar} />
-        ) : (
-          <img
+        {eVideo ? (
+          <Video
             key={atual.url}
-            src={atual.url}
-            alt=""
-            className="h-full w-full object-cover"
+            midia={atual}
+            mudo={mudo}
+            onFim={avancar}
+            onProgresso={setProgresso}
           />
+        ) : (
+          <img key={atual.url} src={atual.url} alt="" className="h-full w-full object-cover" />
         )}
 
-        {atual.tipo === "video" && atual.titulo && (
-          <span className="pointer-events-none absolute left-space-sm top-space-sm inline-flex items-center gap-space-xxs rounded bg-black/70 px-space-xs py-space-xxs font-badge-status text-badge-status uppercase text-on-surface backdrop-blur-sm">
+        {eVideo && atual.titulo && (
+          <span className="pointer-events-none absolute left-space-sm top-space-sm inline-flex max-w-[70%] items-center gap-space-xxs truncate rounded bg-black/60 px-space-xs py-space-xxs font-badge-status text-badge-status uppercase text-on-surface backdrop-blur-sm">
             <Icone nome="play_circle" className="text-[13px] text-primary" />
             {atual.titulo}
           </span>
         )}
-      </div>
 
-      {/* Marcadores: também servem de atalho para pular direto num item. */}
-      {midias.length > 1 && (
-        <div className="flex items-center justify-center gap-space-xxs bg-surface-container-lowest px-space-sm py-space-xs">
-          {midias.map((midia, i) => (
-            <button
-              key={midia.url}
-              type="button"
-              onClick={() => setIndice(i)}
-              aria-label={`Ir para a mídia ${i + 1} de ${midias.length}`}
-              aria-current={i === indice}
-              className={`h-1.5 rounded-full transition-all ${
-                i === indice
-                  ? "w-6 bg-primary"
-                  : "w-1.5 bg-outline/50 hover:bg-outline"
-              }`}
-            />
-          ))}
-        </div>
-      )}
+        {eVideo && (
+          <button
+            type="button"
+            onClick={() => setMudo((m) => !m)}
+            aria-label={mudo ? "Ativar som" : "Desativar som"}
+            className="absolute right-space-sm top-space-sm flex h-7 w-7 items-center justify-center rounded bg-black/60 text-on-surface backdrop-blur-sm transition-colors hover:text-primary"
+          >
+            <Icone nome={mudo ? "volume_off" : "volume_up"} className="text-[15px]" />
+          </button>
+        )}
+
+        {/* Marcadores sobre a mídia, não numa faixa embaixo: a faixa somava
+            altura ao cabeçalho e se lia como um bloco solto. */}
+        {midias.length > 1 && (
+          <div className="absolute inset-x-0 bottom-0 flex items-end justify-center gap-space-xxs bg-gradient-to-t from-black/70 to-transparent px-space-sm pb-space-xs pt-space-lg">
+            {midias.map((midia, i) => (
+              <button
+                key={midia.url}
+                type="button"
+                onClick={() => setIndice(i)}
+                aria-label={`Ir para a mídia ${i + 1} de ${midias.length}`}
+                aria-current={i === indice}
+                className={`h-1 rounded-full transition-all ${
+                  i === indice ? "w-5 bg-primary" : "w-1 bg-on-surface/40 hover:bg-on-surface/70"
+                }`}
+              />
+            ))}
+          </div>
+        )}
+
+        {/* Fio de progresso do trailer - substitui a barra nativa, que ocupava
+            um oitavo da altura do bloco. */}
+        {eVideo && (
+          <div
+            className="absolute inset-x-0 bottom-0 h-0.5 bg-primary/80 transition-[width] duration-200"
+            style={{ width: `${Math.min(100, progresso * 100)}%` }}
+            aria-hidden
+          />
+        )}
+      </div>
     </div>
   );
 }
