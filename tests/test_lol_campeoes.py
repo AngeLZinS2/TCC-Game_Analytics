@@ -7,6 +7,8 @@ errado, que e pior do que tela vazia.
 
 from __future__ import annotations
 
+import json as json_module
+
 from collectors.base import RawRecord
 from collectors.lol_campeoes import CampeoesLolCollector
 from collectors.opgg_mcp import analisar_notacao_compacta
@@ -119,3 +121,80 @@ def test_campeao_sem_estatistica_entra_sem_metrica():
     nunu = next(c for c in campeoes if c["nome"] == "Nunu & Willump")
     assert "metricas" not in nunu
     assert "papel" not in nunu
+
+
+# --- videos de habilidade do Valorant (ficha oficial da Riot) ---
+
+from collectors.valorant_agentes import _casar_video, _chave_habilidade, _extrair_videos, _slug_riot
+
+
+def test_slug_riot_cobre_os_nomes_torto():
+    """A URL da ficha da Riot deriva do nome - "KAY/O" e o caso que quebra."""
+    assert _slug_riot("KAY/O") == "kay-o"
+    assert _slug_riot("Chamber") == "chamber"
+    assert _slug_riot("Nunu & Willump") == "nunu-willump"
+
+
+def test_chave_habilidade_tira_o_que_a_riot_poe_alem_do_nome():
+    """A valorant-api entrega o nome limpo; a ficha da Riot enfeita."""
+    assert _chave_habilidade("Q - Predador Explosivo") == _chave_habilidade("Predador Explosivo")
+    assert _chave_habilidade("Enseada (Fumaça de Enseada)") == _chave_habilidade("Enseada")
+    assert _chave_habilidade("Nebulosa/Dissipar") == _chave_habilidade("Nebulosa")
+
+
+def test_casar_video_aceita_nome_contido():
+    videos = {"formaastraldivisacosmica": "http://x/a.mp4", "nebulosa": "http://x/b.mp4"}
+    # "Forma Astral" (valorant-api) casa com "Forma Astral/Divisão Cósmica" (Riot)
+    assert _casar_video("Forma Astral", videos) == "http://x/a.mp4"
+    # Casamento exato ainda ganha
+    assert _casar_video("Nebulosa", videos) == "http://x/b.mp4"
+    # Nada parecido -> None, nao um chute
+    assert _casar_video("Muralha de Fogo", videos) is None
+
+
+def test_extrair_videos_de_next_data_minimo():
+    """A blade de habilidade e a unica `iconTab`; o texto do header muda com o
+    idioma e por isso NAO e usado no filtro."""
+    html = (
+        '<script id="__NEXT_DATA__" type="application/json">'
+        + json_module.dumps(
+            {
+                "props": {
+                    "pageProps": {
+                        "page": {
+                            "blades": [
+                                {"type": "characterMasthead"},
+                                {
+                                    "type": "iconTab",
+                                    "header": {"title": "Habilidades Especiais"},
+                                    "groups": [
+                                        {
+                                            "content": {
+                                                "title": "C - Chama",
+                                                "media": {
+                                                    "sources": [
+                                                        {
+                                                            "src": "https://cmsassets.rgpub.io/x/y.mp4",
+                                                            "type": "video/mp4",
+                                                        }
+                                                    ]
+                                                },
+                                            }
+                                        }
+                                    ],
+                                },
+                            ]
+                        }
+                    }
+                }
+            }
+        )
+        + "</script>"
+    )
+    videos = _extrair_videos(html)
+    assert videos == {"chama": "https://cmsassets.rgpub.io/x/y.mp4"}
+
+
+def test_extrair_videos_devolve_vazio_se_a_forma_mudar():
+    assert _extrair_videos("<html>sem next data</html>") == {}
+    assert _extrair_videos('<script id="__NEXT_DATA__">nao e json</script>') == {}

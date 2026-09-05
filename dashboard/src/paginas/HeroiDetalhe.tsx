@@ -260,37 +260,61 @@ function Ficha({ dados }: { dados: DetalhePersonagem }) {
 
       {/* ==================== HABILIDADES ==================== */}
       {dados.habilidades.length > 0 && (
-        <Painel icone="bolt" titulo="Habilidades">
+        <Painel
+          icone="bolt"
+          titulo="Habilidades"
+          descricao={
+            dados.habilidades.some((h) => h.video)
+              ? "Clipe e texto oficiais da Riot."
+              : undefined
+          }
+        >
           <div className="grid grid-cols-1 gap-space-base sm:grid-cols-2">
             {dados.habilidades.map((hab) => (
               <div
                 key={hab.nome}
-                className="flex gap-space-base rounded-lg bg-surface-container-lowest p-space-base"
+                className="flex flex-col overflow-hidden rounded-lg bg-surface-container-lowest"
               >
-                {hab.icone && (
-                  <img
-                    src={hab.icone}
-                    alt=""
-                    aria-hidden
-                    className="h-10 w-10 shrink-0 opacity-90"
+                {hab.video && (
+                  <video
+                    src={hab.video}
+                    muted
+                    loop
+                    playsInline
+                    autoPlay
+                    // O clipe da Riot roda em silencio e em loop, como na
+                    // ficha oficial - e uma pré-visualização da mecânica, não
+                    // um vídeo para assistir com áudio.
+                    className="aspect-video w-full bg-black object-cover"
+                    controlsList="nodownload"
                   />
                 )}
-                <div className="flex flex-col gap-space-xxs">
-                  <div className="flex items-center gap-space-xs">
-                    <span className="font-title-code text-title-code text-on-surface">
-                      {hab.nome}
-                    </span>
-                    {hab.slot && (
-                      <span className="font-badge-status text-badge-status uppercase tracking-wider text-outline">
-                        {hab.slot}
+                <div className="flex gap-space-base p-space-base">
+                  {hab.icone && (
+                    <img
+                      src={hab.icone}
+                      alt=""
+                      aria-hidden
+                      className="h-10 w-10 shrink-0 opacity-90"
+                    />
+                  )}
+                  <div className="flex flex-col gap-space-xxs">
+                    <div className="flex items-center gap-space-xs">
+                      <span className="font-title-code text-title-code text-on-surface">
+                        {hab.nome}
                       </span>
+                      {hab.slot && (
+                        <span className="font-badge-status text-badge-status uppercase tracking-wider text-outline">
+                          {hab.slot}
+                        </span>
+                      )}
+                    </div>
+                    {hab.descricao && (
+                      <p className="font-body-sm text-body-sm text-on-surface-variant">
+                        {hab.descricao}
+                      </p>
                     )}
                   </div>
-                  {hab.descricao && (
-                    <p className="font-body-sm text-body-sm text-on-surface-variant">
-                      {hab.descricao}
-                    </p>
-                  )}
                 </div>
               </div>
             ))}

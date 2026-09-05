@@ -599,6 +599,7 @@ def detalhe_do_personagem(
                 nome=h.get("nome"),
                 descricao=h.get("descricao"),
                 icone=h.get("icone"),
+                video=h.get("video"),
             )
             for h in metadados.get("habilidades") or []
             if h.get("nome")

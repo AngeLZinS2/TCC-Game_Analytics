@@ -241,6 +241,8 @@ export interface HabilidadePersonagem {
   nome: string;
   descricao: string | null;
   icone: string | null;
+  /** Clipe curto da habilidade (mp4, CDN da Riot). `null` quando não há. */
+  video: string | null;
 }
 
 /** O desempenho do personagem num mapa/rota específico. */

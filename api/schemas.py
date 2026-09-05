@@ -296,6 +296,9 @@ class HabilidadePersonagem(BaseModel):
     nome: str
     descricao: str | None = None
     icone: str | None = None
+    #: Clipe curto da habilidade, do CDN da propria Riot. `None` quando a ficha
+    #: oficial nao tinha (agente recem-lancado, mudanca de layout do site).
+    video: str | None = None
 
 
 class EstatisticaMapa(BaseModel):
