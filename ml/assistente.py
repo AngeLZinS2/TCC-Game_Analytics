@@ -1370,15 +1370,28 @@ def _bloco_guia(pergunta: str, sessao) -> Bloco | None:
     if not any(_normalizar(termo) in normalizada for termo in GATILHOS_GUIA):
         return None
 
+    # Sem pontuacao dos dois lados: "Kaisa" na pergunta casa "Kai'Sa" no banco,
+    # "belveth" casa "Bel'Veth". Mantem o espaco para "Twisted Fate" nao virar
+    # substring solto.
+    def _sem_pontuacao(texto: str) -> str:
+        return re.sub(r"[^a-z0-9 ]", "", _normalizar(texto))
+
+    pergunta_limpa = _sem_pontuacao(pergunta)
+
     candidatos = sessao.execute(
         select(DimPersonagem.nome, DimJogo.nome, DimPersonagem.metadados)
         .join(DimJogo, DimJogo.id_jogo == DimPersonagem.id_jogo)
         .where(DimPersonagem.metadados.has_key("guia"))
+        # Nomes mais longos primeiro: "Twisted Fate" antes de "Fate", se
+        # existisse.
+        .order_by(func.length(DimPersonagem.nome).desc())
     ).all()
 
     alvo = None
     for nome_p, nome_jogo, metadados in candidatos:
-        if _normalizar(nome_p) in normalizada:
+        # `\b` dos dois lados: "Mel" nao casa dentro de "melhor", mas casa
+        # sozinho; "Twisted Fate" casa como frase.
+        if re.search(rf"\b{re.escape(_sem_pontuacao(nome_p))}\b", pergunta_limpa):
             alvo = (nome_p, nome_jogo, (metadados or {}).get("guia") or {})
             break
     if alvo is None or not alvo[2]:

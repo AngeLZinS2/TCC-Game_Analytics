@@ -550,9 +550,49 @@ def test_bloco_geral_lista_os_jogos_cobertos():
         bloco = _bloco_geral(sessao)
 
     assert "Jogos de esports no nosso banco" in bloco.conteudo
-    # A linha que separa "temos o jogo" de "temos partida do jogo" - sem ela,
-    # ver o elenco listado convidaria o modelo a ranquear agente por conta.
+    # As linhas do mapa de capacidade: partida nossa, desempenho por personagem
+    # (e a fonte) e guia de build - sem elas, ver o elenco listado convidaria o
+    # modelo a ranquear agente por conta, ou a negar que da quando da.
     assert "Dado de PARTIDA" in bloco.conteudo
+    assert "DESEMPENHO por personagem" in bloco.conteudo
+    assert "GUIA de como jogar" in bloco.conteudo
+
+
+def test_bloco_guia_so_com_gatilho_e_nome():
+    """Guia entra so quando a pergunta pede COMO JOGAR e nomeia um personagem
+    que tem guia coletado. O nome casa apesar da pontuacao ("Kaisa" -> "Kai'Sa")."""
+    with session_scope() as sessao:
+        # Gatilho sem nome: nada.
+        assert _bloco_guia("qual a melhor build em geral?", sessao) is None
+        # Nome sem gatilho de "como jogar": nada (isso e pergunta de meta).
+        assert _bloco_guia("a Kaisa esta forte no meta?", sessao) is None
+
+        com_guia = _bloco_guia(
+            "qual a build da Kaisa e a ordem de subir habilidade?", sessao
+        )
+        dota = _bloco_guia("melhor item pra montar no Void Spirit?", sessao)
+
+    if com_guia is None:
+        pytest.skip("guia de LoL ainda nao coletado neste banco")
+    assert com_guia.chave == "guia"
+    assert "Kai'Sa" in com_guia.conteudo
+    assert "Prioridade de subir" in com_guia.conteudo or "Ordem por nivel" in com_guia.conteudo
+    # A procedencia vem junto - nao e cenario profissional.
+    assert "nao e cenario profissional" in com_guia.conteudo
+
+    if dota is not None:
+        # Dota nao tem ordem de skill agregada - e a nota diz isso.
+        assert "OpenDota" in dota.conteudo
+
+
+def test_bloco_modelos_nomeia_o_jogo_e_lista_a_cobertura():
+    """`_bloco_modelos` responde pelo jogo citado (nao so Dota) e diz para
+    quais jogos existe modelo - "voces preveem CS?" precisa dessa resposta."""
+    with session_scope() as sessao:
+        bloco = _bloco_modelos("quem ganha um confronto de counter-strike?", sessao)
+
+    assert bloco.chave == "modelos"
+    assert "Existe modelo ajustado para:" in bloco.conteudo
 
 
 def test_elenco_so_entra_para_jogo_sem_partida(sem_opgg):
