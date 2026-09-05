@@ -85,7 +85,17 @@ export function CartaoJogoRecomendado({ jogo }: { jogo: JogoRecomendado }) {
       to={`/steam/${jogo.app_id}`}
       className="group flex flex-col overflow-hidden rounded-xl bg-surface-container-lowest ring-1 ring-outline-variant/20 transition-all hover:-translate-y-0.5 hover:ring-primary/50 hover:shadow-lg"
     >
-      <ArteJogo appId={jogo.app_id} nome={jogo.nome} className="h-32 w-full rounded-none" />
+      {/*
+        `imagemUrl` só vem preenchida quando o candidato saiu da busca ao vivo
+        na loja. Passar `null` no caminho do catálogo é o comportamento certo:
+        aí a `ArteJogo` monta a arte pelo `app_id`, como nas outras telas.
+      */}
+      <ArteJogo
+        appId={jogo.app_id}
+        nome={jogo.nome}
+        imagemUrl={jogo.imagem_header}
+        className="h-32 w-full rounded-none"
+      />
 
       <div className="flex flex-1 flex-col gap-space-sm p-space-base">
         <h3 className="font-headline-sm text-headline-sm text-on-surface transition-colors group-hover:text-primary">
@@ -101,13 +111,20 @@ export function CartaoJogoRecomendado({ jogo }: { jogo: JogoRecomendado }) {
         )}
 
         <div className="mt-auto flex items-center justify-between gap-space-xs border-t border-outline-variant/20 pt-space-sm font-title-code text-title-code">
-          <span
-            className="flex items-center gap-space-xxs text-tertiary"
-            title="Avaliações positivas"
-          >
-            <Icone nome="thumb_up" className="text-[14px]" />
-            {fmtPercentual(jogo.nota_avaliacoes)}
-          </span>
+          {/*
+            A busca por característica não passa pelas avaliações (seria o
+            dobro de chamadas por pergunta), então aqui a nota vem nula. Some
+            com o indicador em vez de mostrar um polegar sem número ao lado.
+          */}
+          {jogo.nota_avaliacoes !== null && (
+            <span
+              className="flex items-center gap-space-xxs text-tertiary"
+              title="Avaliações positivas"
+            >
+              <Icone nome="thumb_up" className="text-[14px]" />
+              {fmtPercentual(jogo.nota_avaliacoes)}
+            </span>
+          )}
           <span
             className="flex items-center gap-space-xxs text-on-surface-variant"
             title="Jogadores simultâneos agora"

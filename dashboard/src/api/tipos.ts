@@ -433,6 +433,8 @@ export interface JogoRecomendado {
   preco: number | null;
   moeda: string | null;
   gratuito: boolean | null;
+  /** Vem preenchida na descoberta ao vivo; `null` no caminho do catálogo. */
+  imagem_header: string | null;
 }
 
 /**

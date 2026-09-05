@@ -49,7 +49,7 @@ from typing import Any, Callable
 import requests
 from sqlalchemy import Integer, cast, desc, func, select
 
-from collectors import itad_loja, steam_loja
+from collectors import itad_loja, steam_descoberta, steam_loja
 from config import get_settings
 from db.models import (
     DimJogoSteam,
@@ -122,6 +122,12 @@ responda com ESSE número (a loja e o valor), não só o preço da Steam - é \
 exatamente o que "mais barato"/"menor valor" pergunta. Se essas linhas não \
 existirem no bloco (jogo sem oferta encontrada), diga que não achou preço em \
 outra loja agora - não invente uma loja ou um valor.
+11. Quando o bloco de recomendação vier da LOJA DA STEAM (título "loja da \
+Steam agora"), liste os jogos dele com o número de jogadores agora e o preço, \
+e diga que a busca foi feita na loja neste momento e que esses jogos não são \
+do nosso banco. NUNCA afirme quantos jogadores cabem numa partida, tamanho de \
+grupo ou "suporta squad de N" - a loja não informa isso, e o próprio bloco \
+avisa. O que está confirmado é que cada um tem modo online.
 """
 
 
@@ -160,6 +166,11 @@ class JogoRecomendado:
     preco: float | None
     moeda: str | None
     gratuito: bool | None
+    #: A capa real da loja. Vem preenchida na descoberta ao vivo (a ficha da
+    #: Steam ja traz) e fica `None` no caminho do catalogo, onde a tela monta a
+    #: arte pelo `app_id`. Sem ela, jogo novo cai no palpite deterministico de
+    #: CDN, que da 404 - eles migraram para um caminho com hash.
+    imagem_header: str | None = None
 
 
 @dataclass
@@ -510,6 +521,179 @@ def _bloco_recomendacao(
     return (
         Bloco("recomendacao", f"Recomendação ({rotulo}) - catálogo próprio", "\n".join(linhas)),
         candidatos,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Descoberta na loja: jogos por caracteristica, fora do nosso catalogo
+# ---------------------------------------------------------------------------
+
+#: Palavras que dizem "quero jogar com outras pessoas".
+#:
+#: Separadas em tres grupos porque elas escolhem FILTRO diferente na busca da
+#: loja: quem pede cooperativo nao quer PvP e vice-versa. As genericas ligam os
+#: dois - "jogar com amigos" nao diz se e um contra o outro ou lado a lado.
+TERMOS_COOPERATIVO = (
+    "coop", "co op", "cooperativo", "cooperativa", "pve", "juntos",
+)
+TERMOS_COMPETITIVO = (
+    "pvp", "competitivo", "ranqueado", "contra outros", "contra outras pessoas",
+)
+TERMOS_MULTIJOGADOR = (
+    "amigo", "amigos", "galera", "turma", "squad", "grupo", "equipe", "time",
+    "multiplayer", "multijogador", "online", "duo", "trio", "pessoas",
+)
+
+
+def _modo_multijogador(pergunta: str) -> tuple[bool, bool] | None:
+    """`(cooperativo, competitivo)` que a pergunta pede, ou `None` se ela nao
+    fala de jogar acompanhado."""
+    normalizada = _normalizar(pergunta)
+    tokens = set(re.findall(r"[a-z0-9]+", normalizada))
+
+    def cita(termos: tuple[str, ...]) -> bool:
+        return any(
+            (termo in normalizada) if " " in termo else (termo in tokens)
+            for termo in termos
+        )
+
+    cooperativo = cita(TERMOS_COOPERATIVO)
+    competitivo = cita(TERMOS_COMPETITIVO)
+    if cooperativo or competitivo:
+        return cooperativo, competitivo
+    if cita(TERMOS_MULTIJOGADOR):
+        # Sem dizer como, vale os dois - a lista fica mais larga, e e o
+        # comportamento certo: "com amigos" cabe em Rainbow Six e em Deep Rock.
+        return True, True
+    return None
+
+
+def _bloco_descoberta(
+    pergunta: str,
+) -> tuple[Bloco | None, list[JogoRecomendado], SerieAssistente | None]:
+    """Recomendacao por CARACTERISTICA, buscada na loja da Steam na hora.
+
+    Responde a classe de pergunta que o catalogo proprio nunca vai responder:
+    "jogos de tiro FPS pra jogar com cinco amigos". Nosso banco guarda os
+    generos grossos da Steam e nenhuma categoria - nao ha coluna que diga "tem
+    PvP online" -, entao a pergunta caia no bloco de "melhor avaliado do
+    catalogo", que responde outra coisa.
+
+    Roda quando a pergunta cita uma TAG que a Steam reconhece (a lista oficial
+    de tags e quem diz que "FPS" existe e vale 1663) e fala de jogar
+    acompanhado. As duas condicoes juntas, porque cada uma sozinha erraria:
+    so a tag pegaria "melhor jogo de FPS" (que e sobre nota, nao sobre grupo),
+    e so o modo pegaria "meus amigos jogam o que?" - sem genero pra filtrar.
+
+    O que este bloco DECLARA nao saber e tao importante quanto o que ele traz:
+    a loja nao expoe tamanho de grupo. "Cinco pessoas" nao e consultavel, e
+    dizer isso no contexto e o que impede o modelo de responder "suporta
+    squads de 5" com cara de dado.
+    """
+    modo = _modo_multijogador(pergunta)
+    if modo is None:
+        return None, [], None
+
+    tag = steam_descoberta.resolver_tag(pergunta)
+    if tag is None:
+        return None, [], None
+
+    tag_id, tag_nome = tag
+    cooperativo, competitivo = modo
+    achados = steam_descoberta.multijogador_por_tag(
+        tag_id, cooperativo=cooperativo, competitivo=competitivo
+    )
+
+    filtro = (
+        "cooperativo online" if cooperativo and not competitivo
+        else "PvP online" if competitivo and not cooperativo
+        else "PvP ou cooperativo online"
+    )
+    rotulo = f"{tag_nome}, {filtro}"
+
+    if not achados:
+        return (
+            Bloco(
+                "descoberta",
+                f"Recomendação ({rotulo})",
+                f"A busca na loja da Steam por '{tag_nome}' com {filtro} não "
+                "devolveu nenhum jogo agora. Diga que a busca não trouxe "
+                "resultado - não substitua por jogos de memória.",
+                fonte="steam",
+            ),
+            [],
+            None,
+        )
+
+    linhas = [
+        f"Jogos da loja da Steam com a tag '{tag_nome}' e {filtro}, consultados "
+        "AGORA (não são do nosso banco). Ordem: quem tem mais gente jogando "
+        "neste instante. Recomende só entre estes:",
+    ]
+    recomendados: list[JogoRecomendado] = []
+    pontos: list[PontoSerie] = []
+
+    for jogo in achados:
+        preco_texto = (
+            "Gratuito"
+            if jogo["gratuito"]
+            else f"{jogo['moeda'] or ''} {jogo['preco']}".strip()
+            if jogo["preco"] is not None
+            else "sem preço na região"
+        )
+        linhas.append(
+            f"- {jogo['nome']}: {jogo['jogadores_agora'] or 0} jogadores agora, "
+            f"{preco_texto}, modos {', '.join(jogo['categorias']) or '-'}, "
+            f"gêneros {', '.join(jogo['generos']) or '-'}"
+        )
+        recomendados.append(
+            JogoRecomendado(
+                app_id=jogo["app_id"],
+                nome=jogo["nome"],
+                generos=jogo["generos"],
+                # A busca por caracteristica nao passa pelas avaliacoes: pedir a
+                # nota de cada candidato dobraria as chamadas por pergunta, e o
+                # criterio aqui e "tem gente jogando", nao "e bem avaliado".
+                nota_avaliacoes=None,
+                jogadores_simultaneos=jogo["jogadores_agora"],
+                preco=jogo["preco"],
+                moeda=jogo["moeda"],
+                gratuito=jogo["gratuito"],
+                imagem_header=jogo["imagem_header"],
+            )
+        )
+        if jogo["jogadores_agora"]:
+            pontos.append(
+                PontoSerie(
+                    rotulo=jogo["nome"],
+                    valor=float(jogo["jogadores_agora"]),
+                    detalhe="Gratuito" if jogo["gratuito"] else preco_texto,
+                )
+            )
+
+    linhas.append(
+        "A loja NÃO informa tamanho de grupo nem quantos jogadores cabem numa "
+        "partida. O que está confirmado é que cada um destes tem modo online "
+        "(PvP ou cooperativo) na categoria da própria Steam. Não afirme que "
+        "algum suporta exatamente 5 jogadores - isso não está nos dados."
+    )
+
+    serie = SerieAssistente(
+        chave="descoberta",
+        titulo=f"Jogando agora — {tag_nome}",
+        unidade="jogadores",
+        itens=pontos[:8],
+    )
+
+    return (
+        Bloco(
+            "descoberta",
+            f"Recomendação ({rotulo}) - loja da Steam agora",
+            "\n".join(linhas),
+            fonte="steam",
+        ),
+        recomendados,
+        serie,
     )
 
 
@@ -1135,9 +1319,26 @@ def montar_contexto(pergunta: str) -> ContextoMontado:
         if ao_vivo is not None:
             blocos.append(ao_vivo)
 
-        recomendacao, recomendacoes = _bloco_recomendacao(pergunta, sessao)
-        if recomendacao is not None:
-            blocos.append(recomendacao)
+        # A descoberta na loja tem precedencia sobre a recomendacao do
+        # catalogo, e as duas nunca entram juntas. Quando a pergunta pede
+        # "FPS pra jogar com amigos", o bloco do catalogo responderia "os mais
+        # bem avaliados que monitoramos" - outra pergunta - e a tela mostraria
+        # dois blocos de recomendacao discordando, o mesmo defeito que ja
+        # apareceu entre recomendacao e extremo de avaliacao.
+        descoberta, recomendacoes, serie_descoberta = _bloco_descoberta(pergunta)
+        if descoberta is not None:
+            blocos.append(descoberta)
+            if serie_descoberta is not None and serie_descoberta.itens:
+                # Na FRENTE das outras: a tela desenha `series[0]`, e a serie
+                # que responde a pergunta e esta. Anexada no fim, o grafico
+                # mostraria os jogadores dos jogos do NOSSO catalogo ao lado de
+                # uma resposta sobre jogos da loja - o grafico contradizendo o
+                # texto, que e a falha que este projeto menos pode ter.
+                series.insert(0, serie_descoberta)
+        else:
+            recomendacao, recomendacoes = _bloco_recomendacao(pergunta, sessao)
+            if recomendacao is not None:
+                blocos.append(recomendacao)
 
     # Nao depende de sessao (e so rede, ver steam_loja.extremo_avaliacao_por_genero).
     extremo = _bloco_extremo_avaliacao(pergunta)

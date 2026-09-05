@@ -478,6 +478,9 @@ class JogoRecomendado(BaseModel):
     generos: list[str]
     nota_avaliacoes: float | None
     jogadores_simultaneos: int | None
+    #: Preenchida quando o candidato veio da busca ao vivo na loja; `None` no
+    #: caminho do catalogo, onde a tela monta a arte pelo `app_id`.
+    imagem_header: str | None = None
     preco: float | None
     moeda: str | None
     gratuito: bool | None

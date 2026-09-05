@@ -117,6 +117,7 @@ def responder(entrada: EntradaPergunta) -> RespostaAssistente:
                 generos=j.generos,
                 nota_avaliacoes=j.nota_avaliacoes,
                 jogadores_simultaneos=j.jogadores_simultaneos,
+                imagem_header=j.imagem_header,
                 preco=j.preco,
                 moeda=j.moeda,
                 gratuito=j.gratuito,

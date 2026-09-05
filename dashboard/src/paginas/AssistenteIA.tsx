@@ -56,6 +56,9 @@ export function AssistenteIAPagina() {
   // A primeira serie e a do bloco mais relevante para a pergunta - a ordem
   // dos blocos vem do backend, nao de reordenar aqui por tamanho.
   const serie = resposta?.series[0];
+  // As recomendações vêm de dois caminhos: o catálogo (SQL nosso) ou a busca
+  // por característica na loja. O bloco "descoberta" é o que diz qual foi.
+  const daLoja = resposta?.blocos.some((b) => b.chave === "descoberta") ?? false;
 
   const ultimaColeta = useMemo(
     () =>
@@ -279,7 +282,15 @@ export function AssistenteIAPagina() {
                 <Painel
                   icone="stadia_controller"
                   titulo="Jogos recomendados"
-                  descricao="Escolhidos pelo sistema a partir do catálogo — nota de avaliação e popularidade agora, não pelo modelo."
+                  descricao={
+                    // A mesma lista sai de dois caminhos diferentes, e dizer o
+                    // caminho errado é dizer a procedência errada: "a partir do
+                    // catálogo" numa lista que veio da loja afirmaria que esses
+                    // jogos são coletados por nós, o que não é verdade.
+                    daLoja
+                      ? "Buscados na loja da Steam agora, por tag e modo online — não são do nosso catálogo. Ordem: quem tem mais gente jogando neste instante."
+                      : "Escolhidos pelo sistema a partir do catálogo — nota de avaliação e popularidade agora, não pelo modelo."
+                  }
                 >
                   <div className="grid grid-cols-1 gap-space-base sm:grid-cols-2 xl:grid-cols-3">
                     {resposta.recomendacoes.map((jogo) => (

@@ -41,11 +41,15 @@ URL_STEAMSPY = "https://steamspy.com/api.php"
 MINIMO_AVALIACOES_EXTREMO = 1000
 
 
-def _pegar(url: str, params: dict[str, Any]) -> Any | None:
+def pegar(url: str, params: dict[str, Any]) -> Any | None:
     """GET que devolve `None` em vez de estourar.
 
     Quem chama monta contexto para um assistente: uma consulta que falhou
     significa um bloco a menos, nao uma pergunta sem resposta.
+
+    Publica porque o `steam_descoberta` faz as mesmas chamadas com a mesma
+    politica de falha - duas copias divergiriam no dia em que uma ganhasse
+    retentativa e a outra nao.
     """
     settings = get_settings()
     try:
@@ -68,7 +72,7 @@ def _pegar(url: str, params: dict[str, Any]) -> Any | None:
 def buscar(termo: str, limite: int = 5) -> list[dict[str, Any]]:
     """Busca apps pelo nome. Devolve lista vazia quando nada casa ou a loja cai."""
     settings = get_settings()
-    dados = _pegar(
+    dados = pegar(
         URL_BUSCA,
         {"term": termo, "cc": settings.steam_country, "l": settings.steam_language},
     )
@@ -90,7 +94,7 @@ def ficha(app_id: int) -> dict[str, Any] | None:
     vez de so olhar o status HTTP.
     """
     settings = get_settings()
-    dados = _pegar(
+    dados = pegar(
         URL_FICHA,
         {
             "appids": app_id,
@@ -115,7 +119,7 @@ def resumo_avaliacoes(app_id: int) -> dict[str, Any] | None:
     `num_per_page=0` pede zero avaliacoes e mesmo assim traz o agregado: os
     campos do resumo vem iguais com ou sem a lista, entao a chamada e barata.
     """
-    dados = _pegar(
+    dados = pegar(
         URL_AVALIACOES.format(app_id=app_id),
         {
             "json": 1,
@@ -147,7 +151,7 @@ def extremo_avaliacao_por_genero(genero: str, pior: bool) -> dict[str, Any] | No
     isto deve marcar a procedencia de acordo (`fonte="steam"` no `Bloco`, e a
     instrucao do assistente ja pede a frase "segundo o SteamSpy").
     """
-    dados = _pegar(URL_STEAMSPY, {"request": "genre", "genre": genero})
+    dados = pegar(URL_STEAMSPY, {"request": "genre", "genre": genero})
     if not isinstance(dados, dict):
         return None
 

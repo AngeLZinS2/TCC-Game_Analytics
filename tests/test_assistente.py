@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import pytest
 
+from collectors import steam_descoberta
 from db.session import session_scope
 from ml.assistente import (
     GATILHOS,
@@ -23,6 +24,7 @@ from ml.assistente import (
     Bloco,
     PontoSerie,
     SerieAssistente,
+    _bloco_descoberta,
     _bloco_extremo_avaliacao,
     _bloco_herois,
     _bloco_partidas,
@@ -32,10 +34,12 @@ from ml.assistente import (
     _confirma_nome,
     _extremo_avaliacao_pedido,
     _genero_pedido,
+    _modo_multijogador,
     _normalizar,
     _pede_recomendacao,
     _recomendacoes,
     _termos_de_jogo,
+    montar_contexto,
 )
 
 
@@ -368,3 +372,159 @@ def test_todo_construtor_de_bloco_devolve_par_bloco_serie():
                 # Uma serie sem unidade nao da pra rotular no eixo do grafico.
                 assert serie.chave and serie.titulo and serie.unidade
                 assert all(isinstance(p, PontoSerie) for p in serie.itens)
+
+
+# --- Descoberta na loja: recomendacao por caracteristica -------------------
+
+
+@pytest.mark.parametrize(
+    "pergunta, esperado",
+    [
+        # Generico: nao diz se e um contra o outro ou lado a lado -> os dois.
+        ("me recomenda jogos de tiro fps pra jogar com amigos", (True, True)),
+        ("fps para 5 pessoas", (True, True)),
+        # Explicito de um lado so -> so aquele filtro.
+        ("algum fps cooperativo?", (True, False)),
+        ("quero um shooter pvp competitivo", (False, True)),
+        # Nao fala de jogar acompanhado.
+        ("qual o melhor jogo de fps?", None),
+        ("quantos jogos da steam vocês monitoram?", None),
+    ],
+)
+def test_modo_multijogador(pergunta: str, esperado: tuple[bool, bool] | None):
+    assert _modo_multijogador(pergunta) == esperado
+
+
+def test_descoberta_exige_tag_e_modo(monkeypatch):
+    """As duas condicoes juntas, porque cada uma sozinha erra.
+
+    So a tag pegaria "qual o melhor FPS" (pergunta de nota, nao de grupo); so o
+    modo pegaria "o que jogar com amigos" - sem genero, nao ha o que filtrar na
+    busca da loja.
+    """
+    chamou = []
+    monkeypatch.setattr(
+        steam_descoberta, "resolver_tag", lambda p: (1663, "fps")
+    )
+    monkeypatch.setattr(
+        steam_descoberta,
+        "multijogador_por_tag",
+        lambda *a, **k: chamou.append(k) or [],
+    )
+
+    # Tem tag, nao tem modo -> nem chega a buscar.
+    bloco, cartoes, serie = _bloco_descoberta("qual o melhor jogo de fps?")
+    assert (bloco, cartoes, serie) == (None, [], None)
+    assert chamou == []
+
+    # Tem os dois -> busca, com os dois filtros ligados.
+    bloco, _, _ = _bloco_descoberta("me recomenda um fps pra jogar com amigos")
+    assert bloco is not None
+    assert chamou == [{"cooperativo": True, "competitivo": True}]
+
+
+def test_descoberta_sem_resultado_proibe_substituir_de_memoria():
+    """Busca vazia vira bloco explicito, nao ausencia de bloco.
+
+    Se o bloco sumisse, o modelo responderia com jogos que ele "sabe" que sao
+    FPS - exatamente o que a regra 8 da instrucao existe para impedir. A lacuna
+    tem que aparecer escrita no contexto.
+    """
+    bloco, cartoes, serie = _bloco_descoberta("fps com amigos")
+
+    # Roda de verdade contra a loja; o que se afirma aqui vale nos dois casos.
+    if bloco is None:
+        pytest.skip("a loja nao respondeu - nada a afirmar sobre o bloco")
+    assert bloco.fonte == "steam"
+    assert bloco.titulo.startswith("Recomendação (")
+    if not cartoes:
+        assert "não substitua" in bloco.conteudo
+
+
+def test_descoberta_avisa_que_tamanho_de_grupo_nao_e_dado(monkeypatch):
+    """A pergunta pede "5 pessoas" e a loja nao tem esse campo.
+
+    Sem esta linha no contexto, o modelo preenche a lacuna sozinho - "suporta
+    squads de 5" sai com a mesma cara de dado que o preco, que e medido.
+    """
+    monkeypatch.setattr(steam_descoberta, "resolver_tag", lambda p: (1663, "fps"))
+    monkeypatch.setattr(
+        steam_descoberta,
+        "multijogador_por_tag",
+        lambda *a, **k: [
+            {
+                "app_id": 730,
+                "nome": "Counter-Strike 2",
+                "generos": ["Action"],
+                "categorias": ["Multi-player"],
+                "gratuito": True,
+                "preco": None,
+                "moeda": None,
+                "imagem_header": "https://exemplo/header.jpg",
+                "jogadores_agora": 1_000_000,
+            }
+        ],
+    )
+
+    bloco, cartoes, serie = _bloco_descoberta("fps para 5 amigos")
+
+    assert bloco is not None
+    assert "NÃO informa tamanho de grupo" in bloco.conteudo
+    assert "Não afirme que algum suporta exatamente 5 jogadores" in bloco.conteudo
+    # O cartao carrega a capa real - sem ela, jogo de fora do banco cairia no
+    # palpite de CDN, que da 404 nos apps novos.
+    assert cartoes[0].imagem_header == "https://exemplo/header.jpg"
+    assert serie is not None and serie.itens[0].valor == 1_000_000
+
+
+def test_descoberta_tem_precedencia_sobre_recomendacao_do_catalogo(monkeypatch):
+    """Os dois blocos nunca entram juntos.
+
+    "FPS pra jogar com amigos" traria tambem "os mais bem avaliados que
+    monitoramos" - outra pergunta - e a tela mostraria dois blocos de
+    recomendacao discordando, o mesmo defeito ja corrigido entre recomendacao e
+    extremo de avaliacao.
+    """
+    monkeypatch.setattr(steam_descoberta, "resolver_tag", lambda p: (1663, "fps"))
+    monkeypatch.setattr(
+        steam_descoberta, "multijogador_por_tag", lambda *a, **k: []
+    )
+
+    contexto = montar_contexto("me recomenda um fps pra jogar com amigos")
+    chaves = [b.chave for b in contexto.blocos]
+
+    assert "descoberta" in chaves
+    assert "recomendacao" not in chaves
+
+
+def test_serie_da_descoberta_vem_na_frente(monkeypatch):
+    """A tela desenha `series[0]`, e tem que ser a serie da resposta.
+
+    Uma pergunta como "FPS pra jogar com amigos" tambem aciona o bloco do nosso
+    catalogo, que traz a sua propria serie de jogadores. Anexada no fim, a
+    serie da descoberta perderia o lugar e o grafico mostraria os jogos do
+    nosso banco ao lado de uma resposta sobre jogos da loja.
+    """
+    monkeypatch.setattr(steam_descoberta, "resolver_tag", lambda p: (1663, "fps"))
+    monkeypatch.setattr(
+        steam_descoberta,
+        "multijogador_por_tag",
+        lambda *a, **k: [
+            {
+                "app_id": 578080,
+                "nome": "PUBG: BATTLEGROUNDS",
+                "generos": ["Action"],
+                "categorias": ["Online PvP"],
+                "gratuito": True,
+                "preco": None,
+                "moeda": None,
+                "imagem_header": None,
+                "jogadores_agora": 130_000,
+            }
+        ],
+    )
+
+    contexto = montar_contexto("me recomenda um fps de tiro pra jogar com amigos")
+
+    assert contexto.series, "a descoberta tinha ponto - a serie nao podia sumir"
+    assert contexto.series[0].chave == "descoberta"
