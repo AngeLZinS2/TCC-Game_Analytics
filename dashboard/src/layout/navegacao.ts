@@ -20,23 +20,30 @@ export interface ItemNavegacao {
 
 export const NAVEGACAO: ItemNavegacao[] = [
   { rota: "/", rotulo: "Visão Geral", icone: "space_dashboard", selo: "LIVE" },
-  { rota: "/steam", rotulo: "Jogos da Steam", icone: "sports_esports" },
-  { rota: "/partidas", rotulo: "Partidas", icone: "scoreboard" },
-  { rota: "/herois", rotulo: "Heróis", icone: "shield_person" },
-  { rota: "/jogadores", rotulo: "Jogadores", icone: "group" },
 
-  {
-    rota: "/previsao",
-    rotulo: "Previsão de Confronto",
-    icone: "swords",
-    selo: "ML",
-  },
+  // As duas telas do catalogo da Steam ficam juntas: uma mostra o mercado
+  // (preco, jogadores), a outra o que o publico escreveu sobre o mesmo jogo.
+  // Separa-las por tres telas de esports obrigava a atravessar a barra pra ir
+  // de uma a outra sendo que o assunto e o mesmo.
+  { rota: "/steam", rotulo: "Jogos da Steam", icone: "sports_esports" },
   {
     rota: "/recomendacoes",
     rotulo: "Recomendações por Reviews",
     icone: "sentiment_satisfied",
     selo: "ML",
   },
+
+  // Dominio de esports: partida, heroi, jogador e a previsao sobre eles.
+  { rota: "/partidas", rotulo: "Partidas", icone: "scoreboard" },
+  { rota: "/herois", rotulo: "Heróis", icone: "shield_person" },
+  { rota: "/jogadores", rotulo: "Jogadores", icone: "group" },
+  {
+    rota: "/previsao",
+    rotulo: "Previsão de Confronto",
+    icone: "swords",
+    selo: "ML",
+  },
+
   {
     rota: "/assistente",
     rotulo: "Assistente de IA",
