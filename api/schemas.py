@@ -278,6 +278,10 @@ class ResumoPersonagem(BaseModel):
     winrate: float
     #: Funcao dentro do time, quando a fonte declara ("Duelista", "Sentinela").
     papel: str | None = None
+    #: Retrato quadrado do personagem, na CDN de cada jogo. `None` quando nao
+    #: da para derivar (heroi de Dota sem `nome_interno`, jogo sem CDN mapeada).
+    #: A tela cai no quadrado com a inicial.
+    icone: str | None = None
     #: As metricas do esporte, pela chave que o perfil declara.
     #:
     #: Substituiu os campos nomeados que existiam aqui (`kda_medio`,

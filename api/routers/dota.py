@@ -79,6 +79,37 @@ def _media(valor) -> float | None:
     return round(float(valor), 2) if valor is not None else None
 
 
+#: Retrato quadrado do heroi na CDN da Valve, do `npc_dota_hero_<x>` da dimensao.
+_CDN_DOTA = (
+    "https://cdn.cloudflare.steamstatic.com/apps/dota2/images/dota_react/"
+    "heroes/icons/{curto}.png"
+)
+
+
+def _icone_personagem(
+    jogo: str, nome_interno: str | None, metadados: dict | None
+) -> str | None:
+    """A URL do retrato do personagem, na fonte de cada jogo.
+
+    Ate agora so o Dota tinha retrato: a tela derivava o caminho da CDN da
+    Valve do `npc_dota_hero_*`. Agente de Valorant e campeao de LoL caiam no
+    quadrado cinza com a inicial, porque `nome_interno` deles nao e um
+    `npc_dota_hero_`. Cada jogo tem uma CDN estavel para isso:
+
+    - Dota:     a mesma da Valve, do `npc_dota_hero_<x>`.
+    - LoL:      Community Dragon, do `key` do campeao (`nome_interno`). `latest`
+                resolve a versao e cobre "MonkeyKing" -> Wukong.
+    - Valorant: o icone ja veio da valorant-api.com e esta em `metadados`.
+    """
+    if jogo == "valorant" and metadados:
+        return metadados.get("icone")
+    if jogo == "leagueoflegends" and nome_interno:
+        return f"https://cdn.communitydragon.org/latest/champion/{nome_interno}/square"
+    if nome_interno and nome_interno.startswith("npc_dota_hero_"):
+        return _CDN_DOTA.format(curto=nome_interno[len("npc_dota_hero_") :])
+    return None
+
+
 @router.get("/jogos", response_model=list[JogoDisponivel])
 def listar_jogos(
     sessao: Session = Depends(get_db),
@@ -641,12 +672,17 @@ def _personagens_agregados(
         .subquery()
     )
 
+    codigo_jogo = sessao.scalar(
+        select(DimJogo.codigo).where(DimJogo.id_jogo == id_jogo)
+    )
+
     consulta = (
         select(
             DimPersonagem.id_personagem,
             DimPersonagem.nome,
             DimPersonagem.nome_interno,
             DimPersonagem.papel,
+            DimPersonagem.metadados,
             recente.c.partidas,
             recente.c.vitorias,
             recente.c.metricas,
@@ -664,6 +700,7 @@ def _personagens_agregados(
             nome=linha.nome,
             nome_interno=linha.nome_interno,
             papel=linha.papel,
+            icone=_icone_personagem(codigo_jogo, linha.nome_interno, linha.metadados),
             partidas=linha.partidas or 0,
             vitorias=linha.vitorias or 0,
             winrate=(
@@ -773,6 +810,7 @@ def listar_personagens(
             id_personagem=linha.id_personagem,
             nome=linha.nome,
             nome_interno=linha.nome_interno,
+            icone=_icone_personagem(jogo, linha.nome_interno, None),
             partidas=linha.partidas,
             vitorias=linha.vitorias,
             winrate=round(float(linha.winrate), 1),

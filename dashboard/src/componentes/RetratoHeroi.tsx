@@ -1,38 +1,48 @@
 /**
- * O retrato de um heroi do Dota.
+ * O retrato quadrado de um personagem — herói, agente ou campeão.
  *
- * Mesma ideia da `CapaJogo`: a CDN da Valve serve a arte num caminho
- * deterministico, aqui derivado do `nome_interno` que ja esta em
- * `dim_personagem` (`npc_dota_hero_razor` -> `razor.png`). Nada a coletar,
- * nada a guardar.
+ * A URL vem PRONTA do backend (`ResumoPersonagem.icone`), que sabe a CDN de
+ * cada jogo: Valve para Dota, Community Dragon para LoL, valorant-api para os
+ * agentes. Antes o componente só sabia derivar o caminho da Valve a partir de
+ * `npc_dota_hero_*`, então agente e campeão caíam no quadrado cinza com a
+ * inicial.
  *
- * `nome_interno` e nulo quando a dimensao foi preenchida so pelo fato, sem o
- * endpoint /heroes ter rodado - por isso o retrato precisa de um substituto.
+ * `nomeInterno` ainda é aceito como fonte alternativa para as telas que não
+ * passam pelo endpoint de personagens (o placar de uma partida de Dota).
+ * `nome` é o rótulo do substituto e o `alt`.
  */
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
-// `heroes/icons/<nome>.png` e a versao quadrada; `heroes/<nome>.png` e o
-// banner 256x144, que num quadrado de 24px vira uma fatia do meio da arte.
-const CDN =
+const CDN_DOTA =
   "https://cdn.cloudflare.steamstatic.com/apps/dota2/images/dota_react/heroes/icons";
-const PREFIXO = "npc_dota_hero_";
+const PREFIXO_DOTA = "npc_dota_hero_";
 
 export function RetratoHeroi({
   nome,
-  nomeInterno,
+  nomeInterno = null,
+  icone = null,
   className = "h-6 w-6",
 }: {
   nome: string;
-  nomeInterno: string | null;
+  nomeInterno?: string | null;
+  icone?: string | null;
   className?: string;
 }) {
   const [falhou, setFalhou] = useState(false);
-  const curto = nomeInterno?.startsWith(PREFIXO)
-    ? nomeInterno.slice(PREFIXO.length)
-    : null;
 
-  if (!curto || falhou) {
+  // `icone` do backend tem prioridade; o derivado do `npc_dota_hero_*` é o
+  // fallback para quem não passa por lá.
+  const curtoDota = nomeInterno?.startsWith(PREFIXO_DOTA)
+    ? nomeInterno.slice(PREFIXO_DOTA.length)
+    : null;
+  const src = icone ?? (curtoDota ? `${CDN_DOTA}/${curtoDota}.png` : null);
+
+  // Uma URL nova (trocar de jogo na tabela) tem que rearmar o `onError`: sem
+  // isso, um retrato que falhou uma vez ficava como quadrado para sempre.
+  useEffect(() => setFalhou(false), [src]);
+
+  if (!src || falhou) {
     return (
       <div
         className={`flex shrink-0 items-center justify-center overflow-hidden rounded border border-outline-variant bg-surface-container-high font-label-caps text-label-caps text-outline ${className}`}
@@ -48,12 +58,12 @@ export function RetratoHeroi({
       className={`shrink-0 overflow-hidden rounded border border-outline-variant ${className}`}
     >
       <img
-        src={`${CDN}/${curto}.png`}
+        src={src}
         alt=""
-        // Sem `loading="lazy"`: dentro do grafico divergente o Chrome nunca
-        // chegava a disparar o pedido - a imagem ficava pendente para sempre,
+        // Sem `loading="lazy"`: dentro do gráfico divergente o Chrome nunca
+        // chegava a disparar o pedido — a imagem ficava pendente para sempre,
         // e com ela nem o retrato nem o substituto apareciam, porque `onError`
-        // so dispara quando o pedido FALHA, nao quando ele nao acontece.
+        // só dispara quando o pedido FALHA, não quando ele não acontece.
         onError={() => setFalhou(true)}
         className="h-full w-full object-cover"
       />

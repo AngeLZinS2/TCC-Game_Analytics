@@ -99,9 +99,15 @@ function LinhaDivergente({
       <span className="mr-2 truncate font-body-sm text-body-sm text-on-surface transition-colors group-hover:text-primary">
         {heroi.nome}
       </span>
-      <RetratoHeroi nome={heroi.nome} nomeInterno={heroi.nome_interno} />
+      <RetratoHeroi
+        nome={heroi.nome}
+        nomeInterno={heroi.nome_interno}
+        icone={heroi.icone}
+      />
     </>
   );
+
+
 
   const barra = (
     <div
@@ -142,7 +148,11 @@ function LinhaDivergente({
           {/* Espelhado: a barra cresce para a esquerda a partir do eixo. */}
           <div className="flex w-1/2 items-center justify-end pr-1">{barra}</div>
           <div className="flex w-1/2 items-center pl-space-md">
-            <RetratoHeroi nome={heroi.nome} nomeInterno={heroi.nome_interno} />
+            <RetratoHeroi
+              nome={heroi.nome}
+              nomeInterno={heroi.nome_interno}
+              icone={heroi.icone}
+            />
             <span className="ml-2 truncate font-body-sm text-body-sm text-on-surface transition-colors group-hover:text-primary">
               {heroi.nome}
             </span>
@@ -538,6 +548,7 @@ export function HeroisPagina() {
                             <RetratoHeroi
                               nome={heroi.nome}
                               nomeInterno={heroi.nome_interno}
+                              icone={heroi.icone}
                               className="h-8 w-8"
                             />
                             <span className="font-headline-sm text-headline-sm text-on-surface transition-colors group-hover:text-primary">

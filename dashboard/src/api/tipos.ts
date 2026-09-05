@@ -232,6 +232,8 @@ export interface ResumoPersonagem {
   winrate: number;
   /** Função no time, quando a fonte declara ("Duelista", "Sentinela"). */
   papel: string | null;
+  /** Retrato quadrado, na CDN do jogo. `null` cai no quadrado com a inicial. */
+  icone: string | null;
   /** As métricas do esporte, pela chave que o perfil declara. */
   metricas: Record<string, number | null>;
 }

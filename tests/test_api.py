@@ -245,6 +245,44 @@ def test_perfil_de_jogo_desconhecido_cai_num_padrao_neutro(
     assert corpo["metricas"] == []
 
 
+def test_icone_do_personagem_sai_da_cdn_de_cada_jogo() -> None:
+    """A tabela mostrava quadrado cinza com a inicial para agente e campeao: o
+    componente so sabia derivar o caminho da CDN da Valve do `npc_dota_hero_*`.
+    Cada jogo tem a sua."""
+    from api.routers.dota import _icone_personagem
+
+    assert _icone_personagem(
+        "dota2", "npc_dota_hero_razor", None
+    ) == (
+        "https://cdn.cloudflare.steamstatic.com/apps/dota2/images/dota_react/"
+        "heroes/icons/razor.png"
+    )
+    assert _icone_personagem("leagueoflegends", "MonkeyKing", None) == (
+        "https://cdn.communitydragon.org/latest/champion/MonkeyKing/square"
+    )
+    assert (
+        _icone_personagem("valorant", "Deadeye", {"icone": "http://x/chamber.png"})
+        == "http://x/chamber.png"
+    )
+    # Sem base para derivar -> `None`, e a tela cai no quadrado com a inicial.
+    assert _icone_personagem("dota2", None, None) is None
+    assert _icone_personagem("leagueoflegends", None, None) is None
+    assert _icone_personagem("valorant", "Deadeye", None) is None
+
+
+@pytest.mark.parametrize("jogo", ["dota2", "leagueoflegends", "valorant"])
+def test_lista_de_personagens_traz_icone(cliente: TestClient, jogo: str) -> None:
+    lista = cliente.get(
+        "/api/partidas/personagens", params={"jogo": jogo, "limite": 5}
+    ).json()
+    if not lista:
+        pytest.skip(f"{jogo} sem personagem")
+    for p in lista:
+        assert "icone" in p
+        if p["icone"] is not None:
+            assert p["icone"].startswith("https://")
+
+
 def test_detalhe_de_personagem_inexistente_e_404(cliente: TestClient) -> None:
     assert cliente.get("/api/partidas/personagens/99999999").status_code == 404
 
