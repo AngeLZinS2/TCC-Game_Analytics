@@ -51,18 +51,24 @@ def carregar(jogo: str, personagens: list[dict[str, Any]], fonte: str) -> int:
                 "nome": p["nome"],
                 "nome_interno": p.get("nome_interno"),
                 "papel": p.get("papel"),
+                "metadados": p.get("metadados"),
             }
             for p in personagens
         ]
         stmt = pg_insert(DimPersonagem).values(elenco)
+        atualizaveis = {
+            "nome": stmt.excluded.nome,
+            "nome_interno": stmt.excluded.nome_interno,
+            "papel": stmt.excluded.papel,
+        }
+        # So sobrescreve `metadados` quando esta coleta trouxe algum: uma fonte
+        # que nao tem a parte estatica (o elenco da OpenDota, um dia) nao pode
+        # apagar o que outra ja gravou.
+        if any(p.get("metadados") for p in personagens):
+            atualizaveis["metadados"] = pg_insert(DimPersonagem).excluded.metadados
         sessao.execute(
             stmt.on_conflict_do_update(
-                constraint="uq_personagem_jogo_externo",
-                set_={
-                    "nome": stmt.excluded.nome,
-                    "nome_interno": stmt.excluded.nome_interno,
-                    "papel": stmt.excluded.papel,
-                },
+                constraint="uq_personagem_jogo_externo", set_=atualizaveis
             )
         )
 
@@ -77,7 +83,7 @@ def carregar(jogo: str, personagens: list[dict[str, Any]], fonte: str) -> int:
 def _snapshot(
     sessao, id_jogo: int, personagens: list[dict[str, Any]], fonte: str
 ) -> int:
-    """As metricas de quem veio COM numero.
+    """As metricas de quem veio COM numero - o agregado geral e o de cada mapa.
 
     Personagem sem metrica nao vira linha de zeros: a diferenca entre "a fonte
     nao publicou" e "e zero" e exatamente o que a tela precisa poder dizer.
@@ -85,10 +91,6 @@ def _snapshot(
     A janela e truncada na hora, como `fato_snapshot_jogo_steam` - duas coletas
     na mesma hora viram um UPDATE, e a serie fica com o grao que a coleta tem.
     """
-    com_numero = [p for p in personagens if p.get("metricas")]
-    if not com_numero:
-        return 0
-
     chaves = {
         id_externo: id_personagem
         for id_externo, id_personagem in sessao.execute(
@@ -99,18 +101,41 @@ def _snapshot(
     }
 
     janela = datetime.now(timezone.utc).replace(minute=0, second=0, microsecond=0)
-    linhas = [
-        {
-            "id_personagem": chaves[p["id_externo"]],
-            "janela_coleta": janela,
-            "fonte": fonte,
-            "partidas": p.get("partidas"),
-            "vitorias": p.get("vitorias"),
-            "metricas": p["metricas"],
-        }
-        for p in com_numero
-        if p["id_externo"] in chaves
-    ]
+    linhas: list[dict[str, Any]] = []
+
+    for p in personagens:
+        id_personagem = chaves.get(p["id_externo"])
+        if id_personagem is None:
+            continue
+
+        if p.get("metricas"):
+            linhas.append(
+                {
+                    "id_personagem": id_personagem,
+                    "janela_coleta": janela,
+                    "fonte": fonte,
+                    "mapa": "",  # `""` = o agregado geral
+                    "partidas": p.get("partidas"),
+                    "vitorias": p.get("vitorias"),
+                    "metricas": p["metricas"],
+                }
+            )
+
+        for recorte in p.get("por_mapa") or []:
+            if not recorte.get("metricas"):
+                continue
+            linhas.append(
+                {
+                    "id_personagem": id_personagem,
+                    "janela_coleta": janela,
+                    "fonte": fonte,
+                    "mapa": recorte["mapa"][:48],
+                    "partidas": recorte.get("partidas"),
+                    "vitorias": recorte.get("vitorias"),
+                    "metricas": recorte["metricas"],
+                }
+            )
+
     if not linhas:
         return 0
 

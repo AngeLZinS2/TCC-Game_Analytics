@@ -11,6 +11,7 @@
  */
 
 import { useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 
 import { usePerfilEsporte, usePersonagens, useSaude } from "../api/consultas";
 import type { ResumoPersonagem } from "../api/tipos";
@@ -530,16 +531,23 @@ export function HeroisPagina() {
                         style={{ boxShadow: `inset 3px 0 0 ${cor}` }}
                       >
                         <td className="px-space-md py-space-sm">
-                          <div className="flex items-center gap-space-sm">
+                          <Link
+                            to={`/herois/${heroi.id_personagem}`}
+                            className="group flex items-center gap-space-sm"
+                          >
                             <RetratoHeroi
                               nome={heroi.nome}
                               nomeInterno={heroi.nome_interno}
                               className="h-8 w-8"
                             />
-                            <span className="font-headline-sm text-headline-sm text-on-surface">
+                            <span className="font-headline-sm text-headline-sm text-on-surface transition-colors group-hover:text-primary">
                               {heroi.nome}
                             </span>
-                          </div>
+                            <Icone
+                              nome="chevron_right"
+                              className="text-[16px] text-outline opacity-0 transition-opacity group-hover:opacity-100"
+                            />
+                          </Link>
                         </td>
 
                         <td className="px-space-md py-space-sm text-right font-title-code text-title-code tabular-nums text-on-surface">

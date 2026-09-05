@@ -409,6 +409,10 @@ class DimPersonagem(Base):
     #: por funcao de forma estavel (o mesmo heroi e carry num jogo e suporte no
     #: outro), e fixar um papel aqui seria dado nosso vestido de dado da fonte.
     papel: Mapped[str | None] = mapped_column(String(32))
+    #: O que NAO muda: lore, retrato, icone e as habilidades. Formato proprio
+    #: do jogo (agente tem habilidade por slot; heroi de Dota tem outra coisa),
+    #: por isso JSONB. Nulo enquanto a fonte estatica nao foi coletada.
+    metadados: Mapped[dict | None] = mapped_column(JSONB)
 
     __table_args__ = (
         UniqueConstraint("id_jogo", "id_externo", name="uq_personagem_jogo_externo"),
@@ -444,14 +448,20 @@ class FatoEstatisticaPersonagem(Base):
     partidas: Mapped[int | None] = mapped_column(BigInteger)
     vitorias: Mapped[int | None] = mapped_column(BigInteger)
     metricas: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    #: `""` = o agregado geral do personagem. Um nome de mapa = o recorte
+    #: daquele mapa (`valorant_list_agent_statistics?map_id=`). Os dois convivem
+    #: por janela de coleta. NOT NULL para nao cair na semantica de NULL
+    #: distinto num indice unico (ver migration 0018).
+    mapa: Mapped[str] = mapped_column(String(48), nullable=False, server_default="")
 
     __table_args__ = (
         UniqueConstraint(
-            "id_personagem", "janela_coleta", name="uq_estatistica_personagem_janela"
+            "id_personagem",
+            "janela_coleta",
+            "mapa",
+            name="uq_estatistica_personagem_janela",
         ),
-        Index(
-            "ix_estatistica_personagem_janela", "id_personagem", "janela_coleta"
-        ),
+        Index("ix_estatistica_personagem_janela", "id_personagem", "janela_coleta"),
     )
 
 

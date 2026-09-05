@@ -6,6 +6,7 @@ import { VisaoGeralPagina } from "./paginas/VisaoGeral";
 import { SteamPagina } from "./paginas/Steam";
 import { JogoSteamPagina } from "./paginas/JogoSteam";
 import { HeroisPagina } from "./paginas/Herois";
+import { HeroiDetalhePagina } from "./paginas/HeroiDetalhe";
 import { JogadoresPagina } from "./paginas/Jogadores";
 import { PartidasPagina } from "./paginas/Partidas";
 import { PartidaPagina } from "./paginas/Partida";
@@ -28,6 +29,7 @@ export function App() {
             <Route path="/partidas" element={<PartidasPagina />} />
             <Route path="/partidas/:idPartida" element={<PartidaPagina />} />
             <Route path="/herois" element={<HeroisPagina />} />
+            <Route path="/herois/:idPersonagem" element={<HeroiDetalhePagina />} />
             <Route path="/jogadores" element={<JogadoresPagina />} />
             <Route path="/previsao" element={<PrevisaoConfrontoPagina />} />
             <Route path="/recomendacoes" element={<RecomendacoesReviewsPagina />} />

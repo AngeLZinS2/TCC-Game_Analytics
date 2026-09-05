@@ -25,6 +25,7 @@ import type {
   ComparacaoSentimento,
   ConfrontoAgendado,
   ConfrontoResultado,
+  DetalhePersonagem,
   PerfilEsporte,
   ResumoConfrontos,
   EquipeConfronto,
@@ -282,6 +283,15 @@ export function usePerfilEsporte(jogo: string) {
   return useQuery({
     queryKey: ["partidas", "perfil", jogo],
     queryFn: () => buscar<PerfilEsporte>("/api/partidas/perfil", { jogo }),
+  });
+}
+
+/** A ficha completa de um personagem: quem é, o que faz, como vai por mapa. */
+export function useDetalhePersonagem(idPersonagem: number) {
+  return useQuery({
+    queryKey: ["partidas", "personagem", idPersonagem],
+    queryFn: () =>
+      buscar<DetalhePersonagem>(`/api/partidas/personagens/${idPersonagem}`),
   });
 }
 

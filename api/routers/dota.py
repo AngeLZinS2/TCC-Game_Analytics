@@ -16,6 +16,9 @@ from sqlalchemy.orm import Session, aliased
 
 from api.schemas import (
     ConfrontoResultado,
+    DetalhePersonagem,
+    EstatisticaMapa,
+    HabilidadePersonagem,
     MetricaEsporte,
     PerfilEsporte,
     FaixaFormato,
@@ -454,7 +457,10 @@ def perfil_do_esporte(jogo: str = "dota2") -> PerfilEsporte:
     mostrar a coluna vazia sugere que o dado falta quando na verdade ele nao
     existe naquele esporte.
     """
-    p = vocabulario_esports.perfil(jogo)
+    return _perfil_schema(vocabulario_esports.perfil(jogo))
+
+
+def _perfil_schema(p) -> PerfilEsporte:
     return PerfilEsporte(
         substantivo=p.substantivo,
         substantivo_plural=p.substantivo_plural,
@@ -472,6 +478,134 @@ def perfil_do_esporte(jogo: str = "dota2") -> PerfilEsporte:
             )
             for m in p.metricas
         ],
+    )
+
+
+@router.get("/personagens/{id_personagem}", response_model=DetalhePersonagem)
+def detalhe_do_personagem(
+    id_personagem: int, sessao: Session = Depends(get_db)
+) -> DetalhePersonagem:
+    """A ficha de um personagem: quem e, o que faz, e como vai por mapa.
+
+    E o equivalente da tela de agente do OP.GG. A parte estatica (lore,
+    retrato, habilidades) vem de `dim_personagem.metadados`, gravada da API do
+    proprio jogo; os numeros gerais e por mapa vem do OP.GG, em
+    `fato_estatistica_personagem`. O recorte por mapa e o que a tela de
+    personagens (uma linha por personagem) nao cabe mostrar - e onde "Chamber
+    e forte em Ascent, fraco em Fracture" aparece.
+    """
+    linha = sessao.execute(
+        select(DimPersonagem, DimJogo.codigo)
+        .join(DimJogo, DimJogo.id_jogo == DimPersonagem.id_jogo)
+        .where(DimPersonagem.id_personagem == id_personagem)
+    ).first()
+    if linha is None:
+        raise HTTPException(status_code=404, detail="personagem nao encontrado")
+
+    personagem, jogo = linha
+    metadados = personagem.metadados or {}
+
+    geral = None
+    por_mapa: list[EstatisticaMapa] = []
+
+    # Dota vem de `fato_partida_jogador` (partida a partida), como na lista. Os
+    # outros jogos vem de `fato_estatistica_personagem` (agregado da fonte).
+    dota = sessao.execute(
+        select(
+            func.count(),
+            _vitorias(),
+            func.avg(FatoPartidaJogador.kills),
+            func.avg(FatoPartidaJogador.deaths),
+            func.avg(FatoPartidaJogador.assists),
+            func.avg(FatoPartidaJogador.economia_por_minuto),
+            func.avg(FatoPartidaJogador.experiencia_por_minuto),
+        ).where(FatoPartidaJogador.id_personagem == id_personagem)
+    ).one()
+    if dota[0]:
+        n, v = dota[0], int(dota[1] or 0)
+        geral = ResumoPersonagem(
+            id_personagem=id_personagem,
+            nome=personagem.nome,
+            nome_interno=personagem.nome_interno,
+            papel=personagem.papel,
+            partidas=n,
+            vitorias=v,
+            winrate=round(100.0 * v / n, 1) if n else 0.0,
+            metricas={
+                "kda": _kda(dota[2], dota[3], dota[4]),
+                "kills_media": _media(dota[2]),
+                "deaths_media": _media(dota[3]),
+                "assists_media": _media(dota[4]),
+                "economia_por_minuto_media": _media(dota[5]),
+                "experiencia_por_minuto_media": _media(dota[6]),
+            },
+        )
+
+    # A janela mais recente com dado deste personagem - a mesma para o geral e
+    # os mapas, porque a coleta grava tudo na mesma passada.
+    janela = sessao.scalar(
+        select(func.max(FatoEstatisticaPersonagem.janela_coleta)).where(
+            FatoEstatisticaPersonagem.id_personagem == id_personagem
+        )
+    )
+
+    if janela is not None:
+        for est in sessao.execute(
+            select(FatoEstatisticaPersonagem).where(
+                FatoEstatisticaPersonagem.id_personagem == id_personagem,
+                FatoEstatisticaPersonagem.janela_coleta == janela,
+            )
+        ).scalars():
+            partidas = est.partidas or 0
+            vitorias = est.vitorias or 0
+            winrate = round(100.0 * vitorias / partidas, 1) if partidas else 0.0
+            if est.mapa == "" and geral is None:
+                geral = ResumoPersonagem(
+                    id_personagem=id_personagem,
+                    nome=personagem.nome,
+                    nome_interno=personagem.nome_interno,
+                    papel=personagem.papel,
+                    partidas=partidas,
+                    vitorias=vitorias,
+                    winrate=winrate,
+                    metricas=est.metricas or {},
+                )
+            else:
+                por_mapa.append(
+                    EstatisticaMapa(
+                        mapa=est.mapa,
+                        partidas=partidas,
+                        vitorias=vitorias,
+                        winrate=winrate,
+                        metricas=est.metricas or {},
+                    )
+                )
+
+    por_mapa.sort(key=lambda m: m.winrate, reverse=True)
+
+    return DetalhePersonagem(
+        id_personagem=id_personagem,
+        nome=personagem.nome,
+        nome_interno=personagem.nome_interno,
+        papel=personagem.papel,
+        jogo=jogo,
+        descricao=metadados.get("descricao"),
+        icone=metadados.get("icone"),
+        retrato=metadados.get("retrato"),
+        fundo=metadados.get("fundo"),
+        habilidades=[
+            HabilidadePersonagem(
+                slot=h.get("slot"),
+                nome=h.get("nome"),
+                descricao=h.get("descricao"),
+                icone=h.get("icone"),
+            )
+            for h in metadados.get("habilidades") or []
+            if h.get("nome")
+        ],
+        perfil=_perfil_schema(vocabulario_esports.perfil(jogo)),
+        geral=geral,
+        por_mapa=por_mapa,
     )
 
 
@@ -497,6 +631,7 @@ def _personagens_agregados(
     """
     recente = (
         select(FatoEstatisticaPersonagem)
+        .where(FatoEstatisticaPersonagem.mapa == "")  # so o agregado geral
         .distinct(FatoEstatisticaPersonagem.id_personagem)
         .order_by(
             FatoEstatisticaPersonagem.id_personagem,

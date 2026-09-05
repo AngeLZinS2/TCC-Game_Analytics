@@ -289,6 +289,61 @@ class ResumoPersonagem(BaseModel):
     metricas: dict[str, float | None] = {}
 
 
+class HabilidadePersonagem(BaseModel):
+    """Uma habilidade do personagem, como a fonte do jogo descreve."""
+
+    slot: str | None = None
+    nome: str
+    descricao: str | None = None
+    icone: str | None = None
+
+
+class EstatisticaMapa(BaseModel):
+    """O desempenho do personagem num mapa/rota especifico.
+
+    Existe porque a media geral esconde: um agente pode ser forte em Ascent e
+    fraco em Fracture. `mapa` e o nome do recorte; `metricas` segue o mesmo
+    vocabulario do resto (`api/vocabulario_esports.py`).
+    """
+
+    mapa: str
+    partidas: int
+    vitorias: int
+    winrate: float
+    metricas: dict[str, float | None] = {}
+
+
+class DetalhePersonagem(BaseModel):
+    """A ficha completa de um personagem - o equivalente da tela de agente do
+    OP.GG, com o que as nossas fontes entregam.
+
+    A parte estatica (lore, retrato, habilidades) vem da API do jogo; os
+    numeros gerais e por mapa vem do OP.GG. O que uma fonte nao der fica nulo,
+    e a tela mostra o que tem.
+    """
+
+    id_personagem: int
+    nome: str
+    nome_interno: str | None
+    papel: str | None
+    jogo: str
+
+    #: Estaticos, de `dim_personagem.metadados`. Nulos para jogo sem essa fonte.
+    descricao: str | None = None
+    icone: str | None = None
+    retrato: str | None = None
+    fundo: str | None = None
+    habilidades: list[HabilidadePersonagem] = []
+
+    #: O vocabulario do esporte - as mesmas colunas da tabela de personagens.
+    perfil: PerfilEsporte
+
+    #: O agregado geral. Nulo quando a fonte nunca publicou numero deste.
+    geral: ResumoPersonagem | None = None
+    #: Por mapa, do melhor winrate ao pior. Vazio fora do Valorant, por ora.
+    por_mapa: list[EstatisticaMapa] = []
+
+
 class Partida(BaseModel):
     id_partida: int
     id_externo: str

@@ -236,6 +236,45 @@ export interface ResumoPersonagem {
   metricas: Record<string, number | null>;
 }
 
+export interface HabilidadePersonagem {
+  slot: string | null;
+  nome: string;
+  descricao: string | null;
+  icone: string | null;
+}
+
+/** O desempenho do personagem num mapa/rota específico. */
+export interface EstatisticaMapa {
+  mapa: string;
+  partidas: number;
+  vitorias: number;
+  winrate: number;
+  metricas: Record<string, number | null>;
+}
+
+/**
+ * A ficha completa de um personagem — o equivalente da tela de agente do OP.GG.
+ *
+ * A parte estática (lore, retrato, habilidades) vem da API do jogo; os números
+ * geral e por mapa vêm do OP.GG. O que uma fonte não dá fica nulo.
+ */
+export interface DetalhePersonagem {
+  id_personagem: number;
+  nome: string;
+  nome_interno: string | null;
+  papel: string | null;
+  jogo: string;
+  descricao: string | null;
+  icone: string | null;
+  retrato: string | null;
+  fundo: string | null;
+  habilidades: HabilidadePersonagem[];
+  perfil: PerfilEsporte;
+  geral: ResumoPersonagem | null;
+  /** Do melhor winrate ao pior. Vazio fora do Valorant, por ora. */
+  por_mapa: EstatisticaMapa[];
+}
+
 export interface Partida {
   id_partida: number;
   id_externo: string;

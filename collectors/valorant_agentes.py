@@ -66,6 +66,31 @@ class AgentesValorantCollector(BaseCollector[list[dict[str, Any]]]):
             except opgg_mcp.OpggIndisponivel as exc:
                 self.logger.warning("estatistica do opgg falhou", extra={"erro": str(exc)})
 
+            # Estatistica por mapa - o recorte que da profundidade ao detalhe do
+            # agente. Um mapa que falhar nao leva os outros; a lista geral acima
+            # ja garante o minimo.
+            try:
+                mapas = opgg_mcp.mapas_valorant()
+            except opgg_mcp.OpggIndisponivel as exc:
+                mapas = []
+                self.logger.warning("lista de mapas falhou", extra={"erro": str(exc)})
+
+            for mapa in mapas:
+                try:
+                    registros.append(
+                        RawRecord(
+                            fonte=self.fonte,
+                            endpoint="valorant_list_agent_statistics",
+                            identificador=f"mapa:{mapa['nome']}",
+                            payload=opgg_mcp.estatisticas_agentes_valorant(mapa["id"]),
+                        )
+                    )
+                except opgg_mcp.OpggIndisponivel as exc:
+                    self.logger.warning(
+                        "estatistica por mapa falhou",
+                        extra={"mapa": mapa["nome"], "erro": str(exc)},
+                    )
+
         return registros
 
     def _elenco(self) -> RawRecord:
@@ -90,12 +115,23 @@ class AgentesValorantCollector(BaseCollector[list[dict[str, Any]]]):
     def parse(self, registros: Sequence[RawRecord]) -> list[dict[str, Any]]:
         agentes: dict[str, dict[str, Any]] = {}
         estatisticas: dict[str, dict[str, Any]] = {}
+        # id_externo -> [{mapa, partidas, vitorias, winrate, pick_rate, metricas}]
+        por_mapa: dict[str, list[dict[str, Any]]] = {}
 
         for registro in registros:
             if registro.identificador == "estatisticas":
                 for linha in registro.payload or []:
                     if isinstance(linha, dict) and linha.get("id_externo"):
                         estatisticas[linha["id_externo"]] = linha
+                continue
+
+            if registro.identificador.startswith("mapa:"):
+                mapa = registro.identificador[len("mapa:") :]
+                for linha in registro.payload or []:
+                    if isinstance(linha, dict) and linha.get("id_externo"):
+                        por_mapa.setdefault(linha["id_externo"], []).append(
+                            {**linha, "mapa": mapa}
+                        )
                 continue
 
             payload = registro.payload
@@ -114,6 +150,7 @@ class AgentesValorantCollector(BaseCollector[list[dict[str, Any]]]):
                 agente["partidas"] = numeros.get("partidas")
                 agente["vitorias"] = numeros.get("vitorias")
                 agente["metricas"] = numeros.get("metricas") or {}
+            agente["por_mapa"] = por_mapa.get(id_externo, [])
 
         return list(agentes.values())
 
@@ -141,6 +178,17 @@ def _normalizar_agente(bruto: Any) -> dict[str, Any] | None:
 
     papel = (bruto.get("role") or {}).get("displayName")
 
+    habilidades = [
+        {
+            "slot": h.get("slot"),
+            "nome": h.get("displayName"),
+            "descricao": h.get("description"),
+            "icone": h.get("displayIcon"),
+        }
+        for h in (bruto.get("abilities") or [])
+        if isinstance(h, dict) and h.get("displayName")
+    ]
+
     # `developerName` e o nome interno do agente no cliente ("Clay" e o Raze,
     # "Pandemic" e a Viper). Mesmo papel do `npc_dota_hero_*` no Dota: e por
     # ele que se casa com dado de outra fonte quando o nome exibido diverge.
@@ -149,11 +197,15 @@ def _normalizar_agente(bruto: Any) -> dict[str, Any] | None:
         "nome": nome.strip()[:64],
         "nome_interno": (bruto.get("developerName") or None),
         "papel": papel.strip()[:32] if isinstance(papel, str) and papel.strip() else None,
-        # Fica fora de `dim_personagem` (nao ha coluna), mas o coletor devolve
-        # pra quem quiser montar contexto sem uma segunda chamada.
-        "habilidades": [
-            h.get("displayName")
-            for h in (bruto.get("abilities") or [])
-            if isinstance(h, dict) and h.get("displayName")
-        ],
+        # O que NAO muda - vai para `dim_personagem.metadados`. E a parte
+        # estatica da tela de detalhe: lore, retratos e as habilidades.
+        "metadados": {
+            "descricao": bruto.get("description"),
+            "icone": bruto.get("displayIcon"),
+            "retrato": bruto.get("fullPortrait"),
+            "fundo": bruto.get("background"),
+            "habilidades": habilidades,
+        },
+        # Compat: o assistente ainda le esta lista plana.
+        "habilidades": [h["nome"] for h in habilidades if h["nome"]],
     }

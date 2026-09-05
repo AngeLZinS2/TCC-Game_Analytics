@@ -243,3 +243,40 @@ def test_perfil_de_jogo_desconhecido_cai_num_padrao_neutro(
 
     assert corpo["substantivo_plural"] == "personagens"
     assert corpo["metricas"] == []
+
+
+def test_detalhe_de_personagem_inexistente_e_404(cliente: TestClient) -> None:
+    assert cliente.get("/api/partidas/personagens/99999999").status_code == 404
+
+
+def test_detalhe_de_personagem_junta_estatico_e_numeros(cliente: TestClient) -> None:
+    """A ficha completa: quem e (da API do jogo) + como vai (do OP.GG).
+
+    O que uma fonte nao der fica nulo, nao vira zero - por isso os asserts sao
+    de forma, nao de valor: o teste roda contra o banco de dev, que pode ter ou
+    nao ter cada fonte coletada.
+    """
+    lista = cliente.get(
+        "/api/partidas/personagens", params={"jogo": "valorant", "limite": 1}
+    ).json()
+    if not lista:
+        pytest.skip("nenhum agente de valorant coletado")
+
+    corpo = cliente.get(
+        f"/api/partidas/personagens/{lista[0]['id_personagem']}"
+    ).json()
+
+    assert corpo["jogo"] == "valorant"
+    assert corpo["nome"] == lista[0]["nome"]
+    # O perfil vem junto - a tela usa as mesmas colunas da lista.
+    assert {"HS%", "ADR", "ACS"} <= {m["rotulo"] for m in corpo["perfil"]["metricas"]}
+    # Habilidades: ou tem a lista completa, ou nenhuma - nunca meia.
+    for hab in corpo["habilidades"]:
+        assert hab["nome"]
+    # Por mapa: ordenado do melhor winrate ao pior, e cada linha carrega as
+    # metricas do mesmo vocabulario.
+    winrates = [m["winrate"] for m in corpo["por_mapa"]]
+    assert winrates == sorted(winrates, reverse=True)
+    for mapa in corpo["por_mapa"]:
+        assert mapa["mapa"]
+        assert 0.0 <= mapa["winrate"] <= 100.0
