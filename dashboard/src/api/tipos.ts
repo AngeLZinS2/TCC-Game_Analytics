@@ -256,6 +256,50 @@ export interface EstatisticaMapa {
   metricas: Record<string, number | null>;
 }
 
+/** Um item da build, com ícone quando a fonte do jogo tem. */
+export interface ItemGuia {
+  nome: string;
+  icone: string | null;
+}
+
+/** Um estágio da build: iniciais, núcleo, meio de jogo… */
+export interface GrupoGuia {
+  titulo: string;
+  itens: ItemGuia[];
+  /** "74% escolhem" — só quando a fonte dá a taxa. */
+  nota: string | null;
+}
+
+/** Uma página de runa (LoL) — a árvore e as escolhas dentro dela. */
+export interface RunaGuia {
+  pagina: string;
+  escolhas: string[];
+}
+
+/** Uma sequência de habilidades, com o vídeo de demonstração (YouTube, LoL). */
+export interface ComboGuia {
+  nome: string;
+  url: string;
+}
+
+/** Como jogar o personagem no meta atual: build, runas, ordem de skill. */
+export interface GuiaPersonagem {
+  fonte: string;
+  rota: string | null;
+  atualizado_em: string | null;
+  grupos: GrupoGuia[];
+  feiticos: string[];
+  runa_primaria: RunaGuia | null;
+  runa_secundaria: RunaGuia | null;
+  /** A sequência de níveis: `["W","Q","E","Q",…]` (LoL). */
+  ordem_habilidades: string[];
+  /** A prioridade de maximizar: `["Q","W","E"]` (LoL). */
+  prioridade_habilidades: string[];
+  combos: ComboGuia[];
+  /** Por que não há ordem de skill (Dota). */
+  nota_habilidades: string | null;
+}
+
 /**
  * A ficha completa de um personagem — o equivalente da tela de agente do OP.GG.
  *
@@ -277,6 +321,8 @@ export interface DetalhePersonagem {
   geral: ResumoPersonagem | null;
   /** Do melhor winrate ao pior. Vazio fora do Valorant, por ora. */
   por_mapa: EstatisticaMapa[];
+  /** Build e ordem de skill do meta. Nulo onde não há fonte (Valorant). */
+  guia: GuiaPersonagem | null;
 }
 
 export interface Partida {

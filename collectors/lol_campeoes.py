@@ -1,4 +1,4 @@
-"""Campeoes de League of Legends e o desempenho deles por rota, via OP.GG.
+"""Campeoes de League of Legends: desempenho por rota e guia de build, via OP.GG.
 
 LoL nao aparecia na tela de personagens por um motivo simples: `dim_personagem`
 tinha 127 herois de Dota, 29 agentes de Valorant e ZERO campeoes. Nunca foram
@@ -18,12 +18,22 @@ campeao com 40% de ban esta forte mesmo com winrate mediano, porque quase
 metade das partidas nao deixa ele ser escolhido. `tier` e o rank que o OP.GG
 publica (1 e o melhor), e vem junto por ser o resumo que a comunidade usa.
 
-Sao seis chamadas por rodada: uma do elenco e cinco de rota.
+**O guia de build.** Alem de "como esse campeao esta?", a tela de detalhe
+responde "como jogar?": item inicial, botas, nucleo, ordem de subir a
+habilidade, feiticos e as runas - tudo do meta atual, na rota principal do
+campeao. Vem de `lol_get_champion_analysis`, uma chamada por campeao (~170 na
+rodada), cada uma isolada num try/except: um campeao sem guia mostra so os
+numeros. Os combos que o OP.GG traz sao demonstracoes em video no YouTube,
+conteudo da comunidade - entram como link, com a origem marcada, nao embutidos.
+
+Sao ~180 chamadas por rodada: uma do elenco, cinco de rota e uma por campeao.
 """
 
 from __future__ import annotations
 
 import logging
+import time
+from datetime import date
 from typing import Any, Sequence
 
 import requests
@@ -50,6 +60,40 @@ ROTAS: dict[str, str] = {
 
 FERRAMENTA_ELENCO = "lol_list_champions"
 FERRAMENTA_ROTA = "lol_list_lane_meta_champions"
+FERRAMENTA_GUIA = "lol_get_champion_analysis"
+
+#: A rota da meta (chave de `ROTAS`) para o enum que o guia aceita.
+POSICAO_GUIA: dict[str, str] = {
+    "TOP": "top",
+    "JUNGLE": "jungle",
+    "MID": "mid",
+    "ADC": "adc",
+    "SUPPORT": "support",
+}
+
+# O guia pede a resposta INTEIRA (`desired_output_fields: []`). O filtro de
+# campos do OP.GG e intermitente sob carga - devolve um payload degradado (so
+# `counters_meta`) e diz que os campos "nao casaram", com a dica de mandar
+# array vazio para a resposta completa. A completa tem ~5 KB e o nosso parser
+# navega por chave, entao os ramos extras (counters, synergies, trends) so sao
+# ignorados.
+
+#: Os feiticos de invocador. O OP.GG devolve so o id numerico - a Riot nunca
+#: muda esses ids, entao a tabela e fixa e em pt-BR.
+FEITICOS_LOL: dict[int, str] = {
+    1: "Purificar",
+    3: "Exaustao",
+    4: "Flash",
+    6: "Fantasma",
+    7: "Curar",
+    11: "Punir",
+    12: "Teleporte",
+    13: "Clarividencia",
+    14: "Chamas",
+    21: "Barreira",
+    32: "Marca",
+    39: "Marca",
+}
 
 #: O idioma dos nomes. "Nunu & Willump" em pt_BR, "Nunu & Willump" em en_US -
 #: varios sao iguais, mas alguns mudam, e a tela e em portugues.
@@ -63,7 +107,22 @@ DDRAGON_VERSOES = "https://ddragon.leagueoflegends.com/api/versions.json"
 DDRAGON_CAMPEOES = (
     "https://ddragon.leagueoflegends.com/cdn/{versao}/data/pt_BR/championFull.json"
 )
+DDRAGON_ITENS = (
+    "https://ddragon.leagueoflegends.com/cdn/{versao}/data/pt_BR/item.json"
+)
 DDRAGON_IMG = "https://ddragon.leagueoflegends.com/cdn/{versao}/img"
+
+
+def _juntar_nome(nome: str) -> str:
+    """Chave de casamento entre o elenco (pt-BR) e as tabelas de rota (en).
+
+    `lol_list_champions` responde "Nunu e Willump"; `lol_list_lane_meta_champions`
+    responde "Nunu & Willump". Minusculo, `&` vira `e` e espaco colapsa - o
+    resto dos ~170 nomes ja bate.
+    """
+    import re
+
+    return re.sub(r"\s+", " ", nome.lower().replace("&", "e")).strip()
 
 
 class CampeoesLolCollector(BaseCollector[list[dict[str, Any]]]):
@@ -115,6 +174,7 @@ class CampeoesLolCollector(BaseCollector[list[dict[str, Any]]]):
         except requests.RequestException as exc:
             self.logger.warning("data dragon falhou", extra={"erro": str(exc)})
 
+        registros.extend(self._guias(registros))
         return registros
 
     def _estatico(self) -> RawRecord:
@@ -126,12 +186,120 @@ class CampeoesLolCollector(BaseCollector[list[dict[str, Any]]]):
             DDRAGON_CAMPEOES.format(versao=versao),
             timeout=settings.http_timeout_seconds,
         ).json()
+        # `item.json` (~1 MB) so para o icone de cada item do guia - o OP.GG da
+        # o nome ja em pt-BR, mas nao o icone.
+        try:
+            itens = requests.get(
+                DDRAGON_ITENS.format(versao=versao),
+                timeout=settings.http_timeout_seconds,
+            ).json()
+        except requests.RequestException:
+            itens = {}
         return RawRecord(
             fonte=self.fonte,
             endpoint="ddragon",
             identificador="estatico",
-            payload={"versao": versao, "data": campeoes.get("data", {})},
+            payload={
+                "versao": versao,
+                "data": campeoes.get("data", {}),
+                "itens": itens.get("data", {}),
+            },
         )
+
+    def _guias(self, registros: Sequence[RawRecord]) -> list[RawRecord]:
+        """Uma chamada de `lol_get_champion_analysis` por campeao, na rota dele.
+
+        A rota principal sai das tabelas de rota ja coletadas (maior
+        `role_rate`). Cada chamada e isolada: um campeao sem guia, ou o OP.GG
+        fora do ar no meio, deixa os demais intactos.
+        """
+        # `key` interno da Riot ("MonkeyKing", "LeeSin") - o `champion` do guia
+        # aceita nome, key ou UPPER_SNAKE, mas a key e a forma canonica.
+        chave: dict[str, str] = {}
+        for registro in registros:
+            if registro.identificador != "elenco" or not isinstance(
+                registro.payload, str
+            ):
+                continue
+            for bruto in opgg_mcp.analisar_notacao_compacta(
+                registro.payload, "Champion"
+            ):
+                if isinstance(bruto.get("name"), str) and isinstance(
+                    bruto.get("key"), str
+                ):
+                    chave[_juntar_nome(bruto["name"])] = bruto["key"]
+
+        posicao: dict[str, str] = {}  # nome do campeao -> enum de posicao
+        melhor_taxa: dict[str, float] = {}
+        for registro in registros:
+            if not registro.identificador.startswith("rota:"):
+                continue
+            rota = registro.identificador.removeprefix("rota:")
+            if not isinstance(registro.payload, str):
+                continue
+            for bruto in opgg_mcp.analisar_notacao_compacta(
+                registro.payload, rota.capitalize()
+            ):
+                nome = bruto.get("champion")
+                taxa = bruto.get("role_rate") or 0
+                if not isinstance(nome, str):
+                    continue
+                juncao = _juntar_nome(nome)
+                if juncao not in melhor_taxa or taxa > melhor_taxa[juncao]:
+                    melhor_taxa[juncao] = taxa
+                    posicao[juncao] = POSICAO_GUIA.get(rota, "mid")
+
+        guias: list[RawRecord] = []
+        for juncao, pos in sorted(posicao.items()):
+            texto = self._guia_do_opgg(chave.get(juncao, juncao), pos, juncao)
+            if texto is not None:
+                guias.append(
+                    RawRecord(
+                        fonte=self.fonte,
+                        endpoint=FERRAMENTA_GUIA,
+                        identificador=f"guia:{juncao}",
+                        payload=texto,
+                    )
+                )
+        return guias
+
+    def _guia_do_opgg(self, champion: str, pos: str, rotulo: str) -> str | None:
+        """Uma chamada do guia, com uma nova tentativa para a resposta vazia.
+
+        Sob carga o OP.GG devolve, em vez de erro, um payload com a forma certa
+        e todos os arrays vazios (`is_rip: true`, `damage_type: "UNKNOWN"`).
+        Testado um a um, o mesmo campeao responde cheio - e questao de ritmo, nao
+        de o dado nao existir. Uma pausa longa e uma segunda tentativa recuperam
+        parte; o resto fica para a proxima rodada, e a carga MESCLA o `metadados`
+        (ver `etl/load_personagens`), entao a cobertura so cresce.
+        """
+        for tentativa in range(2):
+            try:
+                texto = opgg_mcp.chamar_ferramenta(
+                    FERRAMENTA_GUIA,
+                    {
+                        "champion": champion,
+                        "position": pos,
+                        "game_mode": "ranked",
+                        "lang": IDIOMA,
+                        "desired_output_fields": [],
+                    },
+                )
+            except opgg_mcp.OpggIndisponivel as exc:
+                self.logger.warning(
+                    "guia do opgg falhou",
+                    extra={"campeao": rotulo, "erro": str(exc)},
+                )
+                return None
+
+            arvore = opgg_mcp.analisar_objeto_compacto(texto)
+            if _montar_guia_lol(arvore, None, {}) is not None:
+                return texto
+            if tentativa == 0:
+                time.sleep(8)
+
+        self.logger.warning("guia do opgg veio vazio", extra={"campeao": rotulo})
+        return None
 
     def parse(self, registros: Sequence[RawRecord]) -> list[dict[str, Any]]:
         elenco: dict[str, dict[str, Any]] = {}
@@ -140,14 +308,26 @@ class CampeoesLolCollector(BaseCollector[list[dict[str, Any]]]):
         por_rota: dict[str, list[dict[str, Any]]] = {}
         # key do campeao (nome_interno) -> metadados
         estatico: dict[str, dict[str, Any]] = {}
+        # id do item (str) -> url do icone, do `item.json` do Data Dragon
+        icone_item: dict[str, str] = {}
+        # nome do campeao -> arvore do guia (build, runas, skills, combos)
+        guia_bruto: dict[str, Any] = {}
 
         for registro in registros:
             if registro.identificador == "estatico" and isinstance(registro.payload, dict):
                 estatico = _metadados_ddragon(registro.payload)
+                icone_item = _icones_item_ddragon(registro.payload)
                 continue
 
             texto = registro.payload
             if not isinstance(texto, str):
+                continue
+
+            if registro.identificador.startswith("guia:"):
+                juncao = registro.identificador[len("guia:") :]
+                arvore = opgg_mcp.analisar_objeto_compacto(texto)
+                if isinstance(arvore, dict):
+                    guia_bruto[juncao] = arvore
                 continue
 
             if registro.identificador == "elenco":
@@ -221,7 +401,15 @@ class CampeoesLolCollector(BaseCollector[list[dict[str, Any]]]):
                 )
             ]
 
-            campeao["metadados"] = estatico.get(campeao["nome_interno"])
+            metadados = estatico.get(campeao["nome_interno"])
+            guia = _montar_guia_lol(
+                guia_bruto.get(_juntar_nome(nome)),
+                rota_pt=campeao.get("papel"),
+                icone_item=icone_item,
+            )
+            if guia is not None:
+                metadados = {**(metadados or {}), "guia": guia}
+            campeao["metadados"] = metadados
             campeoes.append(campeao)
 
         return campeoes
@@ -313,6 +501,143 @@ def _metadados_ddragon(payload: dict[str, Any]) -> dict[str, dict[str, Any]]:
             "habilidades": habilidades,
         }
     return saida
+
+
+def _icones_item_ddragon(payload: dict[str, Any]) -> dict[str, str]:
+    """`{id_do_item: url_do_icone}` a partir do `item.json`.
+
+    Nomes se repetem (o mesmo item tem uma versao de Arena com id 220000+); o
+    OP.GG devolve o id junto do nome, entao o casamento e por id e nao precisa
+    desambiguar.
+    """
+    versao = payload.get("versao", "")
+    img = DDRAGON_IMG.format(versao=versao)
+    saida: dict[str, str] = {}
+    for id_item, item in (payload.get("itens") or {}).items():
+        cheio = (item or {}).get("image", {}).get("full")
+        if cheio:
+            saida[str(id_item)] = f"{img}/item/{cheio}"
+    return saida
+
+
+def _grupo_itens(
+    titulo: str, no: Any, icone_item: dict[str, str]
+) -> dict[str, Any] | None:
+    """Um estagio da build (`{titulo, itens, nota}`) de um no do guia do OP.GG.
+
+    `no` tem `ids`, `ids_names` e `pick_rate`. Os dois primeiros andam juntos;
+    quando so um vem, o nome manda e o icone fica sem.
+    """
+    if not isinstance(no, dict):
+        return None
+    nomes = no.get("ids_names") or []
+    ids = no.get("ids") or []
+    itens: list[dict[str, Any]] = []
+    for i, nome in enumerate(nomes):
+        id_item = ids[i] if i < len(ids) else None
+        itens.append(
+            {"nome": nome, "icone": icone_item.get(str(id_item)) if id_item else None}
+        )
+    if not itens:
+        return None
+    taxa = no.get("pick_rate")
+    nota = (
+        f"{round(taxa * 100)}% escolhem"
+        if isinstance(taxa, (int, float)) and taxa
+        else None
+    )
+    return {"titulo": titulo, "itens": itens, "nota": nota}
+
+
+def _montar_guia_lol(
+    arvore: Any, rota_pt: str | None, icone_item: dict[str, str]
+) -> dict[str, Any] | None:
+    """O guia de build do campeao, da arvore de `lol_get_champion_analysis`.
+
+    Devolve `None` quando a arvore nao veio ou nao tem nem build nem skills -
+    o campeao fica so com os numeros. Os combos sao links de video do YouTube
+    (conteudo da comunidade que o OP.GG agrega); entram com a origem marcada.
+    """
+    if not isinstance(arvore, dict):
+        return None
+    dados = arvore.get("data")
+    if not isinstance(dados, dict):
+        return None
+
+    grupos = [
+        g
+        for g in (
+            _grupo_itens("Itens iniciais", dados.get("starter_items"), icone_item),
+            _grupo_itens("Botas", dados.get("boots"), icone_item),
+            _grupo_itens("Itens nucleo", dados.get("core_items"), icone_item),
+        )
+        if g
+    ]
+    finais: list[dict[str, Any]] = []
+    for opcao in dados.get("last_items") or []:
+        if not isinstance(opcao, dict):
+            continue
+        nome = (opcao.get("ids_names") or [None])[0]
+        id_item = (opcao.get("ids") or [None])[0]
+        if nome:
+            finais.append(
+                {
+                    "nome": nome,
+                    "icone": icone_item.get(str(id_item)) if id_item else None,
+                }
+            )
+    if finais:
+        grupos.append(
+            {"titulo": "Opcoes de item final", "itens": finais, "nota": None}
+        )
+
+    feiticos = [
+        FEITICOS_LOL[i]
+        for i in (dados.get("summoner_spells") or {}).get("ids", []) or []
+        if i in FEITICOS_LOL
+    ]
+
+    def _pagina(nome_pagina: Any, escolhas: Any) -> dict[str, Any] | None:
+        if not isinstance(nome_pagina, str):
+            return None
+        return {
+            "pagina": nome_pagina,
+            "escolhas": [e for e in (escolhas or []) if isinstance(e, str)],
+        }
+
+    runas = dados.get("runes") or {}
+    skills = dados.get("skills") or {}
+    maestria = dados.get("skill_masteries") or {}
+    combos = [
+        {"nome": c.get("name"), "url": c.get("video_url")}
+        for c in dados.get("skill_combos") or []
+        if isinstance(c, dict) and c.get("name") and c.get("video_url")
+    ]
+
+    ordem = [s for s in skills.get("order", []) or [] if isinstance(s, str)]
+    prioridade = [s for s in maestria.get("ids", []) or [] if isinstance(s, str)]
+
+    tem_algo = grupos or feiticos or runas or ordem or combos
+    if not tem_algo:
+        return None
+
+    return {
+        "fonte": "OP.GG",
+        "rota": rota_pt,
+        "atualizado_em": date.today().isoformat(),
+        "grupos": grupos,
+        "feiticos": feiticos,
+        "runa_primaria": _pagina(
+            runas.get("primary_page_name"), runas.get("primary_rune_names")
+        ),
+        "runa_secundaria": _pagina(
+            runas.get("secondary_page_name"), runas.get("secondary_rune_names")
+        ),
+        "ordem_habilidades": ordem,
+        "prioridade_habilidades": prioridade,
+        "combos": combos,
+        "nota_habilidades": None,
+    }
 
 
 def _fracao_para_percentual(valor: Any) -> float | None:

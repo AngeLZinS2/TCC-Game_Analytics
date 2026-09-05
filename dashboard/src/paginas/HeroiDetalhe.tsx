@@ -1,33 +1,40 @@
 /**
  * A ficha de um personagem — o equivalente da tela de agente do op.gg.
  *
- * Três blocos, na ordem em que a pergunta chega:
+ * Duas abas, quando a fonte do jogo dá as duas:
  *
- * 1. Quem é: retrato, função, lore. Vem da API do próprio jogo
- *    (`dim_personagem.metadados`).
- * 2. Como vai: o desempenho geral, nas mesmas colunas da tabela de personagens,
- *    com o intervalo de confiança do winrate — o mesmo tratamento que a lista.
- * 3. Onde vai bem: o recorte POR MAPA. É o que a lista (uma linha por
- *    personagem) não cabe mostrar, e onde "Chamber é forte em Ascent, fraco em
- *    Fracture" aparece. Só Valorant tem, por ora.
+ * - **Desempenho**: quem é (retrato, função, lore), como vai (o agregado com
+ *   intervalo de confiança) e onde vai bem (o recorte por mapa/rota). É o que
+ *   sempre existiu.
+ * - **Guia**: como jogar no meta atual — build de item, ordem de subir a
+ *   habilidade, feitiços e runas. Vem do OP.GG (LoL, completo) ou da OpenDota
+ *   (Dota, só os itens). Valorant não tem: o jogo não tem build de item.
  *
- * O que a fonte não dá fica de fora, não vira zero: um jogo sem a parte
- * estática mostra só os números; um sem número mostra só quem é.
+ * O que a fonte não dá fica de fora, não vira zero.
  */
 
+import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 
 import { useDetalhePersonagem } from "../api/consultas";
 import type {
   DetalhePersonagem,
   EstatisticaMapa,
+  GuiaPersonagem,
+  GrupoGuia,
   MetricaEsporte,
+  RunaGuia,
 } from "../api/tipos";
 import { Consulta, Icone, Selo } from "../componentes/base";
 import { BarraFina, KpiHud, Painel } from "../componentes/hud";
 import { PALETA_POLOS } from "../tema";
 import { intervaloWilson } from "../utilitarios/estatistica";
-import { fmtDecimal, fmtNumero, fmtPercentual } from "../utilitarios/formatos";
+import {
+  fmtData,
+  fmtDecimal,
+  fmtNumero,
+  fmtPercentual,
+} from "../utilitarios/formatos";
 
 /** Formata um valor de métrica pela definição do perfil (casas + unidade). */
 function fmtMetrica(valor: number | null | undefined, m: MetricaEsporte): string {
@@ -127,7 +134,213 @@ function TabelaMapas({
   );
 }
 
-function Ficha({ dados }: { dados: DetalhePersonagem }) {
+/** As quatro linhas Q/W/E/R × 18 níveis, com o nível de cada ponto aceso. */
+function GradeHabilidades({ ordem }: { ordem: string[] }) {
+  const slots = ["Q", "W", "E", "R"];
+  const niveis = Array.from({ length: 18 }, (_, i) => i + 1);
+  // nível (1..18) -> slot subido naquele nível
+  const subidaPorNivel = new Map<number, string>();
+  ordem.forEach((slot, i) => subidaPorNivel.set(i + 1, slot));
+
+  return (
+    <div className="rolagem-discreta overflow-x-auto">
+      <table className="border-collapse font-title-code text-title-code tabular-nums">
+        <thead>
+          <tr className="text-outline">
+            <th className="px-space-xs py-space-xxs" />
+            {niveis.map((n) => (
+              <th key={n} className="w-7 px-0 py-space-xxs text-center font-label-caps text-label-caps">
+                {n}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {slots.map((slot) => (
+            <tr key={slot}>
+              <td className="px-space-xs py-space-xxs font-label-caps text-label-caps uppercase text-on-surface-variant">
+                {slot}
+              </td>
+              {niveis.map((n) => {
+                const aceso = subidaPorNivel.get(n) === slot;
+                return (
+                  <td key={n} className="px-[2px] py-[2px]">
+                    <div
+                      className={`flex h-6 items-center justify-center rounded-sm text-center ${
+                        aceso
+                          ? "bg-primary/20 text-primary"
+                          : "bg-surface-container-highest/40 text-transparent"
+                      }`}
+                    >
+                      {aceso ? slot : "·"}
+                    </div>
+                  </td>
+                );
+              })}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+/** Um estágio da build: título + a fila de ícones/nomes, com a taxa. */
+function LinhaBuild({ grupo }: { grupo: GrupoGuia }) {
+  return (
+    <div className="flex flex-col gap-space-xs">
+      <div className="flex items-baseline gap-space-sm">
+        <span className="font-label-caps text-label-caps uppercase tracking-widest text-outline">
+          {grupo.titulo}
+        </span>
+        {grupo.nota && (
+          <span className="font-title-code text-title-code text-on-surface-variant">
+            {grupo.nota}
+          </span>
+        )}
+      </div>
+      <div className="flex flex-wrap gap-space-sm">
+        {grupo.itens.map((item, i) => (
+          <div
+            key={`${item.nome}-${i}`}
+            className="flex items-center gap-space-xs rounded bg-surface-container-lowest px-space-sm py-space-xxs"
+            title={item.nome}
+          >
+            {item.icone ? (
+              <img src={item.icone} alt="" aria-hidden className="h-7 w-7 rounded-sm" />
+            ) : (
+              <div className="h-7 w-7 rounded-sm bg-surface-container-highest" />
+            )}
+            <span className="font-body-sm text-body-sm text-on-surface">{item.nome}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function BlocoRuna({ runa, rotulo }: { runa: RunaGuia; rotulo: string }) {
+  return (
+    <div className="flex flex-col gap-space-xxs">
+      <span className="font-label-caps text-label-caps uppercase tracking-widest text-outline">
+        {rotulo} · {runa.pagina}
+      </span>
+      <div className="flex flex-wrap gap-space-xs">
+        {runa.escolhas.map((escolha) => (
+          <Selo key={escolha}>{escolha}</Selo>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** A aba "Guia": build, ordem de skill, feitiços, runas, combos. */
+function AbaGuia({ guia, nome }: { guia: GuiaPersonagem; nome: string }) {
+  const prioridade = guia.prioridade_habilidades;
+  const fonteRotulo =
+    guia.fonte === "OP.GG"
+      ? guia.rota
+        ? `OP.GG · rota ${guia.rota}`
+        : "OP.GG"
+      : guia.fonte;
+
+  return (
+    <div className="flex flex-col gap-space-lg">
+      {guia.grupos.length > 0 && (
+        <Painel
+          icone="shopping_bag"
+          titulo="Build do meta"
+          descricao={`${fonteRotulo}. O que a comunidade compra em ${nome} no momento.`}
+          meta={
+            guia.atualizado_em ? (
+              <Selo>coleta {fmtData(guia.atualizado_em)}</Selo>
+            ) : undefined
+          }
+        >
+          <div className="flex flex-col gap-space-base">
+            {guia.grupos.map((grupo) => (
+              <LinhaBuild key={grupo.titulo} grupo={grupo} />
+            ))}
+          </div>
+        </Painel>
+      )}
+
+      {(guia.ordem_habilidades.length > 0 || guia.nota_habilidades) && (
+        <Painel
+          icone="trending_up"
+          titulo="Ordem de habilidades"
+          descricao={
+            prioridade.length > 0
+              ? `Prioridade de maximizar: ${prioridade.join(" › ")}.`
+              : undefined
+          }
+        >
+          {guia.ordem_habilidades.length > 0 ? (
+            <GradeHabilidades ordem={guia.ordem_habilidades} />
+          ) : (
+            <p className="font-body-md text-body-md text-on-surface-variant">
+              {guia.nota_habilidades}
+            </p>
+          )}
+        </Painel>
+      )}
+
+      {(guia.feiticos.length > 0 || guia.runa_primaria || guia.runa_secundaria) && (
+        <Painel icone="auto_awesome" titulo="Feitiços e runas">
+          <div className="flex flex-col gap-space-base">
+            {guia.feiticos.length > 0 && (
+              <div className="flex flex-col gap-space-xxs">
+                <span className="font-label-caps text-label-caps uppercase tracking-widest text-outline">
+                  Feitiços de invocador
+                </span>
+                <div className="flex flex-wrap gap-space-xs">
+                  {guia.feiticos.map((f, i) => (
+                    <Selo key={`${f}-${i}`} cor="primario">
+                      {f}
+                    </Selo>
+                  ))}
+                </div>
+              </div>
+            )}
+            {guia.runa_primaria && (
+              <BlocoRuna runa={guia.runa_primaria} rotulo="Primária" />
+            )}
+            {guia.runa_secundaria && (
+              <BlocoRuna runa={guia.runa_secundaria} rotulo="Secundária" />
+            )}
+          </div>
+        </Painel>
+      )}
+
+      {guia.combos.length > 0 && (
+        <Painel
+          icone="smart_display"
+          titulo="Combos"
+          descricao="Demonstrações em vídeo que o OP.GG agrega do YouTube — conteúdo da comunidade."
+        >
+          <div className="flex flex-col gap-space-xs">
+            {guia.combos.map((combo, i) => (
+              <a
+                key={`${combo.nome}-${i}`}
+                href={combo.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-space-sm rounded bg-surface-container-lowest px-space-base py-space-sm font-title-code text-title-code text-on-surface transition-colors hover:text-primary"
+              >
+                <Icone nome="play_circle" className="text-[18px]" />
+                {combo.nome}
+                <Icone nome="open_in_new" className="ml-auto text-[14px] text-outline" />
+              </a>
+            ))}
+          </div>
+        </Painel>
+      )}
+    </div>
+  );
+}
+
+/** A aba "Desempenho": o agregado geral e o recorte por mapa/rota. */
+function AbaDesempenho({ dados }: { dados: DetalhePersonagem }) {
   const { geral, perfil, por_mapa: porMapa } = dados;
   const ic = geral ? intervaloWilson(geral.vitorias, geral.partidas) : null;
 
@@ -135,61 +348,10 @@ function Ficha({ dados }: { dados: DetalhePersonagem }) {
   const piorMapa = porMapa.at(-1);
 
   // O recorte não é "mapa" em todo jogo: Valorant é por mapa, LoL por rota.
-  // A palavra vem do que a fonte chamou o campo `papel` do personagem —
-  // "Meio"/"Suporte" são rotas, "Ascent"/"Bind" são mapas.
-  const recorte =
-    dados.jogo === "leagueoflegends" ? "rota" : "mapa";
+  const recorte = dados.jogo === "leagueoflegends" ? "rota" : "mapa";
 
   return (
     <div className="flex flex-col gap-space-lg">
-      {/* ==================== QUEM É ==================== */}
-      <section className="relative overflow-hidden rounded-xl bg-surface-container-low shadow-2xl">
-        {dados.fundo && (
-          <img
-            src={dados.fundo}
-            alt=""
-            aria-hidden
-            className="pointer-events-none absolute right-0 top-0 h-full w-1/2 object-cover opacity-20"
-          />
-        )}
-        <div className="relative flex flex-col gap-space-base p-space-lg sm:flex-row sm:items-center">
-          {dados.retrato ? (
-            <img
-              src={dados.retrato}
-              alt={dados.nome}
-              className="h-40 w-40 shrink-0 self-center object-contain sm:self-auto"
-            />
-          ) : dados.icone ? (
-            <img
-              src={dados.icone}
-              alt={dados.nome}
-              className="h-24 w-24 shrink-0 self-center rounded bg-surface-container-highest p-space-sm sm:self-auto"
-            />
-          ) : null}
-
-          <div className="flex flex-col gap-space-sm">
-            <div className="flex flex-wrap items-center gap-space-sm">
-              <h1 className="font-headline-lg text-headline-lg uppercase tracking-wide text-primary drop-shadow-[0_0_12px_rgba(0,229,255,0.4)]">
-                {dados.nome}
-              </h1>
-              {dados.papel && <Selo cor="primario">{dados.papel}</Selo>}
-            </div>
-            {dados.descricao && (
-              <p className="max-w-2xl font-body-md text-body-md text-on-surface-variant">
-                {dados.descricao}
-              </p>
-            )}
-            <Link
-              to="/herois"
-              className="flex w-fit items-center gap-space-xxs font-title-code text-title-code text-outline transition-colors hover:text-primary"
-            >
-              <Icone nome="arrow_back" className="text-[16px]" />
-              voltar aos {perfil.substantivo_plural}
-            </Link>
-          </div>
-        </div>
-      </section>
-
       {/* ==================== COMO VAI (geral) ==================== */}
       {geral && geral.partidas > 0 ? (
         <section className="grid grid-cols-1 gap-space-base md:grid-cols-2 xl:grid-cols-4">
@@ -328,6 +490,101 @@ function Ficha({ dados }: { dados: DetalhePersonagem }) {
             ))}
           </div>
         </Painel>
+      )}
+    </div>
+  );
+}
+
+function Ficha({ dados }: { dados: DetalhePersonagem }) {
+  const { perfil } = dados;
+  const [aba, setAba] = useState<"desempenho" | "guia">("desempenho");
+  const temGuia = dados.guia !== null;
+
+  return (
+    <div className="flex flex-col gap-space-lg">
+      {/* ==================== QUEM É ==================== */}
+      <section className="relative overflow-hidden rounded-xl bg-surface-container-low shadow-2xl">
+        {dados.fundo && (
+          <img
+            src={dados.fundo}
+            alt=""
+            aria-hidden
+            className="pointer-events-none absolute right-0 top-0 h-full w-1/2 object-cover opacity-20"
+          />
+        )}
+        <div className="relative flex flex-col gap-space-base p-space-lg sm:flex-row sm:items-center">
+          {dados.retrato ? (
+            <img
+              src={dados.retrato}
+              alt={dados.nome}
+              className="h-40 w-40 shrink-0 self-center object-contain sm:self-auto"
+            />
+          ) : dados.icone ? (
+            <img
+              src={dados.icone}
+              alt={dados.nome}
+              className="h-24 w-24 shrink-0 self-center rounded bg-surface-container-highest p-space-sm sm:self-auto"
+            />
+          ) : null}
+
+          <div className="flex flex-col gap-space-sm">
+            <div className="flex flex-wrap items-center gap-space-sm">
+              <h1 className="font-headline-lg text-headline-lg uppercase tracking-wide text-primary drop-shadow-[0_0_12px_rgba(0,229,255,0.4)]">
+                {dados.nome}
+              </h1>
+              {dados.papel && <Selo cor="primario">{dados.papel}</Selo>}
+            </div>
+            {dados.descricao && (
+              <p className="max-w-2xl font-body-md text-body-md text-on-surface-variant">
+                {dados.descricao}
+              </p>
+            )}
+            <Link
+              to="/herois"
+              className="flex w-fit items-center gap-space-xxs font-title-code text-title-code text-outline transition-colors hover:text-primary"
+            >
+              <Icone nome="arrow_back" className="text-[16px]" />
+              voltar aos {perfil.substantivo_plural}
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      {temGuia ? (
+        <>
+          <div
+            role="tablist"
+            className="flex gap-space-xs border-b border-outline-variant/30"
+          >
+            {(
+              [
+                ["desempenho", "Desempenho"],
+                ["guia", "Guia"],
+              ] as const
+            ).map(([chave, rotulo]) => (
+              <button
+                key={chave}
+                role="tab"
+                aria-selected={aba === chave}
+                onClick={() => setAba(chave)}
+                className={`-mb-px border-b-2 px-space-base py-space-sm font-label-caps text-label-caps uppercase tracking-widest transition-colors ${
+                  aba === chave
+                    ? "border-primary text-primary"
+                    : "border-transparent text-outline hover:text-on-surface-variant"
+                }`}
+              >
+                {rotulo}
+              </button>
+            ))}
+          </div>
+          {aba === "desempenho" ? (
+            <AbaDesempenho dados={dados} />
+          ) : (
+            <AbaGuia guia={dados.guia!} nome={dados.nome} />
+          )}
+        </>
+      ) : (
+        <AbaDesempenho dados={dados} />
       )}
     </div>
   );

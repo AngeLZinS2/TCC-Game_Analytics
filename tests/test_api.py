@@ -318,3 +318,45 @@ def test_detalhe_de_personagem_junta_estatico_e_numeros(cliente: TestClient) -> 
     for mapa in corpo["por_mapa"]:
         assert mapa["mapa"]
         assert 0.0 <= mapa["winrate"] <= 100.0
+    # Valorant nao tem guia de build - o jogo nao tem item.
+    assert corpo["guia"] is None
+
+
+@pytest.mark.parametrize("jogo", ["leagueoflegends", "dota2"])
+def test_detalhe_traz_guia_onde_a_fonte_da(cliente: TestClient, jogo: str) -> None:
+    """LoL e Dota carregam o guia de build; a forma segue o schema.
+
+    Roda contra o banco de dev: pula se o campeao/heroi nao tem guia coletado.
+    """
+    lista = cliente.get(
+        "/api/partidas/personagens", params={"jogo": jogo, "limite": 60}
+    ).json()
+    com_guia = next(
+        (
+            cliente.get(f"/api/partidas/personagens/{p['id_personagem']}").json()
+            for p in lista
+            if cliente.get(
+                f"/api/partidas/personagens/{p['id_personagem']}"
+            ).json().get("guia")
+        ),
+        None,
+    )
+    if com_guia is None:
+        pytest.skip(f"nenhum personagem de {jogo} com guia coletado")
+
+    guia = com_guia["guia"]
+    assert guia["fonte"] in {"OP.GG", "OpenDota"}
+    # Cada grupo de item tem titulo e uma lista (possivelmente vazia).
+    for grupo in guia["grupos"]:
+        assert grupo["titulo"]
+        for item in grupo["itens"]:
+            assert item["nome"]
+    if jogo == "dota2":
+        # Dota nao tem ordem de skill - e a nota explica.
+        assert guia["ordem_habilidades"] == []
+        assert guia["nota_habilidades"]
+    else:
+        # LoL tem: a sequencia so usa Q/W/E/R.
+        assert set(guia["ordem_habilidades"]) <= {"Q", "W", "E", "R"}
+        for combo in guia["combos"]:
+            assert combo["url"].startswith("http")

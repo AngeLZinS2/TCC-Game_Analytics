@@ -15,8 +15,8 @@ import logging
 from datetime import datetime, timezone
 from typing import Any
 
-from sqlalchemy import select
-from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy import func, select, text
+from sqlalchemy.dialects.postgresql import JSONB, insert as pg_insert
 
 from db.models import DimJogo, DimPersonagem, FatoEstatisticaPersonagem
 from db.session import session_scope
@@ -61,11 +61,23 @@ def carregar(jogo: str, personagens: list[dict[str, Any]], fonte: str) -> int:
             "nome_interno": stmt.excluded.nome_interno,
             "papel": stmt.excluded.papel,
         }
-        # So sobrescreve `metadados` quando esta coleta trouxe algum: uma fonte
-        # que nao tem a parte estatica (o elenco da OpenDota, um dia) nao pode
-        # apagar o que outra ja gravou.
+        # So mexe em `metadados` quando esta coleta trouxe algum: uma fonte que
+        # nao tem a parte estatica (o elenco da OpenDota, um dia) nao pode apagar
+        # o que outra ja gravou.
+        #
+        # E MESCLA (`||`), nao substitui: a chave `guia` (build do OP.GG) as
+        # vezes falta - o OP.GG devolve, sob carga, uma resposta vazia para
+        # alguns campeoes. Substituir apagaria o guia bom da rodada anterior.
+        # Com a mescla, as chaves que a coleta trouxe (lore, habilidades) sao
+        # atualizadas e a `guia` que faltou nesta rodada permanece. A cobertura
+        # so cresce entre rodadas.
         if any(p.get("metadados") for p in personagens):
-            atualizaveis["metadados"] = pg_insert(DimPersonagem).excluded.metadados
+            atual = func.coalesce(
+                DimPersonagem.metadados, text("'{}'::jsonb")
+            ).cast(JSONB)
+            atualizaveis["metadados"] = atual.op("||")(
+                pg_insert(DimPersonagem).excluded.metadados
+            )
         sessao.execute(
             stmt.on_conflict_do_update(
                 constraint="uq_personagem_jogo_externo", set_=atualizaveis

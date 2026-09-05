@@ -320,6 +320,66 @@ class EstatisticaMapa(BaseModel):
     metricas: dict[str, float | None] = {}
 
 
+class ItemGuia(BaseModel):
+    """Um item da build, com o icone quando a fonte do jogo tem."""
+
+    nome: str
+    icone: str | None = None
+
+
+class GrupoGuia(BaseModel):
+    """Um estagio da build: iniciais, nucleo, meio de jogo..."""
+
+    titulo: str
+    itens: list[ItemGuia] = []
+    #: "74% escolhem" - so quando a fonte da a taxa.
+    nota: str | None = None
+
+
+class RunaGuia(BaseModel):
+    """Uma pagina de runa (LoL) - a arvore e as escolhas dentro dela."""
+
+    pagina: str
+    escolhas: list[str] = []
+
+
+class ComboGuia(BaseModel):
+    """Uma sequencia de habilidades, com o video de demonstracao.
+
+    Para LoL, o video e um link do YouTube que o OP.GG agrega - conteudo da
+    comunidade, nao um clipe oficial. A tela mostra como link, com a origem.
+    """
+
+    nome: str
+    url: str
+
+
+class GuiaPersonagem(BaseModel):
+    """Como jogar o personagem no meta atual: build, runas, ordem de skill.
+
+    Preenchida so onde ha fonte: LoL traz tudo (OP.GG), Dota traz os itens por
+    fase (OpenDota) e diz que a ordem de skill nao tem fonte. Valorant nao tem
+    guia - o jogo nao tem build de item.
+    """
+
+    fonte: str
+    #: A rota/posicao a que a build se refere (LoL). `None` no Dota.
+    rota: str | None = None
+    atualizado_em: str | None = None
+    grupos: list[GrupoGuia] = []
+    #: Feiticos de invocador (LoL).
+    feiticos: list[str] = []
+    runa_primaria: RunaGuia | None = None
+    runa_secundaria: RunaGuia | None = None
+    #: A sequencia de niveis: `["W","Q","E","Q",...]` (LoL).
+    ordem_habilidades: list[str] = []
+    #: A prioridade de maximizar: `["Q","W","E"]` (LoL).
+    prioridade_habilidades: list[str] = []
+    combos: list[ComboGuia] = []
+    #: Por que nao ha ordem de skill (Dota).
+    nota_habilidades: str | None = None
+
+
 class DetalhePersonagem(BaseModel):
     """A ficha completa de um personagem - o equivalente da tela de agente do
     OP.GG, com o que as nossas fontes entregam.
@@ -349,6 +409,9 @@ class DetalhePersonagem(BaseModel):
     geral: ResumoPersonagem | None = None
     #: Por mapa, do melhor winrate ao pior. Vazio fora do Valorant, por ora.
     por_mapa: list[EstatisticaMapa] = []
+    #: Build e ordem de skill do meta. Nulo onde nao ha fonte (Valorant, ou
+    #: personagem que a coleta ainda nao alcancou).
+    guia: GuiaPersonagem | None = None
 
 
 class Partida(BaseModel):

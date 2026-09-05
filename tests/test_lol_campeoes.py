@@ -276,3 +276,141 @@ def test_limpar_dota_tira_token_de_atributo():
     assert _limpar_dota("Ganha %damage_stat_bonus_pct%%% de dano") == "Ganha … de dano"
     # Tokens em CamelCase (contagem de cargas) tambem somem.
     assert _limpar_dota("consome uma das %AbilityCharges% cargas") == "consome uma das … cargas"
+
+
+# --- guia de build: parser da arvore do OP.GG e montagem por jogo ---
+
+from collectors.opgg_mcp import analisar_objeto_compacto
+from collectors.lol_campeoes import _montar_guia_lol
+from collectors.dota_herois import _montar_guia_dota
+
+_ARVORE_GUIA = (
+    "class Raiz: champion,data\n"
+    "class Data: core_items,boots,starter_items,last_items,runes,skills,"
+    "skill_masteries,skill_combos\n"
+    "class Itens: ids,ids_names,pick_rate\n"
+    "class Runes: primary_page_name,primary_rune_names,secondary_page_name,"
+    "secondary_rune_names\n"
+    "class Skills: order\n"
+    "class Mastery: ids\n"
+    "class SkillCombo: name,video_url\n"
+    "\n"
+    'Raiz("Ahri",Data('
+    'Itens([3118,4645],["Malevolência","Chama Sombria"],0.13),'
+    'Itens([3020],["Sapatos do Feiticeiro"],0.6),'
+    'Itens([1056],["Anel de Doran"],0.99),'
+    '[Itens([3157],["Ampulheta de Zhonya"],0.31)],'
+    'Runes("Dominação",["Eletrocutar"],"Feitiçaria",["Transcendência"]),'
+    'Skills(["W","Q","E","Q"]),'
+    'Mastery(["Q","W","E"]),'
+    '[SkillCombo("Q + Flash","https://youtu.be/x")]))'
+)
+
+
+def test_analisar_objeto_compacto_le_a_arvore_inteira():
+    arvore = analisar_objeto_compacto(_ARVORE_GUIA)
+    assert arvore["champion"] == "Ahri"
+    dados = arvore["data"]
+    assert dados["core_items"]["ids_names"] == ["Malevolência", "Chama Sombria"]
+    assert dados["core_items"]["ids"] == [3118, 4645]
+    # `last_items` e uma LISTA de nós, nao um nó.
+    assert dados["last_items"][0]["ids_names"] == ["Ampulheta de Zhonya"]
+    assert dados["skills"]["order"] == ["W", "Q", "E", "Q"]
+    assert dados["skill_combos"][0]["video_url"] == "https://youtu.be/x"
+
+
+def test_analisar_objeto_compacto_devolve_none_se_nao_fecha():
+    assert analisar_objeto_compacto("class A: x\n\nA(1,2") is None
+
+
+def test_montar_guia_lol_junta_build_ordem_e_combos():
+    arvore = analisar_objeto_compacto(_ARVORE_GUIA)
+    guia = _montar_guia_lol(
+        arvore, rota_pt="Meio", icone_item={"3118": "http://x/malev.png"}
+    )
+
+    assert guia["fonte"] == "OP.GG"
+    assert guia["rota"] == "Meio"
+    titulos = [g["titulo"] for g in guia["grupos"]]
+    assert titulos == ["Itens iniciais", "Botas", "Itens nucleo", "Opcoes de item final"]
+    nucleo = next(g for g in guia["grupos"] if g["titulo"] == "Itens nucleo")
+    assert nucleo["itens"][0] == {"nome": "Malevolência", "icone": "http://x/malev.png"}
+    assert nucleo["nota"] == "13% escolhem"
+    assert guia["ordem_habilidades"] == ["W", "Q", "E", "Q"]
+    assert guia["prioridade_habilidades"] == ["Q", "W", "E"]
+    assert guia["runa_primaria"] == {"pagina": "Dominação", "escolhas": ["Eletrocutar"]}
+    assert guia["combos"] == [{"nome": "Q + Flash", "url": "https://youtu.be/x"}]
+
+
+def test_montar_guia_lol_none_quando_nao_ha_arvore():
+    assert _montar_guia_lol(None, rota_pt="Meio", icone_item={}) is None
+    assert _montar_guia_lol({"data": {}}, rota_pt="Meio", icone_item={}) is None
+
+
+def test_montar_guia_dota_ordena_por_compra_e_corta_a_cauda():
+    pop = {
+        "start_game_items": {"16": 99, "13": 41, "44": 2},  # 44 abaixo do minimo
+        "mid_game_items": {"1": 51},
+        "late_game_items": {},
+    }
+    nomes = {"16": "Tango", "13": "Ramo de Ferro", "44": "Poção", "1": "Blink"}
+    guia = _montar_guia_dota(pop, nomes, {"16": "http://x/16.png"})
+
+    assert guia["fonte"] == "OpenDota"
+    assert guia["ordem_habilidades"] == []
+    assert guia["nota_habilidades"]  # explica por que nao ha ordem
+    inicio = guia["grupos"][0]
+    assert inicio["titulo"] == "Itens iniciais"
+    # ordenado por contagem desc, e a "Poção" (2 compras) ficou de fora.
+    assert [i["nome"] for i in inicio["itens"]] == ["Tango", "Ramo de Ferro"]
+    assert inicio["itens"][0]["icone"] == "http://x/16.png"
+
+
+def test_montar_guia_dota_none_sem_dado():
+    assert _montar_guia_dota(None, {}, {}) is None
+    assert _montar_guia_dota({"start_game_items": {}}, {}, {}) is None
+
+
+# Resposta vazia do OP.GG: forma certa, `is_rip: true`, todo array vazio.
+_GUIA_VAZIA = (
+    "class Raiz: champion,data\n"
+    "class Data: summary,core_items,skills\n"
+    "class Summary: play,is_rotation,is_rip\n"
+    "\n"
+    'Raiz("Ahri",Data(Summary(60103,false,true),[],[]))'
+)
+
+
+def test_guia_do_opgg_repete_a_resposta_vazia(monkeypatch):
+    """A resposta vazia do OP.GG dispara uma nova tentativa; a boa nela vale."""
+    import collectors.lol_campeoes as mod
+
+    chamadas: list[int] = []
+
+    def fake_chamar(nome, args):
+        chamadas.append(1)
+        return _GUIA_VAZIA if len(chamadas) < 2 else _ARVORE_GUIA
+
+    monkeypatch.setattr(mod.opgg_mcp, "chamar_ferramenta", fake_chamar)
+    monkeypatch.setattr(mod.time, "sleep", lambda _s: None)
+
+    coletor = CampeoesLolCollector(raw_storage=None)
+    texto = coletor._guia_do_opgg("Ahri", "mid", "ahri")
+
+    assert len(chamadas) == 2
+    assert texto == _ARVORE_GUIA
+
+
+def test_guia_do_opgg_desiste_depois_da_segunda(monkeypatch):
+    import collectors.lol_campeoes as mod
+
+    chamadas: list[int] = []
+    monkeypatch.setattr(
+        mod.opgg_mcp, "chamar_ferramenta",
+        lambda n, a: chamadas.append(1) or _GUIA_VAZIA,
+    )
+    monkeypatch.setattr(mod.time, "sleep", lambda _s: None)
+
+    coletor = CampeoesLolCollector(raw_storage=None)
+    assert coletor._guia_do_opgg("Ahri", "mid", "ahri") is None
+    assert len(chamadas) == 2

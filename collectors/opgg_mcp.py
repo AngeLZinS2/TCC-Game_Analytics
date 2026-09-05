@@ -238,6 +238,130 @@ def analisar_notacao_compacta(texto: str, classe: str) -> list[dict[str, Any]]:
     return linhas
 
 
+def analisar_objeto_compacto(texto: str) -> Any:
+    """Le a notacao compacta INTEIRA do OP.GG e devolve a arvore de dicts/listas.
+
+    `analisar_notacao_compacta` extrai uma classe folha repetida (as tabelas de
+    rota). Ja `lol_get_champion_analysis` responde uma ARVORE - build, runas,
+    ordem de skill, combos, tudo aninhado - e essa precisa ser lida por inteiro:
+
+        class Data: summary,core_items,boots,...
+        class CoreItems: ids_names,play,win,pick_rate
+        ...
+        LolGetChampionAnalysis("Ahri",Data(CoreItems(["Malevolencia",...],...),...))
+
+    Cada `Classe(a,b,c)` vira `{campo: valor}` pelos campos declarados no
+    cabecalho; lista vira lista; escalar passa por `_valor`. Uma classe fora do
+    cabecalho, ou com contagem de argumentos diferente da declarada, vira lista
+    crua - quem le fica sem aquele ramo, nao com ramo errado.
+
+    Devolve `None` se a expressao nao fecha (ferramenta mudou de forma).
+    """
+    esquema: dict[str, list[str]] = {}
+    for m in re.finditer(r"^class (\w+): (.+)$", texto, re.M):
+        esquema[m.group(1)] = [c.strip() for c in m.group(2).split(",")]
+
+    corpo = [
+        linha for linha in texto.splitlines()
+        if linha and not linha.startswith("class ")
+    ]
+    if not corpo:
+        return None
+    s = "\n".join(corpo)
+    pos = 0
+
+    def _ws() -> None:
+        nonlocal pos
+        while pos < len(s) and s[pos] in " \t\n":
+            pos += 1
+
+    def _valor_texto() -> Any:
+        nonlocal pos
+        _ws()
+        c = s[pos]
+        if c == '"':
+            return _str()
+        if c == "[":
+            return _lista()
+        m = re.match(r"[A-Za-z_]\w*", s[pos:])
+        if m and pos + m.end() < len(s) and s[pos + m.end()] == "(":
+            return _objeto()
+        return _escalar()
+
+    def _str() -> str:
+        nonlocal pos
+        pos += 1
+        buf: list[str] = []
+        while pos < len(s):
+            c = s[pos]
+            pos += 1
+            if c == "\\" and pos < len(s):
+                buf.append(s[pos])
+                pos += 1
+                continue
+            if c == '"':
+                break
+            buf.append(c)
+        return "".join(buf)
+
+    def _lista() -> list[Any]:
+        nonlocal pos
+        pos += 1
+        out: list[Any] = []
+        _ws()
+        if pos < len(s) and s[pos] == "]":
+            pos += 1
+            return out
+        while pos < len(s):
+            out.append(_valor_texto())
+            _ws()
+            if s[pos] == ",":
+                pos += 1
+                continue
+            if s[pos] == "]":
+                pos += 1
+                return out
+        raise ValueError("lista sem `]`")
+
+    def _objeto() -> Any:
+        nonlocal pos
+        m = re.match(r"[A-Za-z_]\w*", s[pos:])
+        nome = m.group(0)
+        pos += m.end() + 1
+        args: list[Any] = []
+        _ws()
+        if pos < len(s) and s[pos] == ")":
+            pos += 1
+        else:
+            while True:
+                args.append(_valor_texto())
+                _ws()
+                if pos >= len(s):
+                    raise ValueError("objeto sem `)`")
+                if s[pos] == ",":
+                    pos += 1
+                    continue
+                if s[pos] == ")":
+                    pos += 1
+                    break
+        campos = esquema.get(nome)
+        if campos and len(campos) == len(args):
+            return dict(zip(campos, args))
+        return args
+
+    def _escalar() -> Any:
+        nonlocal pos
+        inicio = pos
+        while pos < len(s) and s[pos] not in ",()[]":
+            pos += 1
+        return _valor(s[inicio:pos])
+
+    try:
+        return _valor_texto()
+    except (IndexError, ValueError):
+        return None
+
+
 def _argumentos_posicionais(texto: str, posicao: int) -> list[Any] | None:
     """Os argumentos de uma chamada, a partir do caractere apos o parentese.
 

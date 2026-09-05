@@ -8,9 +8,10 @@ quando a Fase 3 popular o LoL, o mesmo endpoint ja o atende.
 from __future__ import annotations
 
 from datetime import date
-from typing import Literal
+from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import ValidationError
 from sqlalchemy import Float, and_, case, cast, desc, func, select
 from sqlalchemy.orm import Session, aliased
 
@@ -18,6 +19,7 @@ from api.schemas import (
     ConfrontoResultado,
     DetalhePersonagem,
     EstatisticaMapa,
+    GuiaPersonagem,
     HabilidadePersonagem,
     MetricaEsporte,
     PerfilEsporte,
@@ -638,7 +640,22 @@ def detalhe_do_personagem(
         perfil=_perfil_schema(vocabulario_esports.perfil(jogo)),
         geral=geral,
         por_mapa=por_mapa,
+        guia=_guia_schema(metadados.get("guia")),
     )
+
+
+def _guia_schema(bruto: Any) -> GuiaPersonagem | None:
+    """Valida o `metadados["guia"]` gravado pela coleta contra o schema.
+
+    Um guia com forma inesperada (a fonte mudou) vira `None` - a aba some, o
+    resto da ficha fica.
+    """
+    if not isinstance(bruto, dict):
+        return None
+    try:
+        return GuiaPersonagem.model_validate(bruto)
+    except ValidationError:
+        return None
 
 
 def _personagens_agregados(
