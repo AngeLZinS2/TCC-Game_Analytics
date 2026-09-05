@@ -164,6 +164,7 @@ def test_intervalos_vem_da_configuracao():
         "treino_confronto": 28800,
         "agentes_valorant": 604800,
         "campeoes_lol": 604800,
+        "herois_dota": 604800,
     }
 
 

@@ -198,3 +198,81 @@ def test_extrair_videos_de_next_data_minimo():
 def test_extrair_videos_devolve_vazio_se_a_forma_mudar():
     assert _extrair_videos("<html>sem next data</html>") == {}
     assert _extrair_videos('<script id="__NEXT_DATA__">nao e json</script>') == {}
+
+
+# --- dado estatico: LoL (Data Dragon) e Dota (datafeed da Valve) ---
+
+from collectors.lol_campeoes import _limpar_html, _metadados_ddragon
+from collectors.dota_herois import _limpar as _limpar_dota, _normalizar_heroi
+
+
+def test_metadados_ddragon_monta_habilidades_com_slot():
+    payload = {
+        "versao": "16.17.1",
+        "data": {
+            "Ahri": {
+                "image": {"full": "Ahri.png"},
+                "lore": "A ligação de Ahri...",
+                "passive": {
+                    "name": "Furto de Essência",
+                    "description": "Ahri se cura.<br>Depois...",
+                    "image": {"full": "Ahri_SoulEater2.png"},
+                },
+                "spells": [
+                    {"name": "Orbe da Ilusão", "description": "d", "image": {"full": "AhriQ.png"}},
+                    {"name": "Fogo de Raposa", "description": "d", "image": {"full": "AhriW.png"}},
+                    {"name": "Encanto", "description": "d", "image": {"full": "AhriE.png"}},
+                    {"name": "Ímpeto Espiritual", "description": "d", "image": {"full": "AhriR.png"}},
+                ],
+            }
+        },
+    }
+    meta = _metadados_ddragon(payload)["Ahri"]
+
+    slots = [h["slot"] for h in meta["habilidades"]]
+    assert slots == ["Passiva", "Q", "W", "E", "R"]
+    assert meta["habilidades"][1]["icone"].endswith("/img/spell/AhriQ.png")
+    assert meta["descricao"].startswith("A ligação de Ahri")
+    # `<br>` virou espaco, sem tag sobrando
+    assert "<" not in meta["habilidades"][0]["descricao"]
+
+
+def test_limpar_html_tira_placeholder_de_template():
+    assert _limpar_html("Envenena o alvo %i:OnHit% ao contato") == (
+        "Envenena o alvo … ao contato"
+    )
+
+
+def test_normalizar_heroi_dota_casa_por_id_e_limpa_o_texto():
+    bruto = {
+        "id": 14,
+        "name": "npc_dota_hero_pudge",
+        "name_loc": "Pudge",
+        "bio_loc": "Nos Campos da Carnificina...",
+        "abilities": [
+            {
+                "name": "pudge_meat_hook",
+                "name_loc": "Gancho de Carne",
+                "desc_loc": "Em inglês: <b><font color='#F2A93E'>Meat Hook</font></b>\n \nLança um gancho.",
+            },
+            {"name": "generic_hidden", "name_loc": "x", "desc_loc": "y"},
+        ],
+    }
+    heroi = _normalizar_heroi(bruto)
+
+    # id_externo e o id numerico da Valve - o mesmo de `dim_personagem` no Dota.
+    assert heroi["id_externo"] == "14"
+    assert heroi["nome_interno"] == "npc_dota_hero_pudge"
+    habs = heroi["metadados"]["habilidades"]
+    # `generic_hidden` (slot vazio) nao entra.
+    assert len(habs) == 1
+    assert habs[0]["nome"] == "Gancho de Carne"
+    # o prefixo "Em inglês: ... </b>" saiu, sobrou so o texto pt-BR.
+    assert habs[0]["descricao"] == "Lança um gancho."
+    assert habs[0]["icone"].endswith("/abilities/pudge_meat_hook.png")
+
+
+def test_limpar_dota_tira_token_de_atributo():
+    assert _limpar_dota("Ganha %damage_stat_bonus_pct%%% de dano") == "Ganha … de dano"
+    # Tokens em CamelCase (contagem de cargas) tambem somem.
+    assert _limpar_dota("consome uma das %AbilityCharges% cargas") == "consome uma das … cargas"

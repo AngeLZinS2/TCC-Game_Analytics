@@ -26,8 +26,11 @@ from __future__ import annotations
 import logging
 from typing import Any, Sequence
 
+import requests
+
 from collectors import opgg_mcp
 from collectors.base import BaseCollector, RawRecord
+from config import get_settings
 
 logger = logging.getLogger(__name__)
 
@@ -51,6 +54,16 @@ FERRAMENTA_ROTA = "lol_list_lane_meta_champions"
 #: O idioma dos nomes. "Nunu & Willump" em pt_BR, "Nunu & Willump" em en_US -
 #: varios sao iguais, mas alguns mudam, e a tela e em portugues.
 IDIOMA = "pt_BR"
+
+#: Data Dragon - o dado estatico OFICIAL da Riot para LoL: lore, retrato,
+#: passiva e as quatro habilidades com icone e texto, tudo em pt_BR. E a CDN
+#: da propria Riot (o mesmo papel da valorant-api.com para os agentes); nao ha
+#: limite de taxa e cabe numa chamada so (`championFull.json`, ~2 MB).
+DDRAGON_VERSOES = "https://ddragon.leagueoflegends.com/api/versions.json"
+DDRAGON_CAMPEOES = (
+    "https://ddragon.leagueoflegends.com/cdn/{versao}/data/pt_BR/championFull.json"
+)
+DDRAGON_IMG = "https://ddragon.leagueoflegends.com/cdn/{versao}/img"
 
 
 class CampeoesLolCollector(BaseCollector[list[dict[str, Any]]]):
@@ -95,13 +108,44 @@ class CampeoesLolCollector(BaseCollector[list[dict[str, Any]]]):
                     "rota do opgg falhou", extra={"rota": rota, "erro": str(exc)}
                 )
 
+        # O dado estatico da Riot. Falha aqui nao leva o resto: a tela ja
+        # mostra nome, retrato e numeros sem a lore e as habilidades.
+        try:
+            registros.append(self._estatico())
+        except requests.RequestException as exc:
+            self.logger.warning("data dragon falhou", extra={"erro": str(exc)})
+
         return registros
+
+    def _estatico(self) -> RawRecord:
+        settings = get_settings()
+        versao = requests.get(
+            DDRAGON_VERSOES, timeout=settings.http_timeout_seconds
+        ).json()[0]
+        campeoes = requests.get(
+            DDRAGON_CAMPEOES.format(versao=versao),
+            timeout=settings.http_timeout_seconds,
+        ).json()
+        return RawRecord(
+            fonte=self.fonte,
+            endpoint="ddragon",
+            identificador="estatico",
+            payload={"versao": versao, "data": campeoes.get("data", {})},
+        )
 
     def parse(self, registros: Sequence[RawRecord]) -> list[dict[str, Any]]:
         elenco: dict[str, dict[str, Any]] = {}
         melhor_rota: dict[str, dict[str, Any]] = {}
+        # nome -> [{rota, play, win, ...}] - todas as rotas onde o campeao joga
+        por_rota: dict[str, list[dict[str, Any]]] = {}
+        # key do campeao (nome_interno) -> metadados
+        estatico: dict[str, dict[str, Any]] = {}
 
         for registro in registros:
+            if registro.identificador == "estatico" and isinstance(registro.payload, dict):
+                estatico = _metadados_ddragon(registro.payload)
+                continue
+
             texto = registro.payload
             if not isinstance(texto, str):
                 continue
@@ -141,6 +185,7 @@ class CampeoesLolCollector(BaseCollector[list[dict[str, Any]]]):
                 nome = bruto.get("champion")
                 if not isinstance(nome, str):
                     continue
+                por_rota.setdefault(nome, []).append({**bruto, "rota": rota})
                 atual = melhor_rota.get(nome)
                 # A rota principal e a de maior `role_rate` - a proporcao das
                 # partidas do campeao que acontecem nela. Media entre rotas
@@ -158,6 +203,25 @@ class CampeoesLolCollector(BaseCollector[list[dict[str, Any]]]):
                 campeao["partidas"] = numeros.get("play")
                 campeao["vitorias"] = numeros.get("win")
                 campeao["metricas"] = _metricas(numeros)
+
+            # Uma linha por rota onde o campeao aparece - o "por mapa" do LoL.
+            # Pantheon topo e Pantheon meio sao dois conjuntos, e essa e a
+            # leitura que a tela de detalhe mostra.
+            campeao["por_mapa"] = [
+                {
+                    "mapa": ROTAS.get(r["rota"], r["rota"]),
+                    "partidas": r.get("play"),
+                    "vitorias": r.get("win"),
+                    "metricas": _metricas(r),
+                }
+                for r in sorted(
+                    por_rota.get(nome, []),
+                    key=lambda x: x.get("role_rate") or 0,
+                    reverse=True,
+                )
+            ]
+
+            campeao["metadados"] = estatico.get(campeao["nome_interno"])
             campeoes.append(campeao)
 
         return campeoes
@@ -166,6 +230,89 @@ class CampeoesLolCollector(BaseCollector[list[dict[str, Any]]]):
         from etl.load_lol import carregar_campeoes
 
         return carregar_campeoes(dados)
+
+
+def _limpar_html(texto: str | None) -> str | None:
+    """Tira as tags do texto de habilidade do Data Dragon.
+
+    O texto vem com `<br>`, `<font color=...>` e afins - a tela mostra em
+    paragrafo simples, entao a marcacao so atrapalha.
+    """
+    import re
+
+    if not isinstance(texto, str):
+        return None
+    limpo = re.sub(r"<br\s*/?>", " ", texto)
+    limpo = re.sub(r"<[^>]+>", "", limpo)
+    # `%i:OnHit%` e afins - placeholders de template do Data Dragon no campo
+    # `description` (o `tooltip` tem ainda mais).
+    limpo = re.sub(r"\{\{[^}]+\}\}|%[a-z]?:?[A-Za-z]+%", "…", limpo)
+    return re.sub(r"\s+", " ", limpo).strip() or None
+
+
+def _metadados_ddragon(payload: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    """`{key_do_campeao: metadados}` a partir do `championFull.json`.
+
+    Mesmo formato do `metadados` do agente de Valorant: descricao, retrato,
+    icone e as habilidades (passiva + Q/W/E/R) com nome, texto e icone. E por
+    isso a tela de detalhe funciona igual nos dois - ela le `metadados`, nao
+    sabe de que jogo e.
+    """
+    versao = payload.get("versao", "")
+    img = DDRAGON_IMG.format(versao=versao)
+    saida: dict[str, dict[str, Any]] = {}
+
+    for key, campeao in (payload.get("data") or {}).items():
+        if not isinstance(campeao, dict):
+            continue
+
+        habilidades: list[dict[str, Any]] = []
+        passiva = campeao.get("passive") or {}
+        if passiva.get("name"):
+            habilidades.append(
+                {
+                    "slot": "Passiva",
+                    "nome": passiva["name"],
+                    "descricao": _limpar_html(passiva.get("description")),
+                    "icone": f"{img}/passive/{passiva['image']['full']}"
+                    if passiva.get("image", {}).get("full")
+                    else None,
+                    "video": None,
+                }
+            )
+        for slot, feitico in zip(("Q", "W", "E", "R"), campeao.get("spells") or []):
+            if not feitico.get("name"):
+                continue
+            habilidades.append(
+                {
+                    "slot": slot,
+                    "nome": feitico["name"],
+                    "descricao": _limpar_html(feitico.get("description")),
+                    "icone": f"{img}/spell/{feitico['image']['full']}"
+                    if feitico.get("image", {}).get("full")
+                    else None,
+                    "video": None,
+                }
+            )
+
+        saida[key] = {
+            "descricao": campeao.get("lore") or campeao.get("blurb"),
+            "icone": f"{img}/champion/{campeao['image']['full']}"
+            if campeao.get("image", {}).get("full")
+            else None,
+            # O "retrato" grande: a splash de carregamento, no mesmo caminho de
+            # sempre da Riot.
+            "retrato": (
+                "https://ddragon.leagueoflegends.com/cdn/img/champion/loading/"
+                f"{key}_0.jpg"
+            ),
+            "fundo": (
+                "https://ddragon.leagueoflegends.com/cdn/img/champion/splash/"
+                f"{key}_0.jpg"
+            ),
+            "habilidades": habilidades,
+        }
+    return saida
 
 
 def _fracao_para_percentual(valor: Any) -> float | None:

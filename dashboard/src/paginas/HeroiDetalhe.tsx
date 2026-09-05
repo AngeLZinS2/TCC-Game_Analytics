@@ -61,16 +61,18 @@ function Numero({
 function TabelaMapas({
   linhas,
   metricas,
+  recorte,
 }: {
   linhas: EstatisticaMapa[];
   metricas: MetricaEsporte[];
+  recorte: string;
 }) {
   return (
     <div className="rolagem-discreta overflow-x-auto">
       <table className="w-full border-collapse text-left">
         <thead>
           <tr className="bg-surface-container font-label-caps text-label-caps uppercase tracking-wider text-outline">
-            <th className="px-space-md py-space-sm">Mapa</th>
+            <th className="px-space-md py-space-sm">{recorte === "rota" ? "Rota" : "Mapa"}</th>
             <th className="px-space-md py-space-sm text-right">Partidas</th>
             <th className="px-space-md py-space-sm">Winrate</th>
             {metricas.map((m) => (
@@ -131,6 +133,12 @@ function Ficha({ dados }: { dados: DetalhePersonagem }) {
 
   const melhorMapa = porMapa[0];
   const piorMapa = porMapa.at(-1);
+
+  // O recorte não é "mapa" em todo jogo: Valorant é por mapa, LoL por rota.
+  // A palavra vem do que a fonte chamou o campo `papel` do personagem —
+  // "Meio"/"Suporte" são rotas, "Ascent"/"Bind" são mapas.
+  const recorte =
+    dados.jogo === "leagueoflegends" ? "rota" : "mapa";
 
   return (
     <div className="flex flex-col gap-space-lg">
@@ -223,14 +231,14 @@ function Ficha({ dados }: { dados: DetalhePersonagem }) {
       {porMapa.length > 0 && (
         <Painel
           icone="map"
-          titulo="Desempenho por mapa"
-          descricao={`${perfil.nota_fonte} A média geral acima esconde a variação entre mapas.`}
-          meta={<Selo>{porMapa.length} mapas</Selo>}
+          titulo={`Desempenho por ${recorte}`}
+          descricao={`${perfil.nota_fonte} A média geral acima esconde a variação entre ${recorte}s.`}
+          meta={<Selo>{porMapa.length} {recorte}s</Selo>}
         >
           {melhorMapa && piorMapa && melhorMapa.mapa !== piorMapa.mapa && (
             <div className="flex flex-wrap gap-space-lg">
               <Numero
-                rotulo="Melhor mapa"
+                rotulo={`Melhor ${recorte}`}
                 valor={
                   <span style={{ color: PALETA_POLOS.positivo }}>
                     {melhorMapa.mapa} · {fmtPercentual(melhorMapa.winrate)}
@@ -239,7 +247,7 @@ function Ficha({ dados }: { dados: DetalhePersonagem }) {
                 titulo={`${fmtNumero(melhorMapa.partidas)} partidas`}
               />
               <Numero
-                rotulo="Pior mapa"
+                rotulo={`Pior ${recorte}`}
                 valor={
                   <span style={{ color: PALETA_POLOS.negativo }}>
                     {piorMapa.mapa} · {fmtPercentual(piorMapa.winrate)}
@@ -250,11 +258,11 @@ function Ficha({ dados }: { dados: DetalhePersonagem }) {
               <Numero
                 rotulo="Amplitude"
                 valor={`${fmtDecimal(melhorMapa.winrate - piorMapa.winrate, 1)} pp`}
-                titulo="diferença entre o melhor e o pior mapa"
+                titulo={`diferença entre ${recorte === "rota" ? "a melhor e a pior rota" : "o melhor e o pior mapa"}`}
               />
             </div>
           )}
-          <TabelaMapas linhas={porMapa} metricas={perfil.metricas} />
+          <TabelaMapas linhas={porMapa} metricas={perfil.metricas} recorte={recorte} />
         </Painel>
       )}
 

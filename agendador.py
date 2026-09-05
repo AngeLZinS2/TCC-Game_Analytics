@@ -399,6 +399,17 @@ def _coletar_campeoes_lol(settings: Settings, storage: RawStorage) -> Collection
         coletor.close()
 
 
+def _coletar_herois_dota(settings: Settings, storage: RawStorage) -> CollectionResult:
+    """Lore e habilidades de cada heroi de Dota (datafeed da Valve)."""
+    from collectors.dota_herois import HeroisDotaCollector
+
+    coletor = HeroisDotaCollector(raw_storage=storage)
+    try:
+        return coletor.run(carregar=True)
+    finally:
+        coletor.close()
+
+
 def _coletar_esports_opgg(
     settings: Settings, storage: RawStorage
 ) -> CollectionResult:
@@ -568,6 +579,13 @@ def montar_tarefas(settings: Settings) -> list[Tarefa]:
                 executar=_coletar_campeoes_lol,
             )
         )
+    tarefas.append(
+        Tarefa(
+            nome="herois_dota",
+            intervalo_segundos=settings.agendador_agentes_minutos * 60,
+            executar=_coletar_herois_dota,
+        )
+    )
     return tarefas
 
 
