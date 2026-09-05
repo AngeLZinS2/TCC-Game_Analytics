@@ -79,6 +79,8 @@ class JogoSteam(BaseModel):
     imagem_header: str | None = None
     em_breve: bool | None = None
     requisitos_minimos: str | None = None
+    #: Nem todo jogo publica: 21 dos 30 no nosso raw tem, o resto so o minimo.
+    requisitos_recomendados: str | None = None
     #: Trailers e capturas de tela, na ordem em que o carrossel da ficha
     #: mostra: [{"tipo": "video"|"imagem", "url", "cartaz", "titulo"}].
     midias: list[dict[str, str]] = Field(default_factory=list)
@@ -241,6 +243,9 @@ _TAG_BBCODE = re.compile(
 _TOKEN_STEAM = re.compile(r"\{STEAM_[A-Z_]+\}")
 _ESPACO = re.compile(r"[ \t]*\n[ \t]*")
 
+#: Tags que separam LINHA, nao palavra - ver `_texto_de_html`.
+_QUEBRA_HTML = re.compile(r"<\s*br\s*/?\s*>|</\s*(?:li|p|div|tr)\s*>", re.I)
+
 
 def _texto_de_html(bruto: Any, limite: int | None = None) -> str | None:
     """HTML/BBCode -> texto puro. A Steam manda descricao, requisitos e o corpo
@@ -248,6 +253,11 @@ def _texto_de_html(bruto: Any, limite: int | None = None) -> str | None:
     if not isinstance(bruto, str) or not bruto.strip():
         return None
     texto = _BLOCO_MIDIA.sub(" ", bruto)
+    # `<br>` e fim de `<li>` viram quebra ANTES de as tags virarem espaco: nos
+    # requisitos de PC cada `<li>` e um campo ("OS:", "Processor:", "Memory:"),
+    # e achatar tudo produzia um paragrafo corrido de 300 caracteres onde
+    # ninguem acha a placa de video.
+    texto = _QUEBRA_HTML.sub("\n", texto)
     texto = _TAG_BBCODE.sub(" ", _TAG_HTML.sub(" ", texto))
     texto = _TOKEN_STEAM.sub(" ", texto)
     texto = texto.replace("\\[", "[").replace("\\]", "]")  # bracket escapado -> literal
@@ -256,6 +266,9 @@ def _texto_de_html(bruto: Any, limite: int | None = None) -> str | None:
     # Sobra de URL solta (o [img] ja saiu, mas as vezes a URL vem fora dele).
     texto = re.sub(r"https?://\S+\.(?:png|jpe?g|gif|webp|mp4)\S*", " ", texto, flags=re.I)
     texto = _ESPACO.sub("\n", texto)
+    # `<br></li>` gera duas quebras seguidas; uma linha em branco entre cada
+    # campo dobraria a altura do bloco de requisitos sem dizer nada.
+    texto = re.sub(r"\n{2,}", "\n", texto)
     texto = re.sub(r"[ \t]{2,}", " ", texto).strip(" \t\n\"'")
     if limite and len(texto) > limite:
         texto = texto[:limite].rsplit(" ", 1)[0] + "…"
@@ -438,6 +451,9 @@ def parse_appdetails(payload: Any, app_id: int) -> JogoSteam | None:
         imagem_header=dados.get("header_image") or None,
         em_breve=lancamento.get("coming_soon"),
         requisitos_minimos=_texto_de_html(requisitos.get("minimum"), limite=1200),
+        requisitos_recomendados=_texto_de_html(
+            requisitos.get("recommended"), limite=1200
+        ),
         midias=_parse_midias(dados),
     )
 

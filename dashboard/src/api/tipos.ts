@@ -104,6 +104,8 @@ export interface FichaJogoSteam {
   imagem_header: string | null;
   em_breve: boolean | null;
   requisitos_minimos: string | null;
+  /** Nulo quando o jogo não publica recomendado — a tela some com a aba. */
+  requisitos_recomendados: string | null;
   /** Trailers e capturas da loja, na ordem do carrossel do topo da ficha. */
   midias: MidiaJogo[];
   donos_estimados: string | null;

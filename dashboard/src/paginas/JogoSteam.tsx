@@ -98,7 +98,7 @@ export function JogoSteamPagina() {
                 vazia e empurrava os KPIs pra fora da primeira tela - o cabecalho
                 sozinho passava de 550px de altura.
               */}
-              <div className="relative z-10 mt-space-sm grid grid-cols-1 items-center gap-space-lg lg:grid-cols-[minmax(0,1fr)_minmax(0,24rem)]">
+              <div className="relative z-10 mt-space-sm grid grid-cols-1 items-center gap-space-lg lg:grid-cols-[minmax(0,1fr)_minmax(0,34rem)]">
                 <div className="flex min-w-0 items-start gap-space-base">
                   <CapaJogo
                     appId={jogo.app_id}
@@ -249,6 +249,9 @@ export function JogoSteamPagina() {
 
             {/* ==================== TEMPO PRA ZERAR ==================== */}
             <TempoParaZerar ficha={dados.ficha} nomeSteam={jogo.nome} />
+
+            {/* ==================== REQUISITOS E IDIOMAS ==================== */}
+            <RequisitosEIdiomas ficha={dados.ficha} />
 
             {/* ==================== FICHA ==================== */}
             <FichaDoJogo ficha={dados.ficha} nome={jogo.nome} />
@@ -763,39 +766,9 @@ function FichaDoJogo({ ficha, nome }: { ficha: FichaJogoSteam; nome: string }) {
         </div>
       )}
 
-      {/* ---------- idiomas + requisitos, recolhidos ---------- */}
-      <div className="flex flex-col gap-space-sm sm:flex-row">
-        {ficha.idiomas.length > 0 && (
-          <details className="flex-1 rounded-lg bg-surface-container-lowest px-space-base py-space-sm">
-            <summary className="cursor-pointer font-label-caps text-label-caps uppercase tracking-widest text-outline">
-              Idiomas ({ficha.idiomas.length})
-            </summary>
-            <p className="mt-space-xs font-body-md text-body-sm text-on-surface-variant">
-              {ficha.idiomas.map((idioma) => (
-                <span key={idioma} className="mr-space-sm inline-block">
-                  {idioma}
-                  {ficha.idiomas_com_audio.includes(idioma) && (
-                    <Icone
-                      nome="volume_up"
-                      className="ml-[2px] align-middle text-[12px] text-primary"
-                    />
-                  )}
-                </span>
-              ))}
-            </p>
-          </details>
-        )}
-        {ficha.requisitos_minimos && (
-          <details className="flex-1 rounded-lg bg-surface-container-lowest px-space-base py-space-sm">
-            <summary className="cursor-pointer font-label-caps text-label-caps uppercase tracking-widest text-outline">
-              Requisitos mínimos
-            </summary>
-            <pre className="mt-space-xs whitespace-pre-wrap font-body-md text-body-sm text-on-surface-variant">
-              {ficha.requisitos_minimos}
-            </pre>
-          </details>
-        )}
-      </div>
+      {/* Idiomas e requisitos saíram daqui: viraram painel próprio, logo
+          abaixo do "Quanto tempo leva" (ver `RequisitosEIdiomas`). Recolhidos
+          num `<details>`, eram a informação que mais dava trabalho de achar. */}
 
       <p className="font-body-sm text-body-sm text-outline">
         <strong>{nome}</strong> · Steam Store API + SteamSpy
@@ -1184,6 +1157,147 @@ function TempoParaZerar({ ficha, nomeSteam }: { ficha: FichaJogoSteam; nomeSteam
           HowLongToBeat — o site não tem o mesmo id da Steam, o casamento é por nome.
         </p>
       )}
+    </Painel>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Requisitos e idiomas
+// ---------------------------------------------------------------------------
+
+/**
+ * Requisitos de sistema e idiomas, abertos por padrão.
+ *
+ * Antes viviam recolhidos num `<details>` no fim da ficha - a informação que
+ * mais dá trabalho achar ("roda na minha máquina?" e "tem português?") era
+ * justamente a que exigia dois cliques e uma rolagem até o rodapé.
+ *
+ * Mínimo e recomendado ficam em abas em vez de um bloco só: são a mesma lista
+ * de campos com valores diferentes, e lado a lado viram uma parede de texto
+ * onde ninguém acha a diferença. A aba de recomendado só existe quando o jogo
+ * publica - a Steam entrega só o mínimo em vários (9 dos nossos 25).
+ */
+function RequisitosEIdiomas({ ficha }: { ficha: FichaJogoSteam }) {
+  const temRecomendado = Boolean(ficha.requisitos_recomendados);
+  const [aba, setAba] = useState<"minimos" | "recomendados">("minimos");
+
+  if (!ficha.requisitos_minimos && ficha.idiomas.length === 0) return null;
+
+  const requisitos =
+    aba === "recomendados" ? ficha.requisitos_recomendados : ficha.requisitos_minimos;
+
+  return (
+    <Painel
+      icone="memory"
+      titulo="Requisitos e idiomas"
+      descricao="O que a máquina precisa e em que línguas o jogo chega."
+      meta={
+        ficha.idiomas.length > 0 && (
+          <Selo>{ficha.idiomas.length} idiomas</Selo>
+        )
+      }
+    >
+      <div className="grid grid-cols-1 gap-space-base lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+        {/* ---------- requisitos, com aba ---------- */}
+        {ficha.requisitos_minimos && (
+          <div className="flex flex-col gap-space-sm">
+            <div className="flex gap-space-xxs">
+              {(
+                [
+                  ["minimos", "Mínimos"],
+                  ["recomendados", "Recomendados"],
+                ] as const
+              )
+                .filter(([chave]) => chave === "minimos" || temRecomendado)
+                .map(([chave, rotulo]) => (
+                  <button
+                    key={chave}
+                    type="button"
+                    onClick={() => setAba(chave)}
+                    aria-pressed={aba === chave}
+                    className={`rounded px-space-md py-space-xs font-label-caps text-label-caps uppercase tracking-widest transition-colors ${
+                      aba === chave
+                        ? "bg-surface-container-high text-primary shadow-[inset_0_-2px_0_0_#00e5ff]"
+                        : "text-outline hover:bg-surface-container hover:text-on-surface"
+                    }`}
+                  >
+                    {rotulo}
+                  </button>
+                ))}
+
+              {!temRecomendado && (
+                <span
+                  className="self-center pl-space-sm font-body-sm text-body-sm text-outline"
+                  title="A Steam não publica requisitos recomendados para este jogo"
+                >
+                  sem recomendados publicados
+                </span>
+              )}
+            </div>
+
+            {/* Uma linha por campo, com o rótulo ("Memory:", "Graphics:")
+                separado do valor - é assim que a Steam manda (um `<li>` por
+                campo) e é assim que se lê procurando a placa de vídeo. */}
+            <dl className="rolagem-discreta max-h-72 divide-y divide-outline-variant/15 overflow-auto rounded-lg bg-surface-container-lowest px-space-base">
+              {(requisitos ?? "").split("\n").map((linha, i) => {
+                const corte = linha.indexOf(":");
+                const temRotulo = corte > 0 && corte < 24;
+                return (
+                  <div
+                    key={`${i}-${linha}`}
+                    className="flex flex-col gap-space-xxs py-space-xs sm:flex-row sm:gap-space-sm"
+                  >
+                    {temRotulo && (
+                      <dt className="shrink-0 font-label-caps text-label-caps uppercase tracking-widest text-outline sm:w-32">
+                        {linha.slice(0, corte)}
+                      </dt>
+                    )}
+                    <dd className="m-0 font-body-md text-body-sm text-on-surface-variant">
+                      {temRotulo ? linha.slice(corte + 1).trim() : linha}
+                    </dd>
+                  </div>
+                );
+              })}
+            </dl>
+          </div>
+        )}
+
+        {/* ---------- idiomas ---------- */}
+        {ficha.idiomas.length > 0 && (
+          <div className="flex flex-col gap-space-sm">
+            <div className="font-label-caps text-label-caps uppercase tracking-widest text-outline">
+              Idiomas
+              <span className="ml-space-xs text-on-surface-variant">
+                <Icone nome="volume_up" className="align-middle text-[12px] text-primary" />{" "}
+                = com dublagem
+              </span>
+            </div>
+
+            <div className="rolagem-discreta max-h-72 overflow-auto rounded-lg bg-surface-container-lowest p-space-base">
+              <div className="flex flex-wrap gap-space-xxs">
+                {ficha.idiomas.map((idioma) => {
+                  const dublado = ficha.idiomas_com_audio.includes(idioma);
+                  return (
+                    <span
+                      key={idioma}
+                      className={`inline-flex items-center gap-space-xxs rounded px-space-xs py-space-xxs font-body-sm text-body-sm ${
+                        dublado
+                          ? "bg-primary-container/15 text-on-surface"
+                          : "bg-surface-container text-on-surface-variant"
+                      }`}
+                    >
+                      {idioma}
+                      {dublado && (
+                        <Icone nome="volume_up" className="text-[12px] text-primary" />
+                      )}
+                    </span>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
     </Painel>
   );
 }

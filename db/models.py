@@ -133,6 +133,9 @@ class DimJogoSteam(Base):
     em_breve: Mapped[bool | None] = mapped_column(Boolean)
     #: Requisitos minimos de PC, ja em texto puro (o payload vem em HTML).
     requisitos_minimos: Mapped[str | None] = mapped_column(Text)
+    #: Requisitos recomendados. Nulo no jogo que nao publica (a Steam so traz
+    #: `minimum` para varios) - a tela esconde a aba nesse caso.
+    requisitos_recomendados: Mapped[str | None] = mapped_column(Text)
     #: Trailers e capturas da pagina da loja, na ordem do carrossel da ficha:
     #: [{"tipo": "video"|"imagem", "url", "cartaz", "titulo"}]. Video em HLS -
     #: a Steam nao publica mais mp4/webm direto (ver `_parse_midias`).

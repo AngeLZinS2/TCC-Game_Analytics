@@ -132,6 +132,8 @@ class FichaJogoSteam(BaseModel):
     imagem_header: str | None = None
     em_breve: bool | None = None
     requisitos_minimos: str | None = None
+    #: Nulo quando o jogo nao publica recomendado - a tela some com a aba.
+    requisitos_recomendados: str | None = None
     #: Trailers e capturas da pagina da loja, na ordem do carrossel do topo
     #: da ficha. Video vem em HLS (a Steam nao publica mais mp4/webm direto).
     midias: list[MidiaJogo] = []

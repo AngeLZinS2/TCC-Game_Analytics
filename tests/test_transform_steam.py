@@ -400,3 +400,22 @@ def test_midias_respeitam_o_teto_por_tipo():
 
 def test_midias_vazias_quando_o_jogo_nao_tem_galeria():
     assert _parse_midias({}) == []
+
+
+def test_html_quebra_linha_por_campo_dos_requisitos():
+    """Cada `<li>` dos requisitos e um campo ("OS:", "Memory:"). Achatar tudo
+    numa linha so produzia um paragrafo corrido onde ninguem acha a placa."""
+    bruto = (
+        "<strong>Minimum:</strong><br><ul class='bb_ul'>"
+        "<li><strong>OS:</strong> Windows 10<br></li>"
+        "<li><strong>Memory:</strong> 12 GB RAM<br></li></ul>"
+    )
+    linhas = (_texto_de_html(bruto) or "").split("\n")
+
+    assert linhas == ["Minimum:", "OS: Windows 10", "Memory: 12 GB RAM"]
+
+
+def test_html_sem_quebra_continua_numa_linha_so():
+    """A troca de tag por espaco vale para o resto: so `<br>` e fim de bloco
+    viram linha nova."""
+    assert _texto_de_html("<p>Olá <b>mundo</b> inteiro</p>") == "Olá mundo inteiro"
