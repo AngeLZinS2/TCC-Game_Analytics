@@ -813,8 +813,19 @@ def _desempenho_externo(sessao, codigo_jogo: str) -> dict[str, dict[str, Any]]:
             "partidas": p,
             "vitorias": v,
             "winrate": round(100 * v / p, 1) if p else 0.0,
-            "metricas": metricas or {},
+            "metricas": dict(metricas or {}),
         }
+
+    # `pick_rate` nem sempre esta no JSONB de metricas (o de Valorant guarda so
+    # HS%/ADR/...), mas a proporcao de partidas sempre da pra derivar - e e o
+    # que ordena a lista e desenha o grafico. Sobre o total de participacoes,
+    # nao de partidas: cada partida tem varios personagens.
+    total = sum(d["partidas"] for d in saida.values())
+    if total:
+        for d in saida.values():
+            d["metricas"].setdefault(
+                "pick_rate", round(100 * d["partidas"] / total, 1)
+            )
     return saida
 
 
@@ -1845,13 +1856,16 @@ def montar_contexto(pergunta: str) -> ContextoMontado:
         "sentimento": _bloco_sentimento,
     }
 
-    escolhidos = {
+    # Os gatilhos que a pergunta casou DE VERDADE. Quando nada casa, todos os
+    # blocos entram (para o modelo ter o que ler), mas o GRAFICO de um bloco so
+    # sobe se o gatilho dele foi explicito - senao "como buildar a Kaisa"
+    # mostraria o grafico de jogadores da Steam ao lado da resposta.
+    gatilhos_explicitos = {
         chave
         for chave, termos in GATILHOS.items()
         if any(_normalizar(termo) in normalizada for termo in termos)
     }
-    if not escolhidos:
-        escolhidos = set(GATILHOS)
+    escolhidos = gatilhos_explicitos or set(GATILHOS)
 
     with session_scope() as sessao:
         blocos = [_bloco_geral(sessao)]
@@ -1860,7 +1874,11 @@ def montar_contexto(pergunta: str) -> ContextoMontado:
             if chave in escolhidos:
                 bloco, serie = construtores[chave](sessao)
                 blocos.append(bloco)
-                if serie is not None and serie.itens:
+                if (
+                    serie is not None
+                    and serie.itens
+                    and chave in gatilhos_explicitos
+                ):
                     series.append(serie)
 
         elenco, serie_elenco = _bloco_elenco(pergunta, sessao)
@@ -1875,6 +1893,11 @@ def montar_contexto(pergunta: str) -> ContextoMontado:
         guia = _bloco_guia(pergunta, sessao)
         if guia is not None:
             blocos.append(guia)
+            # Uma build nao e grandeza que caiba num grafico. Se a serie do
+            # topo veio de um bloco que so entrou pelo fallback (nao e da
+            # pergunta), ela some - melhor sem grafico do que com um alheio.
+            if series and series[0].chave not in gatilhos_explicitos | {"elenco"}:
+                series = []
 
         if "modelos" in escolhidos:
             blocos.append(_bloco_modelos(pergunta, sessao))

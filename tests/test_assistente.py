@@ -595,6 +595,25 @@ def test_bloco_modelos_nomeia_o_jogo_e_lista_a_cobertura():
     assert "Existe modelo ajustado para:" in bloco.conteudo
 
 
+def test_grafico_nao_sobe_de_bloco_que_nao_e_da_pergunta():
+    """"como buildar a Kaisa" nao pode mostrar o grafico de jogadores da Steam.
+
+    O bloco geral (e outros) entram pelo fallback para o modelo TER o que ler,
+    mas o grafico do topo - `series[0]`, o unico que a tela desenha - so sobe
+    de um bloco cujo gatilho a pergunta casou de verdade, ou do elenco.
+    """
+    ctx = montar_contexto("qual a build da Kaisa e a ordem de subir habilidade?")
+    # A resposta e sobre build; nenhum grafico do nosso dado responde isso.
+    assert ctx.series == []
+
+    # Ja "melhor agente do valorant" tem grafico - e e o de Valorant, nao o de
+    # jogadores da Steam nem o de winrate de heroi de Dota.
+    ctx2 = montar_contexto("qual o melhor agente do valorant?")
+    if ctx2.series:
+        assert ctx2.series[0].chave == "elenco"
+        assert "VALORANT" in ctx2.series[0].titulo
+
+
 def test_elenco_so_entra_para_jogo_sem_partida(sem_opgg):
     """Para Dota quem responde e o bloco de herois, com winrate medido.
 
