@@ -171,6 +171,7 @@ def _montar_jogo(
         generos=jogo.generos or [],
         gratuito=jogo.gratuito,
         nota_metacritic=jogo.nota_metacritic,
+        imagem_header=jogo.imagem_header,
         janela_coleta=snap.janela_coleta if snap else None,
         jogadores_simultaneos=snap.jogadores_simultaneos if snap else None,
         nota_avaliacoes=snap.nota_avaliacoes if snap else None,

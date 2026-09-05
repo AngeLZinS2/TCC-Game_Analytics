@@ -1235,29 +1235,41 @@ function RequisitosEIdiomas({ ficha }: { ficha: FichaJogoSteam }) {
               )}
             </div>
 
-            {/* Uma linha por campo, com o rótulo ("Memory:", "Graphics:")
-                separado do valor - é assim que a Steam manda (um `<li>` por
-                campo) e é assim que se lê procurando a placa de vídeo. */}
-            <dl className="rolagem-discreta max-h-72 divide-y divide-outline-variant/15 overflow-auto rounded-lg bg-surface-container-lowest px-space-base">
-              {(requisitos ?? "").split("\n").map((linha, i) => {
-                const corte = linha.indexOf(":");
-                const temRotulo = corte > 0 && corte < 24;
-                return (
+            {/* Um cartão por campo, em grade - não uma linha larga por campo.
+                Em linha, "12 GB RAM" ficava sozinho num vão de 700px e o olho
+                tinha que atravessar a tela do rótulo até o valor; em cartão,
+                rótulo e valor ficam a dois centímetros um do outro e a leitura
+                vira vertical. A Steam manda um `<li>` por campo, então cada
+                linha do texto já é um cartão. */}
+            <dl className="grid grid-cols-1 gap-space-sm sm:grid-cols-2">
+              {(requisitos ?? "")
+                .split("\n")
+                .map((linha) => {
+                  const corte = linha.indexOf(":");
+                  const temRotulo = corte > 0 && corte < 24;
+                  return {
+                    rotulo: temRotulo ? linha.slice(0, corte) : null,
+                    valor: temRotulo ? linha.slice(corte + 1).trim() : linha.trim(),
+                  };
+                })
+                // Campo sem valor ("Additional Notes:" vazio) viraria um cartão
+                // em branco - a Steam manda vários assim.
+                .filter((campo) => campo.valor)
+                .map((campo, i) => (
                   <div
-                    key={`${i}-${linha}`}
-                    className="flex flex-col gap-space-xxs py-space-xs sm:flex-row sm:gap-space-sm"
+                    key={`${i}-${campo.rotulo ?? campo.valor}`}
+                    className="flex flex-col gap-space-xxs rounded-lg bg-surface-container-lowest p-space-sm"
                   >
-                    {temRotulo && (
-                      <dt className="shrink-0 font-label-caps text-label-caps uppercase tracking-widest text-outline sm:w-32">
-                        {linha.slice(0, corte)}
+                    {campo.rotulo && (
+                      <dt className="font-label-caps text-label-caps uppercase tracking-widest text-outline">
+                        {campo.rotulo}
                       </dt>
                     )}
-                    <dd className="m-0 font-body-md text-body-sm text-on-surface-variant">
-                      {temRotulo ? linha.slice(corte + 1).trim() : linha}
+                    <dd className="m-0 font-body-md text-body-sm text-on-surface">
+                      {campo.valor}
                     </dd>
                   </div>
-                );
-              })}
+                ))}
             </dl>
           </div>
         )}

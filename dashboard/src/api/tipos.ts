@@ -37,6 +37,12 @@ export interface JogoSteam {
   generos: string[];
   gratuito: boolean | null;
   nota_metacritic: number | null;
+  /**
+   * A capa real da Steam. Vem na lista (e não só na ficha) porque o palpite
+   * determinístico de CDN dá 404 nos jogos novos — eles migraram para um
+   * caminho com hash, e a linha ficava com a inicial do nome no lugar da capa.
+   */
+  imagem_header: string | null;
   janela_coleta: string | null;
   jogadores_simultaneos: number | null;
   nota_avaliacoes: Decimal | null;
@@ -589,6 +595,8 @@ export interface CandidatoJogo {
   /** Se ja existe no banco - decide entre mostrar ou oferecer a coleta. */
   coletado: boolean;
   avaliacoes_coletadas: number;
+  /** `tiny_image` da busca da loja — já é a URL real, com hash. */
+  imagem: string | null;
 }
 
 export interface ResumoColeta {

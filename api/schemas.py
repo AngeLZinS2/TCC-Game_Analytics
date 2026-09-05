@@ -63,6 +63,12 @@ class JogoSteam(BaseModel):
     moeda: str | None
     desconto_percentual: int | None
 
+    #: A capa real, da Steam. Vem na LISTA (e nao so na ficha) porque a
+    #: Valve migrou os jogos novos pra um caminho com hash: o palpite
+    #: deterministico de CDN da 404 em 6 dos nossos 27, e a linha ficava
+    #: com a inicial do nome no lugar da capa. E um campo so, nao a ficha.
+    imagem_header: str | None = None
+
     #: Maior valor ja coletado para este jogo.
     pico_jogadores: int | None = None
     #: Variacao percentual sobre a coleta anterior. None enquanto so houver uma.
@@ -654,6 +660,8 @@ class CandidatoJogo(BaseModel):
     #: Se ja existe em `dim_jogo_steam` - decide entre mostrar ou coletar.
     coletado: bool
     avaliacoes_coletadas: int
+    #: `tiny_image` da busca da loja - ja e a URL real, com hash.
+    imagem: str | None = None
 
 
 class EntradaColeta(BaseModel):

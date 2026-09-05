@@ -551,7 +551,7 @@ export function SteamPagina() {
                       >
                         <td className="px-space-md py-space-sm">
                           <div className="flex items-center gap-space-sm">
-                            <CapaJogo appId={jogo.app_id} nome={jogo.nome} />
+                            <CapaJogo appId={jogo.app_id} nome={jogo.nome} imagemUrl={jogo.imagem_header} />
                             <div className="flex min-w-0 flex-col">
                               <span className="truncate font-headline-sm text-headline-sm font-bold text-primary">
                                 {jogo.nome}
@@ -727,7 +727,7 @@ function LinhaDaLoja({
     >
       <td className="px-space-md py-space-sm">
         <div className="flex items-center gap-space-sm">
-          <CapaJogo appId={candidato.app_id} nome={candidato.nome} />
+          <CapaJogo appId={candidato.app_id} nome={candidato.nome} imagemUrl={candidato.imagem} />
           <div className="flex min-w-0 flex-col">
             <span className="flex items-center gap-space-xs">
               <span className="truncate font-headline-sm text-headline-sm font-bold text-primary">

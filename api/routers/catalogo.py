@@ -92,6 +92,7 @@ def buscar_catalogo(
                 moeda=preco.get("currency"),
                 coletado=app_id in coletados,
                 avaliacoes_coletadas=coletados.get(app_id, 0),
+                imagem=item.get("tiny_image") or None,
             )
         )
 

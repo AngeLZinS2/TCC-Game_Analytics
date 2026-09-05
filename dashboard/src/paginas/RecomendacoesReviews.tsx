@@ -86,7 +86,15 @@ function corDaTaxa(percentual: number): string {
  *
  * `coletado` diz de onde veio, e é a única diferença de comportamento.
  */
-type ResultadoBusca = { app_id: number; nome: string; coletado: boolean };
+type ResultadoBusca = {
+  app_id: number;
+  nome: string;
+  coletado: boolean;
+  /** A capa real: `imagem_header` para quem já está no banco, `tiny_image`
+   *  da busca da loja para o resto. Sem ela, o palpite de CDN dá 404 nos
+   *  jogos novos e o resultado aparece só com a inicial do nome. */
+  imagem: string | null;
+};
 
 /**
  * Um cartão da faixa de busca.
@@ -128,7 +136,12 @@ function CardJogo({
           : "bg-surface-container-lowest hover:bg-surface-container"
       }`}
     >
-      <CapaJogo appId={resultado.app_id} nome={resultado.nome} className="h-14 w-full" />
+      <CapaJogo
+        appId={resultado.app_id}
+        nome={resultado.nome}
+        imagemUrl={resultado.imagem}
+        className="h-14 w-full"
+      />
       <span className="truncate font-title-code text-title-code text-on-surface">
         {resultado.nome}
       </span>
@@ -200,6 +213,7 @@ function BuscaDeJogo({
       app_id: jogo.app_id,
       nome: jogo.nome,
       coletado: true,
+      imagem: jogo.imagem_header,
     })),
     ...(catalogo.data ?? [])
       .filter((candidato) => !idsNaBase.has(candidato.app_id))
@@ -207,6 +221,7 @@ function BuscaDeJogo({
         app_id: candidato.app_id,
         nome: candidato.nome,
         coletado: candidato.coletado,
+        imagem: candidato.imagem,
       })),
   ];
 
@@ -290,7 +305,12 @@ function DestaqueDoJogo({
 
   return (
     <div className="grid grid-cols-1 gap-space-lg lg:grid-cols-[460px_1fr]">
-      <ArteJogo appId={jogo.app_id} nome={jogo.nome} className="h-52 w-full" />
+      <ArteJogo
+        appId={jogo.app_id}
+        nome={jogo.nome}
+        imagemUrl={jogo.imagem_header}
+        className="h-52 w-full"
+      />
 
       <div className="flex flex-col justify-between gap-space-base">
         <div>
