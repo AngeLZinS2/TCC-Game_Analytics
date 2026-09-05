@@ -25,7 +25,9 @@ from ml.assistente import (
     PontoSerie,
     SerieAssistente,
     _bloco_descoberta,
+    _bloco_elenco,
     _bloco_extremo_avaliacao,
+    _bloco_geral,
     _bloco_herois,
     _bloco_partidas,
     _bloco_recomendacao,
@@ -528,3 +530,68 @@ def test_serie_da_descoberta_vem_na_frente(monkeypatch):
 
     assert contexto.series, "a descoberta tinha ponto - a serie nao podia sumir"
     assert contexto.series[0].chave == "descoberta"
+
+
+# --- Cobertura por jogo e elenco -------------------------------------------
+
+
+def test_bloco_geral_lista_os_jogos_cobertos():
+    """O defeito que originou isto: o assistente respondia que "Valorant nao
+    esta no nosso banco" - falso, sao 87 equipes e 87 confrontos na agenda.
+
+    Ele nao tinha como saber: nenhum bloco falava dos outros jogos, e o unico
+    bloco de personagem consultava herois de Dota. A cobertura entra no bloco
+    geral, que vai em TODA pergunta.
+    """
+    with session_scope() as sessao:
+        bloco = _bloco_geral(sessao)
+
+    assert "Jogos de esports no nosso banco" in bloco.conteudo
+    # A linha que separa "temos o jogo" de "temos partida do jogo" - sem ela,
+    # ver o elenco listado convidaria o modelo a ranquear agente por conta.
+    assert "Dado de PARTIDA" in bloco.conteudo
+
+
+def test_elenco_so_entra_para_jogo_sem_partida():
+    """Para Dota quem responde e o bloco de herois, com winrate medido.
+
+    Listar o elenco ali seria repetir pior o que ja existe - e, pior, colocaria
+    duas fontes de verdade sobre personagem na mesma tela.
+    """
+    with session_scope() as sessao:
+        valorant, _ = _bloco_elenco("qual o melhor agente do valorant?", sessao)
+        dota, _ = _bloco_elenco("qual o melhor heroi de dota 2?", sessao)
+        nenhum, _ = _bloco_elenco("quantos jogos da steam monitoramos?", sessao)
+
+    assert dota is None
+    assert nenhum is None
+    if valorant is None:
+        pytest.skip("elenco de valorant ainda nao coletado neste banco")
+    assert valorant.chave == "elenco"
+    assert "Duelista" in valorant.conteudo
+
+
+def test_elenco_carrega_a_recusa_junto_com_o_dado():
+    """Elenco responde "quem existe", nunca "quem esta forte agora".
+
+    A pergunta que originou tudo pedia o meta atual. Com 29 agentes listados e
+    sem esta frase, o modelo ordenaria os oito duelistas por conta propria - e
+    o numero sairia com a mesma cara dos que a plataforma mede.
+    """
+    with session_scope() as sessao:
+        bloco, serie = _bloco_elenco("melhor agente do valorant no meta atual", sessao)
+
+    if bloco is None:
+        pytest.skip("elenco de valorant ainda nao coletado neste banco")
+    assert "NAO temos nenhuma partida" in bloco.conteudo
+    assert "meta atual" in bloco.conteudo
+    assert "Fora dos dados: " in bloco.conteudo
+    # Sem serie: elenco e lista nominal, nao grandeza. Um grafico de "8
+    # duelistas, 7 sentinelas" contaria o nosso recorte, nao o jogo.
+    assert serie is None
+
+
+def test_instrucao_proibe_negar_jogo_coberto():
+    """A regra que impede a resposta errada de voltar."""
+    assert "não está no nosso banco" in INSTRUCAO
+    assert "dado de PARTIDA" in INSTRUCAO

@@ -188,6 +188,13 @@ class Settings(BaseSettings):
     #: jogo novo no catalogo, nao pra acompanhar variacao.
     agendador_tempo_jogo_minutos: int = Field(default=1440, ge=60)
 
+    #: Intervalo entre coletas do elenco de agentes do VALORANT, em minutos.
+    #:
+    #: Semanal. A Riot lanca um agente a cada poucos meses e ajusta funcao mais
+    #: raramente ainda - o intervalo existe pra um agente novo aparecer sozinho,
+    #: nao pra acompanhar variacao. E uma chamada por rodada.
+    agendador_agentes_minutos: int = Field(default=10080, ge=60)
+
     # --- Assistente (OpenRouter) ---
     #: Sem chave, o endpoint do assistente responde 503 com a instrucao. E um
     #: estado esperado: o resto do projeto funciona sem LLM nenhum.

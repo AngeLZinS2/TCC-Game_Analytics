@@ -375,6 +375,19 @@ def _coletar_tempo_jogo(settings: Settings, storage: RawStorage) -> CollectionRe
         coletor.close()
 
 
+def _coletar_agentes_valorant(
+    settings: Settings, storage: RawStorage
+) -> CollectionResult:
+    """Elenco de agentes do VALORANT (valorant-api.com)."""
+    from collectors.valorant_agentes import AgentesValorantCollector
+
+    coletor = AgentesValorantCollector(raw_storage=storage)
+    try:
+        return coletor.run(carregar=True)
+    finally:
+        coletor.close()
+
+
 def montar_tarefas(settings: Settings) -> list[Tarefa]:
     """As tarefas do agendador, na ordem em que rodam quando empatam.
 
@@ -431,6 +444,13 @@ def montar_tarefas(settings: Settings) -> list[Tarefa]:
                 executar=_coletar_tempo_jogo,
             )
         )
+    tarefas.append(
+        Tarefa(
+            nome="agentes_valorant",
+            intervalo_segundos=settings.agendador_agentes_minutos * 60,
+            executar=_coletar_agentes_valorant,
+        )
+    )
     return tarefas
 
 

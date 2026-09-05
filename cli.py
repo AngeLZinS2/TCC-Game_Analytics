@@ -26,6 +26,7 @@ FONTES = (
     "valve-standings",
     "itad",
     "hltb",
+    "valorant-agentes",
 )
 
 
@@ -286,6 +287,13 @@ def _construir_coletor(args: argparse.Namespace, storage):
             forcar_lookup=args.forcar_lookup,
         )
 
+    if args.fonte == "valorant-agentes":
+        from collectors.valorant_agentes import AgentesValorantCollector
+
+        # Sem `settings` nem `limite`: e uma chamada so, sem paginacao e
+        # sem escolha de quais agentes trazer - o elenco e o elenco.
+        return AgentesValorantCollector(raw_storage=storage)
+
     if args.fonte == "hltb":
         from collectors.hltb_collector import HltbCollector
 
@@ -334,6 +342,10 @@ def _carregador(fonte: str):
         from etl.load_hltb import carregar
 
         return carregar
+    if fonte == "valorant-agentes":
+        from etl.load_valorant import carregar_agentes
+
+        return carregar_agentes
     from etl.load_dota import carregar
 
     return carregar

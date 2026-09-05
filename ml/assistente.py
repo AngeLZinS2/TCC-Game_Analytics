@@ -52,6 +52,9 @@ from sqlalchemy import Integer, cast, desc, func, select
 from collectors import itad_loja, steam_descoberta, steam_loja
 from config import get_settings
 from db.models import (
+    AgendaPartida,
+    DimEquipe,
+    DimJogo,
     DimJogoSteam,
     DimPartida,
     DimPersonagem,
@@ -128,6 +131,7 @@ e diga que a busca foi feita na loja neste momento e que esses jogos não são \
 do nosso banco. NUNCA afirme quantos jogadores cabem numa partida, tamanho de \
 grupo ou "suporta squad de N" - a loja não informa isso, e o próprio bloco \
 avisa. O que está confirmado é que cada um tem modo online.
+12. O bloco "Volumes do banco" lista os jogos de esports que cobrimos. NUNCA diga que um jogo listado ali "não está no nosso banco" - diga o que temos dele (equipes, agenda, elenco) e o que falta. A última linha desse bloco diz para quais jogos existe dado de PARTIDA: só para esses cabe falar de winrate, pick rate, desempenho ou "meta". Para os outros, responder "o melhor personagem é X" seria opinião com cara de medição - diga que falta a coleta de partidas desse jogo.
 """
 
 
@@ -291,7 +295,79 @@ def _bloco_geral(sessao) -> Bloco:
         f"Avaliacoes da Steam com texto: {avaliacoes}",
         f"Ultima janela de coleta da Steam: {ultima:%d/%m/%Y %H:%M UTC}" if ultima else "",
     ]
-    return Bloco("geral", "Volumes do banco", "\n".join(l for l in linhas if l))
+
+    # O filtro tira a linha da ultima coleta quando nao ha coleta nenhuma; a
+    # cobertura entra depois dele para poder ter linha em branco de separacao.
+    corpo = [linha for linha in linhas if linha]
+    corpo.extend(["", *_linhas_cobertura(sessao)])
+
+    return Bloco("geral", "Volumes do banco", "\n".join(corpo).strip())
+
+
+def _linhas_cobertura(sessao) -> list[str]:
+    """Que jogos de esports a plataforma cobre, e com que profundidade.
+
+    Existe por causa de uma resposta errada, nao por completude: perguntado
+    sobre Valorant, o assistente respondia "Valorant nao esta no nosso banco" e
+    caia no conhecimento geral. Era falso - VALORANT esta em `dim_jogo` com 87
+    equipes e 87 confrontos na agenda, vindos da Liquipedia. O modelo so nao
+    tinha como saber: nenhum bloco falava dos outros jogos, e o unico bloco de
+    personagem consultava herois de Dota.
+
+    A ultima linha e a mais importante das duas dezenas: ela separa "temos o
+    jogo" de "temos partida do jogo". Sem ela, ver "VALORANT: 29 agentes" faria
+    o modelo achar que da pra ranquear agente por desempenho - e nao da, porque
+    nenhuma partida de Valorant foi coletada.
+    """
+    contagens = sessao.execute(
+        select(
+            DimJogo.nome,
+            select(func.count())
+            .select_from(DimEquipe)
+            .where(DimEquipe.id_jogo == DimJogo.id_jogo)
+            .scalar_subquery(),
+            select(func.count())
+            .select_from(AgendaPartida)
+            .where(AgendaPartida.id_jogo == DimJogo.id_jogo)
+            .scalar_subquery(),
+            select(func.count())
+            .select_from(DimPartida)
+            .where(DimPartida.id_jogo == DimJogo.id_jogo)
+            .scalar_subquery(),
+            select(func.count())
+            .select_from(DimPersonagem)
+            .where(DimPersonagem.id_jogo == DimJogo.id_jogo)
+            .scalar_subquery(),
+        ).order_by(DimJogo.nome)
+    ).all()
+
+    cobertos = [linha for linha in contagens if any(linha[1:])]
+    if not cobertos:
+        return []
+
+    linhas = [
+        "Jogos de esports no nosso banco (equipes e agenda vem da Liquipedia):"
+    ]
+    com_partida: list[str] = []
+    for nome, equipes, agenda, partidas, personagens in cobertos:
+        partes = []
+        if equipes:
+            partes.append(f"{equipes} equipes")
+        if agenda:
+            partes.append(f"{agenda} confrontos na agenda")
+        if partidas:
+            partes.append(f"{partidas} partidas com dado de jogador")
+            com_partida.append(nome)
+        if personagens:
+            partes.append(f"{personagens} personagens/agentes")
+        linhas.append(f"- {nome}: {', '.join(partes)}")
+
+    linhas.append(
+        "Dado de PARTIDA (quem jogou, com qual personagem, quem venceu) existe "
+        f"so para: {', '.join(com_partida) or 'nenhum jogo'}. Nos outros da pra "
+        "falar de equipes, agenda e elenco - nao de winrate, pick rate nem meta."
+    )
+    return linhas
 
 
 def _bloco_steam(sessao) -> tuple[Bloco, SerieAssistente]:
@@ -522,6 +598,87 @@ def _bloco_recomendacao(
         Bloco("recomendacao", f"Recomendação ({rotulo}) - catálogo próprio", "\n".join(linhas)),
         candidatos,
     )
+
+
+# ---------------------------------------------------------------------------
+# Elenco de personagens de um jogo sem dado de partida
+# ---------------------------------------------------------------------------
+
+
+def _bloco_elenco(pergunta: str, sessao) -> tuple[Bloco | None, SerieAssistente | None]:
+    """O elenco do jogo que a pergunta cita, quando o elenco e tudo que temos.
+
+    Nasce da pergunta "qual o melhor agente do Valorant no meta atual?", que o
+    assistente respondia com "Valorant nao esta no nosso banco" - falso - e
+    depois com o conhecimento geral do modelo.
+
+    O bloco so entra para jogo SEM partida coletada. Para Dota, que tem 115
+    partidas, quem responde e `_bloco_herois`, com winrate medido; listar o
+    elenco ali seria repetir pior o que ja existe.
+
+    E ele carrega a recusa junto com o dado, de proposito. Elenco responde
+    "quem existe e de que funcao"; nao responde "quem esta forte agora", porque
+    isso exige taxa de escolha e de vitoria, que so sai de partida coletada.
+    Sem essa frase no contexto, ver 29 agentes listados convida o modelo a
+    ordenar os oito duelistas por conta propria.
+    """
+    normalizada = _normalizar(pergunta)
+    tokens = re.findall(r"[a-z0-9]+", normalizada)
+    trechos = {
+        " ".join(tokens[i:j])
+        for i in range(len(tokens))
+        for j in range(i + 1, min(i + 4, len(tokens)) + 1)
+    }
+
+    candidatos = sessao.execute(
+        select(
+            DimJogo.id_jogo,
+            DimJogo.nome,
+            select(func.count())
+            .select_from(DimPartida)
+            .where(DimPartida.id_jogo == DimJogo.id_jogo)
+            .scalar_subquery(),
+        )
+    ).all()
+
+    alvo = None
+    for id_jogo, nome, partidas in candidatos:
+        if partidas:
+            continue
+        if _normalizar(nome) in trechos:
+            alvo = (id_jogo, nome)
+            break
+    if alvo is None:
+        return None, None
+
+    id_jogo, nome_jogo = alvo
+    elenco = sessao.execute(
+        select(DimPersonagem.nome, DimPersonagem.papel)
+        .where(DimPersonagem.id_jogo == id_jogo)
+        .order_by(DimPersonagem.papel, DimPersonagem.nome)
+    ).all()
+    if not elenco:
+        return None, None
+
+    por_papel: dict[str, list[str]] = {}
+    for nome_personagem, papel in elenco:
+        por_papel.setdefault(papel or "sem funcao declarada", []).append(nome_personagem)
+
+    linhas = [f"Elenco de {nome_jogo} no nosso banco, por funcao:"]
+    for papel, nomes in sorted(por_papel.items()):
+        linhas.append(f"- {papel} ({len(nomes)}): {', '.join(nomes)}")
+    linhas.append(
+        f"NAO temos nenhuma partida de {nome_jogo} coletada. Sem partida nao ha "
+        "taxa de escolha, taxa de vitoria nem desempenho por personagem - "
+        "entao NAO existe resposta com dado para 'melhor personagem', 'mais "
+        "forte' ou 'meta atual' deste jogo. Diga isso e diga o que temos "
+        "(elenco, funcao, equipes, agenda). Se for falar do meta mesmo assim, "
+        "use o prefixo 'Fora dos dados: ' e nao escreva numero nenhum."
+    )
+
+    # Sem serie: o elenco e uma lista nominal, nao uma grandeza. Um grafico de
+    # "8 duelistas, 7 sentinelas" contaria o nosso recorte, nao o jogo.
+    return Bloco("elenco", f"Elenco de {nome_jogo}", "\n".join(linhas)), None
 
 
 # ---------------------------------------------------------------------------
@@ -1314,6 +1471,10 @@ def montar_contexto(pergunta: str) -> ContextoMontado:
                 blocos.append(bloco)
                 if serie is not None and serie.itens:
                     series.append(serie)
+
+        elenco, _ = _bloco_elenco(pergunta, sessao)
+        if elenco is not None:
+            blocos.append(elenco)
 
         ao_vivo, jogo_ao_vivo = _bloco_steam_ao_vivo(pergunta, sessao)
         if ao_vivo is not None:

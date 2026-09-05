@@ -399,9 +399,16 @@ class DimPersonagem(Base):
         Integer, primary_key=True, autoincrement=True
     )
     id_jogo: Mapped[int] = mapped_column(ForeignKey("dim_jogo.id_jogo"), nullable=False)
-    id_externo: Mapped[str] = mapped_column(String(32), nullable=False)
+    #: 64 e nao 32 porque a chave natural muda de forma com a fonte: o heroi da
+    #: OpenDota e um inteiro ("112"), o agente do Valorant e um uuid de 36.
+    id_externo: Mapped[str] = mapped_column(String(64), nullable=False)
     nome: Mapped[str] = mapped_column(String(64), nullable=False)
     nome_interno: Mapped[str | None] = mapped_column(String(64))
+    #: Funcao dentro do time, como a FONTE do jogo classifica - "Duelista",
+    #: "Sentinela". Nula no Dota de proposito: a OpenDota nao classifica heroi
+    #: por funcao de forma estavel (o mesmo heroi e carry num jogo e suporte no
+    #: outro), e fixar um papel aqui seria dado nosso vestido de dado da fonte.
+    papel: Mapped[str | None] = mapped_column(String(32))
 
     __table_args__ = (
         UniqueConstraint("id_jogo", "id_externo", name="uq_personagem_jogo_externo"),

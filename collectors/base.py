@@ -78,6 +78,17 @@ class BaseCollector(ABC, Generic[TParsed]):
         """Grava os payloads antes de qualquer normalizacao."""
         return self.raw_storage.salvar_muitos(registros)
 
+    def close(self) -> None:
+        """Libera o que o coletor abriu. Sem efeito por padrao.
+
+        A CLI chama isto num `finally` para todo coletor, e ate aqui o metodo
+        so existia por convencao - cada subclasse declarava o seu porque todas
+        seguravam um cliente HTTP com sessao. O primeiro coletor que nao
+        segurava nada (uma chamada unica, sem sessao) quebrou na CLI com
+        `AttributeError` depois de ja ter coletado e gravado tudo. O contrato
+        e da base, entao o padrao mora aqui.
+        """
+
     def load(self, dados: TParsed) -> int:
         """Persiste os dados normalizados. Sobrescrever quando houver banco."""
         raise NotImplementedError
