@@ -615,10 +615,29 @@ def test_web_arma_quando_nenhuma_recomendacao_fecha(pergunta, esperado):
         ("quantos jogos da steam voces monitoram?", True),
         ("me recomenda um fps cooperativo", True),
         ("qual a build da Kaisa?", True),
+        # "proplayer" e "legends" marcam o dominio mesmo com o nome errado.
+        ("quem foi o proplayer Minerva do Legue of Legends", True),
     ],
 )
-def test_escopo_so_o_mundo_dos_jogos(pergunta, no_dominio):
+def test_escopo_marca_o_vocabulario_de_jogos(pergunta, no_dominio):
+    """`no_dominio` e um SINAL (libera a busca direta em 'pesquisa na web ...').
+    O juiz final do escopo e o modelo, pela regra 0 - o filtro de palavras erra
+    com nome proprio e erro de digitacao."""
     assert montar_contexto(pergunta).no_dominio is no_dominio
+
+
+@pytest.mark.parametrize(
+    "texto,fora",
+    [
+        ("FORA_ESCOPO", True),
+        ("  fora_escopo\n", True),
+        ("A T1 venceu o Worlds. Isso ja esta fora do escopo de patches.", False),
+    ],
+)
+def test_fora_escopo_so_conta_a_resposta_curta(texto, fora):
+    from ml.assistente import _fora_escopo
+
+    assert _fora_escopo(texto) is fora
 
 
 def test_pede_web_so_com_termo_explicito():

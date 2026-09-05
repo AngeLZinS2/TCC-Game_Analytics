@@ -76,14 +76,16 @@ INSTRUCAO = """\
 Você é o assistente de dados do Gaming Analytics, uma plataforma de coleta e \
 análise de dados de jogos e esports.
 
-REGRA 0, acima de todas: você SÓ responde sobre o mundo dos jogos e esports - \
-jogos (de qualquer plataforma), lojas e preços, partidas, torneios, times, \
-jogadores, personagens/heróis/agentes, patches, meta, streamers, e a própria \
-plataforma Gaming Analytics. Se a pergunta for de qualquer outro assunto \
-(história, política, ciência, geografia, celebridades fora dos games, \
-conselhos de vida, matemática, etc.), responda EXATAMENTE isto e nada mais: \
-"Só respondo sobre o mundo dos jogos e esports - essa pergunta está fora do \
-que o Gaming Analytics cobre."
+REGRA 0, acima de todas - ESCOPO. Você SÓ trata do mundo dos jogos e esports: \
+jogos de qualquer plataforma, lojas e preços, partidas, torneios, times, \
+jogadores e pro players, personagens/heróis/agentes, patches, meta, streamers, \
+e a própria plataforma Gaming Analytics. Se a pergunta for de OUTRO assunto \
+(história, política, ciência, geografia, culinária, celebridades de fora dos \
+games, conselhos de vida, matemática...), sua resposta inteira deve ser SÓ \
+esta linha, nada mais: FORA_ESCOPO
+Na dúvida entre "é de jogos" e "não é", trate como sendo de jogos e responda. \
+Um nome próprio junto de "pro player", "jogador", "time", "campeonato" ou de um \
+jogo (mesmo com erro de digitação) É do escopo.
 
 O CONTEXTO abaixo vem em blocos, e cada bloco declara a FONTE dele:
 
@@ -151,8 +153,7 @@ avisa. O que está confirmado é que cada um tem modo online.
 13. Quando houver um bloco "Elenco e desempenho de X - OP.GG", ele responde "melhor campeão/agente" e "meta" desse jogo. Use os números dele, diga "segundo o OP.GG" e que é do público geral com classificação, NÃO do cenário profissional. Se a pergunta for sobre o meta PROFISSIONAL/competitivo, diga que esse recorte não responde isso. Se o mapa de capacidade diz que o jogo TEM desempenho por personagem mas NENHUM bloco com esses números veio no contexto, NÃO invente winrate, pick rate ou nomes: diga que o dado existe na tela /herois e que nesta resposta ele não foi carregado.
 14. Quando houver um bloco "Guia de build - X", ele responde "como jogar / o que buildar / ordem de subir a habilidade / runas" desse personagem. Liste os itens por fase, a prioridade de habilidade e as runas COMO ESTÃO no bloco. É dado do OP.GG/OpenDota (público geral), não do cenário profissional, e é da última coleta - não é ao vivo.
 15. Quando houver um bloco "Modelo de confronto", ele diz para quais jogos existe modelo de previsão ajustado. Se a pergunta pedir previsão de um confronto de um jogo SEM modelo na lista, diga que ainda não há modelo para esse jogo. Se o bloco disser que a acurácia não supera a taxa base, a resposta precisa dizer isso - não venda a previsão como confiável.
-16. BUSCA NA WEB. Antes de responder, decida: o CONTEXTO tem como responder esta pergunta? Se NÃO, e a pergunta pede um fato do mundo real que a web resolveria (resultado ou campeão de um torneio, notícia, data de lançamento, patch atual, quem é uma pessoa, comparação entre jogos que não temos), então sua resposta inteira deve ser SÓ esta linha, sem mais nada: PRECISA_WEB
-   Se o CONTEXTO responde, ignore isto e responda normalmente pelas regras acima.
+16. BUSCA NA WEB. Antes de responder, decida nesta ordem: (a) a pergunta é do mundo dos jogos/esports? Se NÃO -> só "FORA_ESCOPO" (regra 0). (b) O CONTEXTO responde? Se responde, responda normalmente. (c) Se é de jogos mas o CONTEXTO não tem (resultado/campeão de torneio, quem é um jogador, notícia, data de lançamento, patch atual, comparação entre jogos que não temos) -> sua resposta inteira deve ser SÓ esta linha: PRECISA_WEB
 17. Numa resposta em MODO WEB (o sistema avisa), os resultados da busca já vêm no contexto. Use-os, inclusive números, MAS: (a) atribua cada afirmação à fonte - "segundo <site/página>", nunca como medição nossa; (b) se os resultados forem rasos, velhos ou se contradisserem, diga que a web não deu resposta firme; (c) não vá além do que os resultados dizem. Sem nada útil na web, aí sim a regra 3.
 """
 
@@ -2030,9 +2031,11 @@ TERMOS_DOMINIO = (
     "co-op", "coop", "pvp", "pve", "raid", "boss", "loot", "grind",
     "plataforma", "nosso sistema", "nosso site", "nosso banco", "dashboard",
     "coleta", "modelo de previsao", "winrate", "pick rate", "kda",
-    "jogador", "jogadora", "pro player", "atleta", "roster", "escalacao",
-    "midlane", "toplane", "jungle", "jungler", "adc", "carry", "igl",
-    "draft", "clutch", "headshot",
+    "jogador", "jogadora", "pro player", "proplayer", "pro-player", "atleta",
+    "roster", "escalacao", "midlane", "toplane", "jungle", "jungler", "adc",
+    "carry", "igl", "draft", "clutch", "headshot", "legends", "worlds",
+    "lck", "lpl", "lcs", "lec", "cblol", "esl", "iem", "blast", "invitational",
+    "the international",
 )
 
 
@@ -2053,6 +2056,19 @@ def _pede_web(pergunta: str) -> bool:
 #: O sinal que o modelo emite (regra 16) quando o CONTEXTO nao responde e a web
 #: resolveria. `perguntar` intercepta e refaz a chamada com a busca ligada.
 SINAL_WEB = "PRECISA_WEB"
+
+#: O sinal da regra 0: a pergunta nao e do mundo dos jogos.
+SINAL_FORA = "FORA_ESCOPO"
+
+
+def _fora_escopo(texto: str) -> bool:
+    """`True` quando a resposta e so o sinal de fora do escopo (regra 0).
+
+    Curta de proposito: uma resposta longa que por acaso cita "fora do escopo"
+    no meio ja e uma resposta de verdade.
+    """
+    limpo = (texto or "").strip()
+    return SINAL_FORA in limpo.upper() and len(limpo) < 120
 
 #: Rede de seguranca: se o modelo nao emitiu o sinal mas a resposta curta e so
 #: uma recusa, tambem vale como "sem resposta".
@@ -2129,9 +2145,7 @@ def perguntar(pergunta: str) -> Resposta:
     contexto_montado = montar_contexto(pergunta)
     blocos = contexto_montado.blocos
 
-    # Fora do escopo: nem chama o modelo. A recusa e fixa, e a web NAO busca -
-    # "qual o pior rei da Espanha" nao vira aula de historia.
-    if not contexto_montado.no_dominio:
+    def _fora_do_escopo() -> Resposta:
         return Resposta(
             pergunta=pergunta,
             resposta=(
@@ -2197,26 +2211,37 @@ def perguntar(pergunta: str) -> Resposta:
             ],
         }
 
-    web_liberada = (
-        settings.assistente_web_habilitada
+    # A busca ja na primeira chamada so quando a pergunta pede na cara ("pesquisa
+    # na web ...") E o filtro de palavras nao a marcou como claramente fora do
+    # mundo dos jogos.
+    web_ligada = settings.assistente_web_habilitada
+    web_na_primeira = (
+        web_ligada
         and contexto_montado.web_sugerida
         and contexto_montado.no_dominio
+        and _pede_web(pergunta)
     )
-    web_na_primeira = web_liberada and _pede_web(pergunta)
 
     usou_web = web_na_primeira
     saida = _chamar_modelo(_corpo_web() if web_na_primeira else _corpo(), settings)
 
-    # Segunda tentativa COM a busca, quando a primeira nao achou nos nossos
-    # dados. So aqui - assim a maioria das perguntas (que a base responde)
-    # custa uma chamada, nao duas nem uma busca paga.
+    # Escopo: o modelo (regra 0) responde `FORA_ESCOPO` quando a pergunta nao e
+    # do mundo dos jogos. E ele o juiz - o filtro de palavras erra ("Legue of
+    # Legends" com erro de digitacao passava batido).
+    if _fora_escopo(saida["texto"]):
+        return _fora_do_escopo()
+
+    # Segunda tentativa COM a busca, quando a primeira nao achou (o modelo pede
+    # com `PRECISA_WEB`, ou a resposta curta e so uma recusa). So aqui - assim a
+    # maioria das perguntas (que a base responde) custa uma chamada, sem busca.
     if (
-        web_liberada
+        web_ligada
+        and contexto_montado.web_sugerida
         and not web_na_primeira
         and _parece_sem_resposta(saida["texto"])
     ):
         segunda = _chamar_modelo(_corpo_web(), settings)
-        if segunda["texto"]:
+        if segunda["texto"] and not _fora_escopo(segunda["texto"]):
             saida = segunda
             usou_web = True
 
