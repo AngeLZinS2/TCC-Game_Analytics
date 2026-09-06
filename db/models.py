@@ -573,6 +573,11 @@ class AgendaPartida(Base):
     vitoria_a: Mapped[bool | None] = mapped_column(Boolean)
     placar_a: Mapped[int | None] = mapped_column(Integer)
     placar_b: Mapped[int | None] = mapped_column(Integer)
+    #: Placar por mapa e linha de cada jogador (agente, ACS, K/D/A, ADR, HS%),
+    #: quando a fonte publica - hoje so Valorant, do vlr.gg. `None` fora disso e
+    #: para partida ainda nao decidida. Formato: `{mapas: [{nome, placar_a,
+    #: placar_b, jogadores: [{nome, time, agente, acs, k, d, a, adr, hs}]}]}`.
+    detalhe: Mapped[dict | None] = mapped_column(JSONB)
 
     __table_args__ = (
         UniqueConstraint("id_jogo", "id_externo", name="uq_agenda_jogo_externo"),

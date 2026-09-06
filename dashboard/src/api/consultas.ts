@@ -25,6 +25,7 @@ import type {
   ComparacaoSentimento,
   ConfrontoAgendado,
   ConfrontoResultado,
+  DetalheConfronto,
   DetalhePersonagem,
   PerfilEsporte,
   ResumoConfrontos,
@@ -313,6 +314,17 @@ export function useConfrontos(jogo: string, pagina = 1, limite = 20) {
         limite,
       }),
     placeholderData: (anterior) => anterior,
+  });
+}
+
+export function useConfrontoDetalhe(idExterno: string | null) {
+  return useQuery({
+    queryKey: ["partidas", "confronto-detalhe", idExterno],
+    enabled: idExterno !== null,
+    queryFn: () =>
+      buscar<DetalheConfronto>("/api/partidas/confronto-detalhe", {
+        id_externo: idExterno as string,
+      }),
   });
 }
 

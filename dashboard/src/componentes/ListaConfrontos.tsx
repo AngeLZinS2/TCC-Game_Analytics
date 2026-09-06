@@ -12,8 +12,12 @@
  * legível sem imagem nenhuma, em vez de abrir um buraco.
  */
 
+import { useState } from "react";
+
 import type { ConfrontoResultado } from "../api/tipos";
 import { fmtDataHora } from "../utilitarios/formatos";
+import { ModalConfrontoDetalhe } from "./ModalConfrontoDetalhe";
+import { Icone } from "./base";
 
 /** O lado de um confronto: escudo, nome e placar, com o vencedor em destaque. */
 function Lado({
@@ -75,12 +79,21 @@ function Lado({
 }
 
 export function ListaConfrontos({ confrontos }: { confrontos: ConfrontoResultado[] }) {
+  // `id_externo` do confronto cujo detalhe por mapa esta aberto no modal.
+  const [aberto, setAberto] = useState<string | null>(null);
+
   return (
+    <>
     <ul className="flex flex-col gap-space-xs">
       {confrontos.map((c) => (
         <li
           key={c.id_externo}
-          className="flex flex-col gap-space-xs rounded-lg bg-surface-container-lowest p-space-sm"
+          onClick={c.tem_detalhe ? () => setAberto(c.id_externo) : undefined}
+          className={`flex flex-col gap-space-xs rounded-lg bg-surface-container-lowest p-space-sm ${
+            c.tem_detalhe
+              ? "cursor-pointer transition-colors hover:bg-surface-container-high/60"
+              : ""
+          }`}
         >
           <div className="flex items-center gap-space-sm">
             <Lado
@@ -110,6 +123,12 @@ export function ListaConfrontos({ confrontos }: { confrontos: ConfrontoResultado
               </span>
             )}
             {c.formato && <span className="shrink-0">· {c.formato}</span>}
+            {c.tem_detalhe && (
+              <span className="inline-flex shrink-0 items-center gap-space-xxs text-primary">
+                <Icone nome="scoreboard" className="text-[14px]" />
+                stats por mapa
+              </span>
+            )}
             <span className="ml-auto shrink-0 tabular-nums">
               {fmtDataHora(c.inicio_previsto)}
             </span>
@@ -117,5 +136,8 @@ export function ListaConfrontos({ confrontos }: { confrontos: ConfrontoResultado
         </li>
       ))}
     </ul>
+
+    <ModalConfrontoDetalhe idExterno={aberto} aoFechar={() => setAberto(null)} />
+    </>
   );
 }

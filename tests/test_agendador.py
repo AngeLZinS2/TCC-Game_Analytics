@@ -147,6 +147,7 @@ def test_intervalos_vem_da_configuracao():
         agendador_esports_opgg_minutos = 360
         agendador_vlr_minutos = 1440
         agendador_vlr_rankings_minutos = 10080
+        agendador_vlr_detalhes_minutos = 1440
         agendador_treino_confronto_minutos = 480
         opgg_enabled = True
         itad_api_key = "chave-de-teste"
@@ -165,6 +166,7 @@ def test_intervalos_vem_da_configuracao():
         "esports_opgg": 21600,
         "vlr": 86400,
         "vlr_rankings": 604800,
+        "vlr_detalhes": 86400,
         "treino_confronto": 28800,
         "agentes_valorant": 604800,
         "campeoes_lol": 604800,
@@ -187,6 +189,7 @@ def test_tarefa_de_preco_so_entra_com_chave_do_itad():
         agendador_esports_opgg_minutos = 360
         agendador_vlr_minutos = 1440
         agendador_vlr_rankings_minutos = 10080
+        agendador_vlr_detalhes_minutos = 1440
         agendador_treino_confronto_minutos = 480
         opgg_enabled = True
         itad_api_key = None
@@ -211,6 +214,7 @@ def test_tarefa_de_tempo_jogo_nao_entra_quando_desabilitada():
         agendador_esports_opgg_minutos = 360
         agendador_vlr_minutos = 1440
         agendador_vlr_rankings_minutos = 10080
+        agendador_vlr_detalhes_minutos = 1440
         agendador_treino_confronto_minutos = 480
         opgg_enabled = True
         itad_api_key = None

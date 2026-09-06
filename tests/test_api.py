@@ -194,6 +194,38 @@ def test_resumo_de_confrontos_de_jogo_inexistente_nao_estoura(
     assert corpo["por_formato"] == []
 
 
+def test_confronto_detalhe_bate_com_a_flag_da_lista(cliente: TestClient) -> None:
+    """`tem_detalhe` na lista e o endpoint de detalhe tem que concordar.
+
+    A linha so vira clicavel quando `tem_detalhe` e verdadeiro; se o endpoint
+    de detalhe devolvesse 404 nesse caso, o clique abriria um modal vazio.
+    """
+    lista = cliente.get(
+        "/api/partidas/confrontos", params={"jogo": "valorant", "limite": 50}
+    ).json()
+    com_detalhe = [c for c in lista if c["tem_detalhe"]]
+    if not com_detalhe:
+        pytest.skip("nenhum confronto de valorant com detalhe por mapa coletado")
+
+    corpo = cliente.get(
+        "/api/partidas/confronto-detalhe",
+        params={"id_externo": com_detalhe[0]["id_externo"]},
+    )
+    assert corpo.status_code == 200
+    dados = corpo.json()
+    assert dados["mapas"]
+    primeiro = dados["mapas"][0]
+    assert {"nome", "placar_a", "placar_b", "jogadores"} <= set(primeiro)
+    assert primeiro["jogadores"], "mapa sem linha de jogador"
+
+
+def test_confronto_detalhe_sem_dado_devolve_404(cliente: TestClient) -> None:
+    resposta = cliente.get(
+        "/api/partidas/confronto-detalhe", params={"id_externo": "vlr:0"}
+    )
+    assert resposta.status_code == 404
+
+
 def test_perfil_declara_o_vocabulario_de_cada_esporte(cliente: TestClient) -> None:
     """Um MOBA e um tatico nao compartilham estatistica.
 

@@ -17,8 +17,11 @@ from sqlalchemy.orm import Session, aliased
 
 from api.schemas import (
     ConfrontoResultado,
+    DetalheConfronto,
     DetalhePersonagem,
     EstatisticaMapa,
+    JogadorNoMapa,
+    MapaDoConfronto,
     GuiaPersonagem,
     HabilidadePersonagem,
     MetricaEsporte,
@@ -428,6 +431,7 @@ def listar_confrontos(
             equipe_b.logo_url,
             equipe_a.tag,
             equipe_b.tag,
+            AgendaPartida.detalhe.is_not(None),
         )
         .join(DimJogo, DimJogo.id_jogo == AgendaPartida.id_jogo)
         .outerjoin(equipe_a, equipe_a.id_equipe == AgendaPartida.id_equipe_a)
@@ -456,9 +460,52 @@ def listar_confrontos(
             equipe_b_logo=linha[10],
             equipe_a_tag=linha[11],
             equipe_b_tag=linha[12],
+            tem_detalhe=bool(linha[13]),
         )
         for linha in sessao.execute(consulta)
     ]
+
+
+@router.get("/confronto-detalhe", response_model=DetalheConfronto)
+def confronto_detalhe(
+    id_externo: str, sessao: Session = Depends(get_db)
+) -> DetalheConfronto:
+    """O placar por mapa e a linha de cada jogador de um confronto decidido.
+
+    Vem de `agenda_partida.detalhe` (JSONB), preenchido pelo coletor
+    `vlr-detalhes` para Valorant. 404 quando o confronto nao existe ou ainda
+    nao tem detalhe coletado.
+    """
+    linha = sessao.execute(
+        select(
+            AgendaPartida.equipe_a_nome,
+            AgendaPartida.equipe_b_nome,
+            AgendaPartida.detalhe,
+        ).where(AgendaPartida.id_externo == id_externo)
+    ).first()
+    if linha is None or not linha[2]:
+        raise HTTPException(status_code=404, detail="confronto sem detalhe coletado")
+
+    detalhe = linha[2]
+    return DetalheConfronto(
+        id_externo=id_externo,
+        equipe_a_nome=linha[0],
+        equipe_b_nome=linha[1],
+        fonte=detalhe.get("fonte", "vlr.gg"),
+        mapas=[
+            MapaDoConfronto(
+                nome=m.get("nome"),
+                duracao=m.get("duracao"),
+                placar_a=m.get("placar_a"),
+                placar_b=m.get("placar_b"),
+                jogadores=[
+                    JogadorNoMapa(**{c: j.get(c) for c in JogadorNoMapa.model_fields})
+                    for j in m.get("jogadores") or []
+                ],
+            )
+            for m in detalhe.get("mapas") or []
+        ],
+    )
 
 
 @router.get("/por-dia", response_model=list[PartidasPorDia])

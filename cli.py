@@ -32,6 +32,7 @@ FONTES = (
     "dota-herois",
     "vlr",
     "vlr-rankings",
+    "vlr-detalhes",
 )
 
 
@@ -316,6 +317,11 @@ def _construir_coletor(args: argparse.Namespace, storage):
         from collectors.vlr_rankings import VlrRankingsCollector
 
         return VlrRankingsCollector(raw_storage=storage)
+
+    if args.fonte == "vlr-detalhes":
+        from collectors.vlr_detalhes import VlrDetalhesCollector
+
+        return VlrDetalhesCollector(raw_storage=storage)
 
     if args.fonte == "valorant-agentes":
         from collectors.valorant_agentes import AgentesValorantCollector

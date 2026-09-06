@@ -902,6 +902,41 @@ class ConfrontoResultado(BaseModel):
     placar_b: int | None
     #: `None` em empate - existe em fase de grupos de alguns formatos.
     vitoria_a: bool | None
+    #: `True` quando ha placar por mapa e stats por jogador (Valorant, do
+    #: vlr.gg). A tela abre o detalhe so nesses.
+    tem_detalhe: bool = False
+
+
+class JogadorNoMapa(BaseModel):
+    nome: str
+    time: str
+    agente: str | None
+    rating: float | None
+    acs: float | None
+    k: int | None
+    d: int | None
+    a: int | None
+    adr: float | None
+    hs: float | None
+
+
+class MapaDoConfronto(BaseModel):
+    nome: str | None
+    duracao: str | None
+    placar_a: int | None
+    placar_b: int | None
+    jogadores: list[JogadorNoMapa] = []
+
+
+class DetalheConfronto(BaseModel):
+    """Placar por mapa e linha de cada jogador - o que a tela de detalhe da
+    partida mostra, como a do vlr.gg. So Valorant tem, por ora."""
+
+    id_externo: str
+    equipe_a_nome: str
+    equipe_b_nome: str
+    fonte: str
+    mapas: list[MapaDoConfronto] = []
 
 
 class ConfrontoAgendado(BaseModel):

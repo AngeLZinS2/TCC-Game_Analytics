@@ -776,6 +776,37 @@ export interface ConfrontoResultado {
   placar_b: number | null;
   /** `null` em empate — existe em fase de grupos de alguns formatos. */
   vitoria_a: boolean | null;
+  /** `true` quando há placar por mapa e stats por jogador (Valorant/vlr.gg). */
+  tem_detalhe: boolean;
+}
+
+export interface JogadorNoMapa {
+  nome: string;
+  time: string;
+  agente: string | null;
+  rating: number | null;
+  acs: number | null;
+  k: number | null;
+  d: number | null;
+  a: number | null;
+  adr: number | null;
+  hs: number | null;
+}
+
+export interface MapaDoConfronto {
+  nome: string | null;
+  duracao: string | null;
+  placar_a: number | null;
+  placar_b: number | null;
+  jogadores: JogadorNoMapa[];
+}
+
+export interface DetalheConfronto {
+  id_externo: string;
+  equipe_a_nome: string;
+  equipe_b_nome: string;
+  fonte: string;
+  mapas: MapaDoConfronto[];
 }
 
 export interface ConfrontoAgendado {

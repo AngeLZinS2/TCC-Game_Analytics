@@ -222,6 +222,12 @@ class Settings(BaseSettings):
     #: um snapshot por semana ja da a serie que a validacao point-in-time usa.
     agendador_vlr_rankings_minutos: int = Field(default=10080, ge=1440)
 
+    #: Intervalo da raspagem do detalhe por mapa/jogador das partidas de
+    #: Valorant do vlr.gg. Diario e so algumas por rodada: a pagina e pesada
+    #: (~700 KB) e a fila (partida decidida sem `detalhe`) so cresce quando ha
+    #: jogo novo, entao a rodada diaria alcanca sem pressa.
+    agendador_vlr_detalhes_minutos: int = Field(default=1440, ge=60)
+
     #: Intervalo entre reajustes da previsao de confronto, em minutos.
     #:
     #: Oito horas, um pouco atras da coleta mais rapida que o alimenta (a do
