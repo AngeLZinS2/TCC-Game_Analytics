@@ -211,6 +211,12 @@ class Settings(BaseSettings):
     #: chamadas por rodada.
     agendador_esports_opgg_minutos: int = Field(default=360, ge=30)
 
+    #: Intervalo da raspagem de partidas de Valorant do vlr.gg, em minutos.
+    #: Diario: o vlr.gg guarda o historico inteiro (paginado), entao nao ha
+    #: risco de perder resultado como no ticker da Liquipedia; a rodada so
+    #: precisa alcancar o que fechou desde ontem.
+    agendador_vlr_minutos: int = Field(default=1440, ge=60)
+
     #: Intervalo entre reajustes da previsao de confronto, em minutos.
     #:
     #: Oito horas, um pouco atras da coleta mais rapida que o alimenta (a do

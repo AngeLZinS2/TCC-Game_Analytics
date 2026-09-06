@@ -868,6 +868,9 @@ class RelatorioConfronto(BaseModel):
     validacao: ValidacaoConfronto
     #: `None` para todo jogo que nao e CS - eles nao tem ranking externo.
     prior_externo: PrioExternoConfronto | None = None
+    #: O peso (log-odds por unidade) que a regressao deu a cada feature de
+    #: contexto pre-partida. Perto de 0 = sem sinal para este jogo.
+    pesos_features: dict[str, float] = {}
     forcas: dict[str, float]
 
 

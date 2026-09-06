@@ -423,6 +423,13 @@ def _coletar_esports_opgg(
         coletor.close()
 
 
+def _coletar_vlr(settings: Settings, storage: RawStorage) -> CollectionResult:
+    """Resultados e agenda de Valorant do vlr.gg."""
+    from collectors.vlr import VlrCollector
+
+    return VlrCollector(raw_storage=storage).run(carregar=True)
+
+
 #: Minimo de confrontos decididos para valer a pena reajustar um jogo.
 #:
 #: O mesmo piso que `ml.confronto.ajustar_e_salvar` exige - abaixo dele ele
@@ -557,6 +564,13 @@ def montar_tarefas(settings: Settings) -> list[Tarefa]:
                 executar=_coletar_esports_opgg,
             )
         )
+    tarefas.append(
+        Tarefa(
+            nome="vlr",
+            intervalo_segundos=settings.agendador_vlr_minutos * 60,
+            executar=_coletar_vlr,
+        )
+    )
     tarefas.append(
         Tarefa(
             nome="treino_confronto",

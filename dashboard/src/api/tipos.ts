@@ -725,6 +725,8 @@ export interface RelatorioConfronto {
   validacao: ValidacaoConfronto;
   /** `null` para todo jogo que nao e CS. */
   prior_externo: PrioExternoConfronto | null;
+  /** Peso (log-odds/unidade) de cada feature de contexto. ~0 = sem sinal. */
+  pesos_features: Record<string, number>;
   forcas: Record<string, number>;
 }
 

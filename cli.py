@@ -30,6 +30,7 @@ FONTES = (
     "opgg-esports",
     "lol-campeoes",
     "dota-herois",
+    "vlr",
 )
 
 
@@ -305,6 +306,11 @@ def _construir_coletor(args: argparse.Namespace, storage):
 
         return OpggEsportsCollector(raw_storage=storage)
 
+    if args.fonte == "vlr":
+        from collectors.vlr import VlrCollector
+
+        return VlrCollector(raw_storage=storage)
+
     if args.fonte == "valorant-agentes":
         from collectors.valorant_agentes import AgentesValorantCollector
 
@@ -366,6 +372,10 @@ def _carregador(fonte: str):
         return carregar_agentes
     if fonte == "opgg-esports":
         from etl.load_opgg_esports import carregar
+
+        return carregar
+    if fonte == "vlr":
+        from etl.load_vlr import carregar
 
         return carregar
     if fonte == "lol-campeoes":
