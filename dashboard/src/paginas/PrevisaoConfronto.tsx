@@ -30,6 +30,7 @@ import {
 } from "../api/consultas";
 import type {
   ConfrontoAgendado,
+  ContribuicaoConfronto,
   EquipeConfronto,
   FatorConfronto,
   LigaConfronto,
@@ -459,8 +460,8 @@ function DetalheConfronto({
           Estatísticas pré-partida
         </h3>
         <p className="mt-space-xxs font-body-sm text-body-sm text-outline">
-          Só a força entra na conta da probabilidade. O resto é o contexto que explica de
-          onde ela veio.
+          A força e as features de contexto marcadas entram na conta. As outras linhas
+          descrevem os times, mas não são somadas — já estão embutidas na força.
         </p>
 
         <div className="mt-space-md grid grid-cols-1 gap-space-sm sm:grid-cols-2 lg:grid-cols-3">
@@ -475,49 +476,85 @@ function DetalheConfronto({
         </div>
 
         <p className="mt-space-md font-body-sm text-body-sm text-outline">
-          <Icone nome="bolt" className="text-[14px] text-primary" /> marca o único fator
-          que entra na conta. As outras linhas descrevem os times, mas não são somadas à
-          probabilidade — já estão embutidas na força, que foi estimada a partir de quem
-          venceu quem.
+          <Icone nome="bolt" className="text-[14px] text-primary" /> marca o que o modelo
+          pesou: a força (estimada de quem venceu quem) e, quando mostraram sinal, a forma
+          recente, o confronto direto e o saldo de placar. Uma feature de contexto só
+          entra com peso positivo — a direção dela é conhecida.
         </p>
       </div>
 
-      {/* ---------- A conta ---------- */}
-      <div className="grid grid-cols-1 gap-space-base sm:grid-cols-2">
-        {(
-          [
-            [
-              "Diferença de força (log-odds)",
-              previsao.contribuicao_forca,
-              3,
-              "Positivo favorece o lado A",
-              TOKENS.primaria,
-            ],
-            [
-              "Vantagem de lado (log-odds)",
-              previsao.contribuicao_lado,
-              4,
-              "O modelo separa isso da qualidade do time",
-              TOKENS.secundaria,
-            ],
-          ] as const
-        ).map(([rotulo, valor, casas, nota, cor]) => (
-          <div key={rotulo} className="rounded-lg bg-surface-container p-space-base">
-            <div className="font-label-caps text-label-caps uppercase tracking-widest text-outline">
-              {rotulo}
+      {/* ---------- A conta: a log-odds decomposta ---------- */}
+      <ContaLogOdds
+        contribuicoes={previsao.contribuicoes}
+        probabilidadeA={previsao.probabilidade_a}
+        nomeA={previsao.equipe_a.nome}
+        nomeB={previsao.equipe_b.nome}
+      />
+    </div>
+  );
+}
+
+/** A soma que vira a probabilidade: cada parcela em log-odds, e a sigmoide no fim. */
+function ContaLogOdds({
+  contribuicoes,
+  probabilidadeA,
+  nomeA,
+  nomeB,
+}: {
+  contribuicoes: ContribuicaoConfronto[];
+  probabilidadeA: number;
+  nomeA: string;
+  nomeB: string;
+}) {
+  const total = contribuicoes.reduce((s, c) => s + c.log_odds, 0);
+  const maior = Math.max(...contribuicoes.map((c) => Math.abs(c.log_odds)), 0.01);
+
+  return (
+    <div className="rounded-lg bg-surface-container p-space-base">
+      <div className="flex items-center justify-between font-label-caps text-label-caps uppercase tracking-widest text-outline">
+        <span>De onde saiu a probabilidade (log-odds)</span>
+        <span>+ favorece {nomeA} · − favorece {nomeB}</span>
+      </div>
+
+      <div className="mt-space-md flex flex-col gap-space-xs">
+        {contribuicoes.map((c) => {
+          const positivo = c.log_odds >= 0;
+          return (
+            <div key={c.rotulo} className="flex items-center gap-space-sm">
+              <span className="w-40 shrink-0 truncate font-body-sm text-body-sm text-on-surface-variant">
+                {c.rotulo}
+              </span>
+              <div className="relative h-3 flex-1 rounded-full bg-surface-container-highest">
+                <div
+                  className="absolute top-0 h-3 rounded-full"
+                  style={{
+                    left: positivo ? "50%" : `${50 - (Math.abs(c.log_odds) / maior) * 50}%`,
+                    width: `${(Math.abs(c.log_odds) / maior) * 50}%`,
+                    background: positivo ? TOKENS.primaria : TOKENS.terciaria,
+                  }}
+                />
+                <div className="absolute left-1/2 top-0 h-3 w-px bg-outline-variant" />
+              </div>
+              <span
+                className="w-16 shrink-0 text-right font-title-code text-title-code tabular-nums"
+                style={{ color: positivo ? TOKENS.primaria : TOKENS.terciaria }}
+              >
+                {positivo ? "+" : ""}
+                {fmtDecimal(c.log_odds, 3)}
+              </span>
             </div>
-            <div
-              className="mt-space-xxs font-headline-kpi text-headline-kpi leading-none"
-              style={{ color: cor }}
-            >
-              {valor >= 0 ? "+" : ""}
-              {fmtDecimal(valor, casas)}
-            </div>
-            <div className="mt-space-xxs font-body-sm text-body-sm text-outline">
-              {nota}
-            </div>
-          </div>
-        ))}
+          );
+        })}
+      </div>
+
+      <div className="mt-space-md flex items-center justify-between border-t border-outline-variant/30 pt-space-sm font-body-sm text-body-sm">
+        <span className="text-on-surface-variant">
+          Soma {fmtDecimal(total, 3)} → sigmoide →{" "}
+          <span className="font-title-code text-title-code text-primary">
+            {fmtPercentual(probabilidadeA * 100, 1)}
+          </span>{" "}
+          para {nomeA}
+        </span>
       </div>
     </div>
   );

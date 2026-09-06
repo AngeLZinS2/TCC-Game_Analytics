@@ -153,6 +153,10 @@ def prever(
             }
             for fator in previsao.fatores
         ],
+        contribuicoes=[
+            {"rotulo": c.rotulo, "log_odds": c.log_odds}
+            for c in previsao.contribuicoes
+        ],
         validacao=relatorio_atual["validacao"],
     )
 

@@ -792,8 +792,16 @@ class FatorConfronto(BaseModel):
     #: Positivo favorece A.
     diferenca: float | None
     unidade: str
-    #: `True` so na forca - os demais sao contexto, nao entram na conta.
+    #: `True` para a força e as features de contexto que o modelo pesou.
     peso_no_modelo: bool
+
+
+class ContribuicaoConfronto(BaseModel):
+    """Uma parcela da log-odds de A vencer. A soma, pela sigmoide, é a
+    probabilidade - a tela desenha de onde o número saiu."""
+
+    rotulo: str
+    log_odds: float
 
 
 class ValidacaoConfronto(BaseModel):
@@ -818,6 +826,8 @@ class PrevisaoConfronto(BaseModel):
     confrontos_diretos: int
     vitorias_diretas_a: int
     fatores: list[FatorConfronto]
+    #: A log-odds decomposta: força + lado + forma + confronto direto + saldo.
+    contribuicoes: list[ContribuicaoConfronto] = []
     #: Vai junto de proposito: a probabilidade so se lê com ela ao lado.
     validacao: ValidacaoConfronto
 

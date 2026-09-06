@@ -18,9 +18,14 @@ from ml.confronto import (
     Equipe,
     _ajustar,
     _fatores_da_previsao,
+    _features_do_confronto,
+    _features_temporais,
+    _forma,
+    _h2h,
     _matriz,
     _metricas,
     _probabilidade,
+    _saldo_recente,
     arquivo_metricas,
     carregar_relatorio,
 )
@@ -69,6 +74,69 @@ def test_vantagem_de_lado_desloca_a_probabilidade():
     assert com_vantagem > sem_vantagem
 
 
+def _placar(a, b, va, pa, pb, minutos=0):
+    c = _confronto(a, b, va, minutos)
+    return Confronto(**{**c.__dict__, "placar_a": pa, "placar_b": pb})
+
+
+def test_forma_centrada_em_zero_e_neutra_sem_historico():
+    hist = [_confronto(1, 2, True, 0), _confronto(1, 3, True, 1), _confronto(4, 1, True, 2)]
+    # time 1: venceu, venceu, perdeu -> 2/3 -> +0.167
+    assert _forma(hist, 1) == pytest.approx(2 / 3 - 0.5)
+    # time 2: uma partida so -> neutro
+    assert _forma(hist, 2) == 0.0
+    # time inexistente -> neutro
+    assert _forma(hist, 99) == 0.0
+
+
+def test_h2h_encolhe_para_amostra_pequena():
+    # 1 ganhou os dois encontros diretos com 2
+    hist = [_confronto(1, 2, True, 0), _confronto(2, 1, False, 1), _confronto(1, 3, True, 2)]
+    # (2 + 1) / (2 + 2) - 0.5 = +0.25, nao +0.5
+    assert _h2h(hist, 1, 2) == pytest.approx(0.25)
+    assert _h2h(hist, 2, 1) == pytest.approx(-0.25)
+    # nunca se jogaram -> 0
+    assert _h2h(hist, 3, 2) == 0.0
+
+
+def test_saldo_recente_normaliza_a_margem():
+    hist = [_placar(1, 2, True, 3, 0, 0), _placar(3, 1, False, 1, 3, 1)]
+    # time 1: venceu 3-0 (margem +1) e venceu 3-1 do lado B (margem +0.5) -> media +0.75
+    assert _saldo_recente(hist, 1) == pytest.approx(0.75)
+    # Dota (sem placar) -> 0
+    assert _saldo_recente([_confronto(1, 2, True)], 1) == 0.0
+
+
+def test_features_temporais_sao_causais():
+    """A feature do confronto i so pode olhar confrontos[:i] - senao a validacao
+    walk-forward incluiria o resultado que ela esta prevendo."""
+    confrontos = [
+        _confronto(1, 2, True, 0),
+        _confronto(1, 2, True, 1),
+        _confronto(1, 2, True, 2),
+    ]
+    feats = _features_temporais(confrontos)
+    # 1o confronto: nada antes -> tudo 0
+    assert feats[0] == [0.0, 0.0, 0.0]
+    # 3o confronto: 1 venceu os 2 anteriores -> forma e h2h a favor de 1 (>0)
+    assert feats[2][0] > 0  # forma_recente (dif)
+    assert feats[2][1] > 0  # confronto_direto
+
+
+def test_ajustar_trava_feature_negativa_em_zero():
+    """A direcao das features e conhecida; coeficiente negativo e ruido -> 0."""
+    # Monta um historico onde o time em pior forma vence sempre (sinal invertido):
+    # a regressao tentaria um peso negativo para `forma`, e o clip o zera.
+    confrontos = []
+    for i in range(30):
+        # 1 sempre perde as ultimas, mas ganha a proxima - forma anti-correlacionada
+        vencedor_a = i % 2 == 0
+        confrontos.append(_confronto(1 if vencedor_a else 2, 2 if vencedor_a else 1, True, i))
+    feats = _features_temporais(confrontos)
+    _, _, _, pesos = _ajustar(confrontos, regularizacao=2.0, features=feats)
+    assert all(p >= 0.0 for p in pesos)
+
+
 def test_time_que_so_vence_recebe_forca_maior():
     """1 vence todo mundo, 4 perde de todo mundo, 2 e 3 ficam no meio.
 
@@ -84,7 +152,7 @@ def test_time_que_so_vence_recebe_forca_maior():
         _confronto(4, 3, False, 4),  # 3 vence
         _confronto(2, 3, True, 5),   # 2 vence
     ]
-    forcas, _, _ = _ajustar(confrontos, regularizacao=1.0)
+    forcas, _, _, _ = _ajustar(confrontos, regularizacao=1.0)
 
     assert forcas[1] > forcas[2] > forcas[4]
 
@@ -97,8 +165,8 @@ def test_regularizacao_forte_encolhe_as_forcas():
         _confronto(1, 3, True, 2),
         _confronto(3, 2, False, 3),
     ]
-    frouxa, _, _ = _ajustar(confrontos, regularizacao=10.0)
-    apertada, _, _ = _ajustar(confrontos, regularizacao=0.01)
+    frouxa, _, _, _ = _ajustar(confrontos, regularizacao=10.0)
+    apertada, _, _, _ = _ajustar(confrontos, regularizacao=0.01)
 
     assert max(abs(v) for v in apertada.values()) < max(abs(v) for v in frouxa.values())
 
@@ -106,7 +174,7 @@ def test_regularizacao_forte_encolhe_as_forcas():
 def test_uma_classe_so_nao_quebra_o_ajuste():
     """Se o lado A venceu todas, nao ha o que separar - forcas ficam em zero."""
     confrontos = [_confronto(1, 2, True, 0), _confronto(3, 4, True, 1)]
-    forcas, lado, peso = _ajustar(confrontos)
+    forcas, lado, peso, _ = _ajustar(confrontos)
 
     assert set(forcas.values()) == {0.0}
     assert lado == 0.0
@@ -115,7 +183,7 @@ def test_uma_classe_so_nao_quebra_o_ajuste():
 
 def test_forcas_cobrem_todas_as_equipes_vistas():
     confrontos = [_confronto(7, 8, True, 0), _confronto(8, 9, False, 1)]
-    forcas, _, _ = _ajustar(confrontos, regularizacao=1.0)
+    forcas, _, _, _ = _ajustar(confrontos, regularizacao=1.0)
     assert set(forcas) == {7, 8, 9}
     assert all(np.isfinite(valor) for valor in forcas.values())
 

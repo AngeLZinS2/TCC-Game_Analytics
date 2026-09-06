@@ -655,8 +655,14 @@ export interface FatorConfronto {
   /** Positivo favorece A. */
   diferenca: number | null;
   unidade: string;
-  /** `true` so na forca - os demais sao contexto, nao entram na conta. */
+  /** `true` para a força e as features de contexto que o modelo pesou. */
   peso_no_modelo: boolean;
+}
+
+export interface ContribuicaoConfronto {
+  rotulo: string;
+  /** Em log-odds. Positivo empurra para A. A soma, pela sigmoide, é a probabilidade. */
+  log_odds: number;
 }
 
 export interface ValidacaoConfronto {
@@ -681,6 +687,8 @@ export interface PrevisaoConfronto {
   confrontos_diretos: number;
   vitorias_diretas_a: number;
   fatores: FatorConfronto[];
+  /** A log-odds decomposta em parcelas: força + lado + forma + h2h + saldo. */
+  contribuicoes: ContribuicaoConfronto[];
   validacao: ValidacaoConfronto;
 }
 

@@ -123,6 +123,15 @@ MINIMO_HISTORICO = 1
 #: Bradley-Terry puro das fases anteriores - sem coluna a mais, sem mudanca.
 FONTE_RANKING_PRIOR = "valve"
 
+#: Quantas partidas recentes entram na "forma" e no "saldo recente" de um time.
+JANELA_FORMA = 6
+
+#: As features de contexto que somam ao Bradley-Terry - uma coluna cada em
+#: `_matriz`, todas SINAL de A menos B (0 = empatado), todas causais (so olham
+#: o que veio antes do confronto). A regularizacao decide o peso de cada uma;
+#: um jogo sem placar de serie (Dota) simplesmente tem `saldo_recente` = 0.
+NOMES_FEATURES = ("forma_recente", "confronto_direto", "saldo_recente")
+
 
 @dataclass(frozen=True)
 class Confronto:
@@ -162,6 +171,9 @@ class Equipe:
     #: tela - o efeito no modelo ja esta embutido em `forca` (Fase 15).
     posicao_ranking: int | None = None
     pontos_ranking: int | None = None
+    #: Winrate nas ultimas `JANELA_FORMA` partidas, em %. `None` sem historico
+    #: suficiente. Preenchido so na previsao (`prever`), nao no ranking.
+    forma_recente: float | None = None
 
     @property
     def winrate(self) -> float:
@@ -178,9 +190,20 @@ class Fator:
     #: Positivo favorece A. `None` quando falta dado de um dos lados.
     diferenca: float | None
     unidade: str
-    #: Quanto este fator explica da probabilidade. So a forca tem peso direto;
-    #: os demais sao contexto que ajuda a ler o resultado.
+    #: `True` quando o modelo aprendeu um peso para este fator (a forca, e as
+    #: features de contexto cujo coeficiente nao ficou ~0). Os demais sao so
+    #: leitura.
     peso_no_modelo: bool
+
+
+@dataclass
+class Contribuicao:
+    """Uma parcela da log-odds de A vencer. A soma, pela sigmoide, e a
+    probabilidade - e por isso a tela pode desenhar de onde saiu o numero."""
+
+    rotulo: str
+    #: Em log-odds. Positivo empurra para A, negativo para B.
+    log_odds: float
 
 
 @dataclass
@@ -196,6 +219,8 @@ class Previsao:
     fatores: list[Fator] = field(default_factory=list)
     confrontos_diretos: int = 0
     vitorias_diretas_a: int = 0
+    #: A decomposicao da log-odds em parcelas (forca, lado, forma, h2h, saldo).
+    contribuicoes: list[Contribuicao] = field(default_factory=list)
 
 
 def _carregar_confrontos(sessao, jogo: str = "dota2") -> list[Confronto]:
@@ -557,29 +582,118 @@ def _ratings_em(snapshots: list[Snapshot], quando: date | None) -> dict[int, flo
     return vigente
 
 
+def _do_time(historico: list[Confronto], id_equipe: int):
+    """`(venceu?, confronto)` de cada partida do time no historico, em ordem."""
+    for c in historico:
+        if c.id_equipe_a == id_equipe:
+            yield c.vitoria_a, c
+        elif c.id_equipe_b == id_equipe:
+            yield (not c.vitoria_a), c
+
+
+def _forma(historico: list[Confronto], id_equipe: int) -> float:
+    """Winrate nas ultimas `JANELA_FORMA` partidas, centrado em 0.5 (0 = 50%).
+
+    `0.0` (neutro) com menos de duas partidas: uma vitoria isolada nao e forma.
+    """
+    jogos = list(_do_time(historico, id_equipe))[-JANELA_FORMA:]
+    if len(jogos) < 2:
+        return 0.0
+    return sum(1 for venceu, _ in jogos if venceu) / len(jogos) - 0.5
+
+
+def _h2h(historico: list[Confronto], a: int, b: int) -> float:
+    """Vantagem de A no confronto direto, encolhida por amostra (Beta(1,1)).
+
+    `(vitorias_a + 1) / (total + 2) - 0.5`: dois jogos 2-0 dao +0.25, nao +0.5;
+    nunca se jogaram da 0. Sem o encolhimento, um unico encontro mandaria a
+    previsao para 0/100.
+    """
+    diretos = [c for c in historico if {c.id_equipe_a, c.id_equipe_b} == {a, b}]
+    if not diretos:
+        return 0.0
+    vitorias_a = sum(1 for c in diretos if (c.id_equipe_a == a) == c.vitoria_a)
+    return (vitorias_a + 1) / (len(diretos) + 2) - 0.5
+
+
+def _saldo_recente(historico: list[Confronto], id_equipe: int) -> float:
+    """Margem media de placar nas ultimas partidas, normalizada a [-1, 1].
+
+    `0.0` quando a fonte nao da placar de serie (Dota) - a coluna existe, so
+    nao carrega sinal nesse jogo.
+    """
+    margens: list[float] = []
+    for _, c in list(_do_time(historico, id_equipe))[-JANELA_FORMA:]:
+        if c.placar_a is None or c.placar_b is None:
+            continue
+        total = c.placar_a + c.placar_b
+        if not total:
+            continue
+        meu, seu = (
+            (c.placar_a, c.placar_b)
+            if c.id_equipe_a == id_equipe
+            else (c.placar_b, c.placar_a)
+        )
+        margens.append((meu - seu) / total)
+    return sum(margens) / len(margens) if margens else 0.0
+
+
+def _features_do_confronto(historico: list[Confronto], a: int, b: int) -> list[float]:
+    """As `NOMES_FEATURES` para o confronto A x B, a partir de `historico`.
+
+    Usado dos dois lados: no treino `historico` e `confrontos[:i]` (causal); na
+    previsao ao vivo e todo o historico ate hoje.
+    """
+    return [
+        _forma(historico, a) - _forma(historico, b),
+        _h2h(historico, a, b),
+        _saldo_recente(historico, a) - _saldo_recente(historico, b),
+    ]
+
+
+def _features_temporais(confrontos: list[Confronto]) -> list[list[float]]:
+    """A matriz de features, uma linha por confronto, olhando so o que veio antes.
+
+    A causalidade e o ponto: `confrontos[i]` ve `confrontos[:i]` e nada mais.
+    Sem isso, a "forma" de um time incluiria a partida que ela esta prevendo, e
+    a validacao walk-forward viraria mentira.
+    """
+    return [
+        _features_do_confronto(
+            confrontos[:i], alvo.id_equipe_a, alvo.id_equipe_b
+        )
+        for i, alvo in enumerate(confrontos)
+    ]
+
+
 def _matriz(
     confrontos: list[Confronto],
     indices: dict[int, int],
     ratings: dict[int, float] | None = None,
+    features: list[list[float]] | None = None,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Matriz de indicadores: +1 para o time do lado A, -1 para o do lado B.
 
     E a forma padrao de escrever Bradley-Terry como regressao logistica. Cada
-    coluna e um time, e o coeficiente aprendido para ela e a forca dele.
+    coluna de time tem por coeficiente a forca dele.
 
-    Com `ratings` (Fase 15), UMA coluna a mais: a diferenca de rating externo
-    entre os dois lados. O modelo aprende o peso dela junto com as forcas - e a
-    regularizacao decide quanto confiar no prior contra o historico proprio.
-    Para um time com duas partidas, a coluna dele encolhe para ~0 e esse termo
-    e o que sobra dizendo algo sobre ele.
+    Colunas a mais, na ordem: as `features` de contexto (forma, confronto
+    direto, saldo) e, por ultimo, a diferenca de rating externo (`ratings`,
+    Fase 15). A regularizacao aprende o peso de cada uma junto das forcas - e
+    para um time de poucas partidas, cuja coluna encolhe para ~0, sao esses
+    termos que sobram dizendo algo sobre ele. O rating fica SEMPRE por ultimo:
+    `_ajustar` le `coef_[-1]` para ele.
     """
-    extra = 1 if ratings else 0
-    X = np.zeros((len(confrontos), len(indices) + extra))
+    n_feat = len(features[0]) if features else 0
+    n_rating = 1 if ratings else 0
+    X = np.zeros((len(confrontos), len(indices) + n_feat + n_rating))
     y = np.zeros(len(confrontos), dtype=int)
 
     for linha, confronto in enumerate(confrontos):
         X[linha, indices[confronto.id_equipe_a]] = 1.0
         X[linha, indices[confronto.id_equipe_b]] = -1.0
+        if features:
+            X[linha, len(indices) : len(indices) + n_feat] = features[linha]
         if ratings:
             X[linha, -1] = ratings.get(confronto.id_equipe_a, 0.0) - ratings.get(
                 confronto.id_equipe_b, 0.0
@@ -589,8 +703,29 @@ def _matriz(
     return X, y
 
 
+def _coef_clipado(
+    modelo: LogisticRegression, inicio_feat: int, n_feat: int
+) -> np.ndarray:
+    """Os coeficientes do modelo com as features de contexto travadas em >= 0.
+
+    A direcao dessas features e conhecida (ver `_ajustar`); um coeficiente
+    negativo e ruido. Aplicado ANTES de medir a perda na CV, para o `C`
+    escolhido ser o do modelo que de fato roda.
+    """
+    coef = modelo.coef_[0].copy()
+    for k in range(n_feat):
+        coef[inicio_feat + k] = max(0.0, coef[inicio_feat + k])
+    return coef
+
+
+def _proba(X: np.ndarray, coef: np.ndarray, intercepto: float) -> np.ndarray:
+    return 1.0 / (1.0 + np.exp(-(X @ coef + intercepto)))
+
+
 def _escolher_regularizacao(
-    confrontos: list[Confronto], ratings: dict[int, float] | None = None
+    confrontos: list[Confronto],
+    ratings: dict[int, float] | None = None,
+    features: list[list[float]] | None = None,
 ) -> float:
     """Escolhe `C` por validacao cruzada DENTRO da janela recebida.
 
@@ -600,7 +735,9 @@ def _escolher_regularizacao(
     """
     ids = sorted({c.id_equipe_a for c in confrontos} | {c.id_equipe_b for c in confrontos})
     indices = {id_equipe: posicao for posicao, id_equipe in enumerate(ids)}
-    X, y = _matriz(confrontos, indices, ratings)
+    X, y = _matriz(confrontos, indices, ratings, features)
+    n_feat = len(features[0]) if features else 0
+    inicio_feat = len(indices)
 
     if len(set(y)) < 2 or len(y) < 20:
         return 0.5
@@ -617,10 +754,11 @@ def _escolher_regularizacao(
                 C=candidato, max_iter=2000, random_state=SEMENTE
             )
             modelo.fit(X[treino], y[treino])
+            coef = _coef_clipado(modelo, inicio_feat, n_feat)
             perdas.append(
                 log_loss(
                     y[validacao],
-                    modelo.predict_proba(X[validacao])[:, 1],
+                    _proba(X[validacao], coef, float(modelo.intercept_[0])),
                     labels=[0, 1],
                 )
             )
@@ -635,44 +773,63 @@ def _ajustar(
     confrontos: list[Confronto],
     regularizacao: float | None = None,
     ratings: dict[int, float] | None = None,
-) -> tuple[dict[int, float], float, float]:
-    """Devolve a forca de cada equipe, a vantagem do lado A (log-odds) e o peso
-    aprendido para o prior externo (0.0 quando nao ha prior).
+    features: list[list[float]] | None = None,
+) -> tuple[dict[int, float], float, float, list[float]]:
+    """Devolve: forca de cada equipe, vantagem do lado A (log-odds), peso do
+    prior externo (0.0 sem prior) e o peso aprendido de cada feature de contexto
+    (`NOMES_FEATURES`, na ordem; lista vazia sem features).
 
     Com `ratings`, a forca guardada de cada time ja SOMA o termo do prior
     (`peso * rating`): quem consome `forca` depois - `_probabilidade`,
-    `prever`, o ranking - nao precisa saber que o prior existe. Para um time
-    com pouco historico, essa soma e o que o tira de ~0.
+    `prever`, o ranking - nao precisa saber que o prior existe. Ja as features
+    de contexto NAO entram na forca: elas dependem do adversario e da data, e
+    sao aplicadas na hora da previsao.
     """
     ids = sorted({c.id_equipe_a for c in confrontos} | {c.id_equipe_b for c in confrontos})
     indices = {id_equipe: posicao for posicao, id_equipe in enumerate(ids)}
 
-    X, y = _matriz(confrontos, indices, ratings)
+    X, y = _matriz(confrontos, indices, ratings, features)
+    n_feat = len(features[0]) if features else 0
 
     # Uma classe so (todo mundo ganhou de um lado) nao tem o que ajustar.
     if len(set(y)) < 2:
-        return {id_equipe: 0.0 for id_equipe in ids}, 0.0, 0.0
+        return {id_equipe: 0.0 for id_equipe in ids}, 0.0, 0.0, [0.0] * n_feat
 
     modelo = LogisticRegression(
         C=regularizacao
         if regularizacao is not None
-        else _escolher_regularizacao(confrontos, ratings),
+        else _escolher_regularizacao(confrontos, ratings, features),
         max_iter=2000,
         random_state=SEMENTE,
     )
     modelo.fit(X, y)
 
-    peso_externo = float(modelo.coef_[0][-1]) if ratings else 0.0
+    inicio_feat = len(indices)
+    # As features de contexto tem DIRECAO conhecida: quem esta em melhor forma,
+    # com vantagem no confronto direto ou vencendo por margens maiores tende a
+    # ganhar - nunca o contrario. Um coeficiente negativo e sobreajuste a ruido
+    # numa amostra de poucas dezenas; a leitura honesta e "essa feature nao
+    # mostrou sinal para este jogo", entao ele vira 0.
+    coef = _coef_clipado(modelo, inicio_feat, n_feat)
+    peso_externo = float(coef[-1]) if ratings else 0.0
+    pesos_features = [float(coef[inicio_feat + k]) for k in range(n_feat)]
     forcas = {
         id_equipe: float(modelo.coef_[0][posicao])
         + peso_externo * (ratings.get(id_equipe, 0.0) if ratings else 0.0)
         for id_equipe, posicao in indices.items()
     }
-    return forcas, float(modelo.intercept_[0]), peso_externo
+    return forcas, float(modelo.intercept_[0]), peso_externo, pesos_features
 
 
-def _probabilidade(forca_a: float, forca_b: float, lado: float) -> float:
-    return float(1.0 / (1.0 + np.exp(-((forca_a - forca_b) + lado))))
+def _probabilidade(
+    forca_a: float, forca_b: float, lado: float, contexto: float = 0.0
+) -> float:
+    """P(A vence) = sigmoide(diferenca de forca + vantagem de lado + contexto).
+
+    `contexto` e a soma `peso_k * feature_k` das features de A x B (forma,
+    confronto direto, saldo) - zero quando o modelo nao tem features.
+    """
+    return float(1.0 / (1.0 + np.exp(-((forca_a - forca_b) + lado + contexto))))
 
 
 def _avaliar_walk_forward(
@@ -691,6 +848,7 @@ def _avaliar_walk_forward(
     agosto, e usa-lo para prever julho seria vazamento.
     """
     snapshots = snapshots or []
+    features = _features_temporais(confrontos)
     corte = int(len(confrontos) * (1 - FRACAO_TESTE))
     probabilidades: list[float] = []
     reais: list[int] = []
@@ -709,15 +867,25 @@ def _avaliar_walk_forward(
         if vistos_a < MINIMO_HISTORICO or vistos_b < MINIMO_HISTORICO:
             continue
 
+        feat_hist = features[:posicao]
         # O prior e o ranking vigente na data da partida - nao o de hoje.
         ratings = _ratings_em(snapshots, alvo.data.date() if alvo.data else None)
         # `C` sai da validacao cruzada dentro do historico, nunca do teste.
-        forcas, lado, _ = _ajustar(
-            historico, _escolher_regularizacao(historico, ratings), ratings
+        forcas, lado, _, pesos_feat = _ajustar(
+            historico,
+            _escolher_regularizacao(historico, ratings, feat_hist),
+            ratings,
+            feat_hist,
         )
+        # `features[posicao]` foi montada de `confrontos[:posicao]` = o historico:
+        # e exatamente a feature PRE-partida do alvo, sem vazamento.
+        contexto = sum(p * f for p, f in zip(pesos_feat, features[posicao]))
         probabilidades.append(
             _probabilidade(
-                forcas.get(alvo.id_equipe_a, 0.0), forcas.get(alvo.id_equipe_b, 0.0), lado
+                forcas.get(alvo.id_equipe_a, 0.0),
+                forcas.get(alvo.id_equipe_b, 0.0),
+                lado,
+                contexto,
             )
         )
         reais.append(1 if alvo.vitoria_a else 0)
@@ -817,8 +985,11 @@ def ajustar_e_salvar(jogo: str = "dota2") -> dict[str, Any]:
         )
 
     ratings_finais = _ratings_em(snapshots, None)
-    regularizacao = _escolher_regularizacao(confrontos, ratings_finais)
-    forcas, lado, peso_externo = _ajustar(confrontos, regularizacao, ratings_finais)
+    features = _features_temporais(confrontos)
+    regularizacao = _escolher_regularizacao(confrontos, ratings_finais, features)
+    forcas, lado, peso_externo, pesos_features = _ajustar(
+        confrontos, regularizacao, ratings_finais, features
+    )
 
     for confronto in confrontos:
         for id_equipe, venceu in (
@@ -839,13 +1010,24 @@ def ajustar_e_salvar(jogo: str = "dota2") -> dict[str, Any]:
     relatorio = {
         "ajustado_em": datetime.now(timezone.utc).isoformat(),
         "jogo": jogo,
-        "metodo": "Bradley-Terry regularizado (regressão logística sobre indicadores)",
+        "metodo": (
+            "Bradley-Terry regularizado (regressão logística sobre indicadores "
+            "de time) + features de contexto pré-partida"
+        ),
         "regularizacao_C": regularizacao,
         "grade_regularizacao": list(GRADE_REGULARIZACAO),
         "confrontos": len(confrontos),
         "equipes": len(forcas),
         "vantagem_lado_a": round(lado, 4),
         "probabilidade_lado_a_entre_iguais": round(_probabilidade(0.0, 0.0, lado), 4),
+        # O peso que a regressao deu a cada feature de contexto (log-odds por
+        # unidade da feature). Perto de zero = a regularizacao nao viu sinal
+        # nela para este jogo.
+        "pesos_features": {
+            nome: round(peso, 4)
+            for nome, peso in zip(NOMES_FEATURES, pesos_features)
+        },
+        "janela_forma": JANELA_FORMA,
         "primeira_partida": confrontos[0].data.isoformat() if confrontos[0].data else None,
         "ultima_partida": confrontos[-1].data.isoformat() if confrontos[-1].data else None,
         "validacao": validacao,
@@ -962,10 +1144,24 @@ def prever(id_equipe_a: int, id_equipe_b: int, jogo: str = "dota2") -> Previsao:
     a, b = equipes[id_equipe_a], equipes[id_equipe_b]
     lado = float(relatorio["vantagem_lado_a"])
 
-    probabilidade = _probabilidade(a.forca, b.forca, lado)
-
     with session_scope() as sessao:
         confrontos = _carregar_confrontos(sessao, jogo)
+
+    # As features de contexto sao calculadas AGORA, do historico inteiro ate
+    # hoje - `_carregar_confrontos` ja vem ordenado por data.
+    pesos_features = [
+        float((relatorio.get("pesos_features") or {}).get(nome, 0.0))
+        for nome in NOMES_FEATURES
+    ]
+    features_agora = _features_do_confronto(confrontos, id_equipe_a, id_equipe_b)
+    contexto = sum(p * f for p, f in zip(pesos_features, features_agora))
+
+    probabilidade = _probabilidade(a.forca, b.forca, lado, contexto)
+
+    # `_forma` devolve winrate - 0.5; a tela mostra em % (o +50 desfaz o centro).
+    fa, fb = _forma(confrontos, id_equipe_a), _forma(confrontos, id_equipe_b)
+    a.forma_recente = round((fa + 0.5) * 100, 1) if fa else None
+    b.forma_recente = round((fb + 0.5) * 100, 1) if fb else None
 
     diretos = [
         c
@@ -979,6 +1175,10 @@ def prever(id_equipe_a: int, id_equipe_b: int, jogo: str = "dota2") -> Previsao:
         or (c.id_equipe_b == id_equipe_a and not c.vitoria_a)
     )
 
+    contribuicoes = _contribuicoes(
+        a.forca - b.forca, lado, pesos_features, features_agora
+    )
+
     return Previsao(
         equipe_a=a,
         equipe_b=b,
@@ -988,8 +1188,41 @@ def prever(id_equipe_a: int, id_equipe_b: int, jogo: str = "dota2") -> Previsao:
         contribuicao_lado=round(lado, 4),
         confrontos_diretos=len(diretos),
         vitorias_diretas_a=vitorias_diretas_a,
-        fatores=_fatores_da_previsao(a, b, _unidade_placar(jogo)),
+        fatores=_fatores_da_previsao(
+            a, b, _unidade_placar(jogo), features_agora, pesos_features
+        ),
+        contribuicoes=contribuicoes,
     )
+
+
+#: Como cada feature de contexto se le na tela.
+_ROTULO_FEATURE = {
+    "forma_recente": "Forma recente",
+    "confronto_direto": "Confronto direto",
+    "saldo_recente": "Saldo de placar recente",
+}
+
+
+def _contribuicoes(
+    dif_forca: float,
+    lado: float,
+    pesos_features: list[float],
+    features_agora: list[float],
+) -> list["Contribuicao"]:
+    """Quanto cada parte empurra a log-odds de A vencer - a soma passa pela
+    sigmoide e da a probabilidade. E o 'por que' com numero, nao so rotulo."""
+    itens = [
+        Contribuicao("Força estimada", round(dif_forca, 4)),
+        Contribuicao("Vantagem de lado", round(lado, 4)),
+    ]
+    for nome, peso, feat in zip(NOMES_FEATURES, pesos_features, features_agora):
+        parcela = peso * feat
+        if abs(parcela) < 1e-4:
+            continue
+        itens.append(
+            Contribuicao(_ROTULO_FEATURE.get(nome, nome), round(parcela, 4))
+        )
+    return itens
 
 
 def _unidade_placar(jogo: str) -> str | None:
@@ -999,7 +1232,11 @@ def _unidade_placar(jogo: str) -> str | None:
 
 
 def _fatores_da_previsao(
-    a: Equipe, b: Equipe, unidade_placar: str | None = None
+    a: Equipe,
+    b: Equipe,
+    unidade_placar: str | None = None,
+    features_agora: list[float] | None = None,
+    pesos_features: list[float] | None = None,
 ) -> list[Fator]:
     """Os fatores do 'por que', so os que fazem sentido para este jogo.
 
@@ -1014,14 +1251,31 @@ def _fatores_da_previsao(
 
     Cada bloco so entra quando ha dado - nada de linha com travessao.
     """
-    # A forca e o unico fator que entra na conta da probabilidade. Os outros
-    # sao contexto que explica de onde ela veio - marca-los como se pesassem
-    # seria mentir sobre o modelo.
+    # A forca e as features de contexto (quando o modelo aprendeu peso para
+    # elas) entram na conta da probabilidade. Winrate e partidas sao leitura.
+    features_agora = features_agora or []
+    pesos_features = pesos_features or []
+    pesa = {
+        nome: abs(peso) > 1e-3
+        for nome, peso in zip(NOMES_FEATURES, pesos_features)
+    }
+
     fatores = [
         _fator("Força estimada", a.forca, b.forca, "", peso=True, casas=3),
         _fator("Winrate", a.winrate, b.winrate, "%"),
         _fator("Partidas coletadas", a.partidas, b.partidas, "", casas=0),
     ]
+
+    if a.forma_recente is not None or b.forma_recente is not None:
+        fatores.append(
+            _fator(
+                f"Forma (últimos {JANELA_FORMA})",
+                a.forma_recente,
+                b.forma_recente,
+                "%",
+                peso=pesa.get("forma_recente", False),
+            )
+        )
 
     if unidade_placar and (a.saldo_placar is not None or b.saldo_placar is not None):
         fatores.append(
@@ -1139,9 +1393,18 @@ def agenda(jogo: str = "dota2", limite: int = 40) -> list[ConfrontoAgendado]:
     try:
         equipes, relatorio = estado(jogo)
         lado = float(relatorio["vantagem_lado_a"])
+        pesos_features = [
+            float((relatorio.get("pesos_features") or {}).get(nome, 0.0))
+            for nome in NOMES_FEATURES
+        ]
         sem_modelo = False
     except FileNotFoundError:
-        equipes, lado, sem_modelo = {}, 0.0, True
+        equipes, lado, pesos_features, sem_modelo = {}, 0.0, [], True
+
+    historico = []
+    if not sem_modelo:
+        with session_scope() as sessao:
+            historico = _carregar_confrontos(sessao, jogo)
 
     agora = datetime.now(timezone.utc)
 
@@ -1191,7 +1454,11 @@ def agenda(jogo: str = "dota2", limite: int = 40) -> list[ConfrontoAgendado]:
             probabilidade = None
         else:
             motivo = None
-            probabilidade = round(_probabilidade(a.forca, b.forca, lado), 4)
+            feats = _features_do_confronto(historico, linha[3], linha[4])
+            contexto = sum(p * f for p, f in zip(pesos_features, feats))
+            probabilidade = round(
+                _probabilidade(a.forca, b.forca, lado, contexto), 4
+            )
 
         confrontos.append(
             ConfrontoAgendado(
