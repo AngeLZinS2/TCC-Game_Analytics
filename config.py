@@ -217,6 +217,11 @@ class Settings(BaseSettings):
     #: precisa alcancar o que fechou desde ontem.
     agendador_vlr_minutos: int = Field(default=1440, ge=60)
 
+    #: Intervalo do snapshot do rating de equipes do vlr.gg, o prior do modelo
+    #: de Valorant. Semanal: o vlr.gg reajusta o rating ~toda semana, e guardar
+    #: um snapshot por semana ja da a serie que a validacao point-in-time usa.
+    agendador_vlr_rankings_minutos: int = Field(default=10080, ge=1440)
+
     #: Intervalo entre reajustes da previsao de confronto, em minutos.
     #:
     #: Oito horas, um pouco atras da coleta mais rapida que o alimenta (a do

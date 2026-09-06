@@ -188,13 +188,15 @@ def test_ratings_em_e_point_in_time(sessao_bd):
     assert _ratings_em(snaps, None) == snaps[-1][1]
 
 
-def test_jogo_sem_ranking_nao_tem_prior(sessao_bd):
-    """Todo jogo que nao e CS: `_carregar_ratings_externos` vazio, e ai o
-    modulo volta a ser o Bradley-Terry puro da Fase 14 - sem coluna a mais."""
-    from ml.confronto import _carregar_ratings_externos
+def test_jogo_fora_do_mapa_de_prior_volta_ao_bradley_terry_puro(sessao_bd):
+    """Só os jogos de `FONTE_PRIOR_POR_JOGO` (CS -> valve, Valorant -> vlr) têm
+    prior. Qualquer outro: `_carregar_ratings_externos` vazio, e o modelo volta
+    a ser o Bradley-Terry puro - sem coluna a mais."""
+    from ml.confronto import FONTE_PRIOR_POR_JOGO, _carregar_ratings_externos
 
+    assert "dota2" not in FONTE_PRIOR_POR_JOGO
     assert _carregar_ratings_externos(sessao_bd, "dota2") == []
-    assert _carregar_ratings_externos(sessao_bd, "valorant") == []
+    assert _carregar_ratings_externos(sessao_bd, "leagueoflegends") == []
 
 
 def test_partida_decidida_fora_do_dota_nunca_fica_sem_equipe(sessao_bd):

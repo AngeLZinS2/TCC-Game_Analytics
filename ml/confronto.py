@@ -117,11 +117,18 @@ FRACAO_TESTE = 0.3
 #: mediria o intercepto, nao o modelo.
 MINIMO_HISTORICO = 1
 
-#: Fonte do ranking externo usado como prior (Fase 15). Hoje so a Valve, e so
-#: para Counter-Strike; `_carregar_ratings_externos` devolve vazio para
-#: qualquer jogo sem snapshot na tabela, e ai o modelo volta a ser o
-#: Bradley-Terry puro das fases anteriores - sem coluna a mais, sem mudanca.
-FONTE_RANKING_PRIOR = "valve"
+#: Ranking externo usado como prior (Fase 15), por jogo. Counter-Strike tem o
+#: Regional Standings da Valve; Valorant, o rating do vlr.gg. Um jogo fora deste
+#: mapa (ou sem snapshot na tabela) simplesmente nao tem prior - o modelo volta
+#: a ser o Bradley-Terry puro, sem coluna a mais.
+FONTE_PRIOR_POR_JOGO: dict[str, str] = {
+    "counterstrike": "valve",
+    "valorant": "vlr",
+}
+
+
+def _fonte_prior(jogo: str) -> str | None:
+    return FONTE_PRIOR_POR_JOGO.get(jogo)
 
 #: Quantas partidas recentes entram na "forma" e no "saldo recente" de um time.
 JANELA_FORMA = 6
@@ -354,10 +361,13 @@ def _preencher_ranking_externo(sessao, jogo: str, equipes: dict[int, Equipe]) ->
     So contexto de tela - o efeito no modelo ja esta em `forca`. `None` para
     equipe fora do ranking, e no-op inteiro para jogo sem `ranking_externo`.
     """
+    fonte = _fonte_prior(jogo)
+    if fonte is None:
+        return
     ultima = sessao.scalar(
         select(func.max(RankingExterno.data_referencia))
         .join(DimJogo, DimJogo.id_jogo == RankingExterno.id_jogo)
-        .where(DimJogo.codigo == jogo, RankingExterno.fonte == FONTE_RANKING_PRIOR)
+        .where(DimJogo.codigo == jogo, RankingExterno.fonte == fonte)
     )
     if ultima is None:
         return
@@ -366,7 +376,7 @@ def _preencher_ranking_externo(sessao, jogo: str, equipes: dict[int, Equipe]) ->
         select(
             RankingExterno.id_equipe, RankingExterno.posicao, RankingExterno.pontos
         ).where(
-            RankingExterno.fonte == FONTE_RANKING_PRIOR,
+            RankingExterno.fonte == fonte,
             RankingExterno.data_referencia == ultima,
             RankingExterno.id_equipe.is_not(None),
         )
@@ -528,6 +538,9 @@ def _carregar_ratings_externos(sessao, jogo: str) -> list[Snapshot]:
     Vazio para todo jogo sem linha em `ranking_externo` - e a maioria. Nesse
     caso o resto do modulo ignora o prior e nada muda em relacao a Fase 14.
     """
+    fonte = _fonte_prior(jogo)
+    if fonte is None:
+        return []
     linhas = sessao.execute(
         select(
             RankingExterno.data_referencia,
@@ -537,7 +550,7 @@ def _carregar_ratings_externos(sessao, jogo: str) -> list[Snapshot]:
         .join(DimJogo, DimJogo.id_jogo == RankingExterno.id_jogo)
         .where(
             DimJogo.codigo == jogo,
-            RankingExterno.fonte == FONTE_RANKING_PRIOR,
+            RankingExterno.fonte == fonte,
             RankingExterno.id_equipe.is_not(None),
             RankingExterno.pontos.is_not(None),
             RankingExterno.pontos > 0,
@@ -946,17 +959,18 @@ def _resumo_prior(
     ratings_finais: dict[int, float],
     forcas: dict[int, float],
     peso: float,
+    fonte: str,
 ) -> dict[str, Any] | None:
     """O bloco do relatorio que descreve o prior externo - ou `None` se nao ha.
 
-    `None` e o estado de todo jogo que nao e CS: a tela e a API sabem que, sem
-    este bloco, o modelo e o Bradley-Terry puro.
+    `None` e o estado de todo jogo sem ranking externo: a tela e a API sabem
+    que, sem este bloco, o modelo e o Bradley-Terry puro.
     """
     if not snapshots:
         return None
     cobertas = [ide for ide in ratings_finais if ide in forcas]
     return {
-        "fonte": FONTE_RANKING_PRIOR,
+        "fonte": fonte,
         "peso": round(peso, 4),
         "snapshots": len(snapshots),
         "data_mais_recente": snapshots[-1][0].isoformat(),
@@ -1031,7 +1045,9 @@ def ajustar_e_salvar(jogo: str = "dota2") -> dict[str, Any]:
         "primeira_partida": confrontos[0].data.isoformat() if confrontos[0].data else None,
         "ultima_partida": confrontos[-1].data.isoformat() if confrontos[-1].data else None,
         "validacao": validacao,
-        "prior_externo": _resumo_prior(snapshots, ratings_finais, forcas, peso_externo),
+        "prior_externo": _resumo_prior(
+            snapshots, ratings_finais, forcas, peso_externo, _fonte_prior(jogo) or ""
+        ),
         "forcas": {
             str(id_equipe): round(forca, 4) for id_equipe, forca in forcas.items()
         },

@@ -430,6 +430,13 @@ def _coletar_vlr(settings: Settings, storage: RawStorage) -> CollectionResult:
     return VlrCollector(raw_storage=storage).run(carregar=True)
 
 
+def _coletar_vlr_rankings(settings: Settings, storage: RawStorage) -> CollectionResult:
+    """Snapshot do rating de equipes de Valorant do vlr.gg (prior do modelo)."""
+    from collectors.vlr_rankings import VlrRankingsCollector
+
+    return VlrRankingsCollector(raw_storage=storage).run(carregar=True)
+
+
 #: Minimo de confrontos decididos para valer a pena reajustar um jogo.
 #:
 #: O mesmo piso que `ml.confronto.ajustar_e_salvar` exige - abaixo dele ele
@@ -569,6 +576,13 @@ def montar_tarefas(settings: Settings) -> list[Tarefa]:
             nome="vlr",
             intervalo_segundos=settings.agendador_vlr_minutos * 60,
             executar=_coletar_vlr,
+        )
+    )
+    tarefas.append(
+        Tarefa(
+            nome="vlr_rankings",
+            intervalo_segundos=settings.agendador_vlr_rankings_minutos * 60,
+            executar=_coletar_vlr_rankings,
         )
     )
     tarefas.append(

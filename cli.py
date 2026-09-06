@@ -31,6 +31,7 @@ FONTES = (
     "lol-campeoes",
     "dota-herois",
     "vlr",
+    "vlr-rankings",
 )
 
 
@@ -311,6 +312,11 @@ def _construir_coletor(args: argparse.Namespace, storage):
 
         return VlrCollector(raw_storage=storage)
 
+    if args.fonte == "vlr-rankings":
+        from collectors.vlr_rankings import VlrRankingsCollector
+
+        return VlrRankingsCollector(raw_storage=storage)
+
     if args.fonte == "valorant-agentes":
         from collectors.valorant_agentes import AgentesValorantCollector
 
@@ -376,6 +382,10 @@ def _carregador(fonte: str):
         return carregar
     if fonte == "vlr":
         from etl.load_vlr import carregar
+
+        return carregar
+    if fonte == "vlr-rankings":
+        from etl.load_vlr_rankings import carregar
 
         return carregar
     if fonte == "lol-campeoes":
