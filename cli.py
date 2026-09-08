@@ -36,6 +36,7 @@ FONTES = (
     "vlr-detalhes",
     "hltv",
     "pandascore-cs",
+    "pandascore-lol",
 )
 
 
@@ -336,10 +337,13 @@ def _construir_coletor(args: argparse.Namespace, storage):
 
         return HltvCollector(raw_storage=storage)
 
-    if args.fonte == "pandascore-cs":
+    if args.fonte in ("pandascore-cs", "pandascore-lol"):
         from collectors.pandascore import PandaScoreCollector
 
-        return PandaScoreCollector(raw_storage=storage, jogo="csgo", settings=settings)
+        jogo_ps = "csgo" if args.fonte == "pandascore-cs" else "lol"
+        return PandaScoreCollector(
+            raw_storage=storage, jogo=jogo_ps, settings=settings
+        )
 
     if args.fonte == "valorant-agentes":
         from collectors.valorant_agentes import AgentesValorantCollector
@@ -412,7 +416,7 @@ def _carregador(fonte: str):
         from etl.load_hltv import carregar
 
         return carregar
-    if fonte == "pandascore-cs":
+    if fonte in ("pandascore-cs", "pandascore-lol"):
         from etl.load_agenda import carregar_agenda
 
         def _carregar_ps(resultado):

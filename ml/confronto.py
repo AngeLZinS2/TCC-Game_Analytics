@@ -78,6 +78,7 @@ from db.models import (
     RankingExterno,
 )
 from db.session import session_scope
+from etl.agenda_fontes import clausula_para_jogo
 from ml.modelos import SEMENTE
 
 logger = logging.getLogger(__name__)
@@ -292,7 +293,7 @@ def _carregar_confrontos_liquipedia(sessao, jogo: str) -> list[Confronto]:
     nome do torneio da Liquipedia, nao a liga da OpenDota, mas cumpre o mesmo
     papel (agrupar `ligas()`/`ranking(liga=...)`).
     """
-    linhas = sessao.execute(
+    consulta = (
         select(
             AgendaPartida.id,
             AgendaPartida.inicio_previsto,
@@ -310,7 +311,12 @@ def _carregar_confrontos_liquipedia(sessao, jogo: str) -> list[Confronto]:
             AgendaPartida.id_equipe_b.is_not(None),
             AgendaPartida.vitoria_a.is_not(None),
         )
-        .order_by(AgendaPartida.inicio_previsto)
+    )
+    clausula = clausula_para_jogo(sessao, jogo)
+    if clausula is not None:
+        consulta = consulta.where(clausula)
+    linhas = sessao.execute(
+        consulta.order_by(AgendaPartida.inicio_previsto)
     ).all()
 
     return [
@@ -339,8 +345,9 @@ def _preencher_partidas_liquipedia(
     final de `estado()` (`if equipe.partidas`) descartaria TODAS as equipes -
     o ranking viria vazio mesmo com confrontos reais no banco.
     """
+    clausula = clausula_para_jogo(sessao, jogo)
     for coluna in (AgendaPartida.id_equipe_a, AgendaPartida.id_equipe_b):
-        for id_equipe, contagem in sessao.execute(
+        consulta = (
             select(coluna, func.count())
             .join(DimJogo, DimJogo.id_jogo == AgendaPartida.id_jogo)
             .where(
@@ -349,7 +356,10 @@ def _preencher_partidas_liquipedia(
                 AgendaPartida.vitoria_a.is_not(None),
             )
             .group_by(coluna)
-        ):
+        )
+        if clausula is not None:
+            consulta = consulta.where(clausula)
+        for id_equipe, contagem in sessao.execute(consulta):
             equipe = equipes.get(id_equipe)
             if equipe is not None:
                 equipe.partidas += contagem
@@ -403,7 +413,7 @@ def _preencher_saldo_placar(sessao, jogo: str, equipes: dict[int, Equipe]) -> No
     if unidade_placar(jogo) is None:
         return
 
-    linhas = sessao.execute(
+    consulta = (
         select(
             AgendaPartida.id_equipe_a,
             AgendaPartida.id_equipe_b,
@@ -419,7 +429,11 @@ def _preencher_saldo_placar(sessao, jogo: str, equipes: dict[int, Equipe]) -> No
             AgendaPartida.placar_a.is_not(None),
             AgendaPartida.placar_b.is_not(None),
         )
-    ).all()
+    )
+    clausula = clausula_para_jogo(sessao, jogo)
+    if clausula is not None:
+        consulta = consulta.where(clausula)
+    linhas = sessao.execute(consulta).all()
 
     acumulado: dict[int, list[float]] = {}
     for id_a, id_b, pa, pb in linhas:

@@ -52,6 +52,7 @@ from db.models import (
     FatoPartidaJogador,
 )
 from db.session import get_db
+from etl.agenda_fontes import clausula_para_jogo, restringir_recorte
 
 router = APIRouter(prefix="/api/partidas", tags=["partidas"])
 
@@ -68,31 +69,6 @@ def _id_jogo(sessao: Session, codigo: str) -> int:
     return id_jogo
 
 
-#: Fontes de confronto em ordem de preferencia — a mesma partida entra por mais
-#: de uma (Liquipedia + vlr/hltv + PandaScore) com nome e horario diferentes, e
-#: a lista duplicava. A mais estruturada ganha: quando ha linha PandaScore no
-#: recorte, so ela; senao vlr/hltv; senao tudo (Liquipedia, id em hash).
-_PRECEDENCIA_FONTE = (
-    AgendaPartida.id_externo.op("~")("^pandascore:"),
-    AgendaPartida.id_externo.op("~")("^(vlr|hltv):"),
-)
-
-
-def _preferir_fonte_dedicada(sessao: Session, consulta_base):
-    """Restringe o recorte a fonte mais estruturada que tenha linha nele.
-
-    Checa dentro do proprio recorte: se so ha linha dedicada para a agenda e
-    nao para os resultados, os resultados continuam vindo da Liquipedia.
-    """
-    for clausula in _PRECEDENCIA_FONTE:
-        tem = sessao.scalar(
-            select(func.count()).select_from(
-                consulta_base.where(clausula).subquery()
-            )
-        )
-        if tem:
-            return consulta_base.where(clausula)
-    return consulta_base
 
 
 def _vitorias():
@@ -341,8 +317,15 @@ def resumo_confrontos(
     Nao devolve duracao nem jogador, e a ausencia e o dado: o ticker publica
     quem jogou, quando e o placar da serie - nada do que aconteceu dentro dela.
     """
-    filtro = DimJogo.codigo == jogo
-    base = select(AgendaPartida).join(DimJogo, DimJogo.id_jogo == AgendaPartida.id_jogo)
+    # Mesma dedup de fonte do `/confrontos`: quando a PandaScore cobre o jogo,
+    # os KPIs contam só ela — senão o total soma OP.GG + PandaScore da mesma
+    # série. Uma cláusula, aplicada a todas as agregações abaixo.
+    clausula = clausula_para_jogo(sessao, jogo)
+    filtro = (
+        (DimJogo.codigo == jogo, clausula)
+        if clausula is not None
+        else (DimJogo.codigo == jogo,)
+    )
 
     decididos, futuros, primeiro, ultimo, vitorias_a = sessao.execute(
         select(
@@ -354,7 +337,7 @@ def resumo_confrontos(
         )
         .select_from(AgendaPartida)
         .join(DimJogo, DimJogo.id_jogo == AgendaPartida.id_jogo)
-        .where(filtro)
+        .where(*filtro)
     ).one()
 
     # Equipes que aparecem no calendario, pelos DOIS lados. Um `count(distinct)`
@@ -366,7 +349,7 @@ def resumo_confrontos(
         for linha in sessao.execute(
             select(AgendaPartida.equipe_a_nome, AgendaPartida.equipe_b_nome)
             .join(DimJogo, DimJogo.id_jogo == AgendaPartida.id_jogo)
-            .where(filtro)
+            .where(*filtro)
         )
         for nome in linha
         if nome
@@ -377,7 +360,7 @@ def resumo_confrontos(
         select(func.count(func.distinct(AgendaPartida.torneio)))
         .select_from(AgendaPartida)
         .join(DimJogo, DimJogo.id_jogo == AgendaPartida.id_jogo)
-        .where(filtro, AgendaPartida.torneio.is_not(None))
+        .where(*filtro, AgendaPartida.torneio.is_not(None))
     ) or 0
 
     por_formato = [
@@ -385,7 +368,7 @@ def resumo_confrontos(
         for rotulo, quantos in sessao.execute(
             select(AgendaPartida.formato, func.count())
             .join(DimJogo, DimJogo.id_jogo == AgendaPartida.id_jogo)
-            .where(filtro, AgendaPartida.formato.is_not(None))
+            .where(*filtro, AgendaPartida.formato.is_not(None))
             .group_by(AgendaPartida.formato)
             # Por NOME e nao por contagem: "Bo1, Bo3, Bo5" e uma escala
             # ordenada, e reordenar por frequencia embaralharia o eixo.
@@ -400,7 +383,7 @@ def resumo_confrontos(
                 func.date(AgendaPartida.inicio_previsto).label("dia"), func.count()
             )
             .join(DimJogo, DimJogo.id_jogo == AgendaPartida.id_jogo)
-            .where(filtro)
+            .where(*filtro)
             .group_by("dia")
             .order_by("dia")
         )
@@ -471,7 +454,7 @@ def listar_confrontos(
     )
 
     consulta = (
-        _preferir_fonte_dedicada(sessao, base)
+        restringir_recorte(sessao, base)
         .order_by(desc(AgendaPartida.inicio_previsto))
         .limit(limite)
         .offset((pagina - 1) * limite)
@@ -580,7 +563,7 @@ def agenda_proximas(
         AgendaPartida.vitoria_a.is_(None),
         AgendaPartida.inicio_previsto >= corte,
     )
-    base = _preferir_fonte_dedicada(sessao, base)
+    base = restringir_recorte(sessao, base)
 
     linhas = sessao.execute(
         base.order_by(AgendaPartida.inicio_previsto).limit(limite)

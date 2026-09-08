@@ -465,6 +465,18 @@ def _coletar_pandascore_cs(settings: Settings, storage: RawStorage) -> Collectio
     return PandaScoreCollector(raw_storage=storage, jogo="csgo").run(carregar=True)
 
 
+def _coletar_pandascore_lol(settings: Settings, storage: RawStorage) -> CollectionResult:
+    """Agenda + resultados de LoL via PandaScore (LCK/LPL/LEC/LCS...).
+
+    Roda junto do `esports_opgg`: a PandaScore dá a estrutura de torneio e o
+    histórico, o OP.GG segue povoando escudo de time. O `_preferir_fonte_dedicada`
+    faz a PandaScore mandar no que aparece na tela e no modelo.
+    """
+    from collectors.pandascore import PandaScoreCollector
+
+    return PandaScoreCollector(raw_storage=storage, jogo="lol").run(carregar=True)
+
+
 def _coletar_vlr_detalhes(settings: Settings, storage: RawStorage) -> CollectionResult:
     """Detalhe por mapa e por jogador das partidas de Valorant ja decididas."""
     from collectors.vlr_detalhes import VlrDetalhesCollector
@@ -625,17 +637,22 @@ def montar_tarefas(settings: Settings) -> list[Tarefa]:
             executar=_coletar_vlr_agenda,
         )
     )
-    # CS: a PandaScore (API) troca o scraping do hltv.org quando há chave.
-    # Sem chave, cai de volta no hltv — que passa por Cloudflare só com
-    # `curl_cffi` e cobre todos os tiers.
+    # A PandaScore (API) troca o scraping do hltv.org quando há chave. Sem
+    # chave, cai de volta no hltv — que passa por Cloudflare só com `curl_cffi`
+    # e cobre todos os tiers. O LoL da PandaScore roda junto do `esports_opgg`
+    # (fontes complementares — ver `_coletar_pandascore_lol`).
     if settings.pandascore_api_key:
-        tarefas.append(
-            Tarefa(
-                nome="pandascore_cs",
-                intervalo_segundos=settings.agendador_pandascore_minutos * 60,
-                executar=_coletar_pandascore_cs,
+        for nome, executar in (
+            ("pandascore_cs", _coletar_pandascore_cs),
+            ("pandascore_lol", _coletar_pandascore_lol),
+        ):
+            tarefas.append(
+                Tarefa(
+                    nome=nome,
+                    intervalo_segundos=settings.agendador_pandascore_minutos * 60,
+                    executar=executar,
+                )
             )
-        )
     else:
         tarefas.append(
             Tarefa(

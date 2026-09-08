@@ -115,7 +115,7 @@ const FONTES: Record<
     etiqueta: "PANDASCORE",
     cor: "#14b8a6",
     api: "PandaScore API",
-    descricao: "Agenda e resultados de esports (torneios tier S/A/B) — troca o scraping",
+    descricao: "Agenda e resultados de esports (CS e LoL, torneios tier S/A/B/C)",
     frequencia: "a cada 30 min",
   },
   vlr: {
