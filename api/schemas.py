@@ -1071,3 +1071,36 @@ class RankingOficialResposta(BaseModel):
     #: `True` quando nao ha ranking externo e a tabela e a classificacao V-D
     #: calculada dos confrontos coletados (nao alimenta o prior do modelo).
     derivado: bool = False
+
+
+class ConfrontoAoVivo(BaseModel):
+    """Um confronto de qualquer jogo para o painel 'Acontecendo agora' da home."""
+
+    id_externo: str
+    jogo: str
+    jogo_nome: str
+    equipe_a_nome: str
+    equipe_b_nome: str
+    equipe_a_logo: str | None = None
+    equipe_a_tag: str | None = None
+    equipe_b_logo: str | None = None
+    equipe_b_tag: str | None = None
+    torneio: str | None = None
+    formato: str | None = None
+    inicio_previsto: datetime
+    #: `True` quando ja passou do horario previsto e ainda nao tem placar.
+    ao_vivo: bool = False
+
+
+class DestaqueConfronto(ConfrontoAoVivo):
+    """O confronto do velocimetro: um `ConfrontoAoVivo` com a previsao do modelo."""
+
+    #: Probabilidade de o time A vencer, em [0, 1].
+    probabilidade_a: float
+
+
+class DestaquesHome(BaseModel):
+    ao_vivo: list[ConfrontoAoVivo]
+    #: `None` quando nenhum confronto proximo tem os dois times num jogo com
+    #: modelo ajustado.
+    destaque: DestaqueConfronto | None = None

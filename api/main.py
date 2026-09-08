@@ -22,6 +22,7 @@ from api.routers import (
     catalogo,
     confronto,
     dota,
+    home,
     meta,
     ranking_oficial,
     sentimento,
@@ -63,6 +64,7 @@ app.include_router(dota.router)
 app.include_router(sentimento.router)
 app.include_router(confronto.router)
 app.include_router(ranking_oficial.router)
+app.include_router(home.router)
 app.include_router(assistente.router)
 
 

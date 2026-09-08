@@ -864,6 +864,36 @@ export interface ConfrontoAgendado {
   motivo_sem_previsao: string | null;
 }
 
+// --- Home: acontecendo agora + destaque ---
+
+export interface ConfrontoAoVivo {
+  id_externo: string;
+  jogo: string;
+  jogo_nome: string;
+  equipe_a_nome: string;
+  equipe_b_nome: string;
+  equipe_a_logo: string | null;
+  equipe_a_tag: string | null;
+  equipe_b_logo: string | null;
+  equipe_b_tag: string | null;
+  torneio: string | null;
+  formato: string | null;
+  inicio_previsto: string;
+  /** `true` quando já passou do horário previsto e ainda não tem placar. */
+  ao_vivo: boolean;
+}
+
+export interface DestaqueConfronto extends ConfrontoAoVivo {
+  /** Probabilidade de o time A vencer, em [0, 1]. */
+  probabilidade_a: number;
+}
+
+export interface DestaquesHome {
+  ao_vivo: ConfrontoAoVivo[];
+  /** `null` quando nenhum confronto próximo tem previsão. */
+  destaque: DestaqueConfronto | null;
+}
+
 // --- Busca no catalogo da Steam e coleta sob demanda (Fase 11) ---
 
 export interface CandidatoJogo {

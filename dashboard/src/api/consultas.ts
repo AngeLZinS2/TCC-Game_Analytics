@@ -27,6 +27,7 @@ import type {
   ComparacaoSentimento,
   ConfrontoAgendado,
   ConfrontoResultado,
+  DestaquesHome,
   DetalheConfronto,
   DetalhePersonagem,
   PerfilEsporte,
@@ -58,6 +59,21 @@ export function useVisaoGeral() {
   return useQuery({
     queryKey: ["visao-geral"],
     queryFn: () => buscar<VisaoGeral>("/api/visao-geral"),
+  });
+}
+
+/**
+ * Acontecendo agora + o confronto em destaque (com previsão), de todos os
+ * jogos. Alimenta o topo da home. O servidor cacheia 3 min; aqui um
+ * `refetchInterval` mantém a home viva sem recarregar.
+ */
+export function useDestaquesHome() {
+  return useQuery({
+    queryKey: ["home", "destaques"],
+    queryFn: () => buscar<DestaquesHome>("/api/home/destaques"),
+    staleTime: 120_000,
+    refetchInterval: 180_000,
+    retry: false,
   });
 }
 

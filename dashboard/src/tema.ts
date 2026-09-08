@@ -28,6 +28,10 @@ export const TOKENS = {
   secundaria: "#c9bfff",
   terciaria: "#16ef7a",
   erro: "#ffb4ab",
+  //: A "agulha do mostrador" — âmbar reservado para o que o MODELO diz
+  //: (velocímetro de previsão, selo de previsão). Não é cor de série nem de
+  //: jogo; marca "olhe aqui, isto é uma estimativa".
+  modelo: "#f5b13b",
 } as const;
 
 /**
@@ -59,12 +63,21 @@ export const PALETA_POLOS = {
   neutro: TOKENS.contorno,
 } as const;
 
-/** Cores de marca por fonte de dados, como aparecem no desenho do Stitch. */
+/**
+ * Cor de cada jogo — só para orientação (trilho, ponto), nunca preenchimento.
+ * Os oito esports do sistema mais a Steam.
+ */
 export const CORES_JOGO: Record<string, string> = {
   steam: "#66c0f4",
   dota2: "#16ef7a",
-  lol: "#c89b3c",
+  counterstrike: "#efa13c",
   valorant: "#ff4655",
+  leagueoflegends: "#c7a046",
+  lol: "#c7a046",
+  callofduty: "#6e7be8",
+  overwatch: "#f99e1a",
+  rainbowsix: "#2bb0e8",
+  rocketleague: "#4c86ff",
 };
 
 export function corDoJogo(codigo: string | null | undefined): string {

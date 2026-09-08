@@ -17,6 +17,7 @@ import {
   useVisaoGeral,
 } from "../api/consultas";
 import type { MaisJogadoSteam, PartidasPorDia, VisaoGeral } from "../api/tipos";
+import { AcontecendoAgora } from "../componentes/AcontecendoAgora";
 import { Botao, Consulta, Icone } from "../componentes/base";
 import { AreaNeon } from "../componentes/graficos/AreaNeon";
 import { BarraCheia, KpiHud, Painel, Segmentos } from "../componentes/hud";
@@ -295,6 +296,9 @@ export function VisaoGeralPagina() {
           </Botao>
         </div>
       </section>
+
+      {/* ============ ACONTECENDO AGORA + DESTAQUE DO MODELO ============ */}
+      <AcontecendoAgora />
 
       {/* ==================== QUATRO KPIS ==================== */}
       <Consulta estado={geral} altura={160}>

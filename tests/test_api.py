@@ -392,3 +392,26 @@ def test_detalhe_traz_guia_onde_a_fonte_da(cliente: TestClient, jogo: str) -> No
         assert set(guia["ordem_habilidades"]) <= {"Q", "W", "E", "R"}
         for combo in guia["combos"]:
             assert combo["url"].startswith("http")
+
+
+def test_home_destaques_tem_o_contrato_da_home(cliente: TestClient) -> None:
+    """`/api/home/destaques` alimenta o topo da home: 'acontecendo agora' + o
+    velocímetro. Verifica as chaves que os dois componentes leem."""
+    resposta = cliente.get("/api/home/destaques")
+    assert resposta.status_code == 200
+
+    corpo = resposta.json()
+    assert isinstance(corpo["ao_vivo"], list)
+    assert corpo["destaque"] is None or isinstance(corpo["destaque"], dict)
+
+    for confronto in corpo["ao_vivo"]:
+        for campo in ("id_externo", "jogo", "jogo_nome", "equipe_a_nome", "equipe_b_nome"):
+            assert isinstance(confronto[campo], str)
+        assert isinstance(confronto["ao_vivo"], bool)
+        assert "inicio_previsto" in confronto
+
+    destaque = corpo["destaque"]
+    if destaque is not None:
+        # É um `ConfrontoAoVivo` mais a probabilidade — o velocímetro precisa dela.
+        assert 0.0 <= destaque["probabilidade_a"] <= 1.0
+        assert destaque["jogo"] and destaque["equipe_a_nome"] and destaque["equipe_b_nome"]
