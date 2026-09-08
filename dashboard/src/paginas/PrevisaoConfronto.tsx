@@ -19,7 +19,6 @@
  */
 
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
 
 import { useEntrarNaTela } from "../hooks/animacao";
 import {
@@ -42,7 +41,7 @@ import type {
   ValidacaoConfronto,
 } from "../api/tipos";
 import { Consulta, Esqueleto, Icone, MensagemErro, Selo } from "../componentes/base";
-import { BarraDivergente, BarraSegmentada, CAMPO, LABEL_CAMPO, Painel, Pilula } from "../componentes/hud";
+import { BarraSegmentada, CAMPO, LABEL_CAMPO, Painel, Pilula } from "../componentes/hud";
 import { Modal } from "../componentes/Modal";
 import { useJogoAtual } from "../layout/JogoAtual";
 import { PALETA_POLOS, TOKENS } from "../tema";
@@ -721,7 +720,6 @@ export function PrevisaoConfrontoPagina({
   const emRanking = secao === "ranking";
 
   const { jogo } = useJogoAtual();
-  const navegar = useNavigate();
 
   const relatorio = useRelatorioConfronto(jogo);
   const ligas = useLigasConfronto(jogo);
@@ -832,18 +830,20 @@ export function PrevisaoConfrontoPagina({
             <div className="flex flex-col gap-space-xs">
               <div className="flex flex-wrap items-center gap-space-sm">
                 <h1 className="font-headline-lg text-headline-lg uppercase tracking-wide text-primary drop-shadow-[0_0_12px_rgba(0,229,255,0.4)]">
-                  {emRanking ? "Ranking de Força" : "Previsão de Confronto"}
+                  {emRanking ? "Ranking" : "Previsão de Confronto"}
                 </h1>
-                <Selo cor="primario">{emRanking ? "Bradley-Terry" : "Antes da partida"}</Selo>
-                <span className="hidden font-label-caps text-label-caps uppercase tracking-wider text-outline sm:inline">
-                  ML // Deck 05
-                </span>
+                <Selo cor="primario">{emRanking ? "Oficial" : "Antes da partida"}</Selo>
+                {!emRanking && (
+                  <span className="hidden font-label-caps text-label-caps uppercase tracking-wider text-outline sm:inline">
+                    ML // Deck 05
+                  </span>
+                )}
               </div>
 
               {emRanking ? (
                 <p className="font-body-sm text-body-sm text-on-surface-variant">
-                  Força é a estimativa do Bradley-Terry sobre os confrontos coletados —
-                  zero é a média. Clique numa linha para simular o time no lado A.
+                  O ranking que a fonte oficial de cada jogo publica. CS vem da
+                  Valve, Valorant do vlr.gg; os outros ainda estão em integração.
                 </p>
               ) : dados ? (
                 <p className="font-body-sm text-body-sm text-on-surface-variant">
@@ -861,6 +861,7 @@ export function PrevisaoConfrontoPagina({
               )}
             </div>
 
+            {!emRanking && (
             <div className="flex flex-wrap items-center gap-space-sm">
               <label className={LABEL_CAMPO}>
                 <span className="font-label-caps text-label-caps uppercase tracking-widest text-outline">
@@ -897,6 +898,7 @@ export function PrevisaoConfrontoPagina({
                 </select>
               </label>
             </div>
+            )}
           </section>
 
           {!emRanking && dados && <AvisoValidacao validacao={dados.validacao} />}
@@ -1122,19 +1124,11 @@ export function PrevisaoConfrontoPagina({
           {emRanking && (
           <>
           {/* -------- Ranking oficial da fonte do esporte, por região -------- */}
-          {rankingOficial.data && regiaoRanking && (
+          {rankingOficial.data && regiaoRanking ? (
           <Painel
             icone="social_leaderboard"
-            titulo={
-              rankingOficial.data.derivado
-                ? "Classificação por liga"
-                : `Ranking oficial — ${rankingOficial.data.fonte}`
-            }
-            descricao={
-              rankingOficial.data.derivado
-                ? "Vitórias e derrotas de série nos últimos ~5 meses, por liga — calculado dos confrontos coletados (PandaScore). Não é a tabela oficial de pontos, mas é a mesma cena na mesma ordem."
-                : `O ranking que a cena acompanha, direto da fonte e separado por região como ela publica. Snapshot de ${fmtDataCurta(rankingOficial.data.data_referencia)}.`
-            }
+            titulo={`Ranking oficial — ${rankingOficial.data.fonte}`}
+            descricao={`O ranking que a cena acompanha, direto da fonte e separado por região como ela publica. Snapshot de ${fmtDataCurta(rankingOficial.data.data_referencia)}.`}
             meta={
               rankingOficial.data.url_fonte ? (
                 <a
@@ -1146,9 +1140,7 @@ export function PrevisaoConfrontoPagina({
                   ver em {rankingOficial.data.fonte}
                   <Icone nome="open_in_new" className="text-[14px]" />
                 </a>
-              ) : (
-                <Selo cor="primario">derivado dos confrontos</Selo>
-              )
+              ) : undefined
             }
           >
             <div className="flex flex-wrap items-center gap-space-sm">
@@ -1176,9 +1168,7 @@ export function PrevisaoConfrontoPagina({
                   <tr className="bg-surface-container font-label-caps text-label-caps uppercase tracking-wider text-outline">
                     <th className="px-space-md py-space-sm">#</th>
                     <th className="px-space-md py-space-sm">Equipe</th>
-                    <th className="px-space-md py-space-sm text-right">
-                      {rankingOficial.data.derivado ? "V–D" : "Rating"}
-                    </th>
+                    <th className="px-space-md py-space-sm text-right">Rating</th>
                   </tr>
                 </thead>
                 <tbody className="font-body-md text-body-sm">
@@ -1212,9 +1202,7 @@ export function PrevisaoConfrontoPagina({
                         </span>
                       </td>
                       <td className="px-space-md py-space-sm text-right font-title-code text-title-code tabular-nums text-primary">
-                        {rankingOficial.data.derivado
-                          ? `${equipe.vitorias ?? 0}–${equipe.derrotas ?? 0}`
-                          : (equipe.pontos ?? "—")}
+                        {equipe.pontos ?? "—"}
                       </td>
                     </tr>
                   ))}
@@ -1223,244 +1211,19 @@ export function PrevisaoConfrontoPagina({
             </div>
 
             <p className="font-body-sm text-body-sm text-outline">
-              {rankingOficial.data.derivado
-                ? `Só conta série decidida (3+ por time).${dados ? " O ranking de força abaixo é o mesmo dado tratado pelo Bradley-Terry, que pesa a qualidade do adversário." : ""}`
-                : "É esse o ranking que o modelo de previsão usa como referência inicial (prior) para um time com pouco histórico coletado — o ranking de força abaixo parte dele e ajusta pelos confrontos que temos."}
+              É esse o ranking que o modelo de previsão usa como referência
+              inicial (prior) para um time com pouco histórico coletado.
             </p>
           </Painel>
+          ) : (
+          <p className="rounded-xl bg-surface-container-low/90 px-space-lg py-space-base font-body-md text-body-md text-on-surface-variant shadow-lg">
+            O ranking oficial deste jogo ainda está sendo integrado. Enquanto isso,
+            a aba <strong className="text-on-surface">Previsão</strong> usa a força
+            que o modelo estima internamente — mas ela não vira ranking público
+            até termos dado suficiente e confiável.
+          </p>
           )}
 
-          {/* -------- Ranking de força do nosso modelo -------- */}
-          {!dados && (
-            <p className="rounded-xl bg-surface-container-low/90 px-space-lg py-space-base font-body-md text-body-md text-on-surface-variant shadow-lg">
-              O ranking de força (Bradley-Terry) ainda não foi ajustado para
-              este jogo — ele treina quando há confronto decidido suficiente.
-            </p>
-          )}
-          {dados && (
-          <>
-          <Painel
-            icone="leaderboard"
-            titulo={liga ? `Ranking de força — ${liga}` : "Ranking de força"}
-            descricao={
-              dados?.prior_externo
-                ? `Força é a estimativa do Bradley-Terry sobre os confrontos coletados, ancorada no ranking da ${dados.prior_externo.fonte} (coluna à parte). Não é a posição da ${dados.prior_externo.fonte}: um time com bom retrospecto sobe acima dela. Zero é a média; clique numa linha para colocá-la no lado A.`
-                : "Força é a estimativa do Bradley-Terry sobre os confrontos coletados. Zero é a média; clique numa linha para colocá-la no lado A."
-            }
-            meta={
-              <Selo cor="primario">
-                {fmtNumero(equipes.length)} equipes com {minPartidas}+ partidas
-              </Selo>
-            }
-          >
-            <Consulta estado={ranking} vazio="Nenhuma equipe atinge esse mínimo.">
-              {(lista: EquipeConfronto[]) => {
-                const maiorForca = Math.max(...lista.map((e) => Math.abs(e.forca)), 0.01);
-                // GPM/KDA são telemetria de MOBA (OpenDota → só Dota 2); o
-                // ranking externo é por esporte (Valve no CS, vlr.gg no
-                // Valorant). As colunas seguem o que o jogo realmente tem.
-                const temTelemetria = lista.some((e) => e.gpm_medio !== null);
-                const temRankingExterno = lista.some(
-                  (e) => e.posicao_ranking !== null,
-                );
-                // Saldo de mapas/jogos/pontos — existe onde a Liquipedia
-                // publica o placar da série (todo jogo 1-contra-1 menos Dota).
-                const temSaldo = lista.some((e) => e.saldo_placar !== null);
-
-                return (
-                  <div className="rolagem-discreta overflow-x-auto rounded-lg bg-surface-container-lowest">
-                    <table className="w-full border-collapse text-left">
-                      <thead>
-                        <tr className="bg-surface-container font-label-caps text-label-caps uppercase tracking-wider text-outline">
-                          <th className="px-space-md py-space-sm">#</th>
-                          <th className="px-space-md py-space-sm">Equipe</th>
-                          <th className="px-space-md py-space-sm">Força</th>
-                          <th className="px-space-md py-space-sm text-right">Partidas</th>
-                          <th className="px-space-md py-space-sm text-right">Winrate</th>
-                          {temSaldo && (
-                            <th
-                              className="px-space-md py-space-sm text-right"
-                              title="Saldo médio de placar por confronto, de -1 (só perde de lavada) a +1 (só vence de lavada)"
-                            >
-                              Saldo
-                            </th>
-                          )}
-                          {temRankingExterno && (
-                            <th
-                              className="px-space-md py-space-sm text-right"
-                              title={`Posição no ranking oficial (${fonteExterna(jogo)})`}
-                            >
-                              {fonteExterna(jogo)}
-                            </th>
-                          )}
-                          {temTelemetria && (
-                            <>
-                              <th className="px-space-md py-space-sm text-right">GPM</th>
-                              <th className="px-space-md py-space-sm text-right">KDA</th>
-                            </>
-                          )}
-                        </tr>
-                      </thead>
-
-                      <tbody className="font-body-md text-body-sm">
-                        {lista.map((equipe, indice) => {
-                          const positivo = equipe.forca >= 0;
-                          const cor = positivo
-                            ? PALETA_POLOS.positivo
-                            : PALETA_POLOS.negativo;
-
-                          return (
-                            <tr
-                              key={equipe.id_equipe}
-                              onClick={() => {
-                                // Joga o time no lado A e leva para o simulador,
-                                // que mora na aba Previsao. O componente
-                                // continua montado entre as abas, entao o
-                                // `setEquipeA` sobrevive a navegacao.
-                                setEquipeA(equipe.id_equipe);
-                                navegar(`/esports/${jogo}/previsao`);
-                              }}
-                              className={`cursor-pointer transition-colors hover:bg-surface-container-high/60 ${
-                                indice % 2 ? "bg-[#131824]" : "bg-[#10141D]"
-                              }`}
-                              style={{
-                                boxShadow:
-                                  equipe.id_equipe === equipeA ||
-                                  equipe.id_equipe === equipeB
-                                    ? `inset 3px 0 0 ${TOKENS.primaria}`
-                                    : undefined,
-                              }}
-                            >
-                              <td className="px-space-md py-space-sm font-label-caps text-label-caps text-outline">
-                                #{String(indice + 1).padStart(2, "0")}
-                              </td>
-
-                              <td className="px-space-md py-space-sm">
-                                <span className="font-headline-sm text-headline-sm text-on-surface">
-                                  {equipe.nome}
-                                </span>
-                                {equipe.tag && (
-                                  <span className="ml-space-xs font-title-code text-title-code text-outline">
-                                    {equipe.tag}
-                                  </span>
-                                )}
-                              </td>
-
-                              <td className="px-space-md py-space-sm">
-                                <div className="flex items-center gap-space-sm">
-                                  <BarraDivergente
-                                    valor={equipe.forca}
-                                    maximo={maiorForca}
-                                    cor={cor}
-                                  />
-                                  <span
-                                    className="font-title-code text-title-code tabular-nums"
-                                    style={{ color: cor }}
-                                  >
-                                    {equipe.forca >= 0 ? "+" : ""}
-                                    {fmtDecimal(equipe.forca, 3)}
-                                  </span>
-                                </div>
-                              </td>
-
-                              <td className="px-space-md py-space-sm text-right font-title-code text-title-code tabular-nums text-on-surface-variant">
-                                {equipe.vitorias}/{equipe.partidas}
-                              </td>
-                              <td className="px-space-md py-space-sm text-right font-title-code text-title-code tabular-nums text-on-surface">
-                                {fmtPercentual(equipe.winrate)}
-                              </td>
-                              {temSaldo && (
-                                <td
-                                  className="px-space-md py-space-sm text-right font-title-code text-title-code tabular-nums"
-                                  style={{
-                                    color:
-                                      equipe.saldo_placar === null
-                                        ? undefined
-                                        : equipe.saldo_placar >= 0
-                                          ? PALETA_POLOS.positivo
-                                          : PALETA_POLOS.negativo,
-                                  }}
-                                >
-                                  {equipe.saldo_placar === null
-                                    ? "—"
-                                    : `${equipe.saldo_placar >= 0 ? "+" : ""}${fmtDecimal(
-                                        equipe.saldo_placar,
-                                        2,
-                                      )}`}
-                                </td>
-                              )}
-                              {temRankingExterno && (
-                                <td
-                                  className="px-space-md py-space-sm text-right font-title-code text-title-code tabular-nums text-on-surface-variant"
-                                  title={
-                                    equipe.pontos_ranking !== null
-                                      ? `${equipe.pontos_ranking} pontos`
-                                      : undefined
-                                  }
-                                >
-                                  {equipe.posicao_ranking !== null
-                                    ? `#${equipe.posicao_ranking}`
-                                    : "—"}
-                                </td>
-                              )}
-                              {temTelemetria && (
-                                <>
-                                  <td className="px-space-md py-space-sm text-right font-title-code text-title-code tabular-nums text-on-surface-variant">
-                                    {fmtNumero(equipe.gpm_medio)}
-                                  </td>
-                                  <td className="px-space-md py-space-sm text-right font-title-code text-title-code tabular-nums text-on-surface-variant">
-                                    {fmtDecimal(equipe.kda_medio, 2)}
-                                  </td>
-                                </>
-                              )}
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                );
-              }}
-            </Consulta>
-          </Painel>
-
-          {/* ==================== CAMPEONATOS ==================== */}
-          <Painel
-            icone="emoji_events"
-            titulo="Campeonatos nos dados"
-            descricao="A coleta pega partidas profissionais recentes; estes são os torneios que apareceram."
-          >
-            <Consulta estado={ligas} vazio="Nenhum campeonato coletado.">
-              {(lista: LigaConfronto[]) => (
-                <div className="grid grid-cols-1 gap-space-base md:grid-cols-2 xl:grid-cols-3">
-                  {lista.map((item) => (
-                    <button
-                      key={item.liga}
-                      type="button"
-                      onClick={() => setLiga(liga === item.liga ? null : item.liga)}
-                      className={`rounded-lg p-space-base text-left transition-colors ${
-                        liga === item.liga
-                          ? "bg-surface-container ring-1 ring-primary-container"
-                          : "bg-surface-container-lowest hover:bg-surface-container"
-                      }`}
-                    >
-                      <div className="font-headline-sm text-headline-sm text-on-surface">
-                        {item.liga}
-                      </div>
-                      <div className="mt-space-xxs font-title-code text-title-code text-primary">
-                        {item.confrontos} confrontos · {item.equipes} equipes
-                      </div>
-                      <div className="mt-space-xxs font-label-caps text-label-caps uppercase tracking-widest text-outline">
-                        {fmtDataCurta(item.inicio)} — {fmtDataCurta(item.fim)}
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </Consulta>
-          </Painel>
-          </>
-          )}
           </>
           )}
             </>

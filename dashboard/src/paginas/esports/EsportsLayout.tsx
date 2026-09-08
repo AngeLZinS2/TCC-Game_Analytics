@@ -27,7 +27,7 @@ const ABAS = [
   { id: "partidas", rotulo: "Partidas", icone: "scoreboard" },
   { id: "resultados", rotulo: "Resultados", icone: "flag" },
   { id: "previsao", rotulo: "Previsão", icone: "swords", selo: "ML" },
-  { id: "ranking", rotulo: "Ranking", icone: "leaderboard", selo: "ML" },
+  { id: "ranking", rotulo: "Ranking", icone: "leaderboard" },
   { id: "herois", rotulo: "Heróis", icone: "shield_person" },
   { id: "jogadores", rotulo: "Jogadores", icone: "group" },
 ] as const;

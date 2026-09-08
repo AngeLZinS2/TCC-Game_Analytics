@@ -15,16 +15,15 @@ em Valorant.
 from __future__ import annotations
 
 import logging
-from datetime import date, datetime, timedelta, timezone
+from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from api.schemas import EquipeRankingOficial, RankingOficialResposta, RegiaoRanking
-from db.models import AgendaPartida, DimEquipe, DimJogo, RankingExterno
+from db.models import DimEquipe, DimJogo, RankingExterno
 from db.session import get_db
-from etl.agenda_fontes import restringir_recorte
 
 logger = logging.getLogger(__name__)
 
@@ -87,10 +86,13 @@ def ranking_oficial(
         )
     )
     if ultima is None:
-        # Sem ranking externo (Valve/vlr.gg): a classificacao V-D dos confrontos
-        # que a PandaScore trouxe, por liga. Nao e "oficial" nem vira prior, mas
-        # e a tabela que a cena olha e a que a tela pode mostrar.
-        return _classificacao_derivada(db, id_jogo, jogo, limite)
+        # So o ranking EXTERNO oficial (Valve/vlr.gg). A classificacao derivada
+        # dos nossos confrontos foi desabilitada ate haver dado suficiente e
+        # confiavel - decisao do produto, 2026-09-08.
+        raise HTTPException(
+            status_code=404,
+            detail=f"nenhum ranking oficial coletado para {jogo!r}",
+        )
 
     linhas = db.execute(
         select(
@@ -149,121 +151,3 @@ def ranking_oficial(
         regioes=regioes,
     )
 
-
-#: Janela da classificacao derivada. Cinco meses cobrem uma temporada regional
-#: sem arrastar resultado de um ano atras.
-_JANELA_DIAS = 150
-#: Minimo de series decididas para um time entrar na tabela da liga.
-_MIN_SERIES = 3
-
-
-def _liga_do_torneio(torneio: str | None) -> str:
-    """`LCK — Playoffs` -> `LCK`. O nome antes do travessao e a liga/regiao."""
-    if not torneio:
-        return "Outros"
-    return torneio.split(" — ")[0].strip() or "Outros"
-
-
-def _classificacao_derivada(
-    db: Session, id_jogo: int, jogo: str, limite: int
-) -> RankingOficialResposta:
-    corte = datetime.now(timezone.utc) - timedelta(days=_JANELA_DIAS)
-
-    base = (
-        select(
-            AgendaPartida.torneio,
-            AgendaPartida.id_equipe_a,
-            AgendaPartida.id_equipe_b,
-            AgendaPartida.equipe_a_nome,
-            AgendaPartida.equipe_b_nome,
-            AgendaPartida.vitoria_a,
-            AgendaPartida.inicio_previsto,
-        )
-        .where(
-            AgendaPartida.id_jogo == id_jogo,
-            AgendaPartida.vitoria_a.is_not(None),
-            AgendaPartida.inicio_previsto >= corte,
-        )
-    )
-    linhas = db.execute(restringir_recorte(db, base)).all()
-    if not linhas:
-        raise HTTPException(
-            status_code=404,
-            detail=f"sem confrontos recentes para classificar {jogo!r}",
-        )
-
-    # (liga, chave_time) -> {nome, id_equipe, v, d, ultimo}
-    tabela: dict[tuple[str, object], dict] = {}
-    for lin in linhas:
-        liga = _liga_do_torneio(lin.torneio)
-        for id_eq, nome, venceu in (
-            (lin.id_equipe_a, lin.equipe_a_nome, lin.vitoria_a is True),
-            (lin.id_equipe_b, lin.equipe_b_nome, lin.vitoria_a is False),
-        ):
-            chave = id_eq if id_eq is not None else f"nome:{nome}"
-            reg = tabela.setdefault(
-                (liga, chave),
-                {"nome": nome, "id_equipe": id_eq, "v": 0, "d": 0},
-            )
-            reg["v" if venceu else "d"] += 1
-
-    # escudo/tag por id_equipe
-    ids = {r["id_equipe"] for r in tabela.values() if r["id_equipe"] is not None}
-    meta = {
-        e.id_equipe: (e.tag, e.logo_url)
-        for e in db.execute(
-            select(DimEquipe.id_equipe, DimEquipe.tag, DimEquipe.logo_url).where(
-                DimEquipe.id_equipe.in_(ids)
-            )
-        )
-    } if ids else {}
-
-    por_liga: dict[str, list[dict]] = {}
-    for (liga, _chave), reg in tabela.items():
-        if reg["v"] + reg["d"] < _MIN_SERIES:
-            continue
-        por_liga.setdefault(liga, []).append(reg)
-
-    if not por_liga:
-        raise HTTPException(
-            status_code=404,
-            detail=f"confrontos de {jogo!r} ainda rasos para uma classificação",
-        )
-
-    regioes: list[RegiaoRanking] = []
-    for liga, times in sorted(por_liga.items(), key=lambda p: -len(p[1])):
-        times.sort(key=lambda r: (-(r["v"] / (r["v"] + r["d"])), -r["v"]))
-        equipes = []
-        for pos, reg in enumerate(times[:limite], start=1):
-            tag, logo = meta.get(reg["id_equipe"], (None, None))
-            total = reg["v"] + reg["d"]
-            equipes.append(
-                EquipeRankingOficial(
-                    posicao=pos,
-                    equipe_nome=reg["nome"],
-                    id_equipe=reg["id_equipe"],
-                    tag=tag,
-                    logo_url=logo,
-                    pontos=round(100 * reg["v"] / total),
-                    vitorias=reg["v"],
-                    derrotas=reg["d"],
-                )
-            )
-        regioes.append(
-            RegiaoRanking(slug=_slug(liga), nome=liga, equipes=equipes)
-        )
-
-    return RankingOficialResposta(
-        jogo=jogo,
-        fonte="Classificação",
-        url_fonte="",
-        data_referencia=date.today(),
-        regioes=regioes,
-        derivado=True,
-    )
-
-
-def _slug(texto: str) -> str:
-    import re
-
-    return re.sub(r"[^a-z0-9]+", "-", texto.lower()).strip("-") or "liga"
