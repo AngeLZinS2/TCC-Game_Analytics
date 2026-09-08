@@ -523,6 +523,13 @@ def _coletar_owcs(settings: Settings, storage: RawStorage) -> CollectionResult:
     return OwcsStandingsCollector(raw_storage=storage).run(carregar=True)
 
 
+def _coletar_rlcs(settings: Settings, storage: RawStorage) -> CollectionResult:
+    """Leaderboard oficial de pontos da RLCS (blast.tv), por regiao."""
+    from collectors.rlcs_rankings import RlcsRankingsCollector
+
+    return RlcsRankingsCollector(raw_storage=storage).run(carregar=True)
+
+
 def _coletar_pandascore_val(settings: Settings, storage: RawStorage) -> CollectionResult:
     """PandaScore de Valorant — só pelo escudo dos times.
 
@@ -744,6 +751,13 @@ def montar_tarefas(settings: Settings) -> list[Tarefa]:
             nome="owcs",
             intervalo_segundos=settings.agendador_owcs_minutos * 60,
             executar=_coletar_owcs,
+        )
+    )
+    tarefas.append(
+        Tarefa(
+            nome="rlcs",
+            intervalo_segundos=settings.agendador_rlcs_minutos * 60,
+            executar=_coletar_rlcs,
         )
     )
     tarefas.append(

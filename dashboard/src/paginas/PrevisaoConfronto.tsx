@@ -81,6 +81,7 @@ function fonteExterna(jogo: string): string {
   if (jogo === "valorant") return "vlr.gg";
   if (jogo === "rainbowsix") return "R6 Esports";
   if (jogo === "overwatch") return "OWCS";
+  if (jogo === "rocketleague") return "RLCS";
   return "Ranking";
 }
 
@@ -846,8 +847,9 @@ export function PrevisaoConfrontoPagina({
                 <p className="font-body-sm text-body-sm text-on-surface-variant">
                   O ranking que a fonte oficial de cada jogo publica. CS vem da
                   Valve, Valorant do vlr.gg, R6 do R6 Esports (SI Points),
-                  Overwatch da tabela do Stage corrente do OWCS; os outros ainda
-                  estão em integração.
+                  Overwatch da tabela do Stage do OWCS, Rocket League do
+                  leaderboard da RLCS (blast.tv); os outros ainda estão em
+                  integração.
                 </p>
               ) : dados ? (
                 <p className="font-body-sm text-body-sm text-on-surface-variant">

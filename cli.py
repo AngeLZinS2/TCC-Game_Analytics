@@ -44,6 +44,7 @@ FONTES = (
     "pandascore-val",
     "ubi-r6",
     "owcs-standings",
+    "rlcs-rankings",
 )
 
 
@@ -354,6 +355,11 @@ def _construir_coletor(args: argparse.Namespace, storage):
 
         return OwcsStandingsCollector(raw_storage=storage)
 
+    if args.fonte == "rlcs-rankings":
+        from collectors.rlcs_rankings import RlcsRankingsCollector
+
+        return RlcsRankingsCollector(raw_storage=storage)
+
     if args.fonte.startswith("pandascore-"):
         from collectors.pandascore import PandaScoreCollector
 
@@ -447,6 +453,10 @@ def _carregador(fonte: str):
         return carregar
     if fonte == "owcs-standings":
         from etl.load_owcs_standings import carregar
+
+        return carregar
+    if fonte == "rlcs-rankings":
+        from etl.load_rlcs_rankings import carregar
 
         return carregar
     if fonte.startswith("pandascore-"):

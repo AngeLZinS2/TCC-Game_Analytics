@@ -285,6 +285,11 @@ class Settings(BaseSettings):
     #: temporada nao ha o que coletar, entao rodar de novo custa pouco.
     agendador_owcs_minutos: int = Field(default=1440, ge=60)
 
+    #: Intervalo do leaderboard da RLCS (blast.tv), em minutos. Diario: os
+    #: pontos so mudam durante um Major (poucas janelas por temporada), mas
+    #: uma pagina por regiao por dia e barato.
+    agendador_rlcs_minutos: int = Field(default=1440, ge=60)
+
     # --- Assistente (OpenRouter) ---
     #: Sem chave, o endpoint do assistente responde 503 com a instrucao. E um
     #: estado esperado: o resto do projeto funciona sem LLM nenhum.

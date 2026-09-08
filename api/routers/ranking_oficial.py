@@ -41,6 +41,7 @@ FONTES = {
         "OWCS (Liquipedia)",
         "https://liquipedia.net/overwatch/Overwatch_Champions_Series",
     ),
+    "rlcs": ("RLCS (blast.tv)", "https://blast.tv/rl/leaderboard"),
 }
 
 #: Nome de exibicao e ORDEM das regioes. Uma regiao fora deste mapa ainda
@@ -54,6 +55,10 @@ REGIOES = {
     "china": "China",
     "pacific": "Pacífico",
     "asia-pacific": "Ásia-Pacífico",
+    "mena": "MENA",
+    "oceania": "Oceania",
+    "south-america": "América do Sul",
+    "sub-saharan-africa": "África Subsaariana",
     "la-s": "LATAM Sul",
     "la-n": "LATAM Norte",
     "global": "Global",
