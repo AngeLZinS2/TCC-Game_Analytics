@@ -47,7 +47,9 @@ const PERIODOS = [
  *
  * A chave e `raw_data.fonte`. `liquipedia` cobre os tres coletores da wiki
  * (agenda, equipes, brackets), que gravam sob a mesma fonte; `valve` e o
- * Regional Standings de CS2, que vem do GitHub, nao de uma API REST.
+ * Regional Standings de CS2, que vem do GitHub, nao de uma API REST. Toda fonte
+ * que roda no `agendador.py` precisa ter uma linha aqui - sem ela a tabela
+ * mostra "—" em tipo e frequencia.
  */
 const FONTES: Record<
   string,
@@ -66,12 +68,27 @@ const FONTES: Record<
     descricao: "Jogadores simultâneos, avaliações e preço da loja",
     frequencia: "janela de 60 min",
   },
+  steam_online: {
+    etiqueta: "STEAM",
+    cor: "#8f98a0",
+    api: "valvesoftware.com/about/stats",
+    descricao:
+      "Usuários simultâneos reais da plataforma Steam + nomes do Top 100 mais jogado",
+    frequencia: "a cada 15 min",
+  },
   opendota: {
     etiqueta: "DOTA 2",
     cor: "#16ef7a",
     api: "OpenDota API",
     descricao: "Partidas profissionais, heróis e séries minuto a minuto",
     frequencia: "por partida",
+  },
+  dota_herois: {
+    etiqueta: "DOTA 2",
+    cor: "#e0654f",
+    api: "Datafeed dota2.com + OpenDota",
+    descricao: "Lore, habilidades e guia de itens do meta de cada herói",
+    frequencia: "semanal",
   },
   liquipedia: {
     etiqueta: "LIQUIPEDIA",
@@ -86,6 +103,69 @@ const FONTES: Record<
     api: "GitHub (Regional Standings)",
     descricao: "Ranking mundial oficial de CS2 — pontuação por equipe",
     frequencia: "mensal (verificado toda semana)",
+  },
+  hltv: {
+    etiqueta: "CS2",
+    cor: "#3b82f6",
+    api: "hltv.org/matches",
+    descricao: "Partidas de Counter-Strike por vir — id estável, horário UTC e evento",
+    frequencia: "a cada 5 min",
+  },
+  vlr: {
+    etiqueta: "VALORANT",
+    cor: "#ff4655",
+    api: "vlr.gg",
+    descricao: "Confrontos de Valorant: placar de série, evento e horário",
+    frequencia: "resultados 1×/dia; agenda a cada 5 min",
+  },
+  vlr_rankings: {
+    etiqueta: "VALORANT",
+    cor: "#fb7185",
+    api: "vlr.gg/rankings",
+    descricao: "Ranking de equipes por região — prior do modelo de confronto",
+    frequencia: "semanal",
+  },
+  vlr_detalhes: {
+    etiqueta: "VALORANT",
+    cor: "#fda4af",
+    api: "vlr.gg (página da partida)",
+    descricao: "Detalhe por mapa e por jogador das partidas já decididas",
+    frequencia: "diário",
+  },
+  valorant_agentes: {
+    etiqueta: "VALORANT",
+    cor: "#ff8a80",
+    api: "valorant-api.com",
+    descricao: "Elenco do VALORANT: função e habilidades dos agentes",
+    frequencia: "semanal",
+  },
+  opgg_esports: {
+    etiqueta: "LOL",
+    cor: "#5383e8",
+    api: "OP.GG (servidor MCP)",
+    descricao: "Confrontos profissionais de LoL: placar, liga, horário e escudo",
+    frequencia: "a cada 6 h",
+  },
+  lol_campeoes: {
+    etiqueta: "LOL",
+    cor: "#c8aa6e",
+    api: "OP.GG",
+    descricao: "Campeões de LoL: desempenho, tier e taxa de ban por rota",
+    frequencia: "semanal",
+  },
+  itad: {
+    etiqueta: "PREÇO",
+    cor: "#22c55e",
+    api: "IsThereAnyDeal API",
+    descricao: "Preço atual em ~33 lojas e menor preço histórico por jogo",
+    frequencia: "a cada 12 h",
+  },
+  hltb: {
+    etiqueta: "HLTB",
+    cor: "#0ea5e9",
+    api: "HowLongToBeat",
+    descricao: "Tempo estimado para zerar cada jogo",
+    frequencia: "diário",
   },
 };
 

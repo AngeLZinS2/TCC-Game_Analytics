@@ -40,7 +40,11 @@ import {
   Sparkline,
 } from "../componentes/hud";
 import { EstatisticasConfrontos } from "../componentes/EstatisticasConfrontos";
-import { ListaConfrontos } from "../componentes/ListaConfrontos";
+import {
+  SeletorModoConfrontos,
+  VisaoConfrontos,
+  useModoConfrontos,
+} from "../componentes/VisaoConfrontos";
 import { useJogoAtual } from "../layout/JogoAtual";
 import { corDoJogo, PALETA_POLOS } from "../tema";
 import {
@@ -94,6 +98,7 @@ export function PartidasPagina({
   const [busca, setBusca] = useState("");
   const [pagina, setPagina] = useState(1);
   const [paginaConfrontos, setPaginaConfrontos] = useState(1);
+  const [modoConfrontos, setModoConfrontos] = useModoConfrontos();
   const [porPagina, setPorPagina] = useState(25);
 
   const desde = useMemo(() => {
@@ -538,7 +543,10 @@ export function PartidasPagina({
         titulo="Confrontos com resultado"
         descricao="Placar da série, do calendário — Liquipedia e OP.GG. Um 3x1 é um confronto, não três partidas."
         meta={
-          <Selo>{confrontos.data?.length ?? 0} em tela</Selo>
+          <div className="flex flex-wrap items-center gap-space-sm">
+            <SeletorModoConfrontos modo={modoConfrontos} aoMudar={setModoConfrontos} />
+            <Selo>{confrontos.data?.length ?? 0} em tela</Selo>
+          </div>
         }
       >
         <Consulta
@@ -548,7 +556,7 @@ export function PartidasPagina({
         >
           {(lista) => (
             <>
-              <ListaConfrontos confrontos={lista} />
+              <VisaoConfrontos confrontos={lista} modo={modoConfrontos} />
               <div className="flex items-center justify-between gap-space-sm pt-space-sm">
                 <Botao
                   icone="chevron_left"
