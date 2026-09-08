@@ -115,7 +115,7 @@ const FONTES: Record<
     etiqueta: "PANDASCORE",
     cor: "#14b8a6",
     api: "PandaScore API",
-    descricao: "Agenda e resultados de esports (CS, LoL, CoD, OW, R6, RL — torneios tier S/A/B/C)",
+    descricao: "Agenda e resultados de esports (CS, LoL, CoD, OW, R6, RL; Valorant só escudo)",
     frequencia: "a cada 30 min",
   },
   vlr: {

@@ -509,6 +509,19 @@ def _coletar_pandascore_rl(settings: Settings, storage: RawStorage) -> Collectio
     return PandaScoreCollector(raw_storage=storage, jogo="rl").run(carregar=True)
 
 
+def _coletar_pandascore_val(settings: Settings, storage: RawStorage) -> CollectionResult:
+    """PandaScore de Valorant — só pelo escudo dos times.
+
+    O vlr.gg continua a fonte de Valorant (tem o detalhe por mapa, o ranking).
+    Estas linhas ficam atrás do `vlr:` na precedência (`etl.agenda_fontes`); o
+    valor é o `image_url` de cada time, que o `carregar_agenda` faz backfill no
+    `dim_equipe` que a raspagem do vlr.gg deixou sem logo.
+    """
+    from collectors.pandascore import PandaScoreCollector
+
+    return PandaScoreCollector(raw_storage=storage, jogo="valorant").run(carregar=True)
+
+
 def _coletar_vlr_detalhes(settings: Settings, storage: RawStorage) -> CollectionResult:
     """Detalhe por mapa e por jogador das partidas de Valorant ja decididas."""
     from collectors.vlr_detalhes import VlrDetalhesCollector
@@ -681,6 +694,7 @@ def montar_tarefas(settings: Settings) -> list[Tarefa]:
             ("pandascore_ow", _coletar_pandascore_ow),
             ("pandascore_r6", _coletar_pandascore_r6),
             ("pandascore_rl", _coletar_pandascore_rl),
+            ("pandascore_val", _coletar_pandascore_val),
         ):
             tarefas.append(
                 Tarefa(

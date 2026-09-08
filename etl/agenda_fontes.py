@@ -5,8 +5,15 @@ sem prefixo), vlr.gg/hltv (`vlr:`/`hltv:`), PandaScore (`pandascore:`) — com
 nome e horário diferentes. Sem cortar, a lista de confrontos mostra a partida
 2x e o modelo de Bradley-Terry conta o resultado 2x.
 
-A regra: a fonte mais estruturada que tenha linha ganha, e as outras somem —
+A regra: a primeira fonte da lista que tenha linha ganha, e as outras somem —
 para aquele jogo, ou para aquele recorte.
+
+**vlr.gg antes da PandaScore de propósito**: o `vlr:` só existe para Valorant, e
+é a linha `vlr` que carrega o `detalhe` por mapa (`vlr_detalhes`). Se a
+PandaScore ganhasse, o botão "por mapa" sumia. A PandaScore de Valorant entra
+só pelo escudo dos times (backfill no `carregar_agenda`). Para CS, `hltv:` fica
+DEPOIS da PandaScore — senão linha `hltv` velha (pré-migração) ressuscitava e
+escondia a PandaScore.
 """
 
 from __future__ import annotations
@@ -16,11 +23,12 @@ from sqlalchemy.orm import Session
 
 from db.models import AgendaPartida, DimJogo
 
-#: Da mais estruturada para a menos. Quem não casa com nenhuma cláusula é o
-#: resto (Liquipedia, OP.GG) — só entra quando ninguém acima tem linha.
+#: Ordem de preferência. Quem não casa com nenhuma cláusula é o resto
+#: (Liquipedia, OP.GG) — só entra quando ninguém acima tem linha.
 _PRECEDENCIA = (
+    AgendaPartida.id_externo.op("~")("^vlr:"),
     AgendaPartida.id_externo.op("~")("^pandascore:"),
-    AgendaPartida.id_externo.op("~")("^(vlr|hltv):"),
+    AgendaPartida.id_externo.op("~")("^hltv:"),
 )
 
 

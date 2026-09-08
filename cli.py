@@ -41,6 +41,7 @@ FONTES = (
     "pandascore-ow",
     "pandascore-r6",
     "pandascore-rl",
+    "pandascore-val",
 )
 
 
@@ -351,6 +352,7 @@ def _construir_coletor(args: argparse.Namespace, storage):
             "pandascore-ow": "ow",
             "pandascore-r6": "r6siege",
             "pandascore-rl": "rl",
+            "pandascore-val": "valorant",
         }[args.fonte]
         return PandaScoreCollector(
             raw_storage=storage, jogo=jogo_ps, settings=settings
