@@ -889,6 +889,9 @@ export interface EquipeRankingOficial {
   logo_url: string | null;
   /** Rating da fonte (ELO ~1000-2000 no vlr.gg). `null` se so publica ordem. */
   pontos: number | null;
+  /** V/D de série — só na classificação derivada dos confrontos. */
+  vitorias: number | null;
+  derrotas: number | null;
 }
 
 export interface RegiaoRanking {
@@ -905,4 +908,6 @@ export interface RankingOficial {
   /** Data do snapshot mais recente (YYYY-MM-DD). */
   data_referencia: string;
   regioes: RegiaoRanking[];
+  /** `true` = classificação V-D calculada dos confrontos (sem fonte externa). */
+  derivado: boolean;
 }

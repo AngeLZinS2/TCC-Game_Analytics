@@ -1038,6 +1038,9 @@ class EquipeRankingOficial(BaseModel):
     #: O rating da fonte (ELO ~1000-2000 no vlr.gg). `None` se a fonte so
     #: publica ordem.
     pontos: int | None = None
+    #: Vitorias/derrotas de serie — so na classificacao derivada dos confrontos.
+    vitorias: int | None = None
+    derrotas: int | None = None
 
 
 class RegiaoRanking(BaseModel):
@@ -1055,3 +1058,6 @@ class RankingOficialResposta(BaseModel):
     #: Data do snapshot mais recente.
     data_referencia: date
     regioes: list[RegiaoRanking]
+    #: `True` quando nao ha ranking externo e a tabela e a classificacao V-D
+    #: calculada dos confrontos coletados (nao alimenta o prior do modelo).
+    derivado: bool = False

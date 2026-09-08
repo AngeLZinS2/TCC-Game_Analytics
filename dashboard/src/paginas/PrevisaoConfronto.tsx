@@ -1125,18 +1125,30 @@ export function PrevisaoConfrontoPagina({
           {rankingOficial.data && regiaoRanking && (
           <Painel
             icone="social_leaderboard"
-            titulo={`Ranking oficial — ${rankingOficial.data.fonte}`}
-            descricao={`O ranking que a cena acompanha, direto da fonte e separado por região como ela publica. Snapshot de ${fmtDataCurta(rankingOficial.data.data_referencia)}.`}
+            titulo={
+              rankingOficial.data.derivado
+                ? "Classificação por liga"
+                : `Ranking oficial — ${rankingOficial.data.fonte}`
+            }
+            descricao={
+              rankingOficial.data.derivado
+                ? "Vitórias e derrotas de série nos últimos ~5 meses, por liga — calculado dos confrontos coletados (PandaScore). Não é a tabela oficial de pontos, mas é a mesma cena na mesma ordem."
+                : `O ranking que a cena acompanha, direto da fonte e separado por região como ela publica. Snapshot de ${fmtDataCurta(rankingOficial.data.data_referencia)}.`
+            }
             meta={
-              <a
-                href={rankingOficial.data.url_fonte}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-space-xxs rounded bg-surface-container px-space-md py-space-xs font-title-code text-title-code text-primary transition-colors hover:bg-surface-container-high"
-              >
-                ver em {rankingOficial.data.fonte}
-                <Icone nome="open_in_new" className="text-[14px]" />
-              </a>
+              rankingOficial.data.url_fonte ? (
+                <a
+                  href={rankingOficial.data.url_fonte}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-space-xxs rounded bg-surface-container px-space-md py-space-xs font-title-code text-title-code text-primary transition-colors hover:bg-surface-container-high"
+                >
+                  ver em {rankingOficial.data.fonte}
+                  <Icone nome="open_in_new" className="text-[14px]" />
+                </a>
+              ) : (
+                <Selo cor="primario">derivado dos confrontos</Selo>
+              )
             }
           >
             <div className="flex flex-wrap items-center gap-space-sm">
@@ -1164,7 +1176,9 @@ export function PrevisaoConfrontoPagina({
                   <tr className="bg-surface-container font-label-caps text-label-caps uppercase tracking-wider text-outline">
                     <th className="px-space-md py-space-sm">#</th>
                     <th className="px-space-md py-space-sm">Equipe</th>
-                    <th className="px-space-md py-space-sm text-right">Rating</th>
+                    <th className="px-space-md py-space-sm text-right">
+                      {rankingOficial.data.derivado ? "V–D" : "Rating"}
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="font-body-md text-body-sm">
@@ -1177,17 +1191,30 @@ export function PrevisaoConfrontoPagina({
                         #{String(equipe.posicao).padStart(2, "0")}
                       </td>
                       <td className="px-space-md py-space-sm">
-                        <span className="font-headline-sm text-headline-sm text-on-surface">
-                          {equipe.equipe_nome}
-                        </span>
-                        {equipe.tag && (
-                          <span className="ml-space-xs font-title-code text-title-code text-outline">
-                            {equipe.tag}
+                        <span className="flex items-center gap-space-xs">
+                          {equipe.logo_url && (
+                            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded bg-neutral-200 p-[2px]">
+                              <img
+                                src={equipe.logo_url}
+                                alt=""
+                                className="max-h-full max-w-full object-contain"
+                              />
+                            </span>
+                          )}
+                          <span className="font-headline-sm text-headline-sm text-on-surface">
+                            {equipe.equipe_nome}
                           </span>
-                        )}
+                          {equipe.tag && (
+                            <span className="font-title-code text-title-code text-outline">
+                              {equipe.tag}
+                            </span>
+                          )}
+                        </span>
                       </td>
                       <td className="px-space-md py-space-sm text-right font-title-code text-title-code tabular-nums text-primary">
-                        {equipe.pontos ?? "—"}
+                        {rankingOficial.data.derivado
+                          ? `${equipe.vitorias ?? 0}–${equipe.derrotas ?? 0}`
+                          : (equipe.pontos ?? "—")}
                       </td>
                     </tr>
                   ))}
@@ -1196,9 +1223,9 @@ export function PrevisaoConfrontoPagina({
             </div>
 
             <p className="font-body-sm text-body-sm text-outline">
-              É esse o ranking que o modelo de previsão usa como referência inicial
-              (prior) para um time com pouco histórico coletado — o ranking de força
-              abaixo parte dele e ajusta pelos confrontos que temos.
+              {rankingOficial.data.derivado
+                ? "Só conta série decidida (3+ por time). O ranking de força abaixo é o mesmo dado tratado pelo Bradley-Terry, que pesa a qualidade do adversário."
+                : "É esse o ranking que o modelo de previsão usa como referência inicial (prior) para um time com pouco histórico coletado — o ranking de força abaixo parte dele e ajusta pelos confrontos que temos."}
             </p>
           </Painel>
           )}
