@@ -42,6 +42,7 @@ FONTES = {
         "https://liquipedia.net/overwatch/Overwatch_Champions_Series",
     ),
     "rlcs": ("RLCS (blast.tv)", "https://blast.tv/rl/leaderboard"),
+    "dltv": ("DLTV World Ranking", "https://dltv.org/ranking"),
 }
 
 #: Nome de exibicao e ORDEM das regioes. Uma regiao fora deste mapa ainda

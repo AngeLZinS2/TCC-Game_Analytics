@@ -45,6 +45,7 @@ FONTES = (
     "ubi-r6",
     "owcs-standings",
     "rlcs-rankings",
+    "dltv-ranking",
 )
 
 
@@ -360,6 +361,11 @@ def _construir_coletor(args: argparse.Namespace, storage):
 
         return RlcsRankingsCollector(raw_storage=storage)
 
+    if args.fonte == "dltv-ranking":
+        from collectors.dltv_ranking import DltvRankingCollector
+
+        return DltvRankingCollector(raw_storage=storage)
+
     if args.fonte.startswith("pandascore-"):
         from collectors.pandascore import PandaScoreCollector
 
@@ -457,6 +463,10 @@ def _carregador(fonte: str):
         return carregar
     if fonte == "rlcs-rankings":
         from etl.load_rlcs_rankings import carregar
+
+        return carregar
+    if fonte == "dltv-ranking":
+        from etl.load_dltv_ranking import carregar
 
         return carregar
     if fonte.startswith("pandascore-"):

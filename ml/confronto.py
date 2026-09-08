@@ -119,12 +119,14 @@ FRACAO_TESTE = 0.3
 MINIMO_HISTORICO = 1
 
 #: Ranking externo usado como prior (Fase 15), por jogo. Counter-Strike tem o
-#: Regional Standings da Valve; Valorant, o rating do vlr.gg. Um jogo fora deste
-#: mapa (ou sem snapshot na tabela) simplesmente nao tem prior - o modelo volta
-#: a ser o Bradley-Terry puro, sem coluna a mais.
+#: Regional Standings da Valve; Valorant, o rating do vlr.gg; Dota 2, o ranking
+#: mundial do DLTV (a Valve nao publica classificacao desde o fim do DPC). Um
+#: jogo fora deste mapa (ou sem snapshot na tabela) simplesmente nao tem prior -
+#: o modelo volta a ser o Bradley-Terry puro, sem coluna a mais.
 FONTE_PRIOR_POR_JOGO: dict[str, str] = {
     "counterstrike": "valve",
     "valorant": "vlr",
+    "dota2": "dltv",
 }
 
 

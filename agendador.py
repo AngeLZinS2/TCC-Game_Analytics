@@ -530,6 +530,13 @@ def _coletar_rlcs(settings: Settings, storage: RawStorage) -> CollectionResult:
     return RlcsRankingsCollector(raw_storage=storage).run(carregar=True)
 
 
+def _coletar_dltv(settings: Settings, storage: RawStorage) -> CollectionResult:
+    """Ranking mundial de Dota 2 do DLTV (não há ranking oficial da Valve)."""
+    from collectors.dltv_ranking import DltvRankingCollector
+
+    return DltvRankingCollector(raw_storage=storage).run(carregar=True)
+
+
 def _coletar_pandascore_val(settings: Settings, storage: RawStorage) -> CollectionResult:
     """PandaScore de Valorant — só pelo escudo dos times.
 
@@ -758,6 +765,13 @@ def montar_tarefas(settings: Settings) -> list[Tarefa]:
             nome="rlcs",
             intervalo_segundos=settings.agendador_rlcs_minutos * 60,
             executar=_coletar_rlcs,
+        )
+    )
+    tarefas.append(
+        Tarefa(
+            nome="dltv",
+            intervalo_segundos=settings.agendador_dltv_minutos * 60,
+            executar=_coletar_dltv,
         )
     )
     tarefas.append(

@@ -82,6 +82,7 @@ function fonteExterna(jogo: string): string {
   if (jogo === "rainbowsix") return "R6 Esports";
   if (jogo === "overwatch") return "OWCS";
   if (jogo === "rocketleague") return "RLCS";
+  if (jogo === "dota2") return "DLTV";
   return "Ranking";
 }
 
@@ -845,11 +846,12 @@ export function PrevisaoConfrontoPagina({
 
               {emRanking ? (
                 <p className="font-body-sm text-body-sm text-on-surface-variant">
-                  O ranking que a fonte oficial de cada jogo publica. CS vem da
-                  Valve, Valorant do vlr.gg, R6 do R6 Esports (SI Points),
+                  O ranking que a fonte de referência de cada jogo publica. CS
+                  vem da Valve, Valorant do vlr.gg, R6 do R6 Esports (SI Points),
                   Overwatch da tabela do Stage do OWCS, Rocket League do
-                  leaderboard da RLCS (blast.tv); os outros ainda estão em
-                  integração.
+                  leaderboard da RLCS (blast.tv), Dota 2 do ranking mundial do
+                  DLTV (a Valve não classifica desde o fim do DPC); os outros
+                  ainda estão em integração.
                 </p>
               ) : dados ? (
                 <p className="font-body-sm text-body-sm text-on-surface-variant">

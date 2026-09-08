@@ -290,6 +290,11 @@ class Settings(BaseSettings):
     #: uma pagina por regiao por dia e barato.
     agendador_rlcs_minutos: int = Field(default=1440, ge=60)
 
+    #: Intervalo do ranking mundial de Dota 2 (DLTV), em minutos. Diario: o
+    #: DLTV recalcula a cada resultado; uma pagina por dia da a serie
+    #: point-in-time que a validacao walk-forward precisa.
+    agendador_dltv_minutos: int = Field(default=1440, ge=60)
+
     # --- Assistente (OpenRouter) ---
     #: Sem chave, o endpoint do assistente responde 503 com a instrucao. E um
     #: estado esperado: o resto do projeto funciona sem LLM nenhum.
