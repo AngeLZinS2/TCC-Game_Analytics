@@ -19,6 +19,7 @@
  */
 
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 import { useEntrarNaTela } from "../hooks/animacao";
 import {
@@ -26,6 +27,7 @@ import {
   useLigasConfronto,
   usePrevisaoConfronto,
   useRankingConfronto,
+  useRankingOficial,
   useRelatorioConfronto,
 } from "../api/consultas";
 import type {
@@ -40,9 +42,8 @@ import type {
   ValidacaoConfronto,
 } from "../api/tipos";
 import { Consulta, Esqueleto, Icone, MensagemErro, Selo } from "../componentes/base";
-import { BarraDivergente, BarraSegmentada, CAMPO, Painel, Pilula } from "../componentes/hud";
+import { BarraDivergente, BarraSegmentada, CAMPO, LABEL_CAMPO, Painel, Pilula } from "../componentes/hud";
 import { Modal } from "../componentes/Modal";
-import { SeletorDeJogo } from "../componentes/SeletorDeJogo";
 import { useJogoAtual } from "../layout/JogoAtual";
 import { PALETA_POLOS, TOKENS } from "../tema";
 import {
@@ -69,6 +70,17 @@ function rotuloDoLado(jogo: string, lado: "a" | "b"): string {
   const base = lado === "a" ? "Lado A" : "Lado B";
   if (jogo !== "dota2") return base;
   return lado === "a" ? `${base} (Radiant)` : `${base} (Dire)`;
+}
+
+/**
+ * O nome curto da fonte do ranking OFICIAL de cada esporte. Cada jogo tem a
+ * sua — a Valve publica o Regional Standings de CS, o vlr.gg o rating de
+ * Valorant — e chamar tudo de "Valve" (como era) mentia numa tela de Valorant.
+ */
+function fonteExterna(jogo: string): string {
+  if (jogo === "counterstrike") return "Valve";
+  if (jogo === "valorant") return "vlr.gg";
+  return "Ranking";
 }
 
 /** O aviso de confiabilidade. Aparece sempre, com o tom que os números pedem. */
@@ -130,12 +142,15 @@ function LadoDoConfronto({
   probabilidade,
   cor,
   rotuloLado,
+  jogo,
 }: {
   equipe: EquipeConfronto;
   probabilidade: number;
   cor: string;
   rotuloLado: string;
+  jogo: string;
 }) {
+  const fonte = fonteExterna(jogo);
   return (
     <div className="flex flex-1 flex-col items-center gap-space-sm text-center">
       <span className="font-label-caps text-label-caps uppercase tracking-widest text-outline">
@@ -169,12 +184,12 @@ function LadoDoConfronto({
             className="mt-space-xxs inline-flex items-center gap-1 rounded-full bg-surface-container-high px-2 py-[1px] font-title-code text-title-code text-on-surface-variant"
             title={
               equipe.pontos_ranking !== null
-                ? `${equipe.pontos_ranking} pontos no Regional Standings da Valve`
-                : "Regional Standings da Valve"
+                ? `${equipe.pontos_ranking} pontos no ranking ${fonte}`
+                : `Posição no ranking ${fonte}`
             }
           >
             <Icone nome="social_leaderboard" className="text-[13px] text-primary" />
-            #{equipe.posicao_ranking} Valve
+            #{equipe.posicao_ranking} {fonte}
           </div>
         )}
       </div>
@@ -399,6 +414,7 @@ function DetalheConfronto({
             probabilidade={previsao.probabilidade_a}
             cor={PALETA_POLOS.positivo}
             rotuloLado={rotuloDoLado(jogo, "a")}
+            jogo={jogo}
           />
           <span className="font-headline-md text-headline-md text-outline">VS</span>
           <LadoDoConfronto
@@ -406,6 +422,7 @@ function DetalheConfronto({
             probabilidade={previsao.probabilidade_b}
             cor={PALETA_POLOS.negativo}
             rotuloLado={rotuloDoLado(jogo, "b")}
+            jogo={jogo}
           />
         </div>
 
@@ -676,21 +693,41 @@ function rotuloDoDia(dia: string): string {
   });
 }
 
-export function PrevisaoConfrontoPagina() {
+/**
+ * `secao` reparte a tela entre duas sub-abas de E-Sports:
+ *
+ * - `previsao` — o kanban da agenda, o modal e o confronto hipotetico.
+ * - `ranking`  — o ranking de forca (Bradley-Terry) e os campeonatos.
+ *
+ * Uma so tela porque as duas leem `min_partidas`, `liga` e o par de times
+ * selecionado — clicar numa linha do ranking joga o time no lado A do
+ * simulador e leva para a aba Previsao.
+ */
+export function PrevisaoConfrontoPagina({
+  secao = "previsao",
+}: {
+  secao?: "previsao" | "ranking";
+} = {}) {
   const [liga, setLiga] = useState<string | null>(null);
   const [minPartidas, setMinPartidas] = useState(3);
   const [equipeA, setEquipeA] = useState<number | null>(null);
   const [equipeB, setEquipeB] = useState<number | null>(null);
   const [soComPrevisao, setSoComPrevisao] = useState(false);
   const [aberto, setAberto] = useState<ConfrontoAgendado | null>(null);
+  //: A região escolhida no ranking oficial. `null` = a primeira que a fonte
+  //  retornou (a lista já vem na ordem em que o esporte a organiza).
+  const [regiao, setRegiao] = useState<string | null>(null);
 
-  // A tela nao lia o chip do topo: trocar de jogo nao mudava nada aqui, e a
-  // API respondia sempre sobre Dota 2, que e o padrao dela.
+  const emRanking = secao === "ranking";
+
   const { jogo } = useJogoAtual();
+  const navegar = useNavigate();
 
   const relatorio = useRelatorioConfronto(jogo);
   const ligas = useLigasConfronto(jogo);
   const ranking = useRankingConfronto(jogo, liga, minPartidas);
+  // Só a aba Ranking usa — mas o hook é barato e o gate de render é o `data`.
+  const rankingOficial = useRankingOficial(jogo);
   const agenda = useAgendaConfronto(jogo, soComPrevisao);
   const previsao = usePrevisaoConfronto(jogo, equipeA, equipeB);
 
@@ -701,6 +738,7 @@ export function PrevisaoConfrontoPagina() {
     setEquipeB(null);
     setLiga(null);
     setAberto(null);
+    setRegiao(null);
   }, [jogo]);
 
   const equipes = useMemo(() => ranking.data ?? [], [ranking.data]);
@@ -738,6 +776,12 @@ export function PrevisaoConfrontoPagina() {
       .sort(([a], [b]) => a.localeCompare(b))
       .slice(0, DIAS_NO_KANBAN);
   }, [agenda.data]);
+
+  /** A região exibida no ranking oficial: a escolhida, ou a primeira da fonte. */
+  const regiaoRanking = useMemo(() => {
+    const regioes = rankingOficial.data?.regioes ?? [];
+    return regioes.find((r) => r.slug === regiao) ?? regioes[0] ?? null;
+  }, [rankingOficial.data, regiao]);
 
   /**
    * Abre o modal de um card.
@@ -788,15 +832,20 @@ export function PrevisaoConfrontoPagina() {
             <div className="flex flex-col gap-space-xs">
               <div className="flex flex-wrap items-center gap-space-sm">
                 <h1 className="font-headline-lg text-headline-lg uppercase tracking-wide text-primary drop-shadow-[0_0_12px_rgba(0,229,255,0.4)]">
-                  Previsão de Confronto
+                  {emRanking ? "Ranking de Força" : "Previsão de Confronto"}
                 </h1>
-                <Selo cor="primario">Antes da partida</Selo>
+                <Selo cor="primario">{emRanking ? "Bradley-Terry" : "Antes da partida"}</Selo>
                 <span className="hidden font-label-caps text-label-caps uppercase tracking-wider text-outline sm:inline">
                   ML // Deck 05
                 </span>
               </div>
 
-              {dados ? (
+              {emRanking ? (
+                <p className="font-body-sm text-body-sm text-on-surface-variant">
+                  Força é a estimativa do Bradley-Terry sobre os confrontos coletados —
+                  zero é a média. Clique numa linha para simular o time no lado A.
+                </p>
+              ) : dados ? (
                 <p className="font-body-sm text-body-sm text-on-surface-variant">
                   Qual time tem mais chance de vencer, a partir do histórico de{" "}
                   {fmtNumero(dados.confrontos)} confrontos entre {dados.equipes} equipes.
@@ -813,16 +862,7 @@ export function PrevisaoConfrontoPagina() {
             </div>
 
             <div className="flex flex-wrap items-center gap-space-sm">
-              {/* Criterio mais largo que o padrao do componente (so partidas):
-                  a agenda de um jogo pode existir antes de qualquer confronto
-                  DECIDIDO dele ter sido coletado - e ai ainda nao ha modelo. */}
-              <SeletorDeJogo
-                disponivel={(item) =>
-                  item.partidas > 0 || item.equipes > 0 || item.agenda > 0
-                }
-              />
-
-              <label className="flex items-center gap-space-xs">
+              <label className={LABEL_CAMPO}>
                 <span className="font-label-caps text-label-caps uppercase tracking-widest text-outline">
                   Campeonato
                 </span>
@@ -840,7 +880,7 @@ export function PrevisaoConfrontoPagina() {
                 </select>
               </label>
 
-              <label className="flex items-center gap-space-xs">
+              <label className={LABEL_CAMPO}>
                 <span className="font-label-caps text-label-caps uppercase tracking-widest text-outline">
                   Mín. partidas
                 </span>
@@ -859,8 +899,10 @@ export function PrevisaoConfrontoPagina() {
             </div>
           </section>
 
-          {dados && <AvisoValidacao validacao={dados.validacao} />}
+          {!emRanking && dados && <AvisoValidacao validacao={dados.validacao} />}
 
+          {!emRanking && (
+          <>
           {/* ==================== KANBAN DA AGENDA ==================== */}
           <Painel
             icone="view_kanban"
@@ -1003,13 +1045,23 @@ export function PrevisaoConfrontoPagina() {
               <div className="h-48 animate-pulse rounded bg-surface-container-high/60" />
             )}
           </Modal>
+          </>
+          )}
 
-          {/* As tres secoes abaixo leem as FORCAS ajustadas. Sem modelo elas
-              so teriam erros para mostrar, e tres paineis de erro empilhados
-              dizem menos que uma frase no cabecalho. */}
+          {/* As secoes abaixo leem as FORCAS ajustadas. Sem modelo elas so
+              teriam erros para mostrar, e um painel de erro diz menos que uma
+              frase. */}
+          {!dados && emRanking && (
+            <p className="rounded-xl bg-surface-container-low/90 px-space-lg py-space-base font-body-md text-body-md text-on-surface-variant shadow-lg">
+              Ainda não há modelo de força ajustado para este jogo — ele precisa
+              de partidas com resultado. O calendário está na aba{" "}
+              <strong className="text-on-surface">Previsão</strong>.
+            </p>
+          )}
           {dados && (
             <>
           {/* ==================== CONFRONTO HIPOTETICO ==================== */}
+          {!emRanking && (
           <Painel
             icone="swords"
             titulo="Simular um confronto"
@@ -1064,8 +1116,94 @@ export function PrevisaoConfrontoPagina() {
               )}
             </Consulta>
           </Painel>
+          )}
 
           {/* ==================== RANKING ==================== */}
+          {emRanking && (
+          <>
+          {/* -------- Ranking oficial da fonte do esporte, por região -------- */}
+          {rankingOficial.data && regiaoRanking && (
+          <Painel
+            icone="social_leaderboard"
+            titulo={`Ranking oficial — ${rankingOficial.data.fonte}`}
+            descricao={`O ranking que a cena acompanha, direto da fonte e separado por região como ela publica. Snapshot de ${fmtDataCurta(rankingOficial.data.data_referencia)}.`}
+            meta={
+              <a
+                href={rankingOficial.data.url_fonte}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-space-xxs rounded bg-surface-container px-space-md py-space-xs font-title-code text-title-code text-primary transition-colors hover:bg-surface-container-high"
+              >
+                ver em {rankingOficial.data.fonte}
+                <Icone nome="open_in_new" className="text-[14px]" />
+              </a>
+            }
+          >
+            <div className="flex flex-wrap items-center gap-space-sm">
+              <label className={LABEL_CAMPO}>
+                <span className="font-label-caps text-label-caps uppercase tracking-widest text-outline">
+                  Região
+                </span>
+                <select
+                  value={regiaoRanking.slug}
+                  onChange={(evento) => setRegiao(evento.target.value)}
+                  className={CAMPO}
+                >
+                  {rankingOficial.data.regioes.map((r) => (
+                    <option key={r.slug} value={r.slug}>
+                      {r.nome} ({r.equipes.length})
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+
+            <div className="rolagem-discreta overflow-x-auto rounded-lg bg-surface-container-lowest">
+              <table className="w-full border-collapse text-left">
+                <thead>
+                  <tr className="bg-surface-container font-label-caps text-label-caps uppercase tracking-wider text-outline">
+                    <th className="px-space-md py-space-sm">#</th>
+                    <th className="px-space-md py-space-sm">Equipe</th>
+                    <th className="px-space-md py-space-sm text-right">Rating</th>
+                  </tr>
+                </thead>
+                <tbody className="font-body-md text-body-sm">
+                  {regiaoRanking.equipes.map((equipe, indice) => (
+                    <tr
+                      key={`${equipe.posicao}-${equipe.equipe_nome}`}
+                      className={indice % 2 ? "bg-[#131824]" : "bg-[#10141D]"}
+                    >
+                      <td className="px-space-md py-space-sm font-label-caps text-label-caps text-outline">
+                        #{String(equipe.posicao).padStart(2, "0")}
+                      </td>
+                      <td className="px-space-md py-space-sm">
+                        <span className="font-headline-sm text-headline-sm text-on-surface">
+                          {equipe.equipe_nome}
+                        </span>
+                        {equipe.tag && (
+                          <span className="ml-space-xs font-title-code text-title-code text-outline">
+                            {equipe.tag}
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-space-md py-space-sm text-right font-title-code text-title-code tabular-nums text-primary">
+                        {equipe.pontos ?? "—"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <p className="font-body-sm text-body-sm text-outline">
+              É esse o ranking que o modelo de previsão usa como referência inicial
+              (prior) para um time com pouco histórico coletado — o ranking de força
+              abaixo parte dele e ajusta pelos confrontos que temos.
+            </p>
+          </Painel>
+          )}
+
+          {/* -------- Ranking de força do nosso modelo -------- */}
           <Painel
             icone="leaderboard"
             titulo={liga ? `Ranking de força — ${liga}` : "Ranking de força"}
@@ -1083,9 +1221,9 @@ export function PrevisaoConfrontoPagina() {
             <Consulta estado={ranking} vazio="Nenhuma equipe atinge esse mínimo.">
               {(lista: EquipeConfronto[]) => {
                 const maiorForca = Math.max(...lista.map((e) => Math.abs(e.forca)), 0.01);
-                // GPM/KDA são telemetria de MOBA (OpenDota → só Dota 2); a
-                // posição da Valve só existe em CS. As colunas seguem o que o
-                // jogo realmente tem, em vez de mostrar "—" numa tela de FPS.
+                // GPM/KDA são telemetria de MOBA (OpenDota → só Dota 2); o
+                // ranking externo é por esporte (Valve no CS, vlr.gg no
+                // Valorant). As colunas seguem o que o jogo realmente tem.
                 const temTelemetria = lista.some((e) => e.gpm_medio !== null);
                 const temRankingExterno = lista.some(
                   (e) => e.posicao_ranking !== null,
@@ -1115,9 +1253,9 @@ export function PrevisaoConfrontoPagina() {
                           {temRankingExterno && (
                             <th
                               className="px-space-md py-space-sm text-right"
-                              title="Posição no Regional Standings da Valve"
+                              title={`Posição no ranking oficial (${fonteExterna(jogo)})`}
                             >
-                              Valve
+                              {fonteExterna(jogo)}
                             </th>
                           )}
                           {temTelemetria && (
@@ -1139,7 +1277,14 @@ export function PrevisaoConfrontoPagina() {
                           return (
                             <tr
                               key={equipe.id_equipe}
-                              onClick={() => setEquipeA(equipe.id_equipe)}
+                              onClick={() => {
+                                // Joga o time no lado A e leva para o simulador,
+                                // que mora na aba Previsao. O componente
+                                // continua montado entre as abas, entao o
+                                // `setEquipeA` sobrevive a navegacao.
+                                setEquipeA(equipe.id_equipe);
+                                navegar(`/esports/${jogo}/previsao`);
+                              }}
                               className={`cursor-pointer transition-colors hover:bg-surface-container-high/60 ${
                                 indice % 2 ? "bg-[#131824]" : "bg-[#10141D]"
                               }`}
@@ -1279,6 +1424,8 @@ export function PrevisaoConfrontoPagina() {
               )}
             </Consulta>
           </Painel>
+          </>
+          )}
             </>
           )}
     </>

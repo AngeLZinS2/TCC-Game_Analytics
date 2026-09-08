@@ -313,6 +313,45 @@ class FatoSnapshotJogoSteam(Base):
     )
 
 
+class FatoSteamOnline(Base):
+    """Usuarios simultaneos da PLATAFORMA Steam - o numero que a Valve publica.
+
+    Diferente de `fato_snapshot_jogo_steam`, que e por jogo: aqui e um numero
+    so, da Steam inteira, vindo de `valvesoftware.com/en/about/stats`. Serie
+    temporal (uma linha por coleta) para a home mostrar a variacao.
+    """
+
+    __tablename__ = "fato_steam_online"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    coletado_em: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+    #: `users_online` da Valve: conectados a Steam neste instante.
+    usuarios_online: Mapped[int] = mapped_column(Integer, nullable=False)
+    #: `users_ingame`: o subconjunto que esta dentro de um jogo.
+    usuarios_em_jogo: Mapped[int] = mapped_column(Integer, nullable=False)
+
+    __table_args__ = (Index("ix_fato_steam_online_coletado_em", "coletado_em"),)
+
+
+class DimAppSteamNome(Base):
+    """Nome por app_id, sem relacao com `dim_jogo_steam`.
+
+    O Top 100 mais jogados traz apps que nao sao monitorados; a tela so quer o
+    nome deles. Tabela separada para o join da home nao esbarrar numa linha de
+    dimensao pela metade.
+    """
+
+    __tablename__ = "dim_app_steam_nome"
+
+    app_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=False)
+    nome: Mapped[str] = mapped_column(Text, nullable=False)
+    visto_em: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+
+
 class FatoAvaliacaoSteam(Base):
     """Uma linha por avaliacao escrita na Steam - o grao do dominio de texto.
 

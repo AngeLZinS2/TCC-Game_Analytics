@@ -32,7 +32,18 @@ import { Link, NavLink, useLocation } from "react-router-dom";
 
 import { useSaude } from "../api/consultas";
 import { Icone } from "../componentes/base";
+import { MenuEsports } from "../componentes/MenuEsports";
 import { NAVEGACAO, type ItemNavegacao } from "./navegacao";
+
+/** O rotulo de cada sub-aba de E-Sports, para o "voce esta aqui". */
+const ABAS_ESPORTS: Record<string, string> = {
+  partidas: "Partidas",
+  resultados: "Resultados",
+  previsao: "Previsao",
+  ranking: "Ranking",
+  herois: "Herois",
+  jogadores: "Jogadores",
+};
 
 /** O rotulo da rota atual, para o "voce esta aqui" da direita. */
 function useTituloDaRota(): string {
@@ -40,6 +51,12 @@ function useTituloDaRota(): string {
 
   if (pathname.startsWith("/steam/")) return "Detalhe do Jogo";
   if (pathname.startsWith("/partidas/")) return "Detalhe da Partida";
+  if (pathname.startsWith("/herois/")) return "Detalhe do Heroi";
+  if (pathname.startsWith("/esports/")) {
+    const aba = pathname.split("/")[3];
+    const sufixo = aba && ABAS_ESPORTS[aba] ? ` · ${ABAS_ESPORTS[aba]}` : "";
+    return `E-Sports${sufixo}`;
+  }
 
   const item = NAVEGACAO.find((i) => i.rota === pathname);
   return item?.rotulo ?? "PlayDB";
@@ -70,6 +87,11 @@ const BOTAO_NAV =
   "group relative flex h-10 w-10 items-center justify-center rounded-lg transition-colors";
 
 function ItemNav({ item }: { item: ItemNavegacao }) {
+  // E-Sports abre o menu de jogos no hover, em vez da dica de uma linha.
+  if (item.menuEsports) {
+    return <MenuEsports item={item} />;
+  }
+
   // Sem rota: o icone existe para mostrar o produto inteiro, mas nao e um
   // link. `aria-disabled` em vez de `disabled` porque nao e um controle, e um
   // item de navegacao que ainda nao leva a lugar nenhum.
@@ -104,17 +126,20 @@ export function BarraSuperior() {
   const online = saude.data?.status === "ok";
 
   return (
-    <header className="fixed left-0 right-0 top-0 z-50 flex h-16 items-center gap-space-base border-b border-outline-variant/30 bg-surface-container-lowest/95 px-space-lg backdrop-blur-md">
+    <header className="fixed left-0 right-0 top-0 z-50 flex h-16 items-center gap-space-base border-b border-outline-variant/30 bg-surface-container-lowest/95 px-space-base backdrop-blur-md md:px-space-lg">
       <Link to="/" className="flex shrink-0 items-center gap-space-sm">
         <Icone nome="stadia_controller" className="text-[24px] text-primary-container" />
-        <span className="hidden font-title-code text-title-code uppercase tracking-wider text-primary sm:inline">
+        {/* No mobile a fileira de icones some (vai para a NavInferior), entao
+            sobra espaco: a marca aparece sempre. */}
+        <span className="font-title-code text-title-code uppercase tracking-wider text-primary">
           PlayDB
         </span>
       </Link>
 
-      <span className="h-6 w-px shrink-0 bg-outline-variant/40" aria-hidden />
+      {/* Fileira de icones: só no desktop. No mobile é a barra inferior. */}
+      <span className="hidden h-6 w-px shrink-0 bg-outline-variant/40 md:block" aria-hidden />
 
-      <nav className="flex items-center gap-space-xxs">
+      <nav className="hidden items-center gap-space-xxs md:flex">
         {NAVEGACAO.map((item) => (
           <ItemNav key={item.rotulo} item={item} />
         ))}
@@ -134,7 +159,7 @@ export function BarraSuperior() {
           href="/docs"
           target="_blank"
           rel="noreferrer"
-          className="group relative flex h-9 w-9 items-center justify-center rounded-lg text-on-surface-variant transition-colors hover:bg-surface-container hover:text-on-surface"
+          className="group relative hidden h-9 w-9 items-center justify-center rounded-lg text-on-surface-variant transition-colors hover:bg-surface-container hover:text-on-surface sm:flex"
         >
           <Icone nome="menu_book" className="text-[18px]" />
           <Dica texto="Documentação ↗" />
@@ -142,7 +167,7 @@ export function BarraSuperior() {
 
         <span
           className={[
-            "inline-flex items-center gap-space-xs rounded px-space-md py-space-xs font-badge-status text-badge-status uppercase",
+            "inline-flex items-center gap-space-xs rounded px-space-sm py-space-xs font-badge-status text-badge-status uppercase md:px-space-md",
             online ? "bg-tertiary/10 text-tertiary" : "bg-error/10 text-error",
           ].join(" ")}
           title={saude.data ? `latência ${saude.data.latenciaMs}ms` : undefined}
@@ -151,7 +176,7 @@ export function BarraSuperior() {
             className={`h-2 w-2 rounded-full ${online ? "animate-pulse bg-tertiary" : "bg-error"}`}
             aria-hidden
           />
-          {online ? "API no ar" : "API fora"}
+          <span className="hidden sm:inline">{online ? "API no ar" : "API fora"}</span>
         </span>
       </div>
     </header>

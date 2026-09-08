@@ -20,12 +20,30 @@ export interface ColetaFonte {
 export interface VisaoGeral {
   jogos_steam: number;
   snapshots_steam: number;
+  /** Soma do último snapshot dos jogos monitorados — NÃO é o total da Steam. */
   jogadores_simultaneos_total: number | null;
+  /** Usuários conectados à Steam agora (número da plataforma, da Valve). */
+  steam_usuarios_online: number | null;
+  /** O subconjunto que está dentro de um jogo. */
+  steam_usuarios_em_jogo: number | null;
+  /** Variação % de `steam_usuarios_online` vs a coleta anterior. */
+  steam_usuarios_online_variacao: number | null;
   partidas: number;
   linhas_fato_partida: number;
   jogadores: number;
   personagens: number;
   coletas: ColetaFonte[];
+}
+
+export interface MaisJogadoSteam {
+  posicao: number;
+  app_id: number;
+  nome: string | null;
+  /** Jogadores dentro do jogo neste instante. */
+  jogadores_agora: number;
+  pico_24h: number | null;
+  /** Movimento vs semana passada: >0 subiu, <0 caiu, 0 igual, `null` novo. */
+  variacao_semana: number | null;
 }
 
 export interface JogoSteam {
@@ -844,4 +862,33 @@ export interface ResumoColeta {
   avaliacoes_coletadas: number;
   registros_brutos: number;
   segundos: number;
+}
+
+// ---------------------------------------------------------------------------
+// Ranking oficial por esporte / regiao (/api/esports/ranking-oficial)
+// ---------------------------------------------------------------------------
+export interface EquipeRankingOficial {
+  posicao: number;
+  equipe_nome: string;
+  id_equipe: number | null;
+  tag: string | null;
+  logo_url: string | null;
+  /** Rating da fonte (ELO ~1000-2000 no vlr.gg). `null` se so publica ordem. */
+  pontos: number | null;
+}
+
+export interface RegiaoRanking {
+  slug: string;
+  nome: string;
+  equipes: EquipeRankingOficial[];
+}
+
+export interface RankingOficial {
+  jogo: string;
+  /** Nome de exibicao da fonte ("vlr.gg", "Valve Regional Standings"). */
+  fonte: string;
+  url_fonte: string;
+  /** Data do snapshot mais recente (YYYY-MM-DD). */
+  data_referencia: string;
+  regioes: RegiaoRanking[];
 }

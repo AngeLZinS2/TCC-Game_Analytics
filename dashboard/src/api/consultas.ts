@@ -15,6 +15,7 @@ import type {
   FiltrosDisponiveis,
   JogoDisponivel,
   JogoSteam,
+  MaisJogadoSteam,
   Partida,
   PartidasPorDia,
   PontoSerieTotal,
@@ -33,6 +34,7 @@ import type {
   LigaConfronto,
   PanoramaSentimento,
   PrevisaoConfronto,
+  RankingOficial,
   RelatorioConfronto,
   ResultadoSentimento,
   ResumoColeta,
@@ -79,6 +81,21 @@ export function useSerieTotalSteam() {
   return useQuery({
     queryKey: ["steam", "serie-total"],
     queryFn: () => buscar<PontoSerieTotal[]>("/api/steam/serie-total"),
+  });
+}
+
+/**
+ * Top N mais jogados da Steam AGORA. O endpoint já é ao vivo (cache de 90s no
+ * servidor); aqui um `staleTime` curto + `refetchInterval` mantêm a home
+ * atualizando sozinha sem recarregar a página.
+ */
+export function useMaisJogadosSteam(limite = 100) {
+  return useQuery({
+    queryKey: ["steam", "mais-jogados", limite],
+    queryFn: () =>
+      buscar<MaisJogadoSteam[]>("/api/steam/mais-jogados", { limite }),
+    staleTime: 60_000,
+    refetchInterval: 120_000,
   });
 }
 
@@ -372,6 +389,21 @@ export function useLigasConfronto(jogo: string) {
   return useQuery({
     queryKey: ["confronto", "ligas", jogo],
     queryFn: () => buscar<LigaConfronto[]>("/api/ml/confronto/ligas", { jogo }),
+    retry: false,
+  });
+}
+
+/**
+ * O ranking OFICIAL do esporte, por regiao (vlr.gg em Valorant, Valve em CS).
+ *
+ * 404 quando o jogo nunca teve snapshot coletado - a tela esconde a seção
+ * nesse caso, então `retry: false` e o consumidor checa `data`.
+ */
+export function useRankingOficial(jogo: string) {
+  return useQuery({
+    queryKey: ["esports", "ranking-oficial", jogo],
+    queryFn: () =>
+      buscar<RankingOficial>("/api/esports/ranking-oficial", { jogo }),
     retry: false,
   });
 }

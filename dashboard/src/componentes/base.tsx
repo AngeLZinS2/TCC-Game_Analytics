@@ -323,7 +323,7 @@ export function Botao({
       type="button"
       onClick={aoClicar}
       disabled={desabilitado}
-      className={`inline-flex items-center gap-space-xs rounded px-space-md py-space-xs font-title-code text-title-code shadow-sm transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${cores} ${className}`}
+      className={`inline-flex min-h-[40px] items-center gap-space-xs rounded px-space-md py-space-xs font-title-code text-title-code shadow-sm transition-colors disabled:cursor-not-allowed disabled:opacity-50 sm:min-h-0 ${cores} ${className}`}
     >
       {icone && <Icone nome={icone} className="text-[18px]" />}
       {children}

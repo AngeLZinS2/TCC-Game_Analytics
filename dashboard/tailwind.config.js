@@ -149,18 +149,25 @@ export default {
             "fontWeight": "700"
           }
         ],
+        // --- Tipografia fluida (ajuste de responsividade, fora do export do Stitch) ---
+        // O Stitch exporta um par fixo por token (ex.: `display-hero` 48px e
+        // `display-hero-mobile` 32px), mas o codigo so usa a versao desktop e
+        // ela estoura no celular. `clamp()` faz um token so escalar entre os
+        // dois extremos, sem tocar nas ~25 chamadas. O maximo do clamp e o
+        // valor original, entao o desktop nao muda. `lineHeight` vira razao
+        // sem unidade para acompanhar a fonte.
         "headline-kpi": [
-          "36px",
+          "clamp(1.75rem, 1rem + 3.6vw, 2.25rem)",
           {
-            "lineHeight": "40px",
+            "lineHeight": "1.1",
             "letterSpacing": "-0.02em",
             "fontWeight": "700"
           }
         ],
         "headline-lg": [
-          "24px",
+          "clamp(1.35rem, 1.05rem + 1.5vw, 1.5rem)",
           {
-            "lineHeight": "30px",
+            "lineHeight": "1.2",
             "letterSpacing": "-0.01em",
             "fontWeight": "600"
           }
@@ -206,9 +213,9 @@ export default {
           }
         ],
         "display-hero": [
-          "48px",
+          "clamp(2rem, 1rem + 5vw, 3rem)",
           {
-            "lineHeight": "52px",
+            "lineHeight": "1.08",
             "letterSpacing": "-0.03em",
             "fontWeight": "700"
           }

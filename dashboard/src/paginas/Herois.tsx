@@ -22,11 +22,11 @@ import {
   BarraSegmentada,
   CAMPO,
   KpiHud,
+  LABEL_CAMPO,
   Painel,
   Pilula,
   Segmentos,
 } from "../componentes/hud";
-import { SeletorDeJogo } from "../componentes/SeletorDeJogo";
 import { useJogoAtual } from "../layout/JogoAtual";
 import { PALETA_POLOS } from "../tema";
 import { desvioConfiavel, intervaloWilson } from "../utilitarios/estatistica";
@@ -261,18 +261,7 @@ export function HeroisPagina() {
 
       {/* ==================== FILTROS ==================== */}
       <section className="flex flex-wrap items-center gap-space-md rounded-xl bg-surface-container-low/90 p-space-base shadow-lg">
-        {/*
-          O padrão exige `partidas > 0`, que é a fonte por jogador. Esta
-          tela também serve o esporte cujo elenco vem com estatística
-          agregada: Valorant tem 29 agentes com HS%, ADR e KDA e zero linha
-          em `fato_partida_jogador`.
-        */}
-        <SeletorDeJogo
-          disponivel={(j) => j.partidas > 0 || j.personagens > 0}
-          listar={(j) => j.personagens > 0}
-        />
-
-        <label className="flex items-center gap-space-xs">
+        <label className={LABEL_CAMPO}>
           <span className="font-label-caps text-label-caps uppercase tracking-widest text-outline">
             Mín. partidas
           </span>

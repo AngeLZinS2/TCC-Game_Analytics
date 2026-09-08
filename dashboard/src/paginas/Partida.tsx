@@ -171,7 +171,7 @@ export function PartidaPagina() {
               />
 
               <Link
-                to="/partidas"
+                to="/esports/dota2/partidas"
                 className="relative z-10 inline-flex items-center gap-space-xxs font-title-code text-title-code text-outline transition-colors hover:text-primary"
               >
                 <Icone nome="arrow_back" className="text-[16px]" />

@@ -1,12 +1,16 @@
 /**
- * As entradas da barra lateral, na ordem do desenho do Stitch.
+ * As entradas da barra superior, na ordem do desenho do Stitch.
  *
  * O campo `rota` e o que separa uma tela pronta de uma tela so desenhada.
- * As seis ultimas entradas existem no Stitch mas dependem de modelos que ainda
- * nao existem no backend (`ml/` esta vazio) - elas aparecem na navegacao,
- * porque fazem parte do desenho do produto, mas nao levam a lugar nenhum e
- * dizem isso na propria linha. Uma tela com numero inventado seria pior: ela
- * parece pronta.
+ * "Perfil" existe no Stitch mas depende de autenticacao, que o projeto nao
+ * tem - aparece na navegacao, porque faz parte do desenho do produto, mas nao
+ * leva a lugar nenhum e diz isso na propria linha.
+ *
+ * **E-Sports nao e uma tela, e uma area.** Partidas, Resultados, Previsao,
+ * Ranking, Herois e Jogadores eram seis icones na barra, todos dependentes do
+ * mesmo jogo escolhido. Viraram sub-abas de uma entrada so; passar o mouse no
+ * icone abre o menu de jogos (`menuEsports`), e cada jogo leva para
+ * `/esports/<jogo>/partidas`.
  */
 
 export interface ItemNavegacao {
@@ -16,6 +20,11 @@ export interface ItemNavegacao {
   icone: string;
   /** Selo a direita do rotulo, quando ha um. */
   selo?: string;
+  /**
+   * O item abre o menu de jogos de E-Sports no hover, em vez de so uma dica.
+   * `rota` continua sendo o destino do clique direto (a 1a aba do jogo atual).
+   */
+  menuEsports?: boolean;
 }
 
 export const NAVEGACAO: ItemNavegacao[] = [
@@ -23,8 +32,6 @@ export const NAVEGACAO: ItemNavegacao[] = [
 
   // As duas telas do catalogo da Steam ficam juntas: uma mostra o mercado
   // (preco, jogadores), a outra o que o publico escreveu sobre o mesmo jogo.
-  // Separa-las por tres telas de esports obrigava a atravessar a barra pra ir
-  // de uma a outra sendo que o assunto e o mesmo.
   { rota: "/steam", rotulo: "Jogos da Steam", icone: "sports_esports" },
   {
     rota: "/recomendacoes",
@@ -33,15 +40,13 @@ export const NAVEGACAO: ItemNavegacao[] = [
     selo: "ML",
   },
 
-  // Dominio de esports: partida, heroi, jogador e a previsao sobre eles.
-  { rota: "/partidas", rotulo: "Partidas", icone: "scoreboard" },
-  { rota: "/herois", rotulo: "Heróis", icone: "shield_person" },
-  { rota: "/jogadores", rotulo: "Jogadores", icone: "group" },
+  // Dominio de esports: partida, resultado, previsao, ranking, heroi e jogador
+  // - tudo escopado pelo jogo escolhido no menu que este item abre.
   {
-    rota: "/previsao",
-    rotulo: "Previsão de Confronto",
-    icone: "swords",
-    selo: "ML",
+    rota: "/esports",
+    rotulo: "E-Sports",
+    icone: "emoji_events",
+    menuEsports: true,
   },
 
   {

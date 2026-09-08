@@ -15,13 +15,13 @@ import {
   BarraFina,
   CAMPO,
   KpiHud,
+  LABEL_CAMPO,
   Paginacao,
   Painel,
   Pilula,
   Segmentos,
   Sparkline,
 } from "../componentes/hud";
-import { SeletorDeJogo } from "../componentes/SeletorDeJogo";
 import { useJogoAtual } from "../layout/JogoAtual";
 import { corDoJogo } from "../tema";
 import { fmtDecimal, fmtNumero, fmtPercentual } from "../utilitarios/formatos";
@@ -224,7 +224,7 @@ export function JogadoresPagina() {
         </div>
 
         <div className="flex flex-wrap items-center gap-space-sm">
-          <label className="flex items-center gap-space-xs">
+          <label className={LABEL_CAMPO}>
             <span className="font-label-caps text-label-caps uppercase tracking-widest text-outline">
               Mín. partidas
             </span>
@@ -267,8 +267,6 @@ export function JogadoresPagina() {
             className="w-full rounded bg-surface-container-lowest py-space-sm pl-10 pr-space-sm font-title-code text-title-code text-on-surface shadow-inner placeholder:text-outline focus:bg-surface-container focus:outline-none"
           />
         </div>
-
-        <SeletorDeJogo />
       </section>
 
       {/* ==================== QUATRO KPIS ==================== */}

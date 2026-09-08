@@ -19,6 +19,7 @@ from logging_config import configurar_logging
 
 FONTES = (
     "steam",
+    "steam-online",
     "opendota",
     "liquipedia",
     "liquipedia-times",
@@ -247,6 +248,11 @@ def _construir_coletor(args: argparse.Namespace, storage):
             coletor.app_ids = coletor.app_ids[: args.limit_apps]
         return coletor
 
+    if args.fonte == "steam-online":
+        from collectors.steam_online import SteamOnlineCollector
+
+        return SteamOnlineCollector(raw_storage=storage)
+
     if args.fonte == "liquipedia":
         from collectors.liquipedia_collector import LiquipediaCollector
 
@@ -419,6 +425,12 @@ def _cmd_collect(args: argparse.Namespace) -> int:
             registros = storage.ler_ultima_coleta(coletor.fonte)
             print(f"Reprocessando {len(registros)} payloads do disco...")
             resultado = coletor.parse(registros)
+            if args.fonte == "steam-online":
+                # `parse` devolve um snapshot (ou `None`), sem `.total`; o
+                # proprio coletor sabe grava-lo.
+                carregados = 0 if args.no_load else coletor.load(resultado)
+                print(f"itens normalizados={0 if resultado is None else 1} carregados={carregados}")
+                return 0
             if args.fonte == "valve-standings":
                 # `parse` devolve uma lista de snapshots (um por mes), e o
                 # proprio coletor sabe carregar a lista. `resultado.total` nao

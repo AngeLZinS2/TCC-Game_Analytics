@@ -540,7 +540,7 @@ function Ficha({ dados }: { dados: DetalhePersonagem }) {
               </p>
             )}
             <Link
-              to="/herois"
+              to={`/esports/${dados.jogo}/herois`}
               className="flex w-fit items-center gap-space-xxs font-title-code text-title-code text-outline transition-colors hover:text-primary"
             >
               <Icone nome="arrow_back" className="text-[16px]" />

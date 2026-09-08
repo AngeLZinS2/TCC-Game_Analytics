@@ -89,6 +89,11 @@ class Settings(BaseSettings):
     #: intervalo acompanha o grao do fato; mudar um sem o outro so gasta rede.
     agendador_steam_minutos: int = Field(default=60, ge=5)
 
+    #: Intervalo do snapshot de usuarios simultaneos da PLATAFORMA Steam
+    #: (`valvesoftware.com/about/stats`), em minutos. Numero unico, chamada
+    #: barata; 15 min da uma serie suave sem martelar a Valve.
+    agendador_steam_online_minutos: int = Field(default=15, ge=5)
+
     #: Intervalo entre coletas de partidas profissionais, em minutos.
     #:
     #: Partidas terminam ao longo do dia e a OpenDota so as publica depois de

@@ -135,6 +135,7 @@ def test_intervalos_vem_da_configuracao():
 
     class FakeSettings:
         agendador_steam_minutos = 15
+        agendador_steam_online_minutos = 15
         agendador_opendota_minutos = 30
         agendador_liquipedia_minutos = 45
         agendador_equipes_minutos = 60
@@ -156,6 +157,7 @@ def test_intervalos_vem_da_configuracao():
     tarefas = {t.nome: t.intervalo_segundos for t in montar_tarefas(FakeSettings())}
     assert tarefas == {
         "steam": 900,
+        "steam_online": 900,
         "opendota": 1800,
         "liquipedia": 2700,
         "equipes": 3600,
@@ -177,6 +179,7 @@ def test_intervalos_vem_da_configuracao():
 def test_tarefa_de_preco_so_entra_com_chave_do_itad():
     class SemChave:
         agendador_steam_minutos = 60
+        agendador_steam_online_minutos = 15
         agendador_opendota_minutos = 360
         agendador_liquipedia_minutos = 720
         agendador_equipes_minutos = 1440
@@ -202,6 +205,7 @@ def test_tarefa_de_preco_so_entra_com_chave_do_itad():
 def test_tarefa_de_tempo_jogo_nao_entra_quando_desabilitada():
     class Desabilitada:
         agendador_steam_minutos = 60
+        agendador_steam_online_minutos = 15
         agendador_opendota_minutos = 360
         agendador_liquipedia_minutos = 720
         agendador_equipes_minutos = 1440

@@ -18,6 +18,7 @@ from db.models import (
     DimPersonagem,
     FatoPartidaJogador,
     FatoSnapshotJogoSteam,
+    FatoSteamOnline,
     RawData,
 )
 from db.session import get_db
@@ -45,6 +46,24 @@ def visao_geral(sessao: Session = Depends(get_db)) -> VisaoGeral:
     )
     jogadores_simultaneos = sessao.scalar(select(func.sum(ultimo.c.jogadores)))
 
+    # Usuarios simultaneos da PLATAFORMA Steam (numero da Valve), com o ponto
+    # anterior para a variacao. Duas linhas mais recentes de `fato_steam_online`.
+    online = sessao.execute(
+        select(
+            FatoSteamOnline.usuarios_online,
+            FatoSteamOnline.usuarios_em_jogo,
+        )
+        .order_by(FatoSteamOnline.coletado_em.desc())
+        .limit(2)
+    ).all()
+    steam_online = online[0].usuarios_online if online else None
+    steam_em_jogo = online[0].usuarios_em_jogo if online else None
+    steam_online_variacao = (
+        round((online[0].usuarios_online - online[1].usuarios_online) / online[1].usuarios_online * 100, 2)
+        if len(online) == 2 and online[1].usuarios_online
+        else None
+    )
+
     coletas = sessao.execute(
         select(
             RawData.fonte,
@@ -61,6 +80,9 @@ def visao_geral(sessao: Session = Depends(get_db)) -> VisaoGeral:
         jogadores_simultaneos_total=(
             int(jogadores_simultaneos) if jogadores_simultaneos is not None else None
         ),
+        steam_usuarios_online=steam_online,
+        steam_usuarios_em_jogo=steam_em_jogo,
+        steam_usuarios_online_variacao=steam_online_variacao,
         partidas=contar(DimPartida),
         linhas_fato_partida=contar(FatoPartidaJogador),
         jogadores=contar(DimJogador),

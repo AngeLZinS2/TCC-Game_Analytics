@@ -283,7 +283,7 @@ export function Pilula({
       title={titulo}
       aria-pressed={ativa}
       className={[
-        "flex items-center gap-space-xxs rounded px-space-sm py-space-xs font-title-code text-title-code transition-colors",
+        "flex min-h-[38px] items-center gap-space-xxs rounded px-space-sm py-space-xs font-title-code text-title-code transition-colors sm:min-h-0",
         desabilitada
           ? "cursor-not-allowed bg-surface-container/40 text-outline/50"
           : ativa
@@ -737,7 +737,7 @@ export function Painel({
 }) {
   return (
     <section
-      className={`space-y-space-md rounded-xl bg-surface-container-low/90 p-space-lg shadow-2xl ${className}`}
+      className={`space-y-space-md rounded-xl bg-surface-container-low/90 p-space-base shadow-2xl sm:p-space-lg ${className}`}
     >
       <div className="flex flex-wrap items-start justify-between gap-space-sm">
         <div className="min-w-0">
@@ -767,6 +767,21 @@ export function Painel({
  * a marcacao em volta.
  */
 export const CAMPO =
-  "rounded bg-surface-container px-space-md py-space-xs font-title-code text-title-code text-on-surface " +
+  // `min-h-[44px]` no mobile: o alvo de toque de um select/input precisa caber
+  // o polegar. No desktop (`sm:`) volta ao compacto do desenho.
+  //
+  // `w-full sm:w-auto` + `max-w-full min-w-0`: um `<select>` do Chrome cresce
+  // ate a largura da MAIOR `<option>` quando nada o limita - e os nomes de
+  // campeonato ("Champions Tour 2026: Pacific Stage 2") empurravam a pagina
+  // para o lado no celular. Full-width no mobile, tamanho natural no desktop.
+  "w-full max-w-full min-w-0 rounded bg-surface-container px-space-md py-2 font-title-code text-title-code text-on-surface " +
+  "min-h-[44px] sm:min-h-0 sm:w-auto sm:py-space-xs " +
   "border border-outline-variant/40 outline-none transition-colors " +
   "hover:border-outline focus:border-primary-container disabled:cursor-not-allowed disabled:text-outline/60";
+
+/**
+ * O invólucro `<label>` de um campo de filtro: rótulo em cima e campo
+ * full-width no mobile, lado a lado no desktop. Combina com `CAMPO`.
+ */
+export const LABEL_CAMPO =
+  "flex w-full flex-col items-start gap-space-xxs sm:w-auto sm:flex-row sm:items-center sm:gap-space-xs";

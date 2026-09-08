@@ -8,26 +8,18 @@
  */
 
 import { useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
 
 import {
-  useJogosSteam,
+  useMaisJogadosSteam,
   usePartidasPorDia,
   useSaude,
   useSerieTotalSteam,
   useVisaoGeral,
 } from "../api/consultas";
-import type { JogoSteam, PartidasPorDia, VisaoGeral } from "../api/tipos";
+import type { MaisJogadoSteam, PartidasPorDia, VisaoGeral } from "../api/tipos";
 import { Botao, Consulta, Icone } from "../componentes/base";
 import { AreaNeon } from "../componentes/graficos/AreaNeon";
-import {
-  BarraCheia,
-  BarraRanking,
-  KpiHud,
-  Painel,
-  Segmentos,
-  Sparkline,
-} from "../componentes/hud";
+import { BarraCheia, KpiHud, Painel, Segmentos } from "../componentes/hud";
 import { corDoJogo } from "../tema";
 import {
   fmtCurto,
@@ -37,8 +29,6 @@ import {
   fmtPercentual,
   fmtRelativo,
 } from "../utilitarios/formatos";
-
-const TOP_JOGOS = 5;
 
 /** Janelas do seletor de periodo, em dias. `null` = tudo que foi coletado. */
 const PERIODOS = [
@@ -100,11 +90,10 @@ const FONTES: Record<
 };
 
 export function VisaoGeralPagina() {
-  const navegar = useNavigate();
   const [periodo, setPeriodo] = useState<number | null>(7);
 
   const geral = useVisaoGeral();
-  const jogos = useJogosSteam({ ordenar_por: "jogadores", limite: TOP_JOGOS });
+  const maisJogados = useMaisJogadosSteam(100);
   const porDia = usePartidasPorDia("dota2");
   const serieTotal = useSerieTotalSteam();
   const saude = useSaude();
@@ -210,7 +199,7 @@ export function VisaoGeralPagina() {
             icone="refresh"
             aoClicar={() => {
               geral.refetch();
-              jogos.refetch();
+              maisJogados.refetch();
               porDia.refetch();
             }}
             desabilitado={geral.isFetching}
@@ -223,28 +212,31 @@ export function VisaoGeralPagina() {
       {/* ==================== QUATRO KPIS ==================== */}
       <Consulta estado={geral} altura={160}>
         {(dados: VisaoGeral) => {
-          const serie = (serieTotal.data ?? []).map(
-            (ponto) => ponto.jogadores_simultaneos ?? 0,
-          );
-          const variacaoSteam =
-            serie.length > 1 && serie.at(-2)
-              ? ((serie.at(-1)! - serie.at(-2)!) / serie.at(-2)!) * 100
-              : null;
-
           return (
             <section className="grid grid-cols-1 gap-space-base md:grid-cols-2 xl:grid-cols-4">
               <KpiHud
-                etiqueta="Jogadores simultâneos na Steam"
-                canto={`${dados.jogos_steam} JOGOS`}
-                valor={fmtNumero(dados.jogadores_simultaneos_total)}
-                valorNumerico={dados.jogadores_simultaneos_total}
+                etiqueta="Usuários simultâneos na Steam"
+                canto="VALVE"
+                valor={
+                  dados.steam_usuarios_online !== null
+                    ? fmtNumero(dados.steam_usuarios_online)
+                    : "—"
+                }
+                valorNumerico={dados.steam_usuarios_online}
                 formatarValor={fmtNumero}
-                rotulo="Somados no último snapshot"
-                variacao={variacaoSteam}
+                rotulo="Conectados à Steam agora"
+                variacao={dados.steam_usuarios_online_variacao}
                 notaVariacao="vs. coleta anterior"
                 acento="primaria"
               >
-                <Sparkline valores={serie} />
+                <div className="mt-space-sm flex items-baseline gap-space-xs font-title-code text-title-code text-on-surface-variant">
+                  <span className="text-tertiary">
+                    {dados.steam_usuarios_em_jogo !== null
+                      ? fmtNumero(dados.steam_usuarios_em_jogo)
+                      : "—"}
+                  </span>
+                  dentro de um jogo
+                </div>
               </KpiHud>
 
               <KpiHud
@@ -299,31 +291,88 @@ export function VisaoGeralPagina() {
       <section className="grid grid-cols-1 gap-space-base xl:grid-cols-2">
         <Painel
           icone="leaderboard"
-          titulo="Jogos com mais jogadores simultâneos"
-          descricao="Último snapshot de cada jogo. Clique para abrir a série completa."
+          titulo="Top 100 mais jogados na Steam"
+          descricao="Jogadores dentro do jogo neste instante, direto da Valve — atualiza sozinho."
           meta={
             <span className="font-label-caps text-label-caps uppercase tracking-widest text-outline">
-              Fonte <span className="text-primary">Steam Web API</span>
+              {maisJogados.isFetching ? (
+                <span className="text-primary">atualizando…</span>
+              ) : (
+                <>ao vivo · <span className="text-primary">Valve</span></>
+              )}
             </span>
           }
         >
-          <Consulta estado={jogos}>
-            {(lista: JogoSteam[]) => {
-              const maximo = lista[0]?.jogadores_simultaneos || 1;
+          <Consulta estado={maisJogados}>
+            {(lista: MaisJogadoSteam[]) => {
+              const maximo = lista[0]?.jogadores_agora || 1;
               return (
-                <div className="grid gap-space-xs">
-                  {lista.map((jogo, indice) => (
-                    <BarraRanking
-                      key={jogo.app_id}
-                      posicao={indice + 1}
-                      etiqueta={jogo.generos[0]}
-                      nome={jogo.nome}
-                      valor={fmtNumero(jogo.jogadores_simultaneos)}
-                      variacao={jogo.variacao_jogadores}
-                      proporcao={(jogo.jogadores_simultaneos ?? 0) / maximo}
-                      aoClicar={() => navegar(`/steam/${jogo.app_id}`)}
-                    />
-                  ))}
+                <div className="rolagem-discreta max-h-[28rem] overflow-y-auto pr-space-xs">
+                  <div className="grid gap-space-xxs">
+                    {lista.map((jogo) => (
+                      <button
+                        key={jogo.app_id}
+                        type="button"
+                        onClick={() =>
+                          window.open(
+                            `https://store.steampowered.com/app/${jogo.app_id}/`,
+                            "_blank",
+                            "noopener,noreferrer",
+                          )
+                        }
+                        className="flex w-full items-center gap-space-sm rounded bg-surface-container px-space-sm py-space-xs text-left transition-colors hover:bg-surface-container-high"
+                      >
+                        <span className="w-7 shrink-0 font-label-caps text-label-caps tabular-nums text-outline">
+                          #{String(jogo.posicao).padStart(2, "0")}
+                        </span>
+
+                        <span className="min-w-0 flex-1 truncate font-body-md text-body-sm font-bold text-on-surface">
+                          {jogo.nome ?? `App ${jogo.app_id}`}
+                        </span>
+
+                        {jogo.variacao_semana !== null &&
+                          jogo.variacao_semana !== 0 && (
+                            <span
+                              className={`flex shrink-0 items-center font-badge-status text-badge-status tabular-nums ${
+                                jogo.variacao_semana > 0
+                                  ? "text-tertiary"
+                                  : "text-error"
+                              }`}
+                              title="Movimento vs. a semana passada"
+                            >
+                              <Icone
+                                nome={
+                                  jogo.variacao_semana > 0
+                                    ? "arrow_drop_up"
+                                    : "arrow_drop_down"
+                                }
+                                className="text-[14px]"
+                              />
+                              {Math.abs(jogo.variacao_semana)}
+                            </span>
+                          )}
+
+                        <span className="w-20 shrink-0 text-right font-title-code text-title-code tabular-nums text-primary">
+                          {fmtCurto(jogo.jogadores_agora)}
+                        </span>
+
+                        <span
+                          className="hidden h-1.5 w-16 shrink-0 overflow-hidden rounded-full bg-surface-container-lowest sm:block"
+                          aria-hidden
+                        >
+                          <span
+                            className="block h-full rounded-full bg-gradient-to-r from-primary-container to-primary"
+                            style={{
+                              width: `${Math.max(
+                                4,
+                                (jogo.jogadores_agora / maximo) * 100,
+                              ).toFixed(1)}%`,
+                            }}
+                          />
+                        </span>
+                      </button>
+                    ))}
+                  </div>
                 </div>
               );
             }}

@@ -28,13 +28,13 @@ import {
   BarraSegmentada,
   CAMPO,
   KpiHud,
+  LABEL_CAMPO,
   Paginacao,
   Painel,
   Sparkline,
 } from "../componentes/hud";
 import { EstatisticasConfrontos } from "../componentes/EstatisticasConfrontos";
 import { ListaConfrontos } from "../componentes/ListaConfrontos";
-import { SeletorDeJogo } from "../componentes/SeletorDeJogo";
 import { useJogoAtual } from "../layout/JogoAtual";
 import { corDoJogo, PALETA_POLOS } from "../tema";
 import {
@@ -62,9 +62,25 @@ export function LadoVencedor({ vencedor }: { vencedor: string | null }) {
   return <span className="text-outline">—</span>;
 }
 
-export function PartidasPagina() {
+/**
+ * `secao` reparte a tela entre duas sub-abas de E-Sports:
+ *
+ * - `partidas`  — o grao de PARTIDA (`dim_partida`): KPIs, histogramas e a
+ *   tabela densa. So Dota 2 tem esse detalhe.
+ * - `resultados` — o grao de CONFRONTO (placar da serie, do calendario):
+ *   existe para quase todos os jogos.
+ *
+ * Uma so tela porque as duas leem o mesmo jogo e a mesma barra de contexto;
+ * o `secao` decide quais paineis aparecem.
+ */
+export function PartidasPagina({
+  secao = "partidas",
+}: {
+  secao?: "partidas" | "resultados";
+} = {}) {
   const navegar = useNavigate();
   const { jogo } = useJogoAtual();
+  const emResultados = secao === "resultados";
 
   const [liga, setLiga] = useState("");
   const [modo, setModo] = useState("");
@@ -134,7 +150,7 @@ export function PartidasPagina() {
         <div className="flex flex-col gap-space-xs">
           <div className="flex flex-wrap items-center gap-space-sm">
             <h1 className="font-headline-lg text-headline-lg uppercase tracking-wide text-primary drop-shadow-[0_0_12px_rgba(0,229,255,0.4)]">
-              Partidas
+              {emResultados ? "Resultados" : "Partidas"}
             </h1>
             <div className="inline-flex items-center gap-space-xs rounded bg-surface-container-high px-space-sm py-space-xxs shadow-inner">
               <span className="relative flex h-2.5 w-2.5">
@@ -159,7 +175,7 @@ export function PartidasPagina() {
               </span>
             </div>
             <span className="hidden font-label-caps text-label-caps uppercase tracking-wider text-outline sm:inline">
-              Match Analytics // Deck 02
+              {emResultados ? "Head-to-head // Deck 04" : "Match Analytics // Deck 02"}
             </span>
           </div>
 
@@ -170,12 +186,15 @@ export function PartidasPagina() {
             erro de dizer a fonte errada num painel de procedência.
           */}
           <p className="font-body-sm text-body-sm text-on-surface-variant">
-            {temPartidaDetalhada
-              ? "Star schema de partidas profissionais. Uma partida vira dez linhas de fato — uma por jogador — e as dimensões são compartilhadas entre os jogos."
-              : "Calendário profissional: quem jogou, quando e o placar da série. Este jogo não tem partida com detalhe por jogador — a fonte publica o resultado do confronto, não o que aconteceu dentro dele."}
+            {emResultados
+              ? "Placar da série decidida, do calendário — Liquipedia e OP.GG. O grão é o confronto: um 3x1 é uma linha, não três partidas."
+              : temPartidaDetalhada
+                ? "Star schema de partidas profissionais. Uma partida vira dez linhas de fato — uma por jogador — e as dimensões são compartilhadas entre os jogos."
+                : "Este jogo não tem partida com detalhe por jogador — a fonte publica o resultado do confronto, não o que aconteceu dentro dele. Veja a aba Resultados."}
           </p>
         </div>
 
+        {!emResultados && temPartidaDetalhada && (
         <div className="flex flex-wrap items-center gap-space-sm">
           <div className="flex items-center rounded bg-surface-container-low p-space-xxs shadow-sm">
             {PERIODOS.map((opcao) => (
@@ -203,27 +222,18 @@ export function PartidasPagina() {
             {partidas.isFetching ? "Atualizando…" : "Atualizar telemetria"}
           </Botao>
         </div>
+        )}
       </section>
 
       {/* ==================== BARRA DE FILTROS ==================== */}
+      {/* Torneio, modo e busca filtram a tabela POR PARTIDA. Sem `dim_partida`
+          ela nao e renderizada, e um filtro que nao filtra nada e pior que
+          filtro nenhum. Na aba Resultados nada disso se aplica. */}
+      {!emResultados && temPartidaDetalhada && (
       <section className="space-y-space-md rounded-xl bg-surface-container-low/90 p-space-base shadow-lg">
         <div className="flex flex-wrap items-center gap-space-sm">
-          {/*
-            O padrão do seletor exige `partidas > 0`, e vale para Heróis e
-            Jogadores — eles leem o fato por jogador, que só a OpenDota
-            entrega. Esta tela não: desde que ela mostra confrontos com placar
-            do calendário, um jogo com agenda tem conteúdo aqui. Com o gate
-            padrão, League of Legends aparecia como "nada coletado ainda"
-            tendo 67 confrontos e 61 equipes no banco.
-          */}
-          <SeletorDeJogo disponivel={(j) => j.partidas > 0 || j.agenda > 0} />
-          {/*
-            Torneio, modo e busca filtram a tabela POR PARTIDA. Sem
-            `dim_partida` ela não é renderizada, e um filtro que não filtra
-            nada é pior que filtro nenhum: parece que o recorte foi aplicado.
-          */}
           {temPartidaDetalhada && (
-          <label className="flex items-center gap-space-xs">
+          <label className={LABEL_CAMPO}>
             <span className="font-label-caps text-label-caps uppercase tracking-widest text-outline">
               Torneio
             </span>
@@ -243,7 +253,7 @@ export function PartidasPagina() {
           )}
 
           {temPartidaDetalhada && (
-          <label className="flex items-center gap-space-xs">
+          <label className={LABEL_CAMPO}>
             <span className="font-label-caps text-label-caps uppercase tracking-widest text-outline">
               Modo
             </span>
@@ -280,6 +290,7 @@ export function PartidasPagina() {
           )}
         </div>
       </section>
+      )}
 
       {/*
         Os blocos entre este comentário e o de "confrontos decididos" leem
@@ -288,14 +299,23 @@ export function PartidasPagina() {
         eles rendiam a tela inteira zerada, então dão lugar à estatística do
         calendário, que é o que esses jogos têm.
       */}
-      {!temPartidaDetalhada && (
+      {emResultados && (
         <Consulta estado={resumoConfrontos} altura={160}>
           {(dados) => <EstatisticasConfrontos dados={dados} />}
         </Consulta>
       )}
 
+      {/* Aba Partidas num jogo sem `dim_partida`: nada a mostrar aqui. */}
+      {!emResultados && !temPartidaDetalhada && (
+        <p className="rounded-xl bg-surface-container-low/90 px-space-lg py-space-base font-body-md text-body-md text-on-surface-variant shadow-lg">
+          Este jogo não tem partida com detalhe por jogador — a fonte publica o
+          placar do confronto, não o que aconteceu dentro dele. O que existe está
+          na aba <strong className="text-on-surface">Resultados</strong>.
+        </p>
+      )}
+
       {/* ==================== QUATRO KPIS ==================== */}
-      {temPartidaDetalhada && (
+      {!emResultados && temPartidaDetalhada && (
       <Consulta estado={resumo} altura={160}>
         {(dados: ResumoPartidas) => {
           const winrateRadiant = (dados.winrate_radiant ?? 50) / 100;
@@ -388,7 +408,7 @@ export function PartidasPagina() {
       )}
 
       {/* ==================== DOIS PAINEIS ==================== */}
-      {temPartidaDetalhada && (
+      {!emResultados && temPartidaDetalhada && (
       <section className="grid grid-cols-1 gap-space-base xl:grid-cols-2">
         <Painel
           icone="bar_chart"
@@ -448,10 +468,11 @@ export function PartidasPagina() {
       )}
 
       {/* ==================== CONFRONTOS DECIDIDOS ==================== */}
+      {emResultados && (
       <Painel
         icone="scoreboard"
         titulo="Confrontos com resultado"
-        descricao="Placar da série, do calendário — Liquipedia e OP.GG. Grão diferente da tabela abaixo: um 3x1 é um confronto, não três partidas."
+        descricao="Placar da série, do calendário — Liquipedia e OP.GG. Um 3x1 é um confronto, não três partidas."
         meta={
           <Selo>{confrontos.data?.length ?? 0} em tela</Selo>
         }
@@ -489,11 +510,11 @@ export function PartidasPagina() {
           )}
         </Consulta>
       </Painel>
+      )}
 
       {/* ==================== TABELA DENSA ==================== */}
-      {/* Por PARTIDA: sem `dim_partida` ela nao tem o que listar, e o painel
-          de confrontos acima ja e a lista deste jogo. */}
-      {temPartidaDetalhada && (
+      {/* Por PARTIDA: sem `dim_partida` ela nao tem o que listar. */}
+      {!emResultados && temPartidaDetalhada && (
       <Painel
         icone="history"
         titulo="Histórico operacional de partidas"

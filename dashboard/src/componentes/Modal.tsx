@@ -45,14 +45,14 @@ export function Modal({
 
   return (
     <div
-      className="fixed inset-0 z-[100] flex items-start justify-center overflow-y-auto bg-background/80 p-space-lg backdrop-blur-sm"
+      className="fixed inset-0 z-[100] flex items-start justify-center overflow-y-auto bg-background/80 p-space-sm backdrop-blur-sm sm:p-space-lg"
       role="dialog"
       aria-modal
       aria-label={typeof titulo === "string" ? titulo : undefined}
       onClick={aoFechar}
     >
       <div
-        className="my-space-xl w-full max-w-5xl space-y-space-md rounded-xl bg-surface-container-low p-space-lg shadow-2xl"
+        className="my-space-base w-full max-w-5xl space-y-space-md rounded-xl bg-surface-container-low p-space-base shadow-2xl sm:my-space-xl sm:p-space-lg"
         // O clique dentro nao pode fechar: so o do fundo.
         onClick={(evento) => evento.stopPropagation()}
       >

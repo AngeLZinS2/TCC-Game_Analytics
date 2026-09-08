@@ -29,12 +29,34 @@ class VisaoGeral(BaseModel):
 
     jogos_steam: int
     snapshots_steam: int
+    #: Soma do ultimo snapshot dos jogos monitorados. NAO e o total da Steam -
+    #: mantido para "cobertura da nossa coleta", nao como headline.
     jogadores_simultaneos_total: int | None
+    #: Usuarios conectados a Steam AGORA (numero da plataforma, da Valve).
+    steam_usuarios_online: int | None = None
+    #: O subconjunto que esta dentro de um jogo.
+    steam_usuarios_em_jogo: int | None = None
+    #: Variacao % de `steam_usuarios_online` vs a coleta anterior.
+    steam_usuarios_online_variacao: float | None = None
     partidas: int
     linhas_fato_partida: int
     jogadores: int
     personagens: int
     coletas: list[ColetaFonte]
+
+
+class MaisJogadoSteam(BaseModel):
+    """Uma linha do Top 100 mais jogados da Steam AGORA (ao vivo)."""
+
+    posicao: int
+    app_id: int
+    nome: str | None
+    #: Jogadores dentro do jogo neste instante (`concurrent_in_game`).
+    jogadores_agora: int
+    #: Pico das ultimas 24h.
+    pico_24h: int | None = None
+    #: Movimento vs a semana passada: >0 subiu, <0 caiu, 0 igual, `None` novo.
+    variacao_semana: int | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -985,3 +1007,35 @@ class ResumoColeta(BaseModel):
     avaliacoes_coletadas: int
     registros_brutos: int
     segundos: float
+
+
+# ---------------------------------------------------------------------------
+# Ranking oficial (por esporte / regiao) - /api/esports/ranking-oficial
+# ---------------------------------------------------------------------------
+class EquipeRankingOficial(BaseModel):
+    posicao: int
+    equipe_nome: str
+    #: `None` enquanto a reconciliacao nao casou o nome publicado com dim_equipe.
+    id_equipe: int | None = None
+    tag: str | None = None
+    logo_url: str | None = None
+    #: O rating da fonte (ELO ~1000-2000 no vlr.gg). `None` se a fonte so
+    #: publica ordem.
+    pontos: int | None = None
+
+
+class RegiaoRanking(BaseModel):
+    slug: str
+    nome: str
+    equipes: list[EquipeRankingOficial]
+
+
+class RankingOficialResposta(BaseModel):
+    jogo: str
+    #: Nome de exibicao da fonte ("vlr.gg", "Valve Regional Standings").
+    fonte: str
+    #: Onde o publico confere o ranking original.
+    url_fonte: str
+    #: Data do snapshot mais recente.
+    data_referencia: date
+    regioes: list[RegiaoRanking]

@@ -137,6 +137,13 @@ def _coletar_steam(settings: Settings, storage: RawStorage) -> CollectionResult:
         coletor.close()
 
 
+def _coletar_steam_online(settings: Settings, storage: RawStorage) -> CollectionResult:
+    """Usuarios simultaneos da plataforma Steam (numero da Valve, nao a soma)."""
+    from collectors.steam_online import SteamOnlineCollector
+
+    return SteamOnlineCollector(raw_storage=storage).run(carregar=True)
+
+
 def _coletar_opendota(settings: Settings, storage: RawStorage) -> CollectionResult:
     from collectors.opendota_collector import OpenDotaCollector
 
@@ -527,6 +534,11 @@ def montar_tarefas(settings: Settings) -> list[Tarefa]:
             nome="steam",
             intervalo_segundos=settings.agendador_steam_minutos * 60,
             executar=_coletar_steam,
+        ),
+        Tarefa(
+            nome="steam_online",
+            intervalo_segundos=settings.agendador_steam_online_minutos * 60,
+            executar=_coletar_steam_online,
         ),
         Tarefa(
             nome="opendota",
