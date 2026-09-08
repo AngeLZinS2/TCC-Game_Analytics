@@ -119,7 +119,27 @@ function Placar({
   );
 }
 
-function Sigla({ tag, nome }: { tag: string | null | undefined; nome: string }) {
+function Sigla({
+  logo,
+  tag,
+  nome,
+}: {
+  logo?: string | null;
+  tag: string | null | undefined;
+  nome: string;
+}) {
+  if (logo) {
+    return (
+      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-sm bg-neutral-200 p-[2px]">
+        <img
+          src={logo}
+          alt=""
+          loading="lazy"
+          className="max-h-full max-w-full object-contain"
+        />
+      </span>
+    );
+  }
   return (
     <span
       className="flex h-6 w-6 shrink-0 items-center justify-center rounded-sm bg-surface-container-highest text-[9px] font-bold uppercase leading-none text-outline"
@@ -162,13 +182,13 @@ function LinhaLista({
         <span className={`min-w-0 flex-1 text-right ${nomeA}`} title={c.equipe_a_nome}>
           {c.equipe_a_nome}
         </span>
-        <Sigla tag={c.equipe_a_tag} nome={c.equipe_a_nome} />
+        <Sigla logo={c.equipe_a_logo} tag={c.equipe_a_tag} nome={c.equipe_a_nome} />
         <span className="flex shrink-0 items-center gap-0.5">
           <Placar valor={c.placar_a} venceu={c.vitoria_a === true} semResultado={semResultado} />
           <span className="text-outline">-</span>
           <Placar valor={c.placar_b} venceu={c.vitoria_a === false} semResultado={semResultado} />
         </span>
-        <Sigla tag={c.equipe_b_tag} nome={c.equipe_b_nome} />
+        <Sigla logo={c.equipe_b_logo} tag={c.equipe_b_tag} nome={c.equipe_b_nome} />
         <span className={`min-w-0 flex-1 text-left ${nomeB}`} title={c.equipe_b_nome}>
           {c.equipe_b_nome}
         </span>

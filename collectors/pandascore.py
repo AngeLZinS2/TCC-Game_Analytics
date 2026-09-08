@@ -74,6 +74,12 @@ class ConfrontoPandaScore:
     vitoria_a: bool | None
     placar_a: int | None
     placar_b: int | None
+    # A PandaScore traz escudo e sigla de todo time — vira `dim_equipe.logo_url`
+    # / `tag` no `carregar_agenda`, inclusive backfill dos que já existiam sem.
+    equipe_a_logo: str | None = None
+    equipe_b_logo: str | None = None
+    equipe_a_tag: str | None = None
+    equipe_b_tag: str | None = None
 
 
 @dataclass
@@ -166,6 +172,10 @@ def _para_confronto(
     nog = partida.get("number_of_games")
     formato = f"Bo{nog}" if isinstance(nog, int) and nog > 0 else None
 
+    def _sigla(time: dict[str, Any]) -> str | None:
+        sig = (time.get("acronym") or "").strip()
+        return sig[:32] or None
+
     return ConfrontoPandaScore(
         id_externo=f"pandascore:{partida['id']}",
         equipe_a_nome=nome_a[:120],
@@ -176,6 +186,10 @@ def _para_confronto(
         vitoria_a=vitoria_a,
         placar_a=placar_a,
         placar_b=placar_b,
+        equipe_a_logo=a.get("image_url") or None,
+        equipe_b_logo=b.get("image_url") or None,
+        equipe_a_tag=_sigla(a),
+        equipe_b_tag=_sigla(b),
     )
 
 

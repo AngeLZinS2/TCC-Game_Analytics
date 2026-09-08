@@ -47,6 +47,21 @@ def test_decidida_traz_placar_e_vencedor():
     assert c.torneio == "BLAST Open — Playoffs"
 
 
+def test_escudo_e_sigla_vem_do_opponent():
+    c = _para_confronto(
+        _partida(
+            opponents=[
+                {"opponent": {"id": 100, "name": "Team Spirit", "image_url": "http://x/ts.png", "acronym": "TS"}},
+                {"opponent": {"id": 200, "name": "MOUZ", "image_url": None, "acronym": ""}},
+            ]
+        )
+    )
+    assert c.equipe_a_logo == "http://x/ts.png"
+    assert c.equipe_a_tag == "TS"
+    assert c.equipe_b_logo is None
+    assert c.equipe_b_tag is None
+
+
 def test_vencedor_do_lado_b():
     c = _para_confronto(_partida(winner_id=200))
     assert c.vitoria_a is False

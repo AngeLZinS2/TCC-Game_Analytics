@@ -783,6 +783,10 @@ export interface PartidaAgendada {
   id_externo: string;
   equipe_a_nome: string;
   equipe_b_nome: string;
+  equipe_a_logo: string | null;
+  equipe_b_logo: string | null;
+  equipe_a_tag: string | null;
+  equipe_b_tag: string | null;
   /** ISO. O horário do vlr.gg não tem fuso confiável — tratar como "por volta de". */
   inicio_previsto: string;
   torneio: string | null;

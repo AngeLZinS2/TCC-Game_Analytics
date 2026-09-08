@@ -558,27 +558,49 @@ def agenda_proximas(
     id_jogo = _id_jogo(sessao, jogo)
     corte = datetime.now(timezone.utc) - timedelta(hours=3)
 
-    base = select(AgendaPartida).where(
-        AgendaPartida.id_jogo == id_jogo,
-        AgendaPartida.vitoria_a.is_(None),
-        AgendaPartida.inicio_previsto >= corte,
+    equipe_a = aliased(DimEquipe)
+    equipe_b = aliased(DimEquipe)
+    base = (
+        select(
+            AgendaPartida.id_externo,
+            AgendaPartida.equipe_a_nome,
+            AgendaPartida.equipe_b_nome,
+            AgendaPartida.inicio_previsto,
+            AgendaPartida.torneio,
+            AgendaPartida.formato,
+            equipe_a.logo_url,
+            equipe_b.logo_url,
+            equipe_a.tag,
+            equipe_b.tag,
+        )
+        .outerjoin(equipe_a, equipe_a.id_equipe == AgendaPartida.id_equipe_a)
+        .outerjoin(equipe_b, equipe_b.id_equipe == AgendaPartida.id_equipe_b)
+        .where(
+            AgendaPartida.id_jogo == id_jogo,
+            AgendaPartida.vitoria_a.is_(None),
+            AgendaPartida.inicio_previsto >= corte,
+        )
     )
     base = restringir_recorte(sessao, base)
 
     linhas = sessao.execute(
         base.order_by(AgendaPartida.inicio_previsto).limit(limite)
-    ).scalars()
+    )
 
     return [
         PartidaAgendada(
-            id_externo=a.id_externo,
-            equipe_a_nome=a.equipe_a_nome,
-            equipe_b_nome=a.equipe_b_nome,
-            inicio_previsto=a.inicio_previsto,
-            torneio=a.torneio,
-            formato=a.formato,
+            id_externo=linha[0],
+            equipe_a_nome=linha[1],
+            equipe_b_nome=linha[2],
+            inicio_previsto=linha[3],
+            torneio=linha[4],
+            formato=linha[5],
+            equipe_a_logo=linha[6],
+            equipe_b_logo=linha[7],
+            equipe_a_tag=linha[8],
+            equipe_b_tag=linha[9],
         )
-        for a in linhas
+        for linha in linhas
     ]
 
 

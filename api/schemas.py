@@ -51,6 +51,11 @@ class PartidaAgendada(BaseModel):
     id_externo: str
     equipe_a_nome: str
     equipe_b_nome: str
+    #: Escudo e sigla quando a equipe foi reconciliada com a dimensao.
+    equipe_a_logo: str | None = None
+    equipe_b_logo: str | None = None
+    equipe_a_tag: str | None = None
+    equipe_b_tag: str | None = None
     inicio_previsto: datetime
     torneio: str | None = None
     formato: str | None = None

@@ -16,7 +16,7 @@ import logging
 from datetime import datetime, timezone
 from typing import Iterable, Protocol
 
-from sqlalchemy import select
+from sqlalchemy import func, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from db.models import AgendaPartida, DimEquipe, DimJogo
@@ -40,6 +40,58 @@ class ConfrontoAgenda(Protocol):
     vitoria_a: bool | None
     placar_a: int | None
     placar_b: int | None
+    # Opcionais — a PandaScore preenche, vlr/hltv não. Lidos com `getattr`.
+    # equipe_a_logo / equipe_b_logo / equipe_a_tag / equipe_b_tag
+
+
+def _preencher_escudos(
+    sessao,
+    id_jogo: int,
+    mapa: dict[str, int],
+    meta_time: dict[str, tuple[str | None, str | None]],
+) -> None:
+    """Preenche `logo_url` (e `tag` se nula) dos times que estão sem.
+
+    Só toca em nulo — um escudo já gravado (da wiki, do OP.GG) manda. É o que
+    faz a agenda de CS/LoL/CoD aparecer com escudo mesmo nos times que a
+    PandaScore criou antes de eu passar a guardar a imagem.
+    """
+    if not meta_time:
+        return
+
+    sem_logo = {
+        id_equipe
+        for (id_equipe,) in sessao.execute(
+            select(DimEquipe.id_equipe).where(
+                DimEquipe.id_jogo == id_jogo, DimEquipe.logo_url.is_(None)
+            )
+        )
+    }
+    if not sem_logo:
+        return
+
+    ja_feito: set[int] = set()
+    for nome, (logo, tag) in meta_time.items():
+        if not logo:
+            continue
+        id_equipe = _resolver(nome, mapa)
+        if id_equipe is None or id_equipe not in sem_logo or id_equipe in ja_feito:
+            continue
+        ja_feito.add(id_equipe)
+        valores: dict = {"logo_url": logo}
+        if tag:
+            valores["tag"] = func.coalesce(DimEquipe.tag, tag)
+        sessao.execute(
+            update(DimEquipe)
+            .where(DimEquipe.id_equipe == id_equipe)
+            .values(**valores)
+        )
+
+    if ja_feito:
+        logger.info(
+            "escudos preenchidos na agenda",
+            extra={"id_jogo": id_jogo, "quantidade": len(ja_feito)},
+        )
 
 
 def carregar_agenda(
@@ -69,6 +121,25 @@ def carregar_agenda(
 
         mapa = _mapa_de_equipes(sessao, id_jogo)
 
+        # Escudo e sigla que a fonte trouxe, por nome de time. A PandaScore
+        # manda os dois em toda partida; vlr/hltv não mandam nada (getattr).
+        meta_time: dict[str, tuple[str | None, str | None]] = {}
+        for c in confrontos:
+            for nome, logo, tag in (
+                (
+                    c.equipe_a_nome,
+                    getattr(c, "equipe_a_logo", None),
+                    getattr(c, "equipe_a_tag", None),
+                ),
+                (
+                    c.equipe_b_nome,
+                    getattr(c, "equipe_b_logo", None),
+                    getattr(c, "equipe_b_tag", None),
+                ),
+            ):
+                if nome and nome not in meta_time and (logo or tag):
+                    meta_time[nome] = (logo, tag)
+
         sem_par = sorted(
             {
                 nome
@@ -86,6 +157,8 @@ def carregar_agenda(
                             "id_jogo": id_jogo,
                             "id_externo": f"{prefixo_equipe}:{normalizar(nome)}"[:200],
                             "nome": nome[:120],
+                            "logo_url": meta_time.get(nome, (None, None))[0],
+                            "tag": meta_time.get(nome, (None, None))[1],
                         }
                         for nome in sem_par
                     ]
@@ -98,6 +171,9 @@ def carregar_agenda(
                 "equipes criadas da agenda",
                 extra={"jogo": jogo_codigo, "quantidade": len(sem_par)},
             )
+
+        # Backfill: time que já existia sem escudo ganha o da fonte agora.
+        _preencher_escudos(sessao, id_jogo, mapa, meta_time)
 
         agora = datetime.now(timezone.utc)
         linhas = [

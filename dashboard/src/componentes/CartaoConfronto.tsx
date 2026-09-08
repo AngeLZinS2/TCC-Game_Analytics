@@ -51,7 +51,7 @@ function Escudo({
 }) {
   if (logo) {
     return (
-      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded bg-neutral-200 p-[3px]">
+      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded bg-neutral-200 p-[3px]">
         <img
           src={logo}
           alt=""
@@ -63,7 +63,7 @@ function Escudo({
   }
   return (
     <span
-      className="flex h-6 w-6 shrink-0 items-center justify-center rounded bg-surface-container-highest text-[9px] font-bold uppercase leading-none text-outline"
+      className="flex h-8 w-8 shrink-0 items-center justify-center rounded bg-surface-container-highest text-[10px] font-bold uppercase leading-none text-outline"
       aria-hidden
     >
       {(tag || nome).slice(0, 2)}
