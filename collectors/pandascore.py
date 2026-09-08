@@ -39,13 +39,15 @@ from config import Settings, get_settings
 
 logger = logging.getLogger(__name__)
 
-#: slug do jogo na PandaScore -> código em `dim_jogo`.
+#: prefixo de rota da PandaScore (`/{jogo}/matches`) -> código em `dim_jogo`.
+#: Atenção: a rota NÃO é o slug do videogame — CoD é `cod-mw` no catálogo mas
+#: `codmw` na URL.
 JOGOS_PANDASCORE: dict[str, str] = {
     "csgo": "counterstrike",
     "lol": "leagueoflegends",
     "dota2": "dota2",
     "valorant": "valorant",
-    "cod-mw": "callofduty",
+    "codmw": "callofduty",
 }
 
 #: Quantos torneios recentes puxar de cada lista. 20 cobre a janela relevante.

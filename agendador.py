@@ -477,6 +477,17 @@ def _coletar_pandascore_lol(settings: Settings, storage: RawStorage) -> Collecti
     return PandaScoreCollector(raw_storage=storage, jogo="lol").run(carregar=True)
 
 
+def _coletar_pandascore_cod(settings: Settings, storage: RawStorage) -> CollectionResult:
+    """Agenda + resultados de Call of Duty via PandaScore (CDL, EWC, Challengers).
+
+    CoD não tinha nenhuma fonte — a tela de Partidas ficava vazia. Fora de
+    temporada da CDL há só o histórico; em temporada, a agenda também.
+    """
+    from collectors.pandascore import PandaScoreCollector
+
+    return PandaScoreCollector(raw_storage=storage, jogo="codmw").run(carregar=True)
+
+
 def _coletar_vlr_detalhes(settings: Settings, storage: RawStorage) -> CollectionResult:
     """Detalhe por mapa e por jogador das partidas de Valorant ja decididas."""
     from collectors.vlr_detalhes import VlrDetalhesCollector
@@ -645,6 +656,7 @@ def montar_tarefas(settings: Settings) -> list[Tarefa]:
         for nome, executar in (
             ("pandascore_cs", _coletar_pandascore_cs),
             ("pandascore_lol", _coletar_pandascore_lol),
+            ("pandascore_cod", _coletar_pandascore_cod),
         ):
             tarefas.append(
                 Tarefa(
