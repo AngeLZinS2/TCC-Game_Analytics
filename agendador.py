@@ -488,6 +488,20 @@ def _coletar_pandascore_cod(settings: Settings, storage: RawStorage) -> Collecti
     return PandaScoreCollector(raw_storage=storage, jogo="codmw").run(carregar=True)
 
 
+def _coletar_pandascore_ow(settings: Settings, storage: RawStorage) -> CollectionResult:
+    """Agenda + resultados de Overwatch via PandaScore (OWCS, World Cup)."""
+    from collectors.pandascore import PandaScoreCollector
+
+    return PandaScoreCollector(raw_storage=storage, jogo="ow").run(carregar=True)
+
+
+def _coletar_pandascore_r6(settings: Settings, storage: RawStorage) -> CollectionResult:
+    """Agenda + resultados de Rainbow Six Siege via PandaScore (as ligas regionais)."""
+    from collectors.pandascore import PandaScoreCollector
+
+    return PandaScoreCollector(raw_storage=storage, jogo="r6siege").run(carregar=True)
+
+
 def _coletar_vlr_detalhes(settings: Settings, storage: RawStorage) -> CollectionResult:
     """Detalhe por mapa e por jogador das partidas de Valorant ja decididas."""
     from collectors.vlr_detalhes import VlrDetalhesCollector
@@ -657,6 +671,8 @@ def montar_tarefas(settings: Settings) -> list[Tarefa]:
             ("pandascore_cs", _coletar_pandascore_cs),
             ("pandascore_lol", _coletar_pandascore_lol),
             ("pandascore_cod", _coletar_pandascore_cod),
+            ("pandascore_ow", _coletar_pandascore_ow),
+            ("pandascore_r6", _coletar_pandascore_r6),
         ):
             tarefas.append(
                 Tarefa(

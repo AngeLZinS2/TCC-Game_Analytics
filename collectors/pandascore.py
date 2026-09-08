@@ -48,6 +48,8 @@ JOGOS_PANDASCORE: dict[str, str] = {
     "dota2": "dota2",
     "valorant": "valorant",
     "codmw": "callofduty",
+    "ow": "overwatch",
+    "r6siege": "rainbowsix",
 }
 
 #: Quantos torneios recentes puxar de cada lista. 20 cobre a janela relevante.

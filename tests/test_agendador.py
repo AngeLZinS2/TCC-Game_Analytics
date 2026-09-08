@@ -265,9 +265,9 @@ def test_pandascore_troca_o_hltv_quando_ha_chave():
         hltb_enabled = True
 
     tarefas = {t.nome: t.intervalo_segundos for t in montar_tarefas(ComPandaScore())}
-    assert tarefas.get("pandascore_cs") == 1800
-    assert tarefas.get("pandascore_lol") == 1800
-    assert tarefas.get("pandascore_cod") == 1800
+    for nome in ("pandascore_cs", "pandascore_lol", "pandascore_cod",
+                 "pandascore_ow", "pandascore_r6"):
+        assert tarefas.get(nome) == 1800
     assert "hltv" not in tarefas
     # LoL da PandaScore roda JUNTO do OP.GG (fontes complementares).
     assert "esports_opgg" in tarefas
