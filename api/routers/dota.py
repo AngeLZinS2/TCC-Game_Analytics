@@ -1082,12 +1082,17 @@ def listar_partidas(
         case((FatoPartidaJogador.vitoria.is_(True), FatoPartidaJogador.equipe))
     ).label("vencedor")
 
+    equipe_a = aliased(DimEquipe)
+    equipe_b = aliased(DimEquipe)
+
     consulta = (
-        select(DimPartida, vencedor)
+        select(DimPartida, vencedor, equipe_a, equipe_b)
         .outerjoin(
             FatoPartidaJogador,
             FatoPartidaJogador.id_partida == DimPartida.id_partida,
         )
+        .outerjoin(equipe_a, equipe_a.id_equipe == DimPartida.id_equipe_lado_a)
+        .outerjoin(equipe_b, equipe_b.id_equipe == DimPartida.id_equipe_lado_b)
         .where(DimPartida.id_jogo == id_jogo)
     )
     if liga:
@@ -1096,19 +1101,26 @@ def listar_partidas(
         consulta = consulta.where(DimPartida.data_inicio >= desde)
 
     consulta = (
-        consulta.group_by(DimPartida.id_partida)
+        consulta.group_by(DimPartida.id_partida, equipe_a.id_equipe, equipe_b.id_equipe)
         .order_by(desc(DimPartida.data_inicio))
         .limit(limite)
         .offset(deslocamento)
     )
 
     return [
-        _montar_partida(partida, lado)
-        for partida, lado in sessao.execute(consulta)
+        _montar_partida(partida, lado, eq_a, eq_b)
+        for partida, lado, eq_a, eq_b in sessao.execute(consulta)
     ]
 
 
-def _montar_partida(partida: DimPartida, vencedor: str | None) -> Partida:
+def _montar_partida(
+    partida: DimPartida,
+    vencedor: str | None,
+    equipe_a: DimEquipe | None = None,
+    equipe_b: DimEquipe | None = None,
+) -> Partida:
+    # `dim_partida` guarda lado A = Radiant; o fato escreve "radiant"/"dire".
+    vitoria_a = None if vencedor is None else vencedor == "radiant"
     return Partida(
         id_partida=partida.id_partida,
         id_externo=partida.id_externo,
@@ -1119,6 +1131,13 @@ def _montar_partida(partida: DimPartida, vencedor: str | None) -> Partida:
         patch=partida.patch,
         liga_nome=partida.liga_nome,
         vencedor=vencedor,
+        equipe_a_nome=equipe_a.nome if equipe_a else None,
+        equipe_b_nome=equipe_b.nome if equipe_b else None,
+        equipe_a_logo=equipe_a.logo_url if equipe_a else None,
+        equipe_b_logo=equipe_b.logo_url if equipe_b else None,
+        equipe_a_tag=equipe_a.tag if equipe_a else None,
+        equipe_b_tag=equipe_b.tag if equipe_b else None,
+        vitoria_a=vitoria_a,
     )
 
 

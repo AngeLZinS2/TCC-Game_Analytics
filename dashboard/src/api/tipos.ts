@@ -353,6 +353,15 @@ export interface Partida {
   patch: string | null;
   liga_nome: string | null;
   vencedor: string | null;
+  /** Lado A = Radiant, lado B = Dire. Nulos em qualificatória aberta. */
+  equipe_a_nome: string | null;
+  equipe_b_nome: string | null;
+  equipe_a_logo: string | null;
+  equipe_b_logo: string | null;
+  equipe_a_tag: string | null;
+  equipe_b_tag: string | null;
+  /** `true` se o Radiant venceu, `false` se o Dire, `null` sem resultado. */
+  vitoria_a: boolean | null;
 }
 
 export interface JogadorNaPartida {

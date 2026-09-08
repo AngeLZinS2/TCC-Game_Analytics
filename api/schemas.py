@@ -462,6 +462,16 @@ class Partida(BaseModel):
     patch: str | None
     liga_nome: str | None
     vencedor: str | None
+    #: Lado A = Radiant, lado B = Dire (a mesma convencao de `dim_partida`).
+    #: Nulos em qualificatoria aberta, onde a fonte nao cadastra o time.
+    equipe_a_nome: str | None = None
+    equipe_b_nome: str | None = None
+    equipe_a_logo: str | None = None
+    equipe_b_logo: str | None = None
+    equipe_a_tag: str | None = None
+    equipe_b_tag: str | None = None
+    #: `True` se o Radiant venceu, `False` se o Dire, `None` sem resultado.
+    vitoria_a: bool | None = None
 
 
 class JogadorNaPartida(BaseModel):

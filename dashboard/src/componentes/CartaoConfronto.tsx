@@ -11,9 +11,9 @@
 
 import type { ReactNode } from "react";
 
-import type { ConfrontoResultado, PartidaAgendada } from "../api/tipos";
+import type { ConfrontoResultado, Partida, PartidaAgendada } from "../api/tipos";
 import { PALETA_POLOS } from "../tema";
-import { fmtDataHora, fmtRelativo } from "../utilitarios/formatos";
+import { fmtDataHora, fmtDuracao, fmtRelativo } from "../utilitarios/formatos";
 import { Icone } from "./base";
 
 /** O mínimo que o cartão precisa — o resto é opcional e cai no "por vir". */
@@ -32,12 +32,49 @@ export interface DadosConfronto {
   formato: string | null;
   inicio_previsto: string;
   tem_detalhe?: boolean;
+  /** Linha extra no rodapé (Dota: duração · patch). */
+  nota?: string | null;
+  /** Rota do detalhe quando o clique navega em vez de abrir o modal. */
+  id_rota?: number;
 }
 
 export function paraCartao(
-  c: ConfrontoResultado | PartidaAgendada,
+  c: ConfrontoResultado | PartidaAgendada | Partida,
 ): DadosConfronto {
+  // Confronto e agenda já têm o shape; uma PARTIDA de Dota precisa de
+  // `paraCartaoPartida` (Radiant/Dire, sem placar de série).
   return { ...c } as DadosConfronto;
+}
+
+/**
+ * Uma PARTIDA de Dota (grão de jogo, não de série) como cartão: Radiant e Dire
+ * viram lado A e B, o vencedor destaca sem placar numérico (é BO1), e a duração
+ * e o patch vão para a nota do rodapé. O clique navega para o placar completo.
+ */
+export function paraCartaoPartida(p: Partida): DadosConfronto {
+  const nota = [
+    fmtDuracao(p.duracao_segundos),
+    p.patch ? `patch ${p.patch}` : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+  return {
+    id_externo: p.id_externo,
+    id_rota: p.id_partida,
+    equipe_a_nome: p.equipe_a_nome ?? "Radiant",
+    equipe_b_nome: p.equipe_b_nome ?? "Dire",
+    equipe_a_logo: p.equipe_a_logo,
+    equipe_b_logo: p.equipe_b_logo,
+    equipe_a_tag: p.equipe_a_tag,
+    equipe_b_tag: p.equipe_b_tag,
+    placar_a: null,
+    placar_b: null,
+    vitoria_a: p.vitoria_a,
+    torneio: p.liga_nome,
+    formato: p.modo,
+    inicio_previsto: p.data_inicio ?? "",
+    nota: nota || null,
+  };
 }
 
 function Escudo({
@@ -106,7 +143,7 @@ function LinhaTime({
       >
         {nome}
       </span>
-      {!agendada && (
+      {!agendada && placar != null && (
         <span
           className="shrink-0 font-headline-sm text-headline-sm tabular-nums"
           style={{
@@ -117,7 +154,12 @@ function LinhaTime({
                 : undefined,
           }}
         >
-          {placar ?? "–"}
+          {placar}
+        </span>
+      )}
+      {!agendada && placar == null && venceu && (
+        <span className="shrink-0" style={{ color: PALETA_POLOS.positivo }}>
+          <Icone nome="emoji_events" className="text-[16px]" />
         </span>
       )}
     </div>
@@ -185,11 +227,18 @@ export function CartaoConfronto({
             {agendada ? fmtDataHora(c.inicio_previsto) : fmtRelativo(c.inicio_previsto)}
           </span>
         </span>
-        {c.tem_detalhe && (
+        {c.tem_detalhe ? (
           <span className="inline-flex shrink-0 items-center gap-space-xxs text-primary">
             <Icone nome="scoreboard" className="text-[13px]" />
             por mapa
           </span>
+        ) : (
+          c.nota && (
+            <span className="inline-flex shrink-0 items-center gap-space-xxs tabular-nums text-on-surface-variant">
+              <Icone nome="schedule" className="text-[13px]" />
+              {c.nota}
+            </span>
+          )
         )}
       </div>
     </>

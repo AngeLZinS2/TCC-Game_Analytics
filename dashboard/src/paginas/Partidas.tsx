@@ -40,6 +40,7 @@ import {
   Sparkline,
 } from "../componentes/hud";
 import { EstatisticasConfrontos } from "../componentes/EstatisticasConfrontos";
+import { paraCartaoPartida } from "../componentes/CartaoConfronto";
 import {
   SeletorModoConfrontos,
   VisaoConfrontos,
@@ -72,6 +73,54 @@ export function LadoVencedor({ vencedor }: { vencedor: string | null }) {
   return <span className="text-outline">—</span>;
 }
 
+/** Escudo pequeno de time — logo quando há, senão a sigla. */
+function EscudoMini({
+  logo,
+  tag,
+  nome,
+}: {
+  logo: string | null;
+  tag: string | null;
+  nome: string;
+}) {
+  if (logo) {
+    return (
+      <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-sm bg-neutral-200 p-[1px]">
+        <img src={logo} alt="" className="max-h-full max-w-full object-contain" />
+      </span>
+    );
+  }
+  return (
+    <span
+      className="flex h-5 w-5 shrink-0 items-center justify-center rounded-sm bg-surface-container-highest text-[8px] font-bold uppercase leading-none text-outline"
+      aria-hidden
+    >
+      {(tag || nome).slice(0, 2)}
+    </span>
+  );
+}
+
+/** Radiant × Dire de uma partida, com escudo e o vencedor em negrito. */
+function TimesDaPartida({ partida: p }: { partida: Partida }) {
+  const nomeA = p.equipe_a_nome ?? "Radiant";
+  const nomeB = p.equipe_b_nome ?? "Dire";
+  const classe = (venceu: boolean) =>
+    `truncate ${venceu ? "font-bold text-on-surface" : "text-on-surface-variant"}`;
+  return (
+    <div className="flex items-center gap-space-xs font-title-code text-title-code">
+      <EscudoMini logo={p.equipe_a_logo} tag={p.equipe_a_tag} nome={nomeA} />
+      <span className={`max-w-[9rem] ${classe(p.vitoria_a === true)}`} title={nomeA}>
+        {nomeA}
+      </span>
+      <span className="shrink-0 text-[10px] uppercase text-outline">vs</span>
+      <EscudoMini logo={p.equipe_b_logo} tag={p.equipe_b_tag} nome={nomeB} />
+      <span className={`max-w-[9rem] ${classe(p.vitoria_a === false)}`} title={nomeB}>
+        {nomeB}
+      </span>
+    </div>
+  );
+}
+
 /**
  * `secao` reparte a tela entre duas sub-abas de E-Sports:
  *
@@ -102,6 +151,10 @@ export function PartidasPagina({
   // A agenda (próximas) guarda a própria preferência de modo, separada dos
   // resultados — dá pra querer cartão numa aba e lista na outra.
   const [modoAgenda, setModoAgenda] = useModoConfrontos("playdb:agenda-modo");
+  // O histórico operacional (só Dota) também: a "Lista" aqui é a tabela densa.
+  const [modoHistorico, setModoHistorico] = useModoConfrontos(
+    "playdb:dota-partidas-modo",
+  );
   const [porPagina, setPorPagina] = useState(25);
 
   const desde = useMemo(() => {
@@ -568,8 +621,17 @@ export function PartidasPagina({
       <Painel
         icone="history"
         titulo="Histórico operacional de partidas"
-        descricao="Clique em uma linha para ver o placar completo."
-        meta={<Selo cor="primario">{visiveis.length} em tela</Selo>}
+        descricao={
+          modoHistorico === "lista"
+            ? "Clique em uma linha para ver o placar completo."
+            : "Cada partida é um jogo (BO1). Clique para ver o placar completo."
+        }
+        meta={
+          <div className="flex flex-wrap items-center gap-space-sm">
+            <SeletorModoConfrontos modo={modoHistorico} aoMudar={setModoHistorico} />
+            <Selo cor="primario">{visiveis.length} em tela</Selo>
+          </div>
+        }
       >
         <Consulta estado={partidas} vazio="Nenhuma partida bate com esse filtro.">
           {() =>
@@ -577,12 +639,22 @@ export function PartidasPagina({
               <p className="rounded bg-surface-container px-space-base py-space-md font-body-md text-body-md text-on-surface-variant">
                 Nenhuma partida desta página bate com o modo ou a busca.
               </p>
+            ) : modoHistorico !== "lista" ? (
+              <VisaoConfrontos
+                confrontos={visiveis}
+                modo={modoHistorico}
+                coercao={paraCartaoPartida}
+                aoClicarItem={(c) =>
+                  c.id_rota && navegar(`/partidas/${c.id_rota}`)
+                }
+              />
             ) : (
               <div className="rolagem-discreta overflow-x-auto rounded-lg bg-surface-container-lowest">
                 <table className="w-full border-collapse text-left">
                   <thead>
                     <tr className="bg-surface-container font-label-caps text-label-caps uppercase tracking-wider text-outline">
                       <th className="px-space-md py-space-sm">Match ID</th>
+                      <th className="px-space-md py-space-sm">Times</th>
                       <th className="px-space-md py-space-sm">Liga / Torneio</th>
                       <th className="px-space-md py-space-sm">Modo</th>
                       <th className="px-space-md py-space-sm">Duração</th>
@@ -612,6 +684,10 @@ export function PartidasPagina({
                               #{partida.id_externo}
                             </span>
                           </div>
+                        </td>
+
+                        <td className="px-space-md py-space-sm">
+                          <TimesDaPartida partida={partida} />
                         </td>
 
                         <td className="px-space-md py-space-sm text-on-surface-variant">

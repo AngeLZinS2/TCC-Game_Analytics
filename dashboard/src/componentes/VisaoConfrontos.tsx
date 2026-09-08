@@ -15,7 +15,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 
-import type { ConfrontoResultado, PartidaAgendada } from "../api/tipos";
+import type { ConfrontoResultado, Partida, PartidaAgendada } from "../api/tipos";
 import { PALETA_POLOS } from "../tema";
 import { fmtDataHora, fmtRelativo } from "../utilitarios/formatos";
 import { CartaoConfronto, paraCartao, type DadosConfronto } from "./CartaoConfronto";
@@ -24,8 +24,9 @@ import { Icone } from "./base";
 
 type Modo = "cartoes" | "kanban" | "lista";
 
-/** O que a `VisaoConfrontos` aceita: confronto decidido OU partida por vir. */
-type Entrada = ConfrontoResultado | PartidaAgendada;
+/** O que a `VisaoConfrontos` aceita: confronto decidido, partida por vir ou
+ *  partida de Dota (grão de jogo). O `coercao` diz como virar `DadosConfronto`. */
+type Entrada = ConfrontoResultado | PartidaAgendada | Partida;
 
 const MODOS: { id: Modo; icone: string; rotulo: string }[] = [
   { id: "cartoes", icone: "grid_view", rotulo: "Cartões" },
@@ -155,6 +156,8 @@ function LinhaLista({
   par: boolean;
 }) {
   const semResultado = c.vitoria_a == null && c.placar_a == null;
+  // Dota: decidido mas sem placar numérico (BO1) — o vencedor destaca no nome.
+  const semPlacar = c.placar_a == null && c.placar_b == null;
   const nomeA = `truncate font-title-code text-title-code ${
     c.vitoria_a === true ? "font-bold text-on-surface" : "text-on-surface-variant"
   }`;
@@ -178,11 +181,17 @@ function LinhaLista({
           {c.equipe_a_nome}
         </span>
         <Sigla logo={c.equipe_a_logo} tag={c.equipe_a_tag} nome={c.equipe_a_nome} />
-        <span className="flex shrink-0 items-center gap-0.5">
-          <Placar valor={c.placar_a} venceu={c.vitoria_a === true} semResultado={semResultado} />
-          <span className="text-outline">-</span>
-          <Placar valor={c.placar_b} venceu={c.vitoria_a === false} semResultado={semResultado} />
-        </span>
+        {semPlacar && !semResultado ? (
+          <span className="shrink-0 px-0.5 font-label-caps text-label-caps uppercase tracking-wider text-outline">
+            vs
+          </span>
+        ) : (
+          <span className="flex shrink-0 items-center gap-0.5">
+            <Placar valor={c.placar_a} venceu={c.vitoria_a === true} semResultado={semResultado} />
+            <span className="text-outline">-</span>
+            <Placar valor={c.placar_b} venceu={c.vitoria_a === false} semResultado={semResultado} />
+          </span>
+        )}
         <Sigla logo={c.equipe_b_logo} tag={c.equipe_b_tag} nome={c.equipe_b_nome} />
         <span className={`min-w-0 flex-1 text-left ${nomeB}`} title={c.equipe_b_nome}>
           {c.equipe_b_nome}
@@ -200,6 +209,11 @@ function LinhaLista({
         {c.tem_detalhe && (
           <Icone nome="scoreboard" className="shrink-0 text-[14px] text-primary" />
         )}
+        {c.nota && (
+          <span className="hidden tabular-nums text-on-surface-variant sm:inline">
+            {c.nota}
+          </span>
+        )}
         {c.formato && (
           <span className="rounded bg-surface-container px-space-xxs py-[1px] text-on-surface-variant">
             {c.formato}
@@ -215,22 +229,30 @@ function LinhaLista({
 
 /* --------------------------------- Visão --------------------------------- */
 
-export function VisaoConfrontos({
+export function VisaoConfrontos<T extends Entrada = ConfrontoResultado | PartidaAgendada>({
   confrontos,
   modo,
+  coercao = paraCartao,
+  aoClicarItem,
 }: {
-  confrontos: Entrada[];
+  confrontos: T[];
   modo: Modo;
+  /** Como virar cada entrada em `DadosConfronto`. Padrão: confronto/agenda. */
+  coercao?: (entrada: T) => DadosConfronto;
+  /** Clique num cartão/linha. Quando definido, substitui o modal de detalhe. */
+  aoClicarItem?: (c: DadosConfronto) => void;
 }) {
   const [aberto, setAberto] = useState<string | null>(null);
 
   const itens = useMemo<DadosConfronto[]>(
-    () => confrontos.map(paraCartao),
-    [confrontos],
+    () => confrontos.map((entrada) => coercao(entrada)),
+    [confrontos, coercao],
   );
 
-  const abrir = (c: DadosConfronto) =>
-    c.tem_detalhe ? () => setAberto(c.id_externo) : undefined;
+  const abrir = (c: DadosConfronto) => {
+    if (aoClicarItem) return () => aoClicarItem(c);
+    return c.tem_detalhe ? () => setAberto(c.id_externo) : undefined;
+  };
 
   const porTorneio = useMemo(() => {
     const mapa = new Map<string, DadosConfronto[]>();
