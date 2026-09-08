@@ -52,10 +52,11 @@ function Escudo({
   if (logo) {
     return (
       <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded bg-neutral-200 p-[3px]">
+        {/* Sem `loading="lazy"`: são ~40-70 PNGs de poucos KB e o lazy às
+            vezes não dispara dentro do painel (fica plaquinha em branco). */}
         <img
           src={logo}
           alt=""
-          loading="lazy"
           className="max-h-full max-w-full object-contain"
         />
       </span>

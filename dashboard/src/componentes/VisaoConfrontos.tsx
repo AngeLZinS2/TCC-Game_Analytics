@@ -131,12 +131,7 @@ function Sigla({
   if (logo) {
     return (
       <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-sm bg-neutral-200 p-[2px]">
-        <img
-          src={logo}
-          alt=""
-          loading="lazy"
-          className="max-h-full max-w-full object-contain"
-        />
+        <img src={logo} alt="" className="max-h-full max-w-full object-contain" />
       </span>
     );
   }
