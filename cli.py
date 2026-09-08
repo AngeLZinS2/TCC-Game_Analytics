@@ -34,6 +34,7 @@ FONTES = (
     "vlr",
     "vlr-rankings",
     "vlr-detalhes",
+    "hltv",
 )
 
 
@@ -329,6 +330,11 @@ def _construir_coletor(args: argparse.Namespace, storage):
 
         return VlrDetalhesCollector(raw_storage=storage)
 
+    if args.fonte == "hltv":
+        from collectors.hltv import HltvCollector
+
+        return HltvCollector(raw_storage=storage)
+
     if args.fonte == "valorant-agentes":
         from collectors.valorant_agentes import AgentesValorantCollector
 
@@ -394,6 +400,10 @@ def _carregador(fonte: str):
         return carregar
     if fonte == "vlr":
         from etl.load_vlr import carregar
+
+        return carregar
+    if fonte == "hltv":
+        from etl.load_hltv import carregar
 
         return carregar
     if fonte == "vlr-rankings":

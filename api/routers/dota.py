@@ -7,7 +7,7 @@ quando a Fase 3 popular o LoL, o mesmo endpoint ja o atende.
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime, timedelta, timezone
 from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -25,6 +25,7 @@ from api.schemas import (
     GuiaPersonagem,
     HabilidadePersonagem,
     MetricaEsporte,
+    PartidaAgendada,
     PerfilEsporte,
     FaixaFormato,
     ResumoConfrontos,
@@ -525,6 +526,55 @@ def partidas_por_dia(
     return [
         PartidasPorDia(data=linha.dia, partidas=linha.partidas)
         for linha in sessao.execute(consulta)
+    ]
+
+
+@router.get("/agenda", response_model=list[PartidaAgendada])
+def agenda_proximas(
+    sessao: Session = Depends(get_db),
+    jogo: str = "dota2",
+    limite: int = Query(60, ge=1, le=200),
+) -> list[PartidaAgendada]:
+    """Próximas partidas do jogo — as que ainda vão acontecer.
+
+    `vitoria_a IS NULL` (sem resultado) e `inicio_previsto` daqui para frente
+    (com 3h de folga para trás, para uma partida ao vivo não sumir da lista).
+    Fontes: vlr.gg (Valorant), hltv.org (CS) e o ticker da Liquipedia.
+    """
+    id_jogo = _id_jogo(sessao, jogo)
+    corte = datetime.now(timezone.utc) - timedelta(hours=3)
+
+    base = select(AgendaPartida).where(
+        AgendaPartida.id_jogo == id_jogo,
+        AgendaPartida.vitoria_a.is_(None),
+        AgendaPartida.inicio_previsto >= corte,
+    )
+
+    # Uma partida entra pela Liquipedia E pelo vlr.gg/hltv, com nomes e horário
+    # diferentes — a lista duplicava. Quando a fonte dedicada (vlr para
+    # Valorant, hltv para CS, ambas com `id_externo` prefixado) tem linha para
+    # este jogo, ela manda e a Liquipedia (id em hash) fica de fora.
+    prefixadas = AgendaPartida.id_externo.op("~")("^(vlr|hltv):")
+    tem_dedicada = sessao.scalar(
+        select(func.count()).select_from(base.where(prefixadas).subquery())
+    )
+    if tem_dedicada:
+        base = base.where(prefixadas)
+
+    linhas = sessao.execute(
+        base.order_by(AgendaPartida.inicio_previsto).limit(limite)
+    ).scalars()
+
+    return [
+        PartidaAgendada(
+            id_externo=a.id_externo,
+            equipe_a_nome=a.equipe_a_nome,
+            equipe_b_nome=a.equipe_b_nome,
+            inicio_previsto=a.inicio_previsto,
+            torneio=a.torneio,
+            formato=a.formato,
+        )
+        for a in linhas
     ]
 
 

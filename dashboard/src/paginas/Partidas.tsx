@@ -11,6 +11,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import {
+  useAgendaPartidas,
   useFiltrosPartidas,
   useConfrontos,
   useResumoConfrontos,
@@ -19,7 +20,12 @@ import {
   useResumoPartidas,
   useSaude,
 } from "../api/consultas";
-import type { Partida, PartidasPorDia, ResumoPartidas } from "../api/tipos";
+import type {
+  Partida,
+  PartidaAgendada,
+  PartidasPorDia,
+  ResumoPartidas,
+} from "../api/tipos";
 import { Botao, Consulta, Icone, Selo } from "../componentes/base";
 import { AreaNeon } from "../componentes/graficos/AreaNeon";
 import { HistogramaNeon } from "../componentes/graficos/HistogramaNeon";
@@ -104,6 +110,7 @@ export function PartidasPagina({
   // eles falam de partida com detalhe, que os outros jogos nao tem.
   const confrontos = useConfrontos(jogo, paginaConfrontos);
   const resumoConfrontos = useResumoConfrontos(jogo);
+  const agenda = useAgendaPartidas(jogo);
   // Zero aqui nao e "sem dado": e "a fonte deste jogo nao publica partida,
   // so a serie". `dim_partida` so tem linha para Dota 2.
   const temPartidaDetalhada = (resumo.data?.partidas ?? 0) > 0;
@@ -305,12 +312,69 @@ export function PartidasPagina({
         </Consulta>
       )}
 
-      {/* Aba Partidas num jogo sem `dim_partida`: nada a mostrar aqui. */}
+      {/* ==================== PRÓXIMAS PARTIDAS ==================== */}
+      {!emResultados && (
+        <Painel
+          icone="event_upcoming"
+          titulo="Próximas partidas"
+          descricao="As que ainda vão acontecer — vlr.gg (Valorant), hltv.org (CS) e o ticker da Liquipedia. Atualiza a cada 5 min."
+          meta={
+            agenda.isFetching ? (
+              <span className="font-label-caps text-label-caps uppercase tracking-widest text-primary">
+                atualizando…
+              </span>
+            ) : (
+              <Selo cor="primario">{agenda.data?.length ?? 0} marcadas</Selo>
+            )
+          }
+        >
+          <Consulta
+            estado={agenda}
+            altura={160}
+            vazio="Nenhuma partida marcada para este jogo por enquanto."
+          >
+            {(lista: PartidaAgendada[]) => (
+              <div className="rolagem-discreta grid max-h-[26rem] gap-space-xxs overflow-y-auto pr-space-xs">
+                {lista.map((p) => (
+                  <div
+                    key={p.id_externo}
+                    className="flex flex-col gap-space-xxs rounded bg-surface-container px-space-sm py-space-xs sm:flex-row sm:items-center sm:gap-space-sm"
+                  >
+                    <div className="shrink-0 font-title-code text-title-code tabular-nums text-primary sm:w-40">
+                      {fmtDataHora(p.inicio_previsto)}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate font-body-md text-body-sm font-bold text-on-surface">
+                        {p.equipe_a_nome}{" "}
+                        <span className="font-normal text-outline">vs</span>{" "}
+                        {p.equipe_b_nome}
+                      </div>
+                      {p.torneio && (
+                        <div className="truncate font-label-caps text-label-caps uppercase tracking-wider text-outline">
+                          {p.torneio}
+                        </div>
+                      )}
+                    </div>
+                    {p.formato && (
+                      <span className="shrink-0 self-start rounded bg-surface-container-highest px-space-xs py-space-xxs font-badge-status text-badge-status uppercase text-secondary sm:self-auto">
+                        {p.formato}
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </Consulta>
+        </Painel>
+      )}
+
+      {/* Aba Partidas num jogo sem `dim_partida`: o histórico com detalhe não
+          existe, mas as próximas partidas acima e a aba Resultados sim. */}
       {!emResultados && !temPartidaDetalhada && (
         <p className="rounded-xl bg-surface-container-low/90 px-space-lg py-space-base font-body-md text-body-md text-on-surface-variant shadow-lg">
-          Este jogo não tem partida com detalhe por jogador — a fonte publica o
-          placar do confronto, não o que aconteceu dentro dele. O que existe está
-          na aba <strong className="text-on-surface">Resultados</strong>.
+          Este jogo não tem partida com detalhe por jogador (duração, KDA) — a
+          fonte publica só o placar da série. O histórico decidido está na aba{" "}
+          <strong className="text-on-surface">Resultados</strong>.
         </p>
       )}
 

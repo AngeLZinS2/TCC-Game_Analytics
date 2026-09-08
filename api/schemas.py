@@ -45,6 +45,17 @@ class VisaoGeral(BaseModel):
     coletas: list[ColetaFonte]
 
 
+class PartidaAgendada(BaseModel):
+    """Uma partida que ainda vai acontecer (aba Partidas → Próximas)."""
+
+    id_externo: str
+    equipe_a_nome: str
+    equipe_b_nome: str
+    inicio_previsto: datetime
+    torneio: str | None = None
+    formato: str | None = None
+
+
 class MaisJogadoSteam(BaseModel):
     """Uma linha do Top 100 mais jogados da Steam AGORA (ao vivo)."""
 

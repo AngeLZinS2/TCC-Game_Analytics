@@ -17,6 +17,7 @@ import type {
   JogoSteam,
   MaisJogadoSteam,
   Partida,
+  PartidaAgendada,
   PartidasPorDia,
   PontoSerieTotal,
   ResumoJogador,
@@ -318,6 +319,20 @@ export function useResumoConfrontos(jogo: string) {
     queryKey: ["partidas", "resumo-confrontos", jogo],
     queryFn: () =>
       buscar<ResumoConfrontos>("/api/partidas/resumo-confrontos", { jogo }),
+  });
+}
+
+/**
+ * Próximas partidas do jogo (as que ainda vão acontecer). O coletor roda a
+ * cada 5 min; aqui `refetchInterval` faz a aba acompanhar sem recarregar.
+ */
+export function useAgendaPartidas(jogo: string, limite = 60) {
+  return useQuery({
+    queryKey: ["partidas", "agenda", jogo, limite],
+    queryFn: () =>
+      buscar<PartidaAgendada[]>("/api/partidas/agenda", { jogo, limite }),
+    staleTime: 60_000,
+    refetchInterval: 300_000,
   });
 }
 

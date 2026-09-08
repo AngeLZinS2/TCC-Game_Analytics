@@ -1,0 +1,144 @@
+"""Carga genérica de confrontos em `agenda_partida`, para qualquer fonte.
+
+O `load_vlr` já fazia isto para Valorant; quando o HLTV entrou (CS), a lógica
+— reconciliar times contra `dim_equipe`, criar os que faltam, upsert por
+`id_externo` — era idêntica, só mudava o jogo e o prefixo do id. Ficou aqui,
+parametrizada.
+
+`confrontos` é qualquer iterável de objetos com os atributos: `id_externo`,
+`equipe_a_nome`, `equipe_b_nome`, `inicio_previsto`, `torneio`, `formato`,
+`vitoria_a`, `placar_a`, `placar_b`.
+"""
+
+from __future__ import annotations
+
+import logging
+from datetime import datetime, timezone
+from typing import Iterable, Protocol
+
+from sqlalchemy import select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
+
+from db.models import AgendaPartida, DimEquipe, DimJogo
+from db.session import session_scope
+from etl.load_liquipedia import _mapa_de_equipes, _resolver, normalizar
+
+logger = logging.getLogger(__name__)
+
+
+class JogoNaoCadastradoError(RuntimeError):
+    """dim_jogo é semeada pelas migrations; sem ela nada pode ser carregado."""
+
+
+class ConfrontoAgenda(Protocol):
+    id_externo: str
+    equipe_a_nome: str
+    equipe_b_nome: str
+    inicio_previsto: datetime
+    torneio: str | None
+    formato: str | None
+    vitoria_a: bool | None
+    placar_a: int | None
+    placar_b: int | None
+
+
+def carregar_agenda(
+    jogo_codigo: str,
+    confrontos: Iterable[ConfrontoAgenda],
+    *,
+    prefixo_equipe: str,
+) -> int:
+    """Persiste os confrontos, reconciliando os times. Devolve quantos entraram.
+
+    `prefixo_equipe` é o que vai no `id_externo` de um time que não casou com a
+    dimensão (ex.: `"vlr"`, `"hltv"`) — mantém a origem legível sem duplicar o
+    time quando outra fonte já o tinha criado.
+    """
+    confrontos = list(confrontos)
+    if not confrontos:
+        return 0
+
+    with session_scope() as sessao:
+        id_jogo = sessao.scalar(
+            select(DimJogo.id_jogo).where(DimJogo.codigo == jogo_codigo)
+        )
+        if id_jogo is None:
+            raise JogoNaoCadastradoError(
+                f"jogo {jogo_codigo!r} ausente em dim_jogo - rode `python cli.py init-db`"
+            )
+
+        mapa = _mapa_de_equipes(sessao, id_jogo)
+
+        sem_par = sorted(
+            {
+                nome
+                for c in confrontos
+                for nome in (c.equipe_a_nome, c.equipe_b_nome)
+                if _resolver(nome, mapa) is None and nome.strip()
+            }
+        )
+        if sem_par:
+            sessao.execute(
+                pg_insert(DimEquipe)
+                .values(
+                    [
+                        {
+                            "id_jogo": id_jogo,
+                            "id_externo": f"{prefixo_equipe}:{normalizar(nome)}"[:200],
+                            "nome": nome[:120],
+                        }
+                        for nome in sem_par
+                    ]
+                )
+                .on_conflict_do_nothing(constraint="uq_equipe_jogo_externo")
+            )
+            sessao.flush()
+            mapa = _mapa_de_equipes(sessao, id_jogo)
+            logger.info(
+                "equipes criadas da agenda",
+                extra={"jogo": jogo_codigo, "quantidade": len(sem_par)},
+            )
+
+        agora = datetime.now(timezone.utc)
+        linhas = [
+            {
+                "id_jogo": id_jogo,
+                "id_externo": c.id_externo,
+                "equipe_a_nome": c.equipe_a_nome[:120],
+                "equipe_b_nome": c.equipe_b_nome[:120],
+                "id_equipe_a": _resolver(c.equipe_a_nome, mapa),
+                "id_equipe_b": _resolver(c.equipe_b_nome, mapa),
+                "inicio_previsto": c.inicio_previsto,
+                "torneio": c.torneio,
+                "formato": c.formato,
+                "coletado_em": agora,
+                "vitoria_a": c.vitoria_a,
+                "placar_a": c.placar_a,
+                "placar_b": c.placar_b,
+            }
+            for c in confrontos
+        ]
+
+        stmt = pg_insert(AgendaPartida).values(linhas)
+        sessao.execute(
+            stmt.on_conflict_do_update(
+                constraint="uq_agenda_jogo_externo",
+                set_={
+                    "inicio_previsto": stmt.excluded.inicio_previsto,
+                    "torneio": stmt.excluded.torneio,
+                    "formato": stmt.excluded.formato,
+                    "id_equipe_a": stmt.excluded.id_equipe_a,
+                    "id_equipe_b": stmt.excluded.id_equipe_b,
+                    "coletado_em": stmt.excluded.coletado_em,
+                    "vitoria_a": stmt.excluded.vitoria_a,
+                    "placar_a": stmt.excluded.placar_a,
+                    "placar_b": stmt.excluded.placar_b,
+                },
+            )
+        )
+
+    logger.info(
+        "agenda carregada",
+        extra={"jogo": jogo_codigo, "confrontos": len(linhas)},
+    )
+    return len(linhas)

@@ -1,6 +1,10 @@
 # --- Coleta / HTTP ---
 requests>=2.32.3
 urllib3>=2.2.3
+# O hltv.org bloqueia cliente HTTP comum por TLS fingerprint (403, seja qual
+# for o header). `curl_cffi` reproduz o ClientHello do Chrome e passa - e a
+# unica fonte que precisa disso; o resto continua no `requests`.
+curl_cffi>=0.7
 
 # --- Parsing de HTML (agenda da Liquipedia) ---
 # A agenda vem como HTML da API MediaWiki, nao como JSON estruturado. Regex

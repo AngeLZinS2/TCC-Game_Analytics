@@ -222,6 +222,12 @@ class Settings(BaseSettings):
     #: precisa alcancar o que fechou desde ontem.
     agendador_vlr_minutos: int = Field(default=1440, ge=60)
 
+    #: Intervalo da agenda de PRÓXIMAS partidas, em minutos. Curto (5 min) de
+    #: propósito: horário de partida muda, partida é adiada, entra confronto
+    #: novo — a tela "Próximas partidas" tem que refletir isso quase na hora.
+    #: Duas requisições HTML (vlr.gg/matches + hltv.org/matches), sem histórico.
+    agendador_agenda_proxima_minutos: int = Field(default=5, ge=1)
+
     #: Intervalo do snapshot do rating de equipes do vlr.gg, o prior do modelo
     #: de Valorant. Semanal: o vlr.gg reajusta o rating ~toda semana, e guardar
     #: um snapshot por semana ja da a serie que a validacao point-in-time usa.

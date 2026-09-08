@@ -444,6 +444,20 @@ def _coletar_vlr_rankings(settings: Settings, storage: RawStorage) -> Collection
     return VlrRankingsCollector(raw_storage=storage).run(carregar=True)
 
 
+def _coletar_vlr_agenda(settings: Settings, storage: RawStorage) -> CollectionResult:
+    """Só as próximas partidas de Valorant do vlr.gg (tarefa de 5 min)."""
+    from collectors.vlr import VlrCollector
+
+    return VlrCollector(raw_storage=storage, apenas_agenda=True).run(carregar=True)
+
+
+def _coletar_hltv(settings: Settings, storage: RawStorage) -> CollectionResult:
+    """Próximas partidas de Counter-Strike do hltv.org (tarefa de 5 min)."""
+    from collectors.hltv import HltvCollector
+
+    return HltvCollector(raw_storage=storage).run(carregar=True)
+
+
 def _coletar_vlr_detalhes(settings: Settings, storage: RawStorage) -> CollectionResult:
     """Detalhe por mapa e por jogador das partidas de Valorant ja decididas."""
     from collectors.vlr_detalhes import VlrDetalhesCollector
@@ -595,6 +609,20 @@ def montar_tarefas(settings: Settings) -> list[Tarefa]:
             nome="vlr",
             intervalo_segundos=settings.agendador_vlr_minutos * 60,
             executar=_coletar_vlr,
+        )
+    )
+    tarefas.append(
+        Tarefa(
+            nome="vlr_agenda",
+            intervalo_segundos=settings.agendador_agenda_proxima_minutos * 60,
+            executar=_coletar_vlr_agenda,
+        )
+    )
+    tarefas.append(
+        Tarefa(
+            nome="hltv",
+            intervalo_segundos=settings.agendador_agenda_proxima_minutos * 60,
+            executar=_coletar_hltv,
         )
     )
     tarefas.append(

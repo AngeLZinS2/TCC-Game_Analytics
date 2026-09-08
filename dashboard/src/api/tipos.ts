@@ -779,6 +779,16 @@ export interface ResumoConfrontos {
   por_dia: PartidasPorDia[];
 }
 
+export interface PartidaAgendada {
+  id_externo: string;
+  equipe_a_nome: string;
+  equipe_b_nome: string;
+  /** ISO. O horário do vlr.gg não tem fuso confiável — tratar como "por volta de". */
+  inicio_previsto: string;
+  torneio: string | null;
+  formato: string | null;
+}
+
 export interface ConfrontoResultado {
   id_externo: string;
   equipe_a_nome: string;

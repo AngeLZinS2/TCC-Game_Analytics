@@ -136,9 +136,18 @@ def _hora(texto_hora: str) -> tuple[int, int]:
 
 
 class VlrCollector(BaseCollector[ResultadoVlr]):
-    """Resultados e agenda de Valorant do vlr.gg."""
+    """Resultados e agenda de Valorant do vlr.gg.
+
+    `apenas_agenda=True`: só `/matches` (partidas por vir), uma página. É o
+    modo da tarefa de 5 min que alimenta "Próximas partidas" — os resultados
+    (`/matches/results`, mais pesado) ficam para a rodada diária.
+    """
 
     fonte = "vlr"
+
+    def __init__(self, *args, apenas_agenda: bool = False, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self.apenas_agenda = apenas_agenda
 
     def collect(self) -> list[RawRecord]:
         settings = get_settings()
@@ -150,11 +159,13 @@ class VlrCollector(BaseCollector[ResultadoVlr]):
             user_agent="playdb-tcc/0.1 (+https://playdb.info)",
         )
 
+        alvos = (
+            (("/matches", 1),)
+            if self.apenas_agenda
+            else (("/matches/results", PAGINAS_RESULTADO), ("/matches", PAGINAS_AGENDA))
+        )
         registros: list[RawRecord] = []
-        for caminho, paginas in (
-            ("/matches/results", PAGINAS_RESULTADO),
-            ("/matches", PAGINAS_AGENDA),
-        ):
+        for caminho, paginas in alvos:
             for pagina in range(1, paginas + 1):
                 url = f"{BASE}{caminho}/?page={pagina}"
                 try:
