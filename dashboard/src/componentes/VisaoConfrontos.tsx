@@ -1,12 +1,13 @@
 /**
- * Os confrontos decididos em três formas — o leitor escolhe e a escolha fica.
+ * Uma lista de confrontos em três formas — o leitor escolhe e a escolha fica.
+ * Serve tanto os DECIDIDOS (aba Resultados, com placar) quanto os POR VIR
+ * (aba Partidas, sem placar, horário no lugar).
  *
  * - **Cartões** (padrão): grade de scorecards, um por confronto. É o que lê
  *   melhor de relance e o que funciona no celular.
  * - **Por torneio**: uma seção por campeonato, empilhadas de cima para baixo,
  *   os cartões em grade dentro de cada uma. Para ver um campeonato de uma vez.
- * - **Lista**: a linha densa, o placar alinhado na vertical. Para varrer muitos
- *   confrontos rápido.
+ * - **Lista**: a linha densa, o placar/horário alinhado. Para varrer rápido.
  *
  * O modal de detalhe por mapa (`ModalConfrontoDetalhe`) mora aqui, então os
  * três modos abrem o mesmo detalhe sem duplicar estado.
@@ -14,14 +15,17 @@
 
 import { useEffect, useMemo, useState } from "react";
 
-import type { ConfrontoResultado } from "../api/tipos";
+import type { ConfrontoResultado, PartidaAgendada } from "../api/tipos";
 import { PALETA_POLOS } from "../tema";
-import { fmtRelativo } from "../utilitarios/formatos";
-import { CartaoConfronto } from "./CartaoConfronto";
+import { fmtDataHora, fmtRelativo } from "../utilitarios/formatos";
+import { CartaoConfronto, paraCartao, type DadosConfronto } from "./CartaoConfronto";
 import { ModalConfrontoDetalhe } from "./ModalConfrontoDetalhe";
 import { Icone } from "./base";
 
 type Modo = "cartoes" | "kanban" | "lista";
+
+/** O que a `VisaoConfrontos` aceita: confronto decidido OU partida por vir. */
+type Entrada = ConfrontoResultado | PartidaAgendada;
 
 const MODOS: { id: Modo; icone: string; rotulo: string }[] = [
   { id: "cartoes", icone: "grid_view", rotulo: "Cartões" },
@@ -29,19 +33,24 @@ const MODOS: { id: Modo; icone: string; rotulo: string }[] = [
   { id: "lista", icone: "view_agenda", rotulo: "Lista" },
 ];
 
-const CHAVE = "playdb:confrontos-modo";
+/** Chave padrão do localStorage — a aba Partidas passa uma própria. */
+export const CHAVE_MODO_PADRAO = "playdb:confrontos-modo";
 
-function lerModo(): Modo {
+function ehModo(v: unknown): v is Modo {
+  return v === "cartoes" || v === "kanban" || v === "lista";
+}
+
+function lerModo(chave: string): Modo {
   try {
-    const v = localStorage.getItem(CHAVE);
-    if (v === "cartoes" || v === "kanban" || v === "lista") return v;
+    const v = localStorage.getItem(chave);
+    if (ehModo(v)) return v;
   } catch {
     /* localStorage indisponível: usa o padrão */
   }
   return "cartoes";
 }
 
-/** Alterna Cartões / Kanban / Lista. */
+/** Alterna Cartões / Por torneio / Lista. */
 export function SeletorModoConfrontos({
   modo,
   aoMudar,
@@ -72,15 +81,15 @@ export function SeletorModoConfrontos({
   );
 }
 
-export function useModoConfrontos() {
-  const [modo, setModo] = useState<Modo>(lerModo);
+export function useModoConfrontos(chave: string = CHAVE_MODO_PADRAO) {
+  const [modo, setModo] = useState<Modo>(() => lerModo(chave));
   useEffect(() => {
     try {
-      localStorage.setItem(CHAVE, modo);
+      localStorage.setItem(chave, modo);
     } catch {
       /* ok */
     }
-  }, [modo]);
+  }, [chave, modo]);
   return [modo, setModo] as const;
 }
 
@@ -91,7 +100,7 @@ function Placar({
   venceu,
   semResultado,
 }: {
-  valor: number | null;
+  valor: number | null | undefined;
   venceu: boolean;
   semResultado: boolean;
 }) {
@@ -110,7 +119,7 @@ function Placar({
   );
 }
 
-function Sigla({ tag, nome }: { tag: string | null; nome: string }) {
+function Sigla({ tag, nome }: { tag: string | null | undefined; nome: string }) {
   return (
     <span
       className="flex h-6 w-6 shrink-0 items-center justify-center rounded-sm bg-surface-container-highest text-[9px] font-bold uppercase leading-none text-outline"
@@ -126,11 +135,11 @@ function LinhaLista({
   aoClicar,
   par,
 }: {
-  c: ConfrontoResultado;
+  c: DadosConfronto;
   aoClicar?: () => void;
   par: boolean;
 }) {
-  const semResultado = c.vitoria_a === null && c.placar_a === null;
+  const semResultado = c.vitoria_a == null && c.placar_a == null;
   const nomeA = `truncate font-title-code text-title-code ${
     c.vitoria_a === true ? "font-bold text-on-surface" : "text-on-surface-variant"
   }`;
@@ -181,7 +190,9 @@ function LinhaLista({
             {c.formato}
           </span>
         )}
-        <span className="tabular-nums">{fmtRelativo(c.inicio_previsto)}</span>
+        <span className="tabular-nums">
+          {semResultado ? fmtDataHora(c.inicio_previsto) : fmtRelativo(c.inicio_previsto)}
+        </span>
       </div>
     </li>
   );
@@ -193,28 +204,34 @@ export function VisaoConfrontos({
   confrontos,
   modo,
 }: {
-  confrontos: ConfrontoResultado[];
+  confrontos: Entrada[];
   modo: Modo;
 }) {
   const [aberto, setAberto] = useState<string | null>(null);
-  const abrir = (c: ConfrontoResultado) =>
+
+  const itens = useMemo<DadosConfronto[]>(
+    () => confrontos.map(paraCartao),
+    [confrontos],
+  );
+
+  const abrir = (c: DadosConfronto) =>
     c.tem_detalhe ? () => setAberto(c.id_externo) : undefined;
 
   const porTorneio = useMemo(() => {
-    const mapa = new Map<string, ConfrontoResultado[]>();
-    for (const c of confrontos) {
+    const mapa = new Map<string, DadosConfronto[]>();
+    for (const c of itens) {
       const chave = c.torneio ?? "Sem torneio";
       mapa.set(chave, [...(mapa.get(chave) ?? []), c]);
     }
     // Coluna com mais confrontos primeiro: é onde o olho começa.
     return [...mapa.entries()].sort((a, b) => b[1].length - a[1].length);
-  }, [confrontos]);
+  }, [itens]);
 
   return (
     <>
       {modo === "cartoes" && (
         <div className="grid grid-cols-1 gap-space-base sm:grid-cols-2 xl:grid-cols-3">
-          {confrontos.map((c) => (
+          {itens.map((c) => (
             <CartaoConfronto key={c.id_externo} confronto={c} aoClicar={abrir(c)} />
           ))}
         </div>
@@ -256,7 +273,7 @@ export function VisaoConfrontos({
 
       {modo === "lista" && (
         <ul className="divide-y divide-outline-variant/10 overflow-hidden rounded-lg bg-surface-container-lowest">
-          {confrontos.map((c, i) => (
+          {itens.map((c, i) => (
             <LinhaLista key={c.id_externo} c={c} aoClicar={abrir(c)} par={i % 2 === 1} />
           ))}
         </ul>

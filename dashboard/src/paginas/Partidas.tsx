@@ -99,6 +99,9 @@ export function PartidasPagina({
   const [pagina, setPagina] = useState(1);
   const [paginaConfrontos, setPaginaConfrontos] = useState(1);
   const [modoConfrontos, setModoConfrontos] = useModoConfrontos();
+  // A agenda (próximas) guarda a própria preferência de modo, separada dos
+  // resultados — dá pra querer cartão numa aba e lista na outra.
+  const [modoAgenda, setModoAgenda] = useModoConfrontos("playdb:agenda-modo");
   const [porPagina, setPorPagina] = useState(25);
 
   const desde = useMemo(() => {
@@ -324,13 +327,16 @@ export function PartidasPagina({
           titulo="Próximas partidas"
           descricao="As que ainda vão acontecer — PandaScore (CS/LoL/CoD), vlr.gg (Valorant) e o ticker da Liquipedia. Atualiza sozinha."
           meta={
-            agenda.isFetching ? (
-              <span className="font-label-caps text-label-caps uppercase tracking-widest text-primary">
-                atualizando…
-              </span>
-            ) : (
-              <Selo cor="primario">{agenda.data?.length ?? 0} marcadas</Selo>
-            )
+            <div className="flex flex-wrap items-center gap-space-sm">
+              <SeletorModoConfrontos modo={modoAgenda} aoMudar={setModoAgenda} />
+              {agenda.isFetching ? (
+                <span className="font-label-caps text-label-caps uppercase tracking-widest text-primary">
+                  atualizando…
+                </span>
+              ) : (
+                <Selo cor="primario">{agenda.data?.length ?? 0} marcadas</Selo>
+              )}
+            </div>
           }
         >
           <Consulta
@@ -339,35 +345,7 @@ export function PartidasPagina({
             vazio="Nenhuma partida marcada para este jogo por enquanto."
           >
             {(lista: PartidaAgendada[]) => (
-              <div className="rolagem-discreta grid max-h-[26rem] gap-space-xxs overflow-y-auto pr-space-xs">
-                {lista.map((p) => (
-                  <div
-                    key={p.id_externo}
-                    className="flex flex-col gap-space-xxs rounded bg-surface-container px-space-sm py-space-xs sm:flex-row sm:items-center sm:gap-space-sm"
-                  >
-                    <div className="shrink-0 font-title-code text-title-code tabular-nums text-primary sm:w-40">
-                      {fmtDataHora(p.inicio_previsto)}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate font-body-md text-body-sm font-bold text-on-surface">
-                        {p.equipe_a_nome}{" "}
-                        <span className="font-normal text-outline">vs</span>{" "}
-                        {p.equipe_b_nome}
-                      </div>
-                      {p.torneio && (
-                        <div className="truncate font-label-caps text-label-caps uppercase tracking-wider text-outline">
-                          {p.torneio}
-                        </div>
-                      )}
-                    </div>
-                    {p.formato && (
-                      <span className="shrink-0 self-start rounded bg-surface-container-highest px-space-xs py-space-xxs font-badge-status text-badge-status uppercase text-secondary sm:self-auto">
-                        {p.formato}
-                      </span>
-                    )}
-                  </div>
-                ))}
-              </div>
+              <VisaoConfrontos confrontos={lista} modo={modoAgenda} />
             )}
           </Consulta>
         </Painel>

@@ -17,7 +17,7 @@ import { fmtDataHora, fmtRelativo } from "../utilitarios/formatos";
 import { Icone } from "./base";
 
 /** O mínimo que o cartão precisa — o resto é opcional e cai no "por vir". */
-interface DadosConfronto {
+export interface DadosConfronto {
   id_externo: string;
   equipe_a_nome: string;
   equipe_b_nome: string;
