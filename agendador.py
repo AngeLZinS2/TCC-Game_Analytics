@@ -458,6 +458,13 @@ def _coletar_hltv(settings: Settings, storage: RawStorage) -> CollectionResult:
     return HltvCollector(raw_storage=storage).run(carregar=True)
 
 
+def _coletar_pandascore_cs(settings: Settings, storage: RawStorage) -> CollectionResult:
+    """Agenda + resultados de CS via PandaScore (troca o scraping do hltv)."""
+    from collectors.pandascore import PandaScoreCollector
+
+    return PandaScoreCollector(raw_storage=storage, jogo="csgo").run(carregar=True)
+
+
 def _coletar_vlr_detalhes(settings: Settings, storage: RawStorage) -> CollectionResult:
     """Detalhe por mapa e por jogador das partidas de Valorant ja decididas."""
     from collectors.vlr_detalhes import VlrDetalhesCollector
@@ -618,13 +625,25 @@ def montar_tarefas(settings: Settings) -> list[Tarefa]:
             executar=_coletar_vlr_agenda,
         )
     )
-    tarefas.append(
-        Tarefa(
-            nome="hltv",
-            intervalo_segundos=settings.agendador_agenda_proxima_minutos * 60,
-            executar=_coletar_hltv,
+    # CS: a PandaScore (API) troca o scraping do hltv.org quando há chave.
+    # Sem chave, cai de volta no hltv — que passa por Cloudflare só com
+    # `curl_cffi` e cobre todos os tiers.
+    if settings.pandascore_api_key:
+        tarefas.append(
+            Tarefa(
+                nome="pandascore_cs",
+                intervalo_segundos=settings.agendador_pandascore_minutos * 60,
+                executar=_coletar_pandascore_cs,
+            )
         )
-    )
+    else:
+        tarefas.append(
+            Tarefa(
+                nome="hltv",
+                intervalo_segundos=settings.agendador_agenda_proxima_minutos * 60,
+                executar=_coletar_hltv,
+            )
+        )
     tarefas.append(
         Tarefa(
             nome="vlr_rankings",

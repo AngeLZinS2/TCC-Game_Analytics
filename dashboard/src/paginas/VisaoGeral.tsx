@@ -111,6 +111,13 @@ const FONTES: Record<
     descricao: "Partidas de Counter-Strike por vir — id estável, horário UTC e evento",
     frequencia: "a cada 5 min",
   },
+  pandascore: {
+    etiqueta: "PANDASCORE",
+    cor: "#14b8a6",
+    api: "PandaScore API",
+    descricao: "Agenda e resultados de esports (torneios tier S/A/B) — troca o scraping",
+    frequencia: "a cada 30 min",
+  },
   vlr: {
     etiqueta: "VALORANT",
     cor: "#ff4655",

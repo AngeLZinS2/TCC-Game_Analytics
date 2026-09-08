@@ -322,7 +322,7 @@ export function PartidasPagina({
         <Painel
           icone="event_upcoming"
           titulo="Próximas partidas"
-          descricao="As que ainda vão acontecer — vlr.gg (Valorant), hltv.org (CS) e o ticker da Liquipedia. Atualiza a cada 5 min."
+          descricao="As que ainda vão acontecer — PandaScore (CS), vlr.gg (Valorant) e o ticker da Liquipedia. Atualiza sozinha."
           meta={
             agenda.isFetching ? (
               <span className="font-label-caps text-label-caps uppercase tracking-widest text-primary">

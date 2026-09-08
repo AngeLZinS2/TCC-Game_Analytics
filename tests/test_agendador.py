@@ -151,8 +151,10 @@ def test_intervalos_vem_da_configuracao():
         agendador_vlr_rankings_minutos = 10080
         agendador_vlr_detalhes_minutos = 1440
         agendador_treino_confronto_minutos = 480
+        agendador_pandascore_minutos = 30
         opgg_enabled = True
         itad_api_key = "chave-de-teste"
+        pandascore_api_key = None
         hltb_enabled = True
 
     tarefas = {t.nome: t.intervalo_segundos for t in montar_tarefas(FakeSettings())}
@@ -198,8 +200,10 @@ def test_tarefa_de_preco_so_entra_com_chave_do_itad():
         agendador_vlr_rankings_minutos = 10080
         agendador_vlr_detalhes_minutos = 1440
         agendador_treino_confronto_minutos = 480
+        agendador_pandascore_minutos = 30
         opgg_enabled = True
         itad_api_key = None
+        pandascore_api_key = None
         hltb_enabled = True
 
     nomes = {t.nome for t in montar_tarefas(SemChave())}
@@ -225,12 +229,44 @@ def test_tarefa_de_tempo_jogo_nao_entra_quando_desabilitada():
         agendador_vlr_rankings_minutos = 10080
         agendador_vlr_detalhes_minutos = 1440
         agendador_treino_confronto_minutos = 480
+        agendador_pandascore_minutos = 30
         opgg_enabled = True
         itad_api_key = None
+        pandascore_api_key = None
         hltb_enabled = False
 
     nomes = {t.nome for t in montar_tarefas(Desabilitada())}
     assert "tempo_jogo" not in nomes
+
+
+def test_pandascore_troca_o_hltv_quando_ha_chave():
+    class ComPandaScore:
+        agendador_steam_minutos = 60
+        agendador_steam_online_minutos = 15
+        agendador_agenda_proxima_minutos = 5
+        agendador_opendota_minutos = 360
+        agendador_liquipedia_minutos = 720
+        agendador_equipes_minutos = 1440
+        agendador_brackets_minutos = 1440
+        agendador_ranking_minutos = 10080
+        agendador_precos_minutos = 720
+        agendador_opendota_limite = 100
+        agendador_tempo_jogo_minutos = 1440
+        agendador_agentes_minutos = 10080
+        agendador_esports_opgg_minutos = 360
+        agendador_vlr_minutos = 1440
+        agendador_vlr_rankings_minutos = 10080
+        agendador_vlr_detalhes_minutos = 1440
+        agendador_treino_confronto_minutos = 480
+        agendador_pandascore_minutos = 30
+        opgg_enabled = True
+        itad_api_key = None
+        pandascore_api_key = "chave-de-teste"
+        hltb_enabled = True
+
+    tarefas = {t.nome: t.intervalo_segundos for t in montar_tarefas(ComPandaScore())}
+    assert tarefas.get("pandascore_cs") == 1800
+    assert "hltv" not in tarefas
 
 
 @pytest.mark.parametrize(

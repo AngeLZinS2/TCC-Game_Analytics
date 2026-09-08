@@ -68,6 +68,33 @@ def _id_jogo(sessao: Session, codigo: str) -> int:
     return id_jogo
 
 
+#: Fontes de confronto em ordem de preferencia — a mesma partida entra por mais
+#: de uma (Liquipedia + vlr/hltv + PandaScore) com nome e horario diferentes, e
+#: a lista duplicava. A mais estruturada ganha: quando ha linha PandaScore no
+#: recorte, so ela; senao vlr/hltv; senao tudo (Liquipedia, id em hash).
+_PRECEDENCIA_FONTE = (
+    AgendaPartida.id_externo.op("~")("^pandascore:"),
+    AgendaPartida.id_externo.op("~")("^(vlr|hltv):"),
+)
+
+
+def _preferir_fonte_dedicada(sessao: Session, consulta_base):
+    """Restringe o recorte a fonte mais estruturada que tenha linha nele.
+
+    Checa dentro do proprio recorte: se so ha linha dedicada para a agenda e
+    nao para os resultados, os resultados continuam vindo da Liquipedia.
+    """
+    for clausula in _PRECEDENCIA_FONTE:
+        tem = sessao.scalar(
+            select(func.count()).select_from(
+                consulta_base.where(clausula).subquery()
+            )
+        )
+        if tem:
+            return consulta_base.where(clausula)
+    return consulta_base
+
+
 def _vitorias():
     """SUM(vitoria) portavel: booleano -> 0/1."""
     return func.sum(case((FatoPartidaJogador.vitoria.is_(True), 1), else_=0))
@@ -417,7 +444,7 @@ def listar_confrontos(
     equipe_a = aliased(DimEquipe)
     equipe_b = aliased(DimEquipe)
 
-    consulta = (
+    base = (
         select(
             AgendaPartida.id_externo,
             AgendaPartida.equipe_a_nome,
@@ -441,6 +468,10 @@ def listar_confrontos(
         # `vitoria_a` nulo e confronto sem resultado publicado - e o que a tela
         # de Proximos Confrontos mostra. Aqui e o oposto dela.
         .where(AgendaPartida.vitoria_a.is_not(None))
+    )
+
+    consulta = (
+        _preferir_fonte_dedicada(sessao, base)
         .order_by(desc(AgendaPartida.inicio_previsto))
         .limit(limite)
         .offset((pagina - 1) * limite)
@@ -539,7 +570,7 @@ def agenda_proximas(
 
     `vitoria_a IS NULL` (sem resultado) e `inicio_previsto` daqui para frente
     (com 3h de folga para trás, para uma partida ao vivo não sumir da lista).
-    Fontes: vlr.gg (Valorant), hltv.org (CS) e o ticker da Liquipedia.
+    Fontes: vlr.gg (Valorant), PandaScore/hltv.org (CS) e o ticker da Liquipedia.
     """
     id_jogo = _id_jogo(sessao, jogo)
     corte = datetime.now(timezone.utc) - timedelta(hours=3)
@@ -549,17 +580,7 @@ def agenda_proximas(
         AgendaPartida.vitoria_a.is_(None),
         AgendaPartida.inicio_previsto >= corte,
     )
-
-    # Uma partida entra pela Liquipedia E pelo vlr.gg/hltv, com nomes e horário
-    # diferentes — a lista duplicava. Quando a fonte dedicada (vlr para
-    # Valorant, hltv para CS, ambas com `id_externo` prefixado) tem linha para
-    # este jogo, ela manda e a Liquipedia (id em hash) fica de fora.
-    prefixadas = AgendaPartida.id_externo.op("~")("^(vlr|hltv):")
-    tem_dedicada = sessao.scalar(
-        select(func.count()).select_from(base.where(prefixadas).subquery())
-    )
-    if tem_dedicada:
-        base = base.where(prefixadas)
+    base = _preferir_fonte_dedicada(sessao, base)
 
     linhas = sessao.execute(
         base.order_by(AgendaPartida.inicio_previsto).limit(limite)

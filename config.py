@@ -36,6 +36,10 @@ class Settings(BaseSettings):
     valorant_api_key: str | None = None
     # Opcional: sem chave o OpenDota ja permite ~3.000 chamadas/dia.
     opendota_api_key: str | None = None
+    #: PandaScore (agenda + resultados de esports). Chave gratuita em
+    #: pandascore.co; sem ela o coletor `pandascore` recusa rodar e a agenda de
+    #: CS volta a depender do hltv/Liquipedia.
+    pandascore_api_key: str | None = None
 
     # --- API / dashboard ---
     # Origens liberadas no CORS, separadas por virgula. O Vite sobe em 5173
@@ -255,6 +259,21 @@ class Settings(BaseSettings):
     #: raramente ainda - o intervalo existe pra um agente novo aparecer sozinho,
     #: nao pra acompanhar variacao. E uma chamada por rodada.
     agendador_agentes_minutos: int = Field(default=10080, ge=60)
+
+    # --- PandaScore (agenda + resultados de esports via API) ---
+    pandascore_base_url: str = "https://api.pandascore.co"
+    #: Free tier: 1000 requisicoes/hora. O coletor faz ~8 por rodada, entao 1s
+    #: de folga entre chamadas ja e conservador de sobra.
+    pandascore_rate_limit_seconds: float = Field(default=1.0, gt=0)
+    #: Tiers de torneio a coletar: `s` (major) a `d` (qualifier aberto). O
+    #: default `s,a,b,c` pega circuito principal + challengers/regionais e deixa
+    #: de fora o tier `d` (qualifier aberto) - CS sozinho tem ~90 mil partidas
+    #: decididas, a esmagadora maioria tier d.
+    pandascore_tiers: str = "s,a,b,c"
+    #: Intervalo da agenda/resultados da PandaScore, em minutos. 30 min: horario
+    #: de partida muda e resultado sai rapido, mas nao ha HTML pesado nem risco
+    #: de perder pagina (a API tem o historico inteiro).
+    agendador_pandascore_minutos: int = Field(default=30, ge=5)
 
     # --- Assistente (OpenRouter) ---
     #: Sem chave, o endpoint do assistente responde 503 com a instrucao. E um
