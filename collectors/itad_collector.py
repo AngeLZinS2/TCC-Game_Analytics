@@ -51,11 +51,17 @@ class SemChaveItadError(RuntimeError):
     """`ITAD_API_KEY` nao configurada - o coletor nao tem o que fazer."""
 
 
-def jogos_para_preco(limite: int | None = None) -> list[tuple[int, str | None]]:
+def jogos_para_preco(
+    limite: int | None = None,
+    app_ids: Sequence[int] | None = None,
+) -> list[tuple[int, str | None]]:
     """`(app_id, itad_id)` dos jogos que valem consultar preco.
 
     Jogo gratuito nao entra (nao ha o que comparar). Jogo com `itad_id = ""`
     ja foi procurado e nao existe no ITAD - fica de fora ate alguem forcar.
+
+    `app_ids` restringe a esses apps - e o caminho da coleta sob demanda,
+    quando alguem acabou de buscar um jogo e quer o preco na hora.
     """
     with session_scope() as sessao:
         consulta = (
@@ -66,6 +72,8 @@ def jogos_para_preco(limite: int | None = None) -> list[tuple[int, str | None]]:
             )
             .order_by(DimJogoSteam.app_id)
         )
+        if app_ids is not None:
+            consulta = consulta.where(DimJogoSteam.app_id.in_(list(app_ids)))
         if limite:
             consulta = consulta.limit(limite)
         return [(linha.app_id, linha.itad_id) for linha in sessao.execute(consulta)]
@@ -80,11 +88,14 @@ class ItadCollector(BaseCollector[ResultadoItad]):
         settings: Settings | None = None,
         limite: int | None = None,
         forcar_lookup: bool = False,
+        app_ids: Sequence[int] | None = None,
     ) -> None:
         super().__init__(raw_storage)
         self.settings = settings or get_settings()
         self.limite = limite
         self.forcar_lookup = forcar_lookup
+        #: Quando setado, coleta so esses apps (coleta sob demanda da busca).
+        self.app_ids = list(app_ids) if app_ids is not None else None
         self.falhas = 0
 
         self.client = RateLimitedClient(
@@ -108,9 +119,12 @@ class ItadCollector(BaseCollector[ResultadoItad]):
                 "https://isthereanydeal.com/apps/my/ e coloque no .env."
             )
 
-        alvos = jogos_para_preco(self.limite)
+        alvos = jogos_para_preco(self.limite, self.app_ids)
         if not alvos:
-            logger.info("nenhum jogo pago para consultar preco")
+            logger.info(
+                "nenhum jogo pago para consultar preco",
+                extra={"app_ids": self.app_ids},
+            )
             return []
 
         registros: list[RawRecord] = []

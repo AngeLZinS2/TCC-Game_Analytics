@@ -15,6 +15,11 @@ Steam publica - nome, nota agregada, preco. Mas as telas de recomendacao vivem
 das avaliacoes com TEXTO, e essas so existem depois de coletadas. Sem a coleta
 sob demanda, buscar um jogo novo mostraria a ficha e mais nada: nem tendencia,
 nem aspectos, nem avaliacao classificada. Por isso `/coletar`.
+
+**Preco nas outras lojas.** O `/coletar` tambem dispara, na mesma chamada, a
+coleta do ITAD para esse app - senao o painel "Onde comprar" ficaria vazio ate
+a rodada em lote (horas depois). E best-effort: se o ITAD falhar ou nao tiver
+chave, a coleta da Steam ja esta feita e a resposta volta mesmo assim.
 """
 
 from __future__ import annotations
@@ -40,6 +45,38 @@ router = APIRouter(prefix="/api/steam", tags=["steam"])
 #: Tres paginas (~300 avaliacoes) levam uns 6 segundos e ja dao amostra para a
 #: tendencia e os aspectos; dez levariam 20 e a pessoa acharia que travou.
 PAGINAS_SOB_DEMANDA = 3
+
+
+def _coletar_preco_sob_demanda(app_id: int) -> None:
+    """Puxa o preco do ITAD para um app recem-coletado. Best-effort.
+
+    Roda depois da coleta da Steam, na mesma requisicao: quem buscou um jogo
+    novo quer o painel "Onde comprar" preenchido agora, nao na proxima rodada
+    em lote. Sao ~2 chamadas (lookup do jogo + os dois lotes), ~2 segundos.
+
+    Nunca levanta: sem `ITAD_API_KEY`, jogo gratuito ou ITAD fora do ar, a
+    coleta da Steam ja aconteceu e a resposta do `/coletar` nao muda.
+    """
+    from collectors.itad_collector import ItadCollector
+    from etl.raw_storage import RawStorage
+
+    settings = get_settings()
+    if not settings.itad_api_key:
+        return
+
+    storage = RawStorage(settings.raw_data_path, registrar_no_banco=True)
+    coletor = ItadCollector(
+        raw_storage=storage, settings=settings, app_ids=[app_id]
+    )
+    try:
+        coletor.run(carregar=True)
+    except Exception as exc:  # noqa: BLE001 - preco e acessorio, nao derruba a coleta
+        logger.warning(
+            "coleta de preco sob demanda falhou",
+            extra={"app_id": app_id, "erro": f"{type(exc).__name__}: {exc}"},
+        )
+    finally:
+        coletor.close()
 
 
 @router.get("/catalogo", response_model=list[CandidatoJogo])
@@ -162,6 +199,9 @@ def coletar(entrada: EntradaColeta) -> ResumoColeta:
                 "Pode ser DLC, pacote, ou indisponivel nesta regiao."
             ),
         )
+
+    # O jogo entrou no banco: agora o preco nas outras lojas, best-effort.
+    _coletar_preco_sob_demanda(entrada.app_id)
 
     return ResumoColeta(
         app_id=entrada.app_id,

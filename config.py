@@ -155,10 +155,12 @@ class Settings(BaseSettings):
 
     #: Intervalo entre coletas de preco (IsThereAnyDeal), em minutos.
     #:
-    #: Promocao de loja dura dias, nao minutos. Duas vezes ao dia pega o
-    #: comeco e o fim de uma promo com folga. Sem `itad_api_key` a tarefa nem
-    #: e agendada.
-    agendador_precos_minutos: int = Field(default=720, ge=60)
+    #: A cada 3h pega o inicio e o fim de uma promo sem atraso perceptivel. O
+    #: jogo recem-buscado nao espera por isso - o `/api/steam/coletar` ja puxa
+    #: o preco na hora; a rodada em lote e so para manter os jogos ja no banco
+    #: atualizados. Sao ~2 chamadas por rodada, longe do limite do ITAD
+    #: (1000 / 5 min). Sem `itad_api_key` a tarefa nem e agendada.
+    agendador_precos_minutos: int = Field(default=180, ge=15)
 
     #: Coletar uma vez logo que o agendador sobe, em vez de esperar o intervalo.
     #:
