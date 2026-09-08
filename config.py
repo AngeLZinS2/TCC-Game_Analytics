@@ -280,6 +280,11 @@ class Settings(BaseSettings):
     #: snapshot por semana ja da a serie point-in-time.
     agendador_ubi_r6_minutos: int = Field(default=10080, ge=60)
 
+    #: Intervalo da classificacao do OWCS (Liquipedia), em minutos. Diario: um
+    #: Stage roda ~duas semanas e a tabela muda a cada dia de jogo; fora de
+    #: temporada nao ha o que coletar, entao rodar de novo custa pouco.
+    agendador_owcs_minutos: int = Field(default=1440, ge=60)
+
     # --- Assistente (OpenRouter) ---
     #: Sem chave, o endpoint do assistente responde 503 com a instrucao. E um
     #: estado esperado: o resto do projeto funciona sem LLM nenhum.

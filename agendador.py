@@ -516,6 +516,13 @@ def _coletar_ubi_r6(settings: Settings, storage: RawStorage) -> CollectionResult
     return UbiR6Collector(raw_storage=storage).run(carregar=True)
 
 
+def _coletar_owcs(settings: Settings, storage: RawStorage) -> CollectionResult:
+    """Classificacao do Stage corrente do OWCS (Liquipedia)."""
+    from collectors.owcs_standings import OwcsStandingsCollector
+
+    return OwcsStandingsCollector(raw_storage=storage).run(carregar=True)
+
+
 def _coletar_pandascore_val(settings: Settings, storage: RawStorage) -> CollectionResult:
     """PandaScore de Valorant — só pelo escudo dos times.
 
@@ -730,6 +737,13 @@ def montar_tarefas(settings: Settings) -> list[Tarefa]:
             nome="ubi_r6",
             intervalo_segundos=settings.agendador_ubi_r6_minutos * 60,
             executar=_coletar_ubi_r6,
+        )
+    )
+    tarefas.append(
+        Tarefa(
+            nome="owcs",
+            intervalo_segundos=settings.agendador_owcs_minutos * 60,
+            executar=_coletar_owcs,
         )
     )
     tarefas.append(

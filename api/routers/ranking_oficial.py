@@ -37,6 +37,10 @@ FONTES = {
         "R6 Esports Global Standings",
         "https://www.ubisoft.com/en-us/esports/rainbow-six/siege/global-standings",
     ),
+    "owcs": (
+        "OWCS (Liquipedia)",
+        "https://liquipedia.net/overwatch/Overwatch_Champions_Series",
+    ),
 }
 
 #: Nome de exibicao e ORDEM das regioes. Uma regiao fora deste mapa ainda
@@ -46,7 +50,9 @@ REGIOES = {
     "europe": "Europa",
     "brazil": "Brasil",
     "korea": "Coreia",
+    "japan": "Japão",
     "china": "China",
+    "pacific": "Pacífico",
     "asia-pacific": "Ásia-Pacífico",
     "la-s": "LATAM Sul",
     "la-n": "LATAM Norte",
