@@ -502,6 +502,13 @@ def _coletar_pandascore_r6(settings: Settings, storage: RawStorage) -> Collectio
     return PandaScoreCollector(raw_storage=storage, jogo="r6siege").run(carregar=True)
 
 
+def _coletar_pandascore_rl(settings: Settings, storage: RawStorage) -> CollectionResult:
+    """Agenda + resultados de Rocket League via PandaScore (RLCS, EWC)."""
+    from collectors.pandascore import PandaScoreCollector
+
+    return PandaScoreCollector(raw_storage=storage, jogo="rl").run(carregar=True)
+
+
 def _coletar_vlr_detalhes(settings: Settings, storage: RawStorage) -> CollectionResult:
     """Detalhe por mapa e por jogador das partidas de Valorant ja decididas."""
     from collectors.vlr_detalhes import VlrDetalhesCollector
@@ -673,6 +680,7 @@ def montar_tarefas(settings: Settings) -> list[Tarefa]:
             ("pandascore_cod", _coletar_pandascore_cod),
             ("pandascore_ow", _coletar_pandascore_ow),
             ("pandascore_r6", _coletar_pandascore_r6),
+            ("pandascore_rl", _coletar_pandascore_rl),
         ):
             tarefas.append(
                 Tarefa(

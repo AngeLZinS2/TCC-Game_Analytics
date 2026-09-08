@@ -266,7 +266,7 @@ def test_pandascore_troca_o_hltv_quando_ha_chave():
 
     tarefas = {t.nome: t.intervalo_segundos for t in montar_tarefas(ComPandaScore())}
     for nome in ("pandascore_cs", "pandascore_lol", "pandascore_cod",
-                 "pandascore_ow", "pandascore_r6"):
+                 "pandascore_ow", "pandascore_r6", "pandascore_rl"):
         assert tarefas.get(nome) == 1800
     assert "hltv" not in tarefas
     # LoL da PandaScore roda JUNTO do OP.GG (fontes complementares).

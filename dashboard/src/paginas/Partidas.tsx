@@ -325,7 +325,7 @@ export function PartidasPagina({
         <Painel
           icone="event_upcoming"
           titulo="Próximas partidas"
-          descricao="As que ainda vão acontecer — PandaScore (CS, LoL, CoD, OW, R6), vlr.gg (Valorant) e o ticker da Liquipedia. Atualiza sozinha."
+          descricao="As que ainda vão acontecer — PandaScore (CS, LoL, CoD, OW, R6, RL), vlr.gg (Valorant) e o ticker da Liquipedia. Atualiza sozinha."
           meta={
             <div className="flex flex-wrap items-center gap-space-sm">
               <SeletorModoConfrontos modo={modoAgenda} aoMudar={setModoAgenda} />
