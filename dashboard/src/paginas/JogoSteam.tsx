@@ -1003,7 +1003,7 @@ function OndeComprar({
                 className={i % 2 ? "bg-[#131824]" : "bg-[#10141D]"}
                 style={
                   o.melhor
-                    ? { boxShadow: "inset 3px 0 0 #00e5ff" }
+                    ? { boxShadow: "inset 3px 0 0 #5a8cff" }
                     : undefined
                 }
               >
@@ -1217,7 +1217,7 @@ function RequisitosEIdiomas({ ficha }: { ficha: FichaJogoSteam }) {
                     aria-pressed={aba === chave}
                     className={`rounded px-space-md py-space-xs font-label-caps text-label-caps uppercase tracking-widest transition-colors ${
                       aba === chave
-                        ? "bg-surface-container-high text-primary shadow-[inset_0_-2px_0_0_#00e5ff]"
+                        ? "bg-surface-container-high text-primary shadow-[inset_0_-2px_0_0_#5a8cff]"
                         : "text-outline hover:bg-surface-container hover:text-on-surface"
                     }`}
                   >

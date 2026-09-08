@@ -77,7 +77,7 @@ export function HistogramaNeon({
               <div
                 className={`w-full rounded-t ${
                   modal
-                    ? "bg-gradient-to-t from-secondary to-primary-container shadow-[0_0_12px_rgba(0,229,255,0.35)]"
+                    ? "bg-gradient-to-t from-secondary to-primary-container shadow-[0_0_12px_rgba(90,140,255,0.35)]"
                     : "bg-surface-container-highest group-hover:bg-secondary-container"
                 }`}
                 style={{

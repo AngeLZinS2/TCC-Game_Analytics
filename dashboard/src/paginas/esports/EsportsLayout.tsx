@@ -72,7 +72,7 @@ export function EsportsLayout() {
                 [
                   "flex shrink-0 items-center gap-space-xs rounded-t px-space-md py-space-sm font-title-code text-title-code uppercase tracking-wider transition-colors",
                   isActive
-                    ? "bg-surface-container-high text-primary shadow-[inset_0_-2px_0_0_#00e5ff]"
+                    ? "bg-surface-container-high text-primary shadow-[inset_0_-2px_0_0_#5a8cff]"
                     : "text-on-surface-variant hover:bg-surface-container hover:text-on-surface",
                 ].join(" ")
               }

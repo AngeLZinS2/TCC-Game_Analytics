@@ -2,7 +2,7 @@
  * As cores que o codigo precisa como valor, nao como classe.
  *
  * O Tailwind resolve cor em `class`, e isso cobre quase tudo. O Recharts nao:
- * ele pinta via atributo de apresentacao no SVG (`fill="#00e5ff"`), e atributo
+ * ele pinta via atributo de apresentacao no SVG (`fill="#5a8cff"`), e atributo
  * nao entende classe nem `var(--token)`. Entao os tokens que aparecem em
  * grafico precisam existir tambem como string literal, e e o que este arquivo e.
  *
@@ -17,21 +17,23 @@
 
 /** Tokens do design system usados fora de classe Tailwind. */
 export const TOKENS = {
-  fundo: "#10131a",
-  superficie: "#1d1f27",
-  superficieAlta: "#272a32",
-  contorno: "#849396",
-  contornoSuave: "#3b494c",
-  texto: "#e1e2ec",
-  textoSuave: "#bac9cc",
-  primaria: "#00e5ff",
-  secundaria: "#c9bfff",
-  terciaria: "#16ef7a",
-  erro: "#ffb4ab",
-  //: A "agulha do mostrador" — âmbar reservado para o que o MODELO diz
-  //: (velocímetro de previsão, selo de previsão). Não é cor de série nem de
-  //: jogo; marca "olhe aqui, isto é uma estimativa".
-  modelo: "#f5b13b",
+  fundo: "#0f1114",
+  superficie: "#16191e",
+  superficieAlta: "#1e222a",
+  contorno: "#6a7280",
+  contornoSuave: "#2e333d",
+  texto: "#eceef2",
+  textoSuave: "#9aa2ae",
+  //: Azul — o que é clicável / ativo.
+  primaria: "#5a8cff",
+  //: Âmbar — reservado ao que o MODELO estima (velocímetro, série de previsão).
+  secundaria: "#f3b13b",
+  //: Verde — semântico (vitória / ok).
+  terciaria: "#40d19e",
+  erro: "#ff8a8a",
+  //: A "agulha do mostrador" — o mesmo âmbar de `secundaria`, nomeado para
+  //: deixar claro no código que é a cor do modelo.
+  modelo: "#f3b13b",
 } as const;
 
 /**
@@ -47,7 +49,7 @@ export const PALETA_SERIES = [
   TOKENS.secundaria,
   TOKENS.terciaria,
   "#66c0f4",
-  "#c89b3c",
+  "#c7a046",
 ] as const;
 
 /**
@@ -58,8 +60,8 @@ export const PALETA_SERIES = [
  * sequencial nao.
  */
 export const PALETA_POLOS = {
-  positivo: "#16ef7a",
-  negativo: "#ff8a93",
+  positivo: "#40d19e",
+  negativo: "#ff8a8a",
   neutro: TOKENS.contorno,
 } as const;
 
@@ -69,7 +71,7 @@ export const PALETA_POLOS = {
  */
 export const CORES_JOGO: Record<string, string> = {
   steam: "#66c0f4",
-  dota2: "#16ef7a",
+  dota2: "#40d19e",
   counterstrike: "#efa13c",
   valorant: "#ff4655",
   leagueoflegends: "#c7a046",
@@ -94,7 +96,7 @@ export function corDoWinrate(winrate: number): string {
 /** Estilo compartilhado dos eixos e da grade do Recharts. */
 export const EIXO = {
   stroke: TOKENS.contornoSuave,
-  tick: { fill: TOKENS.textoSuave, fontSize: 12, fontFamily: "IBM Plex Sans" },
+  tick: { fill: TOKENS.textoSuave, fontSize: 11, fontFamily: "IBM Plex Mono" },
 } as const;
 
 export const GRADE = {

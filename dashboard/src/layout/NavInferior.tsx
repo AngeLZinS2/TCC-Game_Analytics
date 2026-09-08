@@ -50,7 +50,7 @@ export function NavInferior() {
               "flex flex-1 flex-col items-center justify-center gap-0.5 py-space-xs font-badge-status text-badge-status uppercase tracking-wide transition-colors",
               "min-h-[54px]",
               isActive
-                ? "text-primary shadow-[inset_0_2px_0_0_#00e5ff]"
+                ? "text-primary shadow-[inset_0_2px_0_0_#5a8cff]"
                 : "text-on-surface-variant",
             ].join(" ")
           }

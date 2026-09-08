@@ -139,7 +139,7 @@ export function Compositor({
             className={[
               "flex items-center gap-space-xs rounded px-space-base py-space-xs font-title-code text-title-code transition-all",
               podeEnviar
-                ? "bg-primary-container text-on-primary shadow-[0_0_14px_rgba(0,229,255,0.35)] hover:brightness-110"
+                ? "bg-primary-container text-on-primary shadow-[0_0_14px_rgba(90,140,255,0.35)] hover:brightness-110"
                 : "cursor-not-allowed bg-surface-container text-outline/60",
             ].join(" ")}
           >

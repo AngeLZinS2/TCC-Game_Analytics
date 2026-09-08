@@ -1,10 +1,12 @@
 /**
- * Tokens do design system 'Apex Broadcast Engine', exportados do Google Stitch.
+ * Design system "PlayDB · Instrumento".
  *
- * O arquivo e uma copia fiel do `tailwind.config` que o Stitch embute em cada
- * tela gerada - as 10 telas do projeto compartilham exatamente este objeto.
- * Editar aqui a mao desalinha o codigo do desenho: o caminho e mudar o design
- * system no Stitch e reexportar.
+ * A base era o "Apex Broadcast Engine" exportado do Stitch — ciano sobre preto,
+ * Space Grotesk. Esta versao troca a casca inteira: fundo grafite morno (a
+ * "caixa" do instrumento), AZUL para o que e clicavel, e um AMBAR reservado ao
+ * que o modelo estima (o token `secondary`, que quase so aparece em previsao e
+ * grafico). Os NOMES dos tokens sao os mesmos — os valores mudaram —, entao os
+ * componentes herdam o visual novo sem tocar em classe.
  */
 
 /** @type {import('tailwindcss').Config} */
@@ -14,53 +16,64 @@ export default {
   theme: {
     extend: {
       colors: {
-        "on-primary-fixed": "#001f24",
-        "error": "#ffb4ab",
-        "surface-bright": "#363941",
-        "primary-fixed-dim": "#00daf3",
-        "on-secondary-fixed": "#1a0063",
-        "background": "#10131a",
-        "on-primary-container": "#00626e",
-        "outline-variant": "#3b494c",
-        "primary-container": "#00e5ff",
-        "on-primary-fixed-variant": "#004f58",
-        "on-primary": "#00363d",
-        "primary-fixed": "#9cf0ff",
-        "tertiary-container": "#16ef7a",
-        "surface-container-low": "#191b23",
-        "surface-container-highest": "#32353d",
-        "secondary": "#c9bfff",
-        "inverse-on-surface": "#2d3038",
-        "surface-tint": "#00daf3",
-        "on-surface": "#e1e2ec",
-        "tertiary": "#afffbd",
-        "on-secondary": "#2e009c",
-        "surface-container": "#1d1f27",
-        "on-tertiary-fixed-variant": "#005225",
-        "on-tertiary": "#003918",
-        "on-secondary-fixed-variant": "#441cc8",
-        "inverse-surface": "#e1e2ec",
-        "tertiary-fixed-dim": "#00e473",
-        "secondary-container": "#4720ca",
-        "secondary-fixed": "#e5deff",
-        "error-container": "#93000a",
-        "outline": "#849396",
-        "secondary-fixed-dim": "#c9bfff",
-        "on-tertiary-fixed": "#00210b",
-        "on-tertiary-container": "#006730",
-        "surface-container-high": "#272a32",
-        "tertiary-fixed": "#63ff95",
-        "surface-variant": "#32353d",
-        "inverse-primary": "#006875",
-        "surface-container-lowest": "#0b0e15",
-        "on-error-container": "#ffdad6",
-        "on-background": "#e1e2ec",
-        "on-surface-variant": "#bac9cc",
-        "primary": "#c3f5ff",
-        "on-secondary-container": "#baaeff",
-        "on-error": "#690005",
-        "surface": "#10131a",
-        "surface-dim": "#10131a"
+        // --- grafite morno: a "caixa" ---
+        "background": "#0f1114",
+        "surface": "#0f1114",
+        "surface-dim": "#0d0f12",
+        "surface-container-lowest": "#0c0e12",
+        "surface-container-low": "#14171e",
+        "surface-container": "#16191e",
+        "surface-container-high": "#1e222a",
+        "surface-container-highest": "#252a33",
+        "surface-bright": "#2b313b",
+        "surface-variant": "#252a33",
+        "inverse-surface": "#eceef2",
+        "inverse-on-surface": "#1e222a",
+
+        // --- tinta ---
+        "on-surface": "#eceef2",
+        "on-background": "#eceef2",
+        "on-surface-variant": "#9aa2ae",
+        "outline": "#6a7280",
+        "outline-variant": "#2e333d",
+
+        // --- azul: o que e clicavel / ativo ---
+        "primary": "#a9c2ff",
+        "primary-container": "#5a8cff",
+        "primary-fixed": "#c4d4ff",
+        "primary-fixed-dim": "#4c86ff",
+        "surface-tint": "#5a8cff",
+        "on-primary": "#0a1633",
+        "on-primary-container": "#1b3a8c",
+        "on-primary-fixed": "#08122e",
+        "on-primary-fixed-variant": "#2a4faa",
+        "inverse-primary": "#2456d6",
+
+        // --- ambar: o que o MODELO estima (era o roxo "secondary") ---
+        "secondary": "#f6c87d",
+        "secondary-container": "#463818",
+        "secondary-fixed": "#fadfae",
+        "secondary-fixed-dim": "#f3b13b",
+        "on-secondary": "#2c2412",
+        "on-secondary-fixed": "#241c0a",
+        "on-secondary-container": "#f0c885",
+        "on-secondary-fixed-variant": "#7a5c1e",
+
+        // --- verde: semantico (vitoria / ok) ---
+        "tertiary": "#8fe8c6",
+        "tertiary-container": "#40d19e",
+        "tertiary-fixed": "#7ce6bf",
+        "tertiary-fixed-dim": "#3fcf8e",
+        "on-tertiary": "#062c1f",
+        "on-tertiary-container": "#12583b",
+        "on-tertiary-fixed": "#04231a",
+        "on-tertiary-fixed-variant": "#1f7a5a",
+
+        // --- vermelho: semantico (derrota / erro) ---
+        "error": "#ff8a8a",
+        "error-container": "#5a1f1f",
+        "on-error": "#3a0808",
+        "on-error-container": "#ffd9d9"
       },
       borderRadius: {
         "DEFAULT": "0.25rem",
@@ -84,53 +97,30 @@ export default {
         "space-2xl": "2rem"
       },
       fontFamily: {
-        "title-code": [
-          "Space Grotesk"
-        ],
-        "body-lg": [
-          "IBM Plex Sans"
-        ],
-        "display-hero-mobile": [
-          "Space Grotesk"
-        ],
-        "headline-kpi": [
-          "Space Grotesk"
-        ],
-        "headline-lg": [
-          "Space Grotesk"
-        ],
-        "body-md": [
-          "IBM Plex Sans"
-        ],
-        "badge-status": [
-          "Space Grotesk"
-        ],
-        "headline-sm": [
-          "Space Grotesk"
-        ],
-        "headline-kpi-mobile": [
-          "Space Grotesk"
-        ],
-        "body-sm": [
-          "IBM Plex Sans"
-        ],
-        "display-hero": [
-          "Space Grotesk"
-        ],
-        "headline-md": [
-          "Space Grotesk"
-        ],
-        "label-caps": [
-          "Space Grotesk"
-        ]
+        // `title-code` carrega número, timestamp e rótulo tabular — vira mono.
+        "title-code": ["IBM Plex Mono", "ui-monospace", "monospace"],
+        // Interface, títulos e rótulos: Schibsted Grotesk (era Space Grotesk).
+        "display-hero": ["Schibsted Grotesk", "system-ui", "sans-serif"],
+        "display-hero-mobile": ["Schibsted Grotesk", "system-ui", "sans-serif"],
+        "headline-kpi": ["Schibsted Grotesk", "system-ui", "sans-serif"],
+        "headline-kpi-mobile": ["Schibsted Grotesk", "system-ui", "sans-serif"],
+        "headline-lg": ["Schibsted Grotesk", "system-ui", "sans-serif"],
+        "headline-md": ["Schibsted Grotesk", "system-ui", "sans-serif"],
+        "headline-sm": ["Schibsted Grotesk", "system-ui", "sans-serif"],
+        "badge-status": ["Schibsted Grotesk", "system-ui", "sans-serif"],
+        "label-caps": ["Schibsted Grotesk", "system-ui", "sans-serif"],
+        // Corpo de texto: IBM Plex Sans.
+        "body-lg": ["IBM Plex Sans", "system-ui", "sans-serif"],
+        "body-md": ["IBM Plex Sans", "system-ui", "sans-serif"],
+        "body-sm": ["IBM Plex Sans", "system-ui", "sans-serif"]
       },
       fontSize: {
         "title-code": [
-          "14px",
+          "13px",
           {
             "lineHeight": "18px",
-            "letterSpacing": "0.08em",
-            "fontWeight": "600"
+            "letterSpacing": "0.01em",
+            "fontWeight": "500"
           }
         ],
         "body-lg": [

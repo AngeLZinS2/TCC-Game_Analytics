@@ -213,7 +213,7 @@ export function HeroisPagina() {
       <section className="flex flex-col gap-space-base pt-space-base lg:flex-row lg:items-center lg:justify-between">
         <div className="flex flex-col gap-space-xs">
           <div className="flex flex-wrap items-center gap-space-sm">
-            <h1 className="font-headline-lg text-headline-lg uppercase tracking-wide text-primary drop-shadow-[0_0_12px_rgba(0,229,255,0.4)]">
+            <h1 className="font-headline-lg text-headline-lg uppercase tracking-wide text-on-surface">
               {(perfil.data?.substantivo_plural ?? "Personagens").toUpperCase()}
             </h1>
             <div className="inline-flex items-center gap-space-xs rounded bg-surface-container-high px-space-sm py-space-xxs shadow-inner">
@@ -226,7 +226,7 @@ export function HeroisPagina() {
                 )}
                 <span
                   className={`relative inline-flex h-2.5 w-2.5 rounded-full ${
-                    online ? "bg-tertiary-container shadow-[0_0_8px_#16ef7a]" : "bg-error"
+                    online ? "bg-tertiary-container shadow-[0_0_8px_#40d19e]" : "bg-error"
                   }`}
                 />
               </span>

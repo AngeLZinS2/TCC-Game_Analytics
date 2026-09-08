@@ -30,10 +30,12 @@
 
 import { Link, NavLink, useLocation } from "react-router-dom";
 
-import { useSaude } from "../api/consultas";
+import { useDestaquesHome, useSaude } from "../api/consultas";
 import { Icone } from "../componentes/base";
 import { MenuEsports } from "../componentes/MenuEsports";
 import { NAVEGACAO, type ItemNavegacao } from "./navegacao";
+import { corDoJogo } from "../tema";
+import { fmtRelativo } from "../utilitarios/formatos";
 
 /** O rotulo de cada sub-aba de E-Sports, para o "voce esta aqui". */
 const ABAS_ESPORTS: Record<string, string> = {
@@ -110,7 +112,7 @@ function ItemNav({ item }: { item: ItemNavegacao }) {
       end={item.rota === "/"}
       className={({ isActive }) =>
         isActive
-          ? `${BOTAO_NAV} bg-surface-container-high text-primary shadow-[inset_0_-2px_0_0_#00e5ff]`
+          ? `${BOTAO_NAV} bg-surface-container-high text-primary shadow-[inset_0_-2px_0_0_#5a8cff]`
           : `${BOTAO_NAV} text-on-surface-variant hover:bg-surface-container hover:text-on-surface`
       }
     >
@@ -120,41 +122,76 @@ function ItemNav({ item }: { item: ItemNavegacao }) {
   );
 }
 
+/** Ticker de "acontecendo agora" — some no mobile e quando não há nada. */
+function Ticker() {
+  const { data } = useDestaquesHome();
+  const itens = data?.ao_vivo.slice(0, 8) ?? [];
+  if (itens.length === 0) return null;
+
+  return (
+    <div
+      className="relative hidden min-w-0 flex-1 overflow-hidden border-x border-outline-variant/25 px-space-md lg:block"
+      style={{
+        maskImage:
+          "linear-gradient(90deg, transparent, #000 24px, #000 calc(100% - 24px), transparent)",
+      }}
+    >
+      <div className="ticker-fita inline-flex gap-space-xl whitespace-nowrap font-title-code text-title-code text-on-surface-variant">
+        {[...itens, ...itens].map((c, i) => (
+          <span key={i} className="inline-flex items-center gap-space-xs">
+            <span
+              className="h-1.5 w-1.5 rounded-full"
+              style={{ background: corDoJogo(c.jogo) }}
+              aria-hidden
+            />
+            <span className="text-on-surface">{c.equipe_a_nome}</span>
+            <span className="text-outline">vs</span>
+            <span className="text-on-surface">{c.equipe_b_nome}</span>
+            <span className="text-outline">
+              {c.ao_vivo ? "· ao vivo" : `· ${fmtRelativo(c.inicio_previsto)}`}
+            </span>
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function BarraSuperior() {
   const titulo = useTituloDaRota();
   const saude = useSaude();
   const online = saude.data?.status === "ok";
 
   return (
-    <header className="fixed left-0 right-0 top-0 z-50 flex h-16 items-center gap-space-base border-b border-outline-variant/30 bg-surface-container-lowest/95 px-space-base backdrop-blur-md md:px-space-lg">
-      <Link to="/" className="flex shrink-0 items-center gap-space-sm">
+    <header className="fixed left-0 right-0 top-0 z-50 flex h-16 items-center gap-space-base border-b border-outline-variant/30 bg-surface-container-lowest/95 px-space-base backdrop-blur-md md:px-space-lg lg:left-60">
+      {/* Marca e fileira de ícones: só até `lg` (no desktop, o trilho lateral). */}
+      <Link to="/" className="flex shrink-0 items-center gap-space-sm lg:hidden">
         <Icone nome="stadia_controller" className="text-[24px] text-primary-container" />
-        {/* No mobile a fileira de icones some (vai para a NavInferior), entao
-            sobra espaco: a marca aparece sempre. */}
         <span className="font-title-code text-title-code uppercase tracking-wider text-primary">
           PlayDB
         </span>
       </Link>
 
-      {/* Fileira de icones: só no desktop. No mobile é a barra inferior. */}
-      <span className="hidden h-6 w-px shrink-0 bg-outline-variant/40 md:block" aria-hidden />
+      <span className="hidden h-6 w-px shrink-0 bg-outline-variant/40 md:block lg:hidden" aria-hidden />
 
-      <nav className="hidden items-center gap-space-xxs md:flex">
+      <nav className="hidden items-center gap-space-xxs md:flex lg:hidden">
         {NAVEGACAO.map((item) => (
           <ItemNav key={item.rotulo} item={item} />
         ))}
       </nav>
 
-      <span className="hidden h-6 w-px shrink-0 bg-outline-variant/40 md:block" aria-hidden />
+      <span className="hidden h-6 w-px shrink-0 bg-outline-variant/40 md:block lg:hidden" aria-hidden />
 
-      <div className="hidden min-w-0 items-center gap-space-sm md:flex">
-        <Icone nome="chevron_right" className="text-[18px] text-outline" />
+      <div className="flex min-w-0 shrink-0 items-center gap-space-sm">
+        <Icone nome="chevron_right" className="hidden text-[18px] text-outline md:block lg:hidden" />
         <span className="truncate font-title-code text-title-code uppercase tracking-wider text-on-surface-variant">
           {titulo}
         </span>
       </div>
 
-      <div className="ml-auto flex shrink-0 items-center gap-space-sm">
+      <Ticker />
+
+      <div className="ml-auto flex shrink-0 items-center gap-space-sm lg:ml-0">
         <a
           href="/docs"
           target="_blank"

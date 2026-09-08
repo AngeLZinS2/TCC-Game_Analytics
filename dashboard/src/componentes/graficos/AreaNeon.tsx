@@ -156,14 +156,14 @@ export function AreaNeon({
         >
           <defs>
             <linearGradient id={`area-${id}`} x1="0%" y1="0%" x2="0%" y2="100%">
-              <stop offset="0%" stopColor="#00daf3" stopOpacity="0.45" />
+              <stop offset="0%" stopColor="#5a8cff" stopOpacity="0.45" />
               <stop offset="60%" stopColor="#4720ca" stopOpacity="0.15" />
-              <stop offset="100%" stopColor="#10131a" stopOpacity="0" />
+              <stop offset="100%" stopColor="#0f1114" stopOpacity="0" />
             </linearGradient>
             <linearGradient id={`traco-${id}`} x1="0%" y1="0%" x2="100%" y2="0%">
-              <stop offset="0%" stopColor="#00e5ff" />
-              <stop offset="70%" stopColor="#c9bfff" />
-              <stop offset="100%" stopColor="#16ef7a" />
+              <stop offset="0%" stopColor="#5a8cff" />
+              <stop offset="70%" stopColor="#f3b13b" />
+              <stop offset="100%" stopColor="#40d19e" />
             </linearGradient>
           </defs>
 
@@ -174,7 +174,7 @@ export function AreaNeon({
             style={{ transition: "opacity 900ms ease-out 400ms" }}
           />
           <path
-            className="drop-shadow-[0_0_8px_rgba(0,229,255,0.8)]"
+            className="drop-shadow-[0_0_8px_rgba(90,140,255,0.8)]"
             d={linha}
             fill="none"
             stroke={`url(#traco-${id})`}
@@ -205,7 +205,7 @@ export function AreaNeon({
                 r={entrou ? (eMaximo || eAtivo ? 6 : 4) : 0}
                 className={
                   eMaximo || eAtivo
-                    ? "fill-primary-container stroke-surface stroke-2 drop-shadow-[0_0_8px_#00e5ff]"
+                    ? "fill-primary-container stroke-surface stroke-2 drop-shadow-[0_0_8px_#5a8cff]"
                     : "fill-primary"
                 }
                 vectorEffect="non-scaling-stroke"

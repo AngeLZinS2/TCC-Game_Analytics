@@ -72,9 +72,28 @@
    * mesmos numeros do token `title-code`.
    */
   .rotulo-marca {
-    font-family: "Space Grotesk", system-ui, sans-serif;
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
     font-size: 12px;
-    font-weight: 600;
-    letter-spacing: 0.04em;
+    font-weight: 500;
+    letter-spacing: 0.01em;
+  }
+
+  /* Ticker de "acontecendo agora" na barra superior. Duas cópias da lista
+     lado a lado, deslizando -50%: o loop é sem emenda. Para no hover. */
+  .ticker-fita {
+    animation: desliza-ticker 34s linear infinite;
+  }
+  .ticker-fita:hover {
+    animation-play-state: paused;
+  }
+  @keyframes desliza-ticker {
+    to {
+      transform: translateX(-50%);
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .ticker-fita {
+      animation: none;
+    }
   }
 }

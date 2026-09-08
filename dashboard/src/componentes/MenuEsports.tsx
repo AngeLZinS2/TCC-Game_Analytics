@@ -87,7 +87,7 @@ export function MenuEsports({ item }: { item: ItemNavegacao }) {
         aria-expanded={aberto}
         className={({ isActive }) =>
           isActive || naArea
-            ? `${BOTAO_NAV} bg-surface-container-high text-primary shadow-[inset_0_-2px_0_0_#00e5ff]`
+            ? `${BOTAO_NAV} bg-surface-container-high text-primary shadow-[inset_0_-2px_0_0_#5a8cff]`
             : `${BOTAO_NAV} text-on-surface-variant hover:bg-surface-container hover:text-on-surface`
         }
       >

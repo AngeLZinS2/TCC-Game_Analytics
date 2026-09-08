@@ -833,7 +833,7 @@ export function PrevisaoConfrontoPagina({
           <section className="flex flex-col gap-space-base pt-space-base lg:flex-row lg:items-center lg:justify-between">
             <div className="flex flex-col gap-space-xs">
               <div className="flex flex-wrap items-center gap-space-sm">
-                <h1 className="font-headline-lg text-headline-lg uppercase tracking-wide text-primary drop-shadow-[0_0_12px_rgba(0,229,255,0.4)]">
+                <h1 className="font-headline-lg text-headline-lg uppercase tracking-wide text-on-surface">
                   {emRanking ? "Ranking" : "Previsão de Confronto"}
                 </h1>
                 <Selo cor="primario">{emRanking ? "Oficial" : "Antes da partida"}</Selo>

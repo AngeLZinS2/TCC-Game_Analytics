@@ -202,7 +202,7 @@ export function AssistenteIAPagina() {
           {/* ---------- ESTADO VAZIO ---------- */}
           {!resposta && !assistente.isPending && !assistente.isError && (
             <div className="flex flex-col items-center gap-space-sm rounded-xl bg-surface-container-low/60 px-space-lg py-space-3xl text-center">
-              <span className="text-[32px] text-primary drop-shadow-[0_0_16px_rgba(0,229,255,0.5)]" aria-hidden>
+              <span className="text-[32px] text-primary drop-shadow-[0_0_16px_rgba(90,140,255,0.5)]" aria-hidden>
                 ✦
               </span>
               <h3 className="font-headline-sm text-headline-sm uppercase tracking-wide text-on-surface">

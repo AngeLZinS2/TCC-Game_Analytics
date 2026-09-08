@@ -118,7 +118,7 @@ export function GraficoSerie({ serie }: { serie: SerieAssistente }) {
                       <div
                         className={`w-full rounded-t ${
                           lider
-                            ? "bg-gradient-to-t from-primary-container to-primary shadow-[0_0_12px_rgba(0,229,255,0.35)]"
+                            ? "bg-gradient-to-t from-primary-container to-primary shadow-[0_0_12px_rgba(90,140,255,0.35)]"
                             : "bg-gradient-to-t from-primary-container/50 to-primary/60"
                         }`}
                         style={{

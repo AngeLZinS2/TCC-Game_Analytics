@@ -651,7 +651,7 @@ export function SteamPagina() {
                             title={fmtDataHora(jogo.janela_coleta)}
                           >
                             <span
-                              className="h-2 w-2 rounded-full bg-tertiary-container shadow-[0_0_4px_#16ef7a]"
+                              className="h-2 w-2 rounded-full bg-tertiary-container shadow-[0_0_4px_#40d19e]"
                               aria-hidden
                             />
                             <span className="font-title-code text-title-code text-on-surface-variant">

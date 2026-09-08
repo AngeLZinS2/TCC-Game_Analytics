@@ -74,7 +74,7 @@ export function Velocimetro({
         textAnchor="middle"
         fill={TOKENS.contorno}
         fontSize="11"
-        fontFamily="Space Grotesk, sans-serif"
+        fontFamily="Schibsted Grotesk, sans-serif"
       >
         0%
       </text>
@@ -84,7 +84,7 @@ export function Velocimetro({
         textAnchor="middle"
         fill={TOKENS.contorno}
         fontSize="11"
-        fontFamily="Space Grotesk, sans-serif"
+        fontFamily="Schibsted Grotesk, sans-serif"
       >
         100%
       </text>
@@ -95,7 +95,7 @@ export function Velocimetro({
         fill={TOKENS.texto}
         fontSize="34"
         fontWeight="700"
-        fontFamily="Space Grotesk, sans-serif"
+        fontFamily="Schibsted Grotesk, sans-serif"
         style={{ fontVariantNumeric: "tabular-nums" }}
       >
         {Math.round(p * 100)}%

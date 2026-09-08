@@ -100,7 +100,7 @@ function Lider({
         <h3 className="truncate font-headline-lg text-headline-lg text-on-surface">
           {ponto.rotulo}
         </h3>
-        <div className="font-headline-kpi text-headline-kpi leading-none text-primary drop-shadow-[0_0_16px_rgba(0,229,255,0.35)]">
+        <div className="font-headline-kpi text-headline-kpi leading-none text-primary drop-shadow-[0_0_16px_rgba(90,140,255,0.35)]">
           {formatar(valor ?? ponto.valor, unidade)}
         </div>
         <div className="mt-space-xxs font-label-caps text-label-caps uppercase tracking-widest text-outline">

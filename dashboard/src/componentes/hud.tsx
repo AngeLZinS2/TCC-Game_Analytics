@@ -287,7 +287,7 @@ export function Pilula({
         desabilitada
           ? "cursor-not-allowed bg-surface-container/40 text-outline/50"
           : ativa
-            ? "bg-primary-container text-on-primary shadow-[0_0_12px_rgba(0,229,255,0.35)]"
+            ? "bg-primary-container text-on-primary shadow-[0_0_12px_rgba(90,140,255,0.35)]"
             : "bg-surface-container text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface",
       ].join(" ")}
     >
@@ -320,7 +320,7 @@ export function ChipContagem({
       className={[
         "flex shrink-0 items-center gap-space-xs rounded px-space-sm py-space-xs font-title-code text-title-code transition-colors",
         ativo
-          ? "bg-surface-container-high text-primary shadow-[0_0_8px_rgba(0,229,255,0.2)]"
+          ? "bg-surface-container-high text-primary shadow-[0_0_8px_rgba(90,140,255,0.2)]"
           : "bg-surface-container text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface",
       ].join(" ")}
     >
@@ -413,7 +413,7 @@ export function BarraRanking({
 
       <div className="flex h-3 w-full overflow-hidden rounded-full bg-surface-container-lowest">
         <div
-          className="h-full rounded-full bg-gradient-to-r from-primary-container via-primary to-secondary shadow-[0_0_10px_rgba(0,229,255,0.5)]"
+          className="h-full rounded-full bg-gradient-to-r from-primary-container via-primary to-secondary shadow-[0_0_10px_rgba(90,140,255,0.5)]"
           style={{
             width: `${entrou ? Math.max(2, proporcao * 100).toFixed(1) : 0}%`,
             transition: "width 700ms cubic-bezier(0.16, 1, 0.3, 1)",
@@ -446,7 +446,7 @@ export function BarraSegmentada({
   // Cor CSS de verdade (hex/rgb), nao classe Tailwind - o `PALETA_POLOS` do
   // design system e o que todo chamador usa, e assim a barra aceita ele
   // direto em vez de exigir uma classe soltando o mesmo tom.
-  corA = "#16ef7a",
+  corA = "#40d19e",
   corB = "#ff8a93",
   altura = "h-2",
   legendaEsquerda,

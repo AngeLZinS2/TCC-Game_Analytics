@@ -79,7 +79,7 @@ const FONTES: Record<
   },
   opendota: {
     etiqueta: "DOTA 2",
-    cor: "#16ef7a",
+    cor: "#40d19e",
     api: "OpenDota API",
     descricao: "Partidas profissionais, heróis e séries minuto a minuto",
     frequencia: "por partida",
@@ -220,7 +220,7 @@ export function VisaoGeralPagina() {
       <section className="flex flex-col gap-space-base pt-space-base lg:flex-row lg:items-center lg:justify-between">
         <div className="flex flex-col gap-space-xs">
           <div className="flex flex-wrap items-center gap-space-sm">
-            <h1 className="font-headline-lg text-headline-lg uppercase tracking-wide text-primary drop-shadow-[0_0_12px_rgba(0,229,255,0.4)]">
+            <h1 className="font-headline-lg text-headline-lg uppercase tracking-wide text-on-surface">
               Visão Geral
             </h1>
 
@@ -235,7 +235,7 @@ export function VisaoGeralPagina() {
                 <span
                   className={`relative inline-flex h-2.5 w-2.5 rounded-full ${
                     online
-                      ? "bg-tertiary-container shadow-[0_0_8px_#16ef7a]"
+                      ? "bg-tertiary-container shadow-[0_0_8px_#40d19e]"
                       : "bg-error"
                   }`}
                 />
@@ -521,7 +521,7 @@ export function VisaoGeralPagina() {
             <span
               className={`h-1.5 w-1.5 rounded-full ${
                 online
-                  ? "animate-pulse bg-tertiary-container shadow-[0_0_4px_#16ef7a]"
+                  ? "animate-pulse bg-tertiary-container shadow-[0_0_4px_#40d19e]"
                   : "bg-error"
               }`}
               aria-hidden
@@ -607,7 +607,7 @@ export function VisaoGeralPagina() {
                             <span
                               className={`h-1.5 w-1.5 rounded-full ${
                                 ativa
-                                  ? "animate-pulse bg-tertiary-container shadow-[0_0_4px_#16ef7a]"
+                                  ? "animate-pulse bg-tertiary-container shadow-[0_0_4px_#40d19e]"
                                   : "bg-outline"
                               }`}
                               aria-hidden
