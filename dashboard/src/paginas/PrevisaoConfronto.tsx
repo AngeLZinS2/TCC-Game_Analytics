@@ -1048,20 +1048,20 @@ export function PrevisaoConfrontoPagina({
           </>
           )}
 
-          {/* As secoes abaixo leem as FORCAS ajustadas. Sem modelo elas so
-              teriam erros para mostrar, e um painel de erro diz menos que uma
-              frase. */}
-          {!dados && emRanking && (
+          {/* A simulacao e o ranking de forca leem as FORCAS ajustadas: sem
+              modelo eles nao tem o que mostrar. A classificacao derivada dos
+              confrontos (abaixo) nao depende do modelo. */}
+          {!dados && !emRanking && (
             <p className="rounded-xl bg-surface-container-low/90 px-space-lg py-space-base font-body-md text-body-md text-on-surface-variant shadow-lg">
               Ainda não há modelo de força ajustado para este jogo — ele precisa
               de partidas com resultado. O calendário está na aba{" "}
               <strong className="text-on-surface">Previsão</strong>.
             </p>
           )}
-          {dados && (
+          {(dados || emRanking) && (
             <>
           {/* ==================== CONFRONTO HIPOTETICO ==================== */}
-          {!emRanking && (
+          {!emRanking && dados && (
           <Painel
             icone="swords"
             titulo="Simular um confronto"
@@ -1224,13 +1224,21 @@ export function PrevisaoConfrontoPagina({
 
             <p className="font-body-sm text-body-sm text-outline">
               {rankingOficial.data.derivado
-                ? "Só conta série decidida (3+ por time). O ranking de força abaixo é o mesmo dado tratado pelo Bradley-Terry, que pesa a qualidade do adversário."
+                ? `Só conta série decidida (3+ por time).${dados ? " O ranking de força abaixo é o mesmo dado tratado pelo Bradley-Terry, que pesa a qualidade do adversário." : ""}`
                 : "É esse o ranking que o modelo de previsão usa como referência inicial (prior) para um time com pouco histórico coletado — o ranking de força abaixo parte dele e ajusta pelos confrontos que temos."}
             </p>
           </Painel>
           )}
 
           {/* -------- Ranking de força do nosso modelo -------- */}
+          {!dados && (
+            <p className="rounded-xl bg-surface-container-low/90 px-space-lg py-space-base font-body-md text-body-md text-on-surface-variant shadow-lg">
+              O ranking de força (Bradley-Terry) ainda não foi ajustado para
+              este jogo — ele treina quando há confronto decidido suficiente.
+            </p>
+          )}
+          {dados && (
+          <>
           <Painel
             icone="leaderboard"
             titulo={liga ? `Ranking de força — ${liga}` : "Ranking de força"}
@@ -1451,6 +1459,8 @@ export function PrevisaoConfrontoPagina({
               )}
             </Consulta>
           </Painel>
+          </>
+          )}
           </>
           )}
             </>
