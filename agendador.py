@@ -509,6 +509,13 @@ def _coletar_pandascore_rl(settings: Settings, storage: RawStorage) -> Collectio
     return PandaScoreCollector(raw_storage=storage, jogo="rl").run(carregar=True)
 
 
+def _coletar_ubi_r6(settings: Settings, storage: RawStorage) -> CollectionResult:
+    """Ranking oficial de R6 (SI Points Standings da Ubisoft)."""
+    from collectors.ubi_r6 import UbiR6Collector
+
+    return UbiR6Collector(raw_storage=storage).run(carregar=True)
+
+
 def _coletar_pandascore_val(settings: Settings, storage: RawStorage) -> CollectionResult:
     """PandaScore de Valorant — só pelo escudo dos times.
 
@@ -716,6 +723,13 @@ def montar_tarefas(settings: Settings) -> list[Tarefa]:
             nome="vlr_rankings",
             intervalo_segundos=settings.agendador_vlr_rankings_minutos * 60,
             executar=_coletar_vlr_rankings,
+        )
+    )
+    tarefas.append(
+        Tarefa(
+            nome="ubi_r6",
+            intervalo_segundos=settings.agendador_ubi_r6_minutos * 60,
+            executar=_coletar_ubi_r6,
         )
     )
     tarefas.append(

@@ -33,6 +33,10 @@ router = APIRouter(prefix="/api/esports", tags=["esports"])
 FONTES = {
     "vlr": ("vlr.gg", "https://www.vlr.gg/rankings"),
     "valve": ("Valve Regional Standings", "https://github.com/ValveSoftware/counter-strike_regional_standings"),
+    "ubi_r6": (
+        "R6 Esports Global Standings",
+        "https://www.ubisoft.com/en-us/esports/rainbow-six/siege/global-standings",
+    ),
 }
 
 #: Nome de exibicao e ORDEM das regioes. Uma regiao fora deste mapa ainda

@@ -275,6 +275,11 @@ class Settings(BaseSettings):
     #: de perder pagina (a API tem o historico inteiro).
     agendador_pandascore_minutos: int = Field(default=30, ge=5)
 
+    #: Intervalo do ranking oficial de R6 (SI Points da Ubisoft), em minutos.
+    #: Semanal: os pontos so mudam depois de um Major/Kickoff (~mensal), e um
+    #: snapshot por semana ja da a serie point-in-time.
+    agendador_ubi_r6_minutos: int = Field(default=10080, ge=60)
+
     # --- Assistente (OpenRouter) ---
     #: Sem chave, o endpoint do assistente responde 503 com a instrucao. E um
     #: estado esperado: o resto do projeto funciona sem LLM nenhum.

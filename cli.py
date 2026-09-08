@@ -42,6 +42,7 @@ FONTES = (
     "pandascore-r6",
     "pandascore-rl",
     "pandascore-val",
+    "ubi-r6",
 )
 
 
@@ -342,6 +343,11 @@ def _construir_coletor(args: argparse.Namespace, storage):
 
         return HltvCollector(raw_storage=storage)
 
+    if args.fonte == "ubi-r6":
+        from collectors.ubi_r6 import UbiR6Collector
+
+        return UbiR6Collector(raw_storage=storage)
+
     if args.fonte.startswith("pandascore-"):
         from collectors.pandascore import PandaScoreCollector
 
@@ -427,6 +433,10 @@ def _carregador(fonte: str):
         return carregar
     if fonte == "hltv":
         from etl.load_hltv import carregar
+
+        return carregar
+    if fonte == "ubi-r6":
+        from etl.load_ubi_r6 import carregar
 
         return carregar
     if fonte.startswith("pandascore-"):
