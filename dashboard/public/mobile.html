@@ -1,0 +1,433 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PlayDB no celular</title>
+<meta name="description" content="O app móvel do PlayDB: partidas ao vivo, previsão do modelo e catálogo Steam no bolso. Gire o celular 3D e use o app de verdade dentro dele.">
+<link rel="icon" href="/favicon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&family=Schibsted+Grotesk:wght@500;600;700;800&display=swap">
+<style>
+  :root{
+    --bg:#0f1114; --surface:#16191e; --surface-2:#1e222a; --surface-3:#252a33;
+    --line:#2b303a; --line-strong:#3a414d;
+    --ink:#eceef2; --ink-dim:#9aa2ae; --ink-faint:#6a7280;
+    --blue:#5a8cff; --blue-soft:#a9c2ff;
+    --amber:#f3b13b; --green:#40d19e;
+    --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+    --sans:"IBM Plex Sans",system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+    --disp:"Schibsted Grotesk",system-ui,sans-serif;
+    --maxw:1180px;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    margin:0;background:var(--bg);color:var(--ink);
+    font-family:var(--sans);font-size:16px;line-height:1.6;
+    -webkit-font-smoothing:antialiased;overflow-x:hidden;
+  }
+  ::selection{background:var(--amber);color:#141414}
+  a{color:inherit;text-decoration:none}
+  img{max-width:100%}
+  h1,h2,h3{font-family:var(--disp);font-weight:800;line-height:1.04;letter-spacing:-0.02em;text-wrap:balance;margin:0}
+  p{margin:0}
+
+  .wrap{max-width:var(--maxw);margin:0 auto;padding:0 clamp(20px,5vw,48px)}
+  .eyebrow{
+    font-family:var(--mono);font-size:12px;font-weight:500;letter-spacing:0.18em;
+    text-transform:uppercase;color:var(--ink-dim);display:inline-flex;align-items:center;gap:9px;
+  }
+  .eyebrow::before{content:"";width:22px;height:1px;background:var(--line-strong)}
+  .mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+
+  header.bar{
+    position:sticky;top:0;z-index:50;backdrop-filter:blur(10px);
+    background:color-mix(in srgb,var(--bg) 82%,transparent);
+    border-bottom:1px solid var(--line);
+  }
+  .bar .wrap{display:flex;align-items:center;justify-content:space-between;height:62px}
+  .brand{display:flex;align-items:center;gap:10px;font-family:var(--disp);font-weight:800;letter-spacing:-0.01em;font-size:18px}
+  .brand .glyph{
+    width:26px;height:26px;border-radius:7px;display:grid;place-items:center;
+    background:linear-gradient(135deg,var(--blue),#3f6fe0);color:#0b0d10;
+    font-family:var(--mono);font-weight:600;font-size:15px;
+  }
+  .bar nav{display:flex;gap:26px;font-size:14px;color:var(--ink-dim)}
+  .bar nav a:hover{color:var(--ink)}
+  .bar .cta-mini{
+    font-family:var(--mono);font-size:12.5px;letter-spacing:.06em;text-transform:uppercase;
+    border:1px solid var(--line-strong);padding:8px 14px;border-radius:8px;color:var(--ink);
+  }
+  .bar .cta-mini:hover{border-color:var(--blue);color:var(--blue-soft)}
+  @media(max-width:760px){.bar nav{display:none}}
+
+  .hero{position:relative;padding:clamp(48px,9vw,104px) 0 clamp(60px,8vw,96px)}
+  .hero .grid{display:grid;grid-template-columns:1.05fr 0.95fr;gap:clamp(24px,5vw,64px);align-items:center;position:relative;z-index:1}
+  .hero h1{font-size:clamp(38px,6.4vw,74px)}
+  .hero h1 .amber{color:var(--amber)}
+  .hero .lede{margin-top:22px;max-width:34ch;color:var(--ink-dim);font-size:clamp(16px,1.6vw,18px)}
+  .hero .actions{display:flex;flex-wrap:wrap;gap:12px;margin-top:30px}
+  .btn{
+    font-family:var(--mono);font-size:13px;letter-spacing:.05em;text-transform:uppercase;
+    padding:14px 20px;border-radius:10px;border:1px solid transparent;cursor:pointer;
+    display:inline-flex;align-items:center;gap:9px;transition:.16s;
+  }
+  .btn-primary{background:var(--blue);color:#0a0c10;font-weight:600}
+  .btn-primary:hover{background:var(--blue-soft)}
+  .btn-ghost{border-color:var(--line-strong);color:var(--ink)}
+  .btn-ghost:hover{border-color:var(--ink-dim)}
+  .chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:34px}
+  .chip{
+    font-family:var(--mono);font-size:11.5px;letter-spacing:.04em;text-transform:uppercase;
+    color:var(--ink-dim);border:1px solid var(--line);border-radius:999px;padding:6px 12px;
+    display:inline-flex;align-items:center;gap:7px;
+  }
+  .chip .dot{width:6px;height:6px;border-radius:50%}
+
+  .hero::after{
+    content:"";position:absolute;right:-6vw;top:8%;width:min(640px,60vw);height:640px;
+    background:radial-gradient(circle at 60% 40%,rgba(243,177,59,.13),transparent 62%);
+    filter:blur(8px);pointer-events:none;z-index:0;
+  }
+
+  .stage{
+    perspective:1400px;perspective-origin:50% 42%;
+    display:flex;justify-content:center;align-items:center;
+    padding:24px 30px;min-height:560px;
+    touch-action:pan-y;user-select:none;-webkit-user-select:none;
+    cursor:grab;
+  }
+  .stage.dragging{cursor:grabbing}
+  .device{
+    position:relative;width:clamp(266px,31vw,330px);aspect-ratio:9/19.3;
+    transform-style:preserve-3d;
+    transform:rotateX(6deg) rotateY(-17deg);
+    transition:transform .9s cubic-bezier(.16,1,.3,1);
+    will-change:transform;
+  }
+  .stage.dragging .device{transition:none}
+  .device .body{
+    position:absolute;inset:0;border-radius:46px;cursor:grab;
+    background:linear-gradient(150deg,#2c313b,#14171c 45%,#0c0e12);
+    box-shadow:0 0 0 2px #05070a,0 40px 80px -20px rgba(0,0,0,.7),inset 0 0 0 8px #0b0d11;
+  }
+  .stage.dragging .device .body{cursor:grabbing}
+  .device .btn-vol,.device .btn-pwr{
+    position:absolute;background:linear-gradient(#31363f,#1a1d23);border-radius:2px;transform:translateZ(-9px);
+  }
+  .device .btn-vol{left:-4px;top:23%;width:4px;height:9%}
+  .device .btn-pwr{right:-4px;top:31%;width:4px;height:12%}
+  .device .app-frame{
+    position:absolute;inset:13px;width:calc(100% - 26px);height:calc(100% - 26px);
+    border:0;border-radius:33px;background:var(--bg);color-scheme:dark;
+    transform:translateZ(1px);
+  }
+  .stage.dragging .app-frame{pointer-events:none}
+  .device .screen-edge{
+    position:absolute;inset:13px;border-radius:33px;z-index:5;pointer-events:none;
+    box-shadow:inset 0 0 0 1px rgba(255,255,255,.05);transform:translateZ(2px);
+  }
+  .device .notch{
+    position:absolute;top:13px;left:50%;transform:translate(-50%,0) translateZ(3px);
+    width:32%;height:19px;background:#05070a;border-radius:0 0 14px 14px;z-index:6;
+  }
+  .device .glare{
+    position:absolute;inset:13px;border-radius:33px;z-index:7;pointer-events:none;
+    background:linear-gradient(120deg,rgba(255,255,255,.07),transparent 34%,transparent 74%,rgba(255,255,255,.03));
+    transform:translateZ(3px);
+  }
+  .hint{
+    margin-top:20px;text-align:center;font-family:var(--mono);font-size:11px;
+    letter-spacing:.1em;text-transform:uppercase;color:var(--ink-faint);
+  }
+  .hint b{color:var(--ink-dim);font-weight:500}
+
+  section.blk{padding:clamp(60px,10vw,120px) 0;border-top:1px solid var(--line)}
+  .blk h2{font-size:clamp(28px,4.2vw,46px);margin-top:14px;max-width:16ch}
+  .blk .sub{margin-top:16px;color:var(--ink-dim);max-width:52ch}
+
+  .feats{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:48px}
+  .feat{border:1px solid var(--line);border-radius:16px;padding:22px;background:var(--surface);display:flex;flex-direction:column;gap:12px}
+  .feat .n{font-family:var(--mono);font-size:11px;color:var(--ink-faint);letter-spacing:.1em}
+  .feat h3{font-family:var(--disp);font-size:19px;font-weight:700;letter-spacing:-.01em}
+  .feat p{color:var(--ink-dim);font-size:14px}
+  .feat .bar-accent{height:2px;width:40px;border-radius:2px}
+  @media(max-width:820px){.feats{grid-template-columns:1fr}}
+
+  .steps{display:grid;grid-template-columns:repeat(3,1fr);margin-top:48px;border:1px solid var(--line);border-radius:16px;overflow:hidden}
+  .step{padding:26px 22px;border-right:1px solid var(--line)}
+  .step:last-child{border-right:0}
+  .step .k{font-family:var(--mono);font-size:26px;font-weight:600;color:var(--amber);letter-spacing:-.02em}
+  .step h3{font-family:var(--disp);font-size:16px;font-weight:700;margin-top:10px}
+  .step p{color:var(--ink-dim);font-size:13.5px;margin-top:6px}
+  @media(max-width:820px){.steps{grid-template-columns:1fr}.step{border-right:0;border-bottom:1px solid var(--line)}.step:last-child{border-bottom:0}}
+
+  .oss{display:grid;grid-template-columns:1.1fr .9fr;gap:40px;align-items:center;margin-top:44px}
+  .stackline{display:flex;flex-wrap:wrap;gap:8px;margin-top:22px}
+  .stackline span{font-family:var(--mono);font-size:12px;color:var(--ink-dim);border:1px solid var(--line);border-radius:8px;padding:7px 11px}
+  .stackline .arrow{border:0;color:var(--ink-faint);padding:7px 2px}
+  .oss .card{border:1px solid var(--line);border-radius:16px;padding:24px;background:var(--surface);font-family:var(--mono);font-size:12.5px;line-height:1.9;color:var(--ink-dim)}
+  .oss .card b{color:var(--ink);font-weight:600}
+  @media(max-width:820px){.oss{grid-template-columns:1fr}}
+
+  .notify{border-top:1px solid var(--line);padding:clamp(56px,9vw,100px) 0}
+  .notify h2{font-size:clamp(26px,3.8vw,40px);max-width:14ch}
+  .nform{display:flex;gap:10px;margin-top:26px;max-width:460px;flex-wrap:wrap}
+  .nform input{flex:1;min-width:220px;background:var(--surface);border:1px solid var(--line-strong);border-radius:10px;padding:14px 16px;color:var(--ink);font-family:var(--sans);font-size:15px}
+  .nform input:focus{outline:none;border-color:var(--blue)}
+  .nform .btn-primary{white-space:nowrap}
+  .ndone{margin-top:16px;font-family:var(--mono);font-size:12.5px;color:var(--green);display:none}
+  .ndone.show{display:block}
+  .nsmall{margin-top:12px;font-family:var(--mono);font-size:11px;color:var(--ink-faint);letter-spacing:.03em}
+
+  footer{border-top:1px solid var(--line);padding:34px 0;color:var(--ink-faint);font-size:13px}
+  footer .wrap{display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px;align-items:center}
+  footer a:hover{color:var(--ink-dim)}
+  .badge-store{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line-strong);border-radius:10px;padding:9px 14px;font-family:var(--mono);font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-dim)}
+
+  @media(max-width:900px){
+    .hero .grid{grid-template-columns:1fr}
+    .hero .stage{margin-top:52px}
+    .hero::after{right:-30vw;top:32%}
+  }
+  @media(prefers-reduced-motion:reduce){
+    *{animation:none!important;transition-duration:.01ms!important}
+    html{scroll-behavior:auto}
+  }
+</style>
+</head>
+<body>
+
+<header class="bar">
+  <div class="wrap">
+    <a class="brand" href="#top"><span class="glyph">P</span>PlayDB</a>
+    <nav>
+      <a href="#recursos">Recursos</a>
+      <a href="#como">Como funciona</a>
+      <a href="#codigo">Código aberto</a>
+    </nav>
+    <a class="cta-mini" href="#avise">Avise-me</a>
+  </div>
+</header>
+
+<main id="top">
+  <section class="hero">
+    <div class="wrap grid">
+      <div>
+        <span class="eyebrow">App móvel · em construção</span>
+        <h1>O dado de esports<br>que cabe no <span class="amber">bolso</span>.</h1>
+        <p class="lede">
+          A mesma coleta que roda no <a class="mono" style="color:var(--blue-soft)" href="/">playdb.info</a> —
+          partidas ao vivo, a previsão do modelo, o catálogo da Steam — num app leve,
+          sem conta, feito a partir do próprio site.
+        </p>
+        <div class="actions">
+          <a class="btn btn-primary" href="#avise">Avise-me quando sair</a>
+          <a class="btn btn-ghost" href="/">Abrir no navegador →</a>
+        </div>
+        <div class="chips">
+          <span class="chip"><span class="dot" style="background:var(--green)"></span>Acontecendo agora</span>
+          <span class="chip"><span class="dot" style="background:var(--amber)"></span>Previsão de confronto</span>
+          <span class="chip"><span class="dot" style="background:var(--blue)"></span>Detalhe da partida</span>
+          <span class="chip"><span class="dot" style="background:#66c0f4"></span>Steam ao vivo</span>
+        </div>
+      </div>
+
+      <div>
+        <div class="stage" id="stage">
+          <div class="device" id="device">
+            <div class="body"></div>
+            <span class="btn-vol"></span><span class="btn-pwr"></span>
+            <iframe class="app-frame" id="appFrame" title="PlayDB — o app rodando de verdade" src="/?ctx=mobile" loading="lazy"></iframe>
+            <div class="screen-edge"></div>
+            <div class="notch"></div>
+            <div class="glare"></div>
+          </div>
+        </div>
+        <p class="hint"><b>arraste a borda</b> pra girar · <b>a tela é o site de verdade</b></p>
+      </div>
+    </div>
+  </section>
+
+  <section class="blk" id="recursos">
+    <div class="wrap">
+      <span class="eyebrow">O que vem no APK</span>
+      <h2>O site inteiro, redesenhado pra uma tela na vertical.</h2>
+      <p class="sub">Nada de versão capada: são as mesmas telas do painel — o que você está girando ali em cima já é o PlayDB rodando, com dado ao vivo.</p>
+      <div class="feats">
+        <div class="feat">
+          <span class="bar-accent" style="background:var(--green)"></span>
+          <span class="n">01</span>
+          <h3>Acontecendo agora</h3>
+          <p>Só as partidas que estão mesmo ao vivo, com o link da transmissão — vários canais quando o torneio tem.</p>
+        </div>
+        <div class="feat">
+          <span class="bar-accent" style="background:var(--amber)"></span>
+          <span class="n">02</span>
+          <h3>A previsão do modelo</h3>
+          <p>O velocímetro do Bradley-Terry com a probabilidade de cada lado, do jeito que aparece na home.</p>
+        </div>
+        <div class="feat">
+          <span class="bar-accent" style="background:var(--blue)"></span>
+          <span class="n">03</span>
+          <h3>Detalhe da partida</h3>
+          <p>Toque no card e veja o placar de série, o resultado mapa a mapa e o scoreboard por jogador (Valorant e LoL, ao vivo).</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="blk" id="como">
+    <div class="wrap">
+      <span class="eyebrow">Como vai funcionar</span>
+      <h2>Instala, abre, acompanha. Sem cadastro.</h2>
+      <p class="sub">O APK é o próprio dashboard empacotado — a API continua sendo a de produção, em <span class="mono">playdb.info</span>.</p>
+      <div class="steps">
+        <div class="step">
+          <span class="k">01</span>
+          <h3>Baixa o APK</h3>
+          <p>Um arquivo, direto daqui. Sem loja, sem espera de revisão. (Play Store depois, se fizer sentido.)</p>
+        </div>
+        <div class="step">
+          <span class="k">02</span>
+          <h3>Abre</h3>
+          <p>Nenhuma conta, nenhuma permissão. Abriu, já está na tela de "acontecendo agora".</p>
+        </div>
+        <div class="step">
+          <span class="k">03</span>
+          <h3>Acompanha ao vivo</h3>
+          <p>O agendador na VPS coleta sozinho. O app só lê — placar, previsão e transmissão atualizam sem você fazer nada.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="blk" id="codigo">
+    <div class="wrap">
+      <span class="eyebrow">Código aberto · TCC</span>
+      <h2>Nasce do mesmo repositório.</h2>
+      <p class="sub">O app não é um projeto novo — é o front do PlayDB rodando dentro de um casco nativo. O que já está no ar vira o que está no bolso.</p>
+      <div class="oss">
+        <div>
+          <p style="color:var(--ink-dim);font-size:14px">
+            Coleta em Python (FastAPI + Postgres), painel em React, tudo em camadas MVC.
+            O empacotamento pro Android reaproveita a mesma build do dashboard — só troca
+            o casco do navegador por um WebView nativo.
+          </p>
+          <div class="stackline">
+            <span>FastAPI</span><span>PostgreSQL 16</span><span>React + Vite</span>
+            <span class="arrow">→</span><span>Capacitor / PWA</span><span class="arrow">→</span><span>APK</span>
+          </div>
+          <div class="actions" style="margin-top:26px">
+            <a class="btn btn-ghost" href="https://github.com/AngeLZinS2/TCC-Game_Analytics" target="_blank" rel="noreferrer">Ver o repositório →</a>
+          </div>
+        </div>
+        <div class="card">
+          <b>playdb.info</b> — no ar desde set/2026<br>
+          8 esports · catálogo Steam<br>
+          coleta a cada 5–30 min<br>
+          <b>previsão</b> Bradley-Terry por jogo<br>
+          detalhe ao vivo: vlr.gg · LoL Esports<br>
+          <span style="color:var(--ink-faint)">— falta só empacotar —</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="notify" id="avise">
+    <div class="wrap">
+      <span class="eyebrow">Lançamento</span>
+      <h2>Quer o APK assim que sair?</h2>
+      <p style="color:var(--ink-dim);margin-top:14px;max-width:44ch">Deixa o e-mail. Uma mensagem só, no dia, com o link. Sem lista, sem newsletter.</p>
+      <form class="nform" id="nform">
+        <input type="email" required placeholder="voce@email.com" aria-label="seu e-mail">
+        <button class="btn btn-primary" type="submit">Me avisa</button>
+      </form>
+      <p class="ndone" id="ndone">✓ anotado. te aviso no dia do lançamento.</p>
+      <p class="nsmall">enquanto isso, dá pra "instalar" o site: abrir <a style="color:var(--blue-soft)" href="/">playdb.info</a> no Chrome do celular → menu → adicionar à tela inicial.</p>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>PlayDB · projeto de TCC · <a href="/" style="color:var(--ink-dim)">playdb.info</a></span>
+    <span style="display:flex;gap:10px">
+      <span class="badge-store">▲ Android · em breve</span>
+      <span class="badge-store"> iOS · avaliando</span>
+    </span>
+  </div>
+</footer>
+
+<script>
+(function(){
+  "use strict";
+  var reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  var stage = document.getElementById("stage");
+  var device = document.getElementById("device");
+  var frame = document.getElementById("appFrame");
+  var restX = 6, restY = -17;
+  var curX = restX, curY = restY, baseX = restX, baseY = restY;
+  var dragging = false, startX = 0, startY = 0;
+  var idleTimer;
+
+  function apply(){ device.style.transform = "rotateX("+curX+"deg) rotateY("+curY+"deg)"; }
+
+  function down(e){
+    dragging = true; stage.classList.add("dragging");
+    var p = e.touches ? e.touches[0] : e;
+    startX = p.clientX; startY = p.clientY; baseX = curX; baseY = curY;
+    clearInterval(idleTimer);
+  }
+  function move(e){
+    if(!dragging) return;
+    var p = e.touches ? e.touches[0] : e;
+    var dx = p.clientX - startX, dy = p.clientY - startY;
+    if(e.cancelable && Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 5) e.preventDefault();
+    curY = Math.max(-52, Math.min(52, baseY + dx * 0.34));
+    curX = Math.max(-8, Math.min(22, baseX - dy * 0.12));
+    apply();
+  }
+  function up(){
+    if(!dragging) return;
+    dragging = false; stage.classList.remove("dragging");
+    curX = restX; curY = restY; apply();
+    scheduleIdle();
+  }
+  // qualquer evento que chega aqui NÃO é dentro do iframe (ele engole os seus).
+  // então mousedown/touchstart na moldura = pode girar; na tela = o app cuida.
+  function fromFrame(e){ return e.target === frame; }
+  stage.addEventListener("mousedown", function(e){ if(!fromFrame(e)) down(e); });
+  stage.addEventListener("touchstart", function(e){ if(!fromFrame(e)) down(e); }, {passive:true});
+  window.addEventListener("mousemove", move);
+  window.addEventListener("touchmove", move, {passive:false});
+  window.addEventListener("mouseup", up);
+  window.addEventListener("touchend", up);
+
+  function scheduleIdle(){
+    clearInterval(idleTimer);
+    if(reduce) return;
+    var t = 0;
+    idleTimer = setInterval(function(){
+      if(dragging) return;
+      t += 0.03;
+      device.style.transform = "rotateX("+(restX + Math.sin(t)*1.1)+"deg) rotateY("+(restY + Math.sin(t*0.7)*2.2)+"deg)";
+    }, 40);
+  }
+  apply(); scheduleIdle();
+
+  var form = document.getElementById("nform");
+  form.addEventListener("submit", function(e){
+    e.preventDefault();
+    document.getElementById("ndone").classList.add("show");
+    form.querySelector("input").value = "";
+    try{ localStorage.setItem("playdb_mobile_notify", "1"); }catch(_){}
+  });
+  try{ if(localStorage.getItem("playdb_mobile_notify")) document.getElementById("ndone").classList.add("show"); }catch(_){}
+})();
+</script>
+</body>
+</html>
