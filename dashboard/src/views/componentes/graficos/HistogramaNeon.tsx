@@ -55,7 +55,15 @@ export function HistogramaNeon({
               title={`${faixa.rotulo}: ${formatarValor(faixa.valor)}`}
             >
               {modal && (
-                <div className="absolute -top-7 flex items-center gap-space-xxs rounded bg-primary-container px-space-xs py-space-xxs font-badge-status text-badge-status text-on-primary-container shadow-lg">
+                <div
+                  className={`absolute -top-7 flex items-center gap-space-xxs whitespace-nowrap rounded bg-primary-container px-space-xs py-space-xxs font-badge-status text-badge-status text-on-primary-container shadow-lg ${
+                    indice === 0
+                      ? "left-0"
+                      : indice === faixas.length - 1
+                        ? "right-0"
+                        : "left-1/2 -translate-x-1/2"
+                  }`}
+                >
                   <span
                     className="h-1.5 w-1.5 animate-ping rounded-full bg-on-primary-container"
                     aria-hidden

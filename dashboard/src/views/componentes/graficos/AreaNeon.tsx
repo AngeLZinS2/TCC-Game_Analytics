@@ -111,12 +111,14 @@ export function AreaNeon({
 
   return (
     <div className="relative">
-      {/* Tooltip: acompanha o ponto marcado. */}
+      {/* Tooltip: acompanha o ponto marcado. `left` fica preso na faixa
+          visível para não ser cortado no mobile (a raiz do app é
+          `overflow-x-clip`). */}
       {pontoAtivo && (
         <div
-          className="pointer-events-none absolute z-10 -translate-x-1/2 -translate-y-full rounded border border-outline-variant/50 bg-surface-container-lowest/95 px-space-md py-space-sm shadow-xl"
+          className="pointer-events-none absolute z-10 max-w-[75vw] -translate-x-1/2 -translate-y-full rounded border border-outline-variant/50 bg-surface-container-lowest/95 px-space-md py-space-sm shadow-xl"
           style={{
-            left: `calc(2rem + ${(coordenadas[ativo!].x / LARGURA) * 100}% * 0.94)`,
+            left: `clamp(6.5rem, calc(2rem + ${(coordenadas[ativo!].x / LARGURA) * 100}% * 0.92), calc(100% - 6.5rem))`,
             top: `${(coordenadas[ativo!].y / ALTURA) * 176 - 8}px`,
           }}
         >
@@ -129,7 +131,9 @@ export function AreaNeon({
         </div>
       )}
 
-      <div className="relative">
+      {/* `overflow-hidden`: o brilho/anel do SVG (que é `overflow-visible`)
+          fica preso na caixa e não escapa pra fora no mobile. */}
+      <div className="relative overflow-hidden">
         {/* Grade e rotulos do eixo Y, atras do SVG. */}
         <div className="absolute inset-0 flex flex-col justify-between font-label-caps text-label-caps text-outline">
           {marcasY.map((marca) => (
@@ -220,15 +224,18 @@ export function AreaNeon({
         </svg>
       </div>
 
-      {/* Rotulos do eixo X. Series longas mostram so alguns, senao viram borrao. */}
-      <div className="flex justify-between pl-8 pr-2 pt-space-xs font-label-caps text-label-caps text-outline">
+      {/* Rotulos do eixo X. Poucos de proposito: no mobile, `justify-between`
+          com 7+ datas vira borrao e a ultima estoura a caixa. */}
+      <div className="flex justify-between gap-space-xxs overflow-hidden pl-8 pr-2 pt-space-xs font-label-caps text-label-caps text-outline">
         {pontos.map((ponto, indice) => {
-          const passo = Math.ceil(pontos.length / 8);
+          const passo = Math.ceil(pontos.length / 4);
           if (indice % passo !== 0 && indice !== pontos.length - 1) return null;
           return (
             <span
               key={indice}
-              className={indice === indiceMaximo ? "font-bold text-primary" : undefined}
+              className={`shrink-0 whitespace-nowrap ${
+                indice === indiceMaximo ? "font-bold text-primary" : ""
+              }`}
             >
               {ponto.rotulo}
             </span>

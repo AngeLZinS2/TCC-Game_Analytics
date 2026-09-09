@@ -472,6 +472,72 @@ function Classificador({ modelo }: { modelo?: string }) {
   );
 }
 
+/**
+ * Uma avaliação da lista. O que a pessoa escreveu é o conteúdo — o voto real e
+ * a previsão do modelo ficam num cabeçalho enxuto (ícone + chip), não num
+ * amontoado de selos verdes. Texto longo fica em 4 linhas com "ler tudo".
+ */
+function CartaoAvaliacao({ avaliacao }: { avaliacao: AvaliacaoClassificada }) {
+  const [aberto, setAberto] = useState(false);
+  const recomenda = avaliacao.recomendado;
+  const longo = avaliacao.texto.length > 300;
+  const horas = avaliacao.minutos_jogados
+    ? ` · ${fmtNumero(Math.round(avaliacao.minutos_jogados / 60))} h`
+    : "";
+
+  return (
+    <article className="rounded-xl border border-outline-variant/15 bg-surface-container-low/50 p-space-base">
+      <header className="flex flex-wrap items-center justify-between gap-x-space-md gap-y-space-xs">
+        <div className="flex items-center gap-space-sm">
+          <span
+            className="inline-flex items-center gap-space-xxs font-badge-status text-badge-status uppercase tracking-wide"
+            style={{
+              color: recomenda ? PALETA_POLOS.positivo : PALETA_POLOS.negativo,
+            }}
+          >
+            <Icone
+              nome={recomenda ? "thumb_up" : "thumb_down"}
+              className="text-[13px]"
+            />
+            {recomenda ? "recomenda" : "não recomenda"}
+          </span>
+          <span className="inline-flex items-center gap-space-xxs rounded-full border border-outline-variant/25 px-space-xs py-[2px] font-badge-status text-badge-status uppercase tracking-wide text-on-surface-variant">
+            modelo {fmtPercentual(avaliacao.probabilidade_positiva * 100, 0)}
+            {!avaliacao.acertou && (
+              <span style={{ color: TOKENS.secundaria }}>· errou</span>
+            )}
+          </span>
+        </div>
+        <span
+          className="shrink-0 font-label-caps text-label-caps uppercase tracking-widest text-outline"
+          title={fmtDataHora(avaliacao.criada_em)}
+        >
+          {fmtRelativo(avaliacao.criada_em)}
+          {horas}
+        </span>
+      </header>
+
+      <p
+        className={`mt-space-sm whitespace-pre-line font-body-md text-[15px] leading-[1.65] text-on-surface ${
+          longo && !aberto ? "line-clamp-4" : ""
+        }`}
+      >
+        {avaliacao.texto}
+      </p>
+
+      {longo && (
+        <button
+          type="button"
+          onClick={() => setAberto((a) => !a)}
+          className="mt-space-xs font-badge-status text-badge-status uppercase tracking-wide text-primary transition-colors hover:text-primary-fixed"
+        >
+          {aberto ? "mostrar menos" : "ler tudo"}
+        </button>
+      )}
+    </article>
+  );
+}
+
 export function RecomendacoesReviewsPagina() {
   const [modelo, setModelo] = useState<string | undefined>();
   const [appId, setAppId] = useState<number | null>(null);
@@ -710,13 +776,13 @@ export function RecomendacoesReviewsPagina() {
                       return (
                         <div
                           key={aspecto.aspecto}
-                          className="flex items-center gap-space-sm"
+                          className="flex items-center gap-space-xs sm:gap-space-sm"
                           title={`Termos: ${aspecto.termos.join(", ")}`}
                         >
-                          <span className="w-32 shrink-0 truncate font-body-sm text-body-sm text-on-surface-variant">
+                          <span className="w-20 shrink-0 truncate font-body-sm text-body-sm text-on-surface-variant sm:w-32">
                             {aspecto.aspecto}
                           </span>
-                          <div className="flex-1">
+                          <div className="min-w-0 flex-1">
                             <BarraFina
                               largura={aspecto.percentual_positivo}
                               cor={
@@ -729,7 +795,7 @@ export function RecomendacoesReviewsPagina() {
                             />
                           </div>
                           <span
-                            className="w-14 shrink-0 text-right font-title-code text-title-code tabular-nums"
+                            className="w-10 shrink-0 text-right font-title-code text-title-code tabular-nums sm:w-14"
                             style={{
                               color: poucos
                                 ? TOKENS.contorno
@@ -738,7 +804,7 @@ export function RecomendacoesReviewsPagina() {
                           >
                             {fmtPercentual(aspecto.percentual_positivo, 0)}
                           </span>
-                          <span className="w-14 shrink-0 text-right font-label-caps text-label-caps text-outline">
+                          <span className="w-10 shrink-0 text-right font-label-caps text-label-caps text-outline sm:w-14">
                             {fmtNumero(aspecto.avaliacoes)}
                           </span>
                         </div>
@@ -786,58 +852,13 @@ export function RecomendacoesReviewsPagina() {
               }
             >
               {(lista: AvaliacaoClassificada[]) => (
-                <div className="space-y-space-sm">
-                  {lista.map((avaliacao) => {
-                    const previstaPositiva = avaliacao.probabilidade_positiva >= 0.5;
-                    const cor = previstaPositiva
-                      ? PALETA_POLOS.positivo
-                      : PALETA_POLOS.negativo;
-
-                    return (
-                      <article
-                        key={avaliacao.id_externo}
-                        className="rounded-lg bg-surface-container-lowest p-space-base"
-                        style={{ boxShadow: `inset 3px 0 0 ${cor}` }}
-                      >
-                        <div className="flex flex-wrap items-center justify-between gap-space-sm">
-                          <div className="flex flex-wrap items-center gap-space-xs">
-                            <Selo cor={avaliacao.recomendado ? "positivo" : "negativo"}>
-                              Autor: {avaliacao.recomendado ? "recomenda" : "não recomenda"}
-                            </Selo>
-                            <span
-                              className="inline-flex items-center gap-space-xxs rounded px-space-xs py-space-xxs font-badge-status text-badge-status uppercase"
-                              style={{ background: `${cor}1a`, color: cor }}
-                            >
-                              Modelo:{" "}
-                              {fmtPercentual(avaliacao.probabilidade_positiva * 100, 0)}{" "}
-                              positiva
-                            </span>
-                            {avaliacao.acertou ? (
-                              <Selo cor="positivo">Acertou</Selo>
-                            ) : (
-                              <Selo cor="negativo">Errou</Selo>
-                            )}
-                          </div>
-
-                          <span
-                            className="font-label-caps text-label-caps uppercase tracking-widest text-outline"
-                            title={fmtDataHora(avaliacao.criada_em)}
-                          >
-                            {fmtRelativo(avaliacao.criada_em)}
-                            {avaliacao.minutos_jogados
-                              ? ` · ${fmtNumero(Math.round(avaliacao.minutos_jogados / 60))}h jogadas`
-                              : ""}
-                          </span>
-                        </div>
-
-                        <p className="mt-space-sm whitespace-pre-line font-body-md text-body-md text-on-surface-variant">
-                          {avaliacao.texto.length > 420
-                            ? `${avaliacao.texto.slice(0, 420)}…`
-                            : avaliacao.texto}
-                        </p>
-                      </article>
-                    );
-                  })}
+                <div className="max-w-[42rem] space-y-space-sm">
+                  {lista.map((avaliacao) => (
+                    <CartaoAvaliacao
+                      key={avaliacao.id_externo}
+                      avaliacao={avaliacao}
+                    />
+                  ))}
                 </div>
               )}
             </Consulta>
