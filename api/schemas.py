@@ -1088,8 +1088,10 @@ class ConfrontoAoVivo(BaseModel):
     torneio: str | None = None
     formato: str | None = None
     inicio_previsto: datetime
-    #: `True` quando ja passou do horario previsto e ainda nao tem placar.
+    #: `True` quando esta MESMO acontecendo (status running, ou comecou ha pouco).
     ao_vivo: bool = False
+    #: URL da transmissao oficial, quando a fonte expoe uma (PandaScore).
+    stream_url: str | None = None
 
 
 class DestaqueConfronto(ConfrontoAoVivo):

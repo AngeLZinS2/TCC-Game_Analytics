@@ -35,7 +35,7 @@ import { Icone } from "../componentes/base";
 import { MenuEsports } from "../componentes/MenuEsports";
 import { NAVEGACAO, type ItemNavegacao } from "./navegacao";
 import { corDoJogo } from "../tema";
-import { fmtRelativo } from "../utilitarios/formatos";
+import { fmtQuando } from "../utilitarios/formatos";
 
 /** O rotulo de cada sub-aba de E-Sports, para o "voce esta aqui". */
 const ABAS_ESPORTS: Record<string, string> = {
@@ -148,7 +148,7 @@ function Ticker() {
             <span className="text-outline">vs</span>
             <span className="text-on-surface">{c.equipe_b_nome}</span>
             <span className="text-outline">
-              {c.ao_vivo ? "· ao vivo" : `· ${fmtRelativo(c.inicio_previsto)}`}
+              {c.ao_vivo ? "· ao vivo" : `· ${fmtQuando(c.inicio_previsto)}`}
             </span>
           </span>
         ))}

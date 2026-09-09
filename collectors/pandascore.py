@@ -83,6 +83,11 @@ class ConfrontoPandaScore:
     equipe_b_logo: str | None = None
     equipe_a_tag: str | None = None
     equipe_b_tag: str | None = None
+    #: `status` da PandaScore: `not_started`, `running`, `finished`, ... — a
+    #: verdade sobre se a partida está mesmo acontecendo. `stream_url` é a live
+    #: oficial quando há. Vão para `agenda_partida.detalhe`.
+    status: str | None = None
+    stream_url: str | None = None
 
 
 @dataclass
@@ -106,6 +111,33 @@ def _instante(*candidatos: str | None) -> datetime | None:
             continue
         return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
     return None
+
+
+def _stream_da_partida(partida: dict[str, Any]) -> str | None:
+    """A URL da transmissão oficial, se a PandaScore expõe uma.
+
+    Prefere a marcada como `official` e `main`; depois qualquer `main`; depois
+    `official_stream_url` / `live.url`. Devolve o link cru (para abrir), não o
+    embed.
+    """
+    lista = partida.get("streams_list") or []
+    marcadas = [s for s in lista if isinstance(s, dict) and (s.get("raw_url") or s.get("embed_url"))]
+
+    def _url(s: dict[str, Any]) -> str | None:
+        return s.get("raw_url") or s.get("embed_url")
+
+    for filtro in (
+        lambda s: s.get("official") and s.get("main"),
+        lambda s: s.get("main"),
+        lambda s: s.get("official"),
+        lambda s: True,
+    ):
+        for s in marcadas:
+            if filtro(s):
+                return _url(s)
+
+    direto = partida.get("official_stream_url") or (partida.get("live") or {}).get("url")
+    return direto or None
 
 
 def _rotulo_torneio(partida: dict[str, Any]) -> str | None:
@@ -193,6 +225,8 @@ def _para_confronto(
         equipe_b_logo=b.get("image_url") or None,
         equipe_a_tag=_sigla(a),
         equipe_b_tag=_sigla(b),
+        status=status if isinstance(status, str) else None,
+        stream_url=_stream_da_partida(partida) if status in ("running", "not_started") else None,
     )
 
 
@@ -283,7 +317,16 @@ class PandaScoreCollector(BaseCollector[ResultadoPandaScore]):
 
         registros: list[RawRecord] = []
 
-        # 1. Próximas partidas: a lista direta, todos os tiers. O `parse` corta
+        # 1. Ao vivo AGORA: é o que diz se uma partida está mesmo acontecendo.
+        #    Sem esta chamada, uma partida que começou some do `upcoming` e só
+        #    volta como `finished` horas depois — no meio fica "no limbo".
+        registros += self._paginar(
+            "matches/running",
+            {"sort": "begin_at"},
+            rotulo="running",
+        )
+
+        # 2. Próximas partidas: a lista direta, todos os tiers. O `parse` corta
         #    pelo tier — assim uma partida tier-c de uma série em andamento não
         #    depende do torneio dela estar no top-20.
         registros += self._paginar(

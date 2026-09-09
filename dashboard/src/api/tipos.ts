@@ -879,8 +879,10 @@ export interface ConfrontoAoVivo {
   torneio: string | null;
   formato: string | null;
   inicio_previsto: string;
-  /** `true` quando já passou do horário previsto e ainda não tem placar. */
+  /** `true` quando está mesmo acontecendo (status running, ou começou há pouco). */
   ao_vivo: boolean;
+  /** URL da transmissão oficial, quando a fonte expõe uma. */
+  stream_url: string | null;
 }
 
 export interface DestaqueConfronto extends ConfrontoAoVivo {

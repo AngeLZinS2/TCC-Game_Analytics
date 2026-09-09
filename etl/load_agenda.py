@@ -94,6 +94,25 @@ def _preencher_escudos(
         )
 
 
+def _detalhe(c: ConfrontoAgenda) -> dict | None:
+    """`{status, stream_url}` para `agenda_partida.detalhe`, se a fonte trouxe.
+
+    Só a PandaScore preenche `status`/`stream_url` (o resto usa `getattr`, que
+    devolve `None`). Sem nenhum dos dois, retorna `None` e o `coalesce` do
+    upsert preserva o que já estava.
+    """
+    status = getattr(c, "status", None)
+    stream = getattr(c, "stream_url", None)
+    if not status and not stream:
+        return None
+    d: dict = {"fonte": "pandascore"}
+    if status:
+        d["status"] = status
+    if stream:
+        d["stream_url"] = stream
+    return d
+
+
 def carregar_agenda(
     jogo_codigo: str,
     confrontos: Iterable[ConfrontoAgenda],
@@ -191,6 +210,9 @@ def carregar_agenda(
                 "vitoria_a": c.vitoria_a,
                 "placar_a": c.placar_a,
                 "placar_b": c.placar_b,
+                # `status` (running/not_started) e a live oficial — só a
+                # PandaScore preenche; vlr/hltv/Liquipedia deixam nulo.
+                "detalhe": _detalhe(c),
             }
             for c in confrontos
         ]
@@ -209,6 +231,11 @@ def carregar_agenda(
                     "vitoria_a": stmt.excluded.vitoria_a,
                     "placar_a": stmt.excluded.placar_a,
                     "placar_b": stmt.excluded.placar_b,
+                    # `coalesce`: se esta rodada não trouxe `detalhe` (fonte que
+                    # não preenche, ou payload sem stream), o que já estava fica.
+                    "detalhe": func.coalesce(
+                        stmt.excluded.detalhe, AgendaPartida.detalhe
+                    ),
                 },
             )
         )

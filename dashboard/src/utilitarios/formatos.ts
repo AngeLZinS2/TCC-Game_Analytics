@@ -116,6 +116,31 @@ export function fmtRelativo(iso: string | null | undefined): string {
 }
 
 /**
+ * "Quando" nos DOIS sentidos: `em 3 h` para o futuro, `há 5 min` para o
+ * passado, `agora` no meio. O `fmtRelativo` só olha para trás (foi feito para
+ * "última coleta"); a agenda de partidas precisa dos dois lados.
+ */
+export function fmtQuando(iso: string | null | undefined): string {
+  if (!iso) return VAZIO;
+  const delta = (new Date(iso).getTime() - Date.now()) / 1000;
+  const abs = Math.abs(delta);
+  if (abs < 60) return "agora";
+
+  const escalas: [limite: number, divisor: number, sufixo: string][] = [
+    [3600, 60, "min"],
+    [86400, 3600, "h"],
+    [2592000, 86400, "d"],
+  ];
+  for (const [limite, divisor, sufixo] of escalas) {
+    if (abs < limite) {
+      const n = Math.round(abs / divisor);
+      return delta > 0 ? `em ${n} ${sufixo}` : `há ${n} ${sufixo}`;
+    }
+  }
+  return fmtData(iso);
+}
+
+/**
  * Classificacao da Steam traduzida e classificada em polaridade.
  *
  * A Steam devolve o rotulo em ingles ("Very Positive"); a tela inteira e em

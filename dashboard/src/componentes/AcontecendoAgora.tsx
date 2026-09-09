@@ -1,9 +1,14 @@
 /**
- * O topo da home: o confronto em destaque (com velocímetro do modelo) e a
- * grade "Acontecendo agora" de todos os jogos.
+ * Dois pedaços da home, do mesmo endpoint (`/api/home/destaques`, cache
+ * compartilhado):
  *
- * Lê `/api/home/destaques` sozinho. Se não há nada por vir em jogo nenhum, a
- * seção não renderiza — a home segue com os KPIs abaixo.
+ * - `<AcontecendoAgora>` — a grade de confrontos ao vivo / prestes a começar,
+ *   de todos os jogos. "Ao vivo" só quando está MESMO acontecendo (status da
+ *   PandaScore, ou começou há < 90 min). Card com transmissão vira link.
+ * - `<DestaqueDoDia>` — o card do velocímetro, um confronto com a previsão do
+ *   modelo. Fica mais abaixo, entre as métricas da Steam e as coletas.
+ *
+ * Cada um some sozinho quando não há o que mostrar.
  */
 
 import { Link } from "react-router-dom";
@@ -11,7 +16,7 @@ import { Link } from "react-router-dom";
 import { useDestaquesHome } from "../api/consultas";
 import type { ConfrontoAoVivo, DestaqueConfronto } from "../api/tipos";
 import { corDoJogo, TOKENS } from "../tema";
-import { fmtDataHora, fmtRelativo } from "../utilitarios/formatos";
+import { fmtDataHora, fmtQuando } from "../utilitarios/formatos";
 import { Icone, Selo } from "./base";
 import { Velocimetro } from "./Velocimetro";
 
@@ -63,11 +68,8 @@ function EtiquetaJogo({ jogo, nome }: { jogo: string; nome: string }) {
 }
 
 function CartaoAoVivo({ c }: { c: ConfrontoAoVivo }) {
-  return (
-    <div
-      className="flex flex-col gap-space-xs overflow-hidden rounded-lg border border-outline-variant/25 bg-surface-container-lowest"
-      style={{ borderLeft: `3px solid ${corDoJogo(c.jogo)}` }}
-    >
+  const corpo = (
+    <>
       <div className="flex items-center justify-between gap-space-xs px-space-sm pt-space-xs">
         <EtiquetaJogo jogo={c.jogo} nome={c.jogo_nome} />
         {c.ao_vivo ? (
@@ -80,7 +82,7 @@ function CartaoAoVivo({ c }: { c: ConfrontoAoVivo }) {
             className="font-badge-status text-badge-status tabular-nums text-outline"
             title={fmtDataHora(c.inicio_previsto)}
           >
-            {fmtRelativo(c.inicio_previsto)}
+            {fmtQuando(c.inicio_previsto)}
           </span>
         )}
       </div>
@@ -100,38 +102,91 @@ function CartaoAoVivo({ c }: { c: ConfrontoAoVivo }) {
         </div>
       </div>
 
-      <div className="truncate px-space-sm pb-space-xs font-body-sm text-body-sm text-outline">
-        {c.torneio ?? "—"}
+      <div className="flex items-center justify-between gap-space-xs px-space-sm pb-space-xs font-body-sm text-body-sm text-outline">
+        <span className="min-w-0 truncate">{c.torneio ?? "—"}</span>
+        {c.stream_url && (
+          <span className="inline-flex shrink-0 items-center gap-space-xxs text-primary">
+            <Icone nome="play_circle" className="text-[14px]" />
+            assistir
+          </span>
+        )}
       </div>
+    </>
+  );
+
+  const classe =
+    "flex flex-col gap-space-xs overflow-hidden rounded-lg border border-outline-variant/25 bg-surface-container-lowest";
+  const estilo = { borderLeft: `3px solid ${corDoJogo(c.jogo)}` };
+
+  if (c.stream_url) {
+    return (
+      <a
+        href={c.stream_url}
+        target="_blank"
+        rel="noreferrer"
+        className={`${classe} transition-colors hover:border-primary-container/50 hover:bg-surface-container`}
+        style={estilo}
+      >
+        {corpo}
+      </a>
+    );
+  }
+  return (
+    <div className={classe} style={estilo}>
+      {corpo}
     </div>
   );
 }
 
-function Destaque({ c }: { c: DestaqueConfronto }) {
+export function AcontecendoAgora() {
+  const { data } = useDestaquesHome();
+  const itens = data?.ao_vivo ?? [];
+  if (itens.length === 0) return null;
+
+  const nVivos = itens.filter((c) => c.ao_vivo).length;
+
+  return (
+    <section className="flex flex-col gap-space-sm">
+      <div className="flex items-center justify-between gap-space-sm">
+        <h2 className="flex items-center gap-space-xs font-headline-sm text-headline-sm uppercase tracking-wide text-on-surface">
+          <Icone nome="sensors" className="text-[20px] text-primary" />
+          Acontecendo agora
+        </h2>
+        <Selo cor={nVivos > 0 ? "negativo" : "primario"}>
+          {nVivos > 0 ? `${nVivos} ao vivo` : `${itens.length} marcados`}
+        </Selo>
+      </div>
+      <div className="grid grid-cols-1 gap-space-sm sm:grid-cols-2 xl:grid-cols-3">
+        {itens.map((c) => (
+          <CartaoAoVivo key={`${c.jogo}:${c.id_externo}`} c={c} />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function DestaqueCard({ c }: { c: DestaqueConfronto }) {
   const favoritoA = c.probabilidade_a >= 0.5;
   const pctA = Math.round(c.probabilidade_a * 100);
 
   return (
-    <div className="flex flex-col gap-space-md rounded-xl border border-outline-variant/25 bg-surface-container-low/90 p-space-base shadow-2xl">
-      <div className="flex items-center justify-between gap-space-sm">
-        <h2 className="flex items-center gap-space-xs font-headline-sm text-headline-sm uppercase tracking-wide text-on-surface">
-          <span style={{ color: TOKENS.modelo }}>
-            <Icone nome="speed" className="text-[20px]" />
+    <div className="flex flex-col gap-space-md rounded-xl border border-outline-variant/25 bg-surface-container-low/90 p-space-base shadow-2xl xl:flex-row xl:items-center xl:gap-space-xl xl:p-space-lg">
+      <div className="flex shrink-0 flex-col items-center gap-space-xs">
+        <div className="flex w-full items-center justify-between gap-space-sm">
+          <h2 className="flex items-center gap-space-xs font-headline-sm text-headline-sm uppercase tracking-wide text-on-surface">
+            <span style={{ color: TOKENS.modelo }}>
+              <Icone nome="speed" className="text-[20px]" />
+            </span>
+            Destaque do dia
+          </h2>
+          <span
+            className="inline-flex items-center gap-space-xxs rounded px-space-xs py-space-xxs font-badge-status text-badge-status uppercase tracking-wider"
+            style={{ color: TOKENS.modelo, background: `${TOKENS.modelo}14` }}
+          >
+            <Icone nome="bolt" className="text-[13px]" />
+            previsão
           </span>
-          Destaque do dia
-        </h2>
-        <span
-          className="inline-flex items-center gap-space-xxs rounded px-space-xs py-space-xxs font-badge-status text-badge-status uppercase tracking-wider"
-          style={{ color: TOKENS.modelo, background: `${TOKENS.modelo}14` }}
-        >
-          <Icone nome="bolt" className="text-[13px]" />
-          previsão
-        </span>
-      </div>
-
-      <EtiquetaJogo jogo={c.jogo} nome={`${c.jogo_nome} · ${c.torneio ?? "—"}`} />
-
-      <div className="flex justify-center py-space-xs">
+        </div>
         <Velocimetro
           probabilidade={c.probabilidade_a}
           rotulo={(c.equipe_a_tag || c.equipe_a_nome).slice(0, 16)}
@@ -139,90 +194,77 @@ function Destaque({ c }: { c: DestaqueConfronto }) {
         />
       </div>
 
-      <div className="flex flex-col gap-space-xxs">
-        <div
-          className="flex items-center gap-space-xs rounded px-space-xs py-space-xxs"
-          style={{ background: favoritoA ? `${TOKENS.modelo}12` : undefined }}
-        >
-          <Escudo logo={c.equipe_a_logo} tag={c.equipe_a_tag} nome={c.equipe_a_nome} tamanho={26} />
-          <span
-            className={`min-w-0 flex-1 truncate font-title-code text-title-code ${
-              favoritoA ? "font-bold text-on-surface" : "text-on-surface-variant"
-            }`}
+      <div className="min-w-0 flex-1">
+        <EtiquetaJogo jogo={c.jogo} nome={`${c.jogo_nome} · ${c.torneio ?? "—"}`} />
+        <div className="mt-space-sm flex flex-col gap-space-xxs">
+          <div
+            className="flex items-center gap-space-xs rounded px-space-xs py-space-xxs"
+            style={{ background: favoritoA ? `${TOKENS.modelo}12` : undefined }}
           >
-            {c.equipe_a_nome}
-          </span>
-          <span className="shrink-0 font-headline-sm text-headline-sm tabular-nums text-on-surface">
-            {pctA}%
-          </span>
-        </div>
-        <div
-          className="flex items-center gap-space-xs rounded px-space-xs py-space-xxs"
-          style={{ background: !favoritoA ? `${TOKENS.modelo}12` : undefined }}
-        >
-          <Escudo logo={c.equipe_b_logo} tag={c.equipe_b_tag} nome={c.equipe_b_nome} tamanho={26} />
-          <span
-            className={`min-w-0 flex-1 truncate font-title-code text-title-code ${
-              !favoritoA ? "font-bold text-on-surface" : "text-on-surface-variant"
-            }`}
+            <Escudo logo={c.equipe_a_logo} tag={c.equipe_a_tag} nome={c.equipe_a_nome} tamanho={26} />
+            <span
+              className={`min-w-0 flex-1 truncate font-title-code text-title-code ${
+                favoritoA ? "font-bold text-on-surface" : "text-on-surface-variant"
+              }`}
+            >
+              {c.equipe_a_nome}
+            </span>
+            <span className="shrink-0 font-headline-sm text-headline-sm tabular-nums text-on-surface">
+              {pctA}%
+            </span>
+          </div>
+          <div
+            className="flex items-center gap-space-xs rounded px-space-xs py-space-xxs"
+            style={{ background: !favoritoA ? `${TOKENS.modelo}12` : undefined }}
           >
-            {c.equipe_b_nome}
-          </span>
-          <span className="shrink-0 font-headline-sm text-headline-sm tabular-nums text-on-surface">
-            {100 - pctA}%
-          </span>
+            <Escudo logo={c.equipe_b_logo} tag={c.equipe_b_tag} nome={c.equipe_b_nome} tamanho={26} />
+            <span
+              className={`min-w-0 flex-1 truncate font-title-code text-title-code ${
+                !favoritoA ? "font-bold text-on-surface" : "text-on-surface-variant"
+              }`}
+            >
+              {c.equipe_b_nome}
+            </span>
+            <span className="shrink-0 font-headline-sm text-headline-sm tabular-nums text-on-surface">
+              {100 - pctA}%
+            </span>
+          </div>
         </div>
-      </div>
 
-      <div className="flex items-center justify-between gap-space-sm border-t border-outline-variant/20 pt-space-sm font-badge-status text-badge-status uppercase tracking-wider text-outline">
-        <span className="flex items-center gap-space-xs">
+        <div className="mt-space-sm flex flex-wrap items-center gap-space-sm border-t border-outline-variant/20 pt-space-sm font-badge-status text-badge-status uppercase tracking-wider text-outline">
           {c.formato && (
             <span className="rounded bg-surface-container px-space-xxs py-[1px] text-on-surface-variant">
               {c.formato}
             </span>
           )}
           <span className="tabular-nums" title={fmtDataHora(c.inicio_previsto)}>
-            {fmtRelativo(c.inicio_previsto)}
+            {c.ao_vivo ? "ao vivo" : fmtQuando(c.inicio_previsto)}
           </span>
-        </span>
-        <Link
-          to={`/esports/${c.jogo}/previsao`}
-          className="inline-flex items-center gap-space-xxs text-primary hover:text-primary-fixed"
-        >
-          abrir análise <Icone nome="arrow_forward" className="text-[14px]" />
-        </Link>
+          {c.stream_url && (
+            <a
+              href={c.stream_url}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-space-xxs text-primary hover:text-primary-fixed"
+            >
+              <Icone nome="play_circle" className="text-[14px]" />
+              assistir
+            </a>
+          )}
+          <Link
+            to={`/esports/${c.jogo}/previsao`}
+            className="ml-auto inline-flex items-center gap-space-xxs text-primary hover:text-primary-fixed"
+          >
+            abrir análise <Icone nome="arrow_forward" className="text-[14px]" />
+          </Link>
+        </div>
       </div>
     </div>
   );
 }
 
-export function AcontecendoAgora() {
+export function DestaqueDoDia() {
   const { data } = useDestaquesHome();
-
-  if (!data || (data.ao_vivo.length === 0 && !data.destaque)) return null;
-
-  return (
-    <section className="grid grid-cols-1 gap-space-base xl:grid-cols-[minmax(0,22rem)_1fr]">
-      {data.destaque ? (
-        <Destaque c={data.destaque} />
-      ) : (
-        <div />
-      )}
-
-      <div className="flex flex-col gap-space-sm">
-        <div className="flex items-center justify-between gap-space-sm">
-          <h2 className="flex items-center gap-space-xs font-headline-sm text-headline-sm uppercase tracking-wide text-on-surface">
-            <Icone nome="sensors" className="text-[20px] text-primary" />
-            Acontecendo agora
-          </h2>
-          <Selo cor="primario">{data.ao_vivo.length} confrontos</Selo>
-        </div>
-        <div className="grid grid-cols-1 gap-space-sm sm:grid-cols-2">
-          {data.ao_vivo.map((c) => (
-            <CartaoAoVivo key={`${c.jogo}:${c.id_externo}`} c={c} />
-          ))}
-        </div>
-      </div>
-    </section>
-  );
+  if (!data?.destaque) return null;
+  return <DestaqueCard c={data.destaque} />;
 }
