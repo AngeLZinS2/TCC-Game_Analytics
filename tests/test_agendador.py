@@ -154,6 +154,7 @@ def test_intervalos_vem_da_configuracao():
         agendador_rlcs_minutos = 1440
         agendador_dltv_minutos = 1440
         agendador_vlr_detalhes_minutos = 1440
+        agendador_lolesports_minutos = 1440
         agendador_treino_confronto_minutos = 480
         agendador_pandascore_minutos = 30
         opgg_enabled = True
@@ -182,6 +183,7 @@ def test_intervalos_vem_da_configuracao():
         "rlcs": 86400,
         "dltv": 86400,
         "vlr_detalhes": 86400,
+        "lolesports": 86400,
         "treino_confronto": 28800,
         "agentes_valorant": 604800,
         "campeoes_lol": 604800,
@@ -211,6 +213,7 @@ def test_tarefa_de_preco_so_entra_com_chave_do_itad():
         agendador_rlcs_minutos = 1440
         agendador_dltv_minutos = 1440
         agendador_vlr_detalhes_minutos = 1440
+        agendador_lolesports_minutos = 1440
         agendador_treino_confronto_minutos = 480
         agendador_pandascore_minutos = 30
         opgg_enabled = True
@@ -244,6 +247,7 @@ def test_tarefa_de_tempo_jogo_nao_entra_quando_desabilitada():
         agendador_rlcs_minutos = 1440
         agendador_dltv_minutos = 1440
         agendador_vlr_detalhes_minutos = 1440
+        agendador_lolesports_minutos = 1440
         agendador_treino_confronto_minutos = 480
         agendador_pandascore_minutos = 30
         opgg_enabled = True
@@ -277,6 +281,7 @@ def test_pandascore_troca_o_hltv_quando_ha_chave():
         agendador_rlcs_minutos = 1440
         agendador_dltv_minutos = 1440
         agendador_vlr_detalhes_minutos = 1440
+        agendador_lolesports_minutos = 1440
         agendador_treino_confronto_minutos = 480
         agendador_pandascore_minutos = 30
         opgg_enabled = True

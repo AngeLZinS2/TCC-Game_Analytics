@@ -247,6 +247,12 @@ class Settings(BaseSettings):
     #: pagina e pesada (~700 KB).
     agendador_vlr_detalhes_minutos: int = Field(default=20, ge=5)
 
+    #: Intervalo do detalhe ao vivo de partidas de LoL (API oficial da LoL
+    #: Esports). Curto — o `feed.lolesports.com/livestats` é ao vivo e o
+    #: coletor só olha as partidas perto do horário (0-2 por vez), mas o
+    #: placar/farm anda rápido durante o jogo.
+    agendador_lolesports_minutos: int = Field(default=5, ge=3)
+
     #: Intervalo entre reajustes da previsao de confronto, em minutos.
     #:
     #: Oito horas, um pouco atras da coleta mais rapida que o alimenta (a do

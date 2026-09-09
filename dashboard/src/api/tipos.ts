@@ -834,6 +834,19 @@ export interface JogadorNoMapa {
   a: number | null;
   adr: number | null;
   hs: number | null;
+  /** LoL: campeão, papel, farm, ouro, nível. */
+  campeao: string | null;
+  papel: string | null;
+  cs: number | null;
+  ouro: number | null;
+  nivel: number | null;
+}
+
+export interface ObjetivosNoMapa {
+  torres: number | null;
+  baroes: number | null;
+  dragoes: number | null;
+  ouro: number | null;
 }
 
 export interface MapaDoConfronto {
@@ -841,6 +854,8 @@ export interface MapaDoConfronto {
   duracao: string | null;
   placar_a: number | null;
   placar_b: number | null;
+  objetivos_a: ObjetivosNoMapa | null;
+  objetivos_b: ObjetivosNoMapa | null;
   jogadores: JogadorNoMapa[];
 }
 

@@ -4,12 +4,14 @@
  *
  * Cabeçalho: status (EM BREVE / AO VIVO / ENCERRADA), os dois times com o
  * placar da série, o evento, o formato e o horário. Abaixo: onde assistir
- * (todos os canais), o resultado mapa a mapa, e — quando a fonte tem
- * (Valorant, do vlr.gg) — a linha de cada jogador por mapa.
+ * (todos os canais), o resultado mapa a mapa, e — quando a fonte tem — a linha
+ * de cada jogador por mapa: Valorant (agente/ACS/K-D-A, do vlr.gg) e LoL
+ * (campeão/K-D-A/CS/ouro + objetivos, da API oficial da LoL Esports, ao vivo).
  *
  * Vem de `/api/partidas/confronto-detalhe`, que lê `agenda_partida` +
  * `agenda_partida.detalhe`. O plano free da PandaScore dá status + placar de
- * série + vencedor de cada mapa; stats por jogador só o scraping do vlr.gg.
+ * série + vencedor de cada mapa; stats por jogador só o scraping do vlr.gg / o
+ * feed livestats da LoL Esports.
  */
 
 import { useConfrontoDetalhe } from "../api/consultas";
@@ -341,6 +343,135 @@ function TabelaTime({
   );
 }
 
+/* ---------------------- Scoreboard por jogador (LoL) ---------------------- */
+
+function LinhaKda({ j }: { j: JogadorNoMapa }) {
+  return (
+    <span className="font-title-code text-title-code tabular-nums text-on-surface">
+      {j.k ?? "—"}<span className="text-outline"> / </span>
+      {j.d ?? "—"}<span className="text-outline"> / </span>
+      {j.a ?? "—"}
+    </span>
+  );
+}
+
+function TabelaTimeLol({
+  time,
+  jogadores,
+}: {
+  time: string;
+  jogadores: JogadorNoMapa[];
+}) {
+  return (
+    <div className="rolagem-discreta overflow-x-auto rounded-lg bg-surface-container-lowest">
+      <table className="w-full border-collapse text-left">
+        <thead>
+          <tr className="bg-surface-container font-label-caps text-label-caps uppercase tracking-wider text-outline">
+            <th className="px-space-sm py-space-xs">{time || "Time"}</th>
+            <th className="px-space-sm py-space-xs text-right">K / D / A</th>
+            <th className="px-space-sm py-space-xs text-right">CS</th>
+            <th className="px-space-sm py-space-xs text-right">Ouro</th>
+          </tr>
+        </thead>
+        <tbody className="font-body-md text-body-sm">
+          {jogadores.map((j, i) => (
+            <tr key={`${j.nome}-${i}`} className={i % 2 ? "bg-[#131824]" : "bg-[#10141D]"}>
+              <td className="px-space-sm py-space-xs">
+                <div className="flex items-center gap-space-xs">
+                  <span className="font-title-code text-title-code text-on-surface">
+                    {j.nome}
+                  </span>
+                  {j.campeao && (
+                    <span className="rounded bg-surface-container px-space-xxs font-badge-status text-badge-status uppercase text-secondary">
+                      {j.campeao}
+                    </span>
+                  )}
+                </div>
+              </td>
+              <td className="px-space-sm py-space-xs text-right">
+                <LinhaKda j={j} />
+              </td>
+              <Num valor={j.cs} />
+              <td className="px-space-sm py-space-xs text-right font-title-code text-title-code tabular-nums text-on-surface">
+                {j.ouro == null ? "—" : `${(j.ouro / 1000).toFixed(1)}k`}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function Objetivos({ o }: { o: NonNullable<MapaDoConfronto["objetivos_a"]> }) {
+  const itens: [string, number | null][] = [
+    ["Torres", o.torres],
+    ["Dragões", o.dragoes],
+    ["Barões", o.baroes],
+  ];
+  return (
+    <span className="flex flex-wrap items-center gap-x-space-sm gap-y-space-xxs font-badge-status text-badge-status uppercase tracking-wider text-outline">
+      {itens.map(([rotulo, v]) => (
+        <span key={rotulo} className="tabular-nums">
+          {rotulo} <span className="text-on-surface">{v ?? 0}</span>
+        </span>
+      ))}
+      {o.ouro != null && (
+        <span className="tabular-nums">
+          Ouro <span className="text-on-surface">{(o.ouro / 1000).toFixed(1)}k</span>
+        </span>
+      )}
+    </span>
+  );
+}
+
+function CardMapaLol({
+  mapa,
+  timeA,
+  timeB,
+}: {
+  mapa: MapaDoConfronto;
+  timeA: string;
+  timeB: string;
+}) {
+  const jogA = mapa.jogadores.filter((j) => j.time !== timeB);
+  const jogB = mapa.jogadores.filter((j) => j.time === timeB);
+  const venceuA =
+    mapa.placar_a != null && mapa.placar_b != null && mapa.placar_a > mapa.placar_b;
+  const venceuB =
+    mapa.placar_a != null && mapa.placar_b != null && mapa.placar_b > mapa.placar_a;
+
+  return (
+    <div className="space-y-space-sm rounded-xl bg-surface-container-low p-space-base">
+      <div className="flex flex-wrap items-baseline justify-between gap-space-sm border-b border-outline-variant/30 pb-space-xs">
+        <h3 className="font-headline-sm text-headline-sm uppercase tracking-wide text-primary">
+          {mapa.nome ?? "Jogo"}
+        </h3>
+        <div className="flex items-baseline gap-space-xs font-headline-sm text-headline-sm tabular-nums">
+          <span className={venceuA ? "text-tertiary" : "text-outline"}>
+            {mapa.placar_a ?? "-"}
+          </span>
+          <span className="text-outline">:</span>
+          <span className={venceuB ? "text-tertiary" : "text-outline"}>
+            {mapa.placar_b ?? "-"}
+          </span>
+        </div>
+      </div>
+
+      <div className="grid gap-space-sm lg:grid-cols-2">
+        <div className="space-y-space-xxs">
+          {mapa.objetivos_a && <Objetivos o={mapa.objetivos_a} />}
+          <TabelaTimeLol time={timeA} jogadores={jogA} />
+        </div>
+        <div className="space-y-space-xxs">
+          {mapa.objetivos_b && <Objetivos o={mapa.objetivos_b} />}
+          <TabelaTimeLol time={timeB} jogadores={jogB} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /** Um mapa: cabecalho com placar e duracao, e as duas tabelas de time. */
 function CardMapa({
   mapa,
@@ -449,14 +580,23 @@ export function ModalConfrontoDetalhe({
                 <div className="space-y-space-base">
                   {d.mapas
                     .filter((m) => m.jogadores.length > 0)
-                    .map((mapa, i) => (
-                      <CardMapa
-                        key={`${mapa.nome ?? "mapa"}-${i}`}
-                        mapa={mapa}
-                        timeA={d.equipe_a_nome}
-                        timeB={d.equipe_b_nome}
-                      />
-                    ))}
+                    .map((mapa, i) =>
+                      d.jogo === "leagueoflegends" ? (
+                        <CardMapaLol
+                          key={`${mapa.nome ?? "jogo"}-${i}`}
+                          mapa={mapa}
+                          timeA={d.equipe_a_nome}
+                          timeB={d.equipe_b_nome}
+                        />
+                      ) : (
+                        <CardMapa
+                          key={`${mapa.nome ?? "mapa"}-${i}`}
+                          mapa={mapa}
+                          timeA={d.equipe_a_nome}
+                          timeB={d.equipe_b_nome}
+                        />
+                      ),
+                    )}
                 </div>
               )}
 

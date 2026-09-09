@@ -594,6 +594,8 @@ def confronto_detalhe(
                 duracao=m.get("duracao"),
                 placar_a=m.get("placar_a"),
                 placar_b=m.get("placar_b"),
+                objetivos_a=m.get("objetivos_a"),
+                objetivos_b=m.get("objetivos_b"),
                 jogadores=[
                     JogadorNoMapa(**{c: j.get(c) for c in JogadorNoMapa.model_fields})
                     for j in m.get("jogadores") or []

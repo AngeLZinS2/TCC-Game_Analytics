@@ -34,6 +34,7 @@ FONTES = (
     "vlr",
     "vlr-rankings",
     "vlr-detalhes",
+    "lolesports",
     "hltv",
     "pandascore-cs",
     "pandascore-lol",
@@ -340,6 +341,11 @@ def _construir_coletor(args: argparse.Namespace, storage):
         from collectors.vlr_detalhes import VlrDetalhesCollector
 
         return VlrDetalhesCollector(raw_storage=storage)
+
+    if args.fonte == "lolesports":
+        from collectors.lolesports import LolEsportsCollector
+
+        return LolEsportsCollector(raw_storage=storage)
 
     if args.fonte == "hltv":
         from collectors.hltv import HltvCollector

@@ -973,14 +973,30 @@ class ConfrontoResultado(BaseModel):
 class JogadorNoMapa(BaseModel):
     nome: str
     time: str
-    agente: str | None
-    rating: float | None
-    acs: float | None
-    k: int | None
-    d: int | None
-    a: int | None
-    adr: float | None
-    hs: float | None
+    #: Valorant: agente. (LoL usa `campeao`.)
+    agente: str | None = None
+    rating: float | None = None
+    acs: float | None = None
+    k: int | None = None
+    d: int | None = None
+    a: int | None = None
+    adr: float | None = None
+    hs: float | None = None
+    #: LoL: campeão, papel (top/jungle/mid/bottom/support), farm, ouro, nível.
+    campeao: str | None = None
+    papel: str | None = None
+    cs: int | None = None
+    ouro: int | None = None
+    nivel: int | None = None
+
+
+class ObjetivosNoMapa(BaseModel):
+    """LoL: o que um time levou num jogo — torres, barões, dragões, ouro."""
+
+    torres: int | None = None
+    baroes: int | None = None
+    dragoes: int | None = None
+    ouro: int | None = None
 
 
 class MapaDoConfronto(BaseModel):
@@ -988,6 +1004,9 @@ class MapaDoConfronto(BaseModel):
     duracao: str | None
     placar_a: int | None
     placar_b: int | None
+    #: LoL: resumo de objetivos de cada lado (None para Valorant).
+    objetivos_a: ObjetivosNoMapa | None = None
+    objetivos_b: ObjetivosNoMapa | None = None
     jogadores: list[JogadorNoMapa] = []
 
 

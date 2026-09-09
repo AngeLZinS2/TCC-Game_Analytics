@@ -557,6 +557,13 @@ def _coletar_vlr_detalhes(settings: Settings, storage: RawStorage) -> Collection
     return VlrDetalhesCollector(raw_storage=storage).run(carregar=True)
 
 
+def _coletar_lolesports(settings: Settings, storage: RawStorage) -> CollectionResult:
+    """Scoreboard ao vivo (campeao/KDA/ouro) das partidas de LoL em andamento."""
+    from collectors.lolesports import LolEsportsCollector
+
+    return LolEsportsCollector(raw_storage=storage).run(carregar=True)
+
+
 #: Minimo de confrontos decididos para valer a pena reajustar um jogo.
 #:
 #: O mesmo piso que `ml.confronto.ajustar_e_salvar` exige - abaixo dele ele
@@ -779,6 +786,13 @@ def montar_tarefas(settings: Settings) -> list[Tarefa]:
             nome="vlr_detalhes",
             intervalo_segundos=settings.agendador_vlr_detalhes_minutos * 60,
             executar=_coletar_vlr_detalhes,
+        )
+    )
+    tarefas.append(
+        Tarefa(
+            nome="lolesports",
+            intervalo_segundos=settings.agendador_lolesports_minutos * 60,
+            executar=_coletar_lolesports,
         )
     )
     tarefas.append(
