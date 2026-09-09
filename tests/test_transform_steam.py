@@ -12,8 +12,8 @@ from decimal import Decimal
 
 import pytest
 
-from collectors.base import RawRecord
-from etl.transform_steam import (
+from services.collectors.base import RawRecord
+from services.etl.transform_steam import (
     ENDPOINT_AVALIACOES,
     ENDPOINT_DETALHES,
     ENDPOINT_JOGADORES,

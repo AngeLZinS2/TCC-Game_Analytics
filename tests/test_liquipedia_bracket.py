@@ -16,7 +16,7 @@ from datetime import timezone
 
 import pytest
 
-from etl.transform_liquipedia_bracket import parse_bracket, transformar
+from services.etl.transform_liquipedia_bracket import parse_bracket, transformar
 
 
 @pytest.fixture(scope="module")

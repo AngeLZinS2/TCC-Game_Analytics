@@ -7,7 +7,7 @@ com `.name` e `.points` ("(1,849 Pontos)").
 
 from __future__ import annotations
 
-from etl.transform_dltv_ranking import parse_ranking
+from services.etl.transform_dltv_ranking import parse_ranking
 
 
 def _item(num: str, nome: str, pontos: str | None, logo: str | None = "x.webp") -> str:

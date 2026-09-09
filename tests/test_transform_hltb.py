@@ -10,8 +10,8 @@ from __future__ import annotations
 
 from decimal import Decimal
 
-from collectors.base import RawRecord
-from etl.transform_hltb import ENDPOINT_BUSCA, FONTE, transformar
+from services.collectors.base import RawRecord
+from services.etl.transform_hltb import ENDPOINT_BUSCA, FONTE, transformar
 
 APP = 1145360
 

@@ -5,8 +5,8 @@ from __future__ import annotations
 import json
 from datetime import datetime, timezone
 
-from collectors.base import RawRecord
-from etl.raw_storage import RawStorage
+from services.collectors.base import RawRecord
+from services.etl.raw_storage import RawStorage
 
 MOMENTO = datetime(2026, 9, 2, 14, 37, 12, tzinfo=timezone.utc)
 

@@ -14,8 +14,8 @@ from datetime import datetime, timezone
 
 import pytest
 
-from collectors.base import RawRecord
-from etl.transform_dota import (
+from services.collectors.base import RawRecord
+from services.etl.transform_dota import (
     ENDPOINT_HEROIS,
     ENDPOINT_LISTA,
     ENDPOINT_PARTIDA,

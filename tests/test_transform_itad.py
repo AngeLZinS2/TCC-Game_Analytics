@@ -10,8 +10,8 @@ from __future__ import annotations
 from datetime import date
 from decimal import Decimal
 
-from collectors.base import RawRecord
-from etl.transform_itad import (
+from services.collectors.base import RawRecord
+from services.etl.transform_itad import (
     ENDPOINT_HISTORICO,
     ENDPOINT_LOOKUP,
     ENDPOINT_PRECOS,

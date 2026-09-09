@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from collectors.vlr_detalhes import _parse_partida
+from services.collectors.vlr_detalhes import _parse_partida
 
 _HTML = (Path(__file__).resolve().parent / "fixtures" / "vlr_partida_734314.html").read_text(
     encoding="utf-8"
@@ -66,7 +66,7 @@ def test_pagina_sem_bloco_de_mapa_volta_vazia():
 def test_cabecalho_le_status_placar_e_canais():
     """A fixture agregada não tem cabeçalho de série; um recorte sintético
     exercita o parser do topo da página (status ao vivo, placar, transmissão)."""
-    from collectors.vlr_detalhes import _parse_cabecalho
+    from services.collectors.vlr_detalhes import _parse_cabecalho
 
     trecho = """
     <div class="match-header-vs-score">

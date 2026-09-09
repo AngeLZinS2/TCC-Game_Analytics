@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import pytest
 
-from etl.transform_dota import parse_serie_minutos
+from services.etl.transform_dota import parse_serie_minutos
 
 
 @pytest.fixture(scope="module")

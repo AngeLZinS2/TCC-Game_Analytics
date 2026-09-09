@@ -19,9 +19,9 @@ from __future__ import annotations
 import pytest
 from sqlalchemy import select, text
 
-from db.models import DimJogo
-from db.session import get_engine, session_scope
-from ml.confronto import (
+from models.models import DimJogo
+from models.session import get_engine, session_scope
+from services.ml.confronto import (
     _carregar_confrontos,
     _carregar_confrontos_liquipedia,
     _carregar_equipes,
@@ -128,7 +128,7 @@ def test_torneios_conhecidos_le_da_agenda(sessao_bd):
     sozinha conforme `agenda_partida.torneio` acumula nomes novos. O teste
     verifica isso contra o banco de verdade: mesma fonte, sem duplicar a
     consulta aqui."""
-    from collectors.liquipedia_bracket_collector import torneios_conhecidos
+    from services.collectors.liquipedia_bracket_collector import torneios_conhecidos
 
     torneios = torneios_conhecidos(JOGO_NAO_DOTA)
     if not torneios:
@@ -141,7 +141,7 @@ def test_torneios_conhecidos_le_da_agenda(sessao_bd):
 def test_torneios_conhecidos_de_jogo_sem_agenda_e_vazia():
     """Um codigo de jogo que nem existe em dim_jogo nao pode levantar - so
     devolve vazio, porque nao ha o que buscar."""
-    from collectors.liquipedia_bracket_collector import torneios_conhecidos
+    from services.collectors.liquipedia_bracket_collector import torneios_conhecidos
 
     assert torneios_conhecidos("jogo-que-nao-existe-xyz") == []
 
@@ -151,7 +151,7 @@ def test_ratings_externos_sao_z_score_por_snapshot(sessao_bd):
     perto de zero, e nenhum valor absurdo. Sem isso o prior entraria numa
     escala arbitraria (a pontuacao da Valve nao significa nada fora da lista
     dela)."""
-    from ml.confronto import _carregar_ratings_externos
+    from services.ml.confronto import _carregar_ratings_externos
 
     snaps = _carregar_ratings_externos(sessao_bd, "counterstrike")
     if not snaps:
@@ -173,7 +173,7 @@ def test_ratings_em_e_point_in_time(sessao_bd):
     julho na validacao walk-forward."""
     from datetime import date, timedelta
 
-    from ml.confronto import _carregar_ratings_externos, _ratings_em
+    from services.ml.confronto import _carregar_ratings_externos, _ratings_em
 
     snaps = _carregar_ratings_externos(sessao_bd, "counterstrike")
     if len(snaps) < 2:
@@ -192,7 +192,7 @@ def test_jogo_fora_do_mapa_de_prior_volta_ao_bradley_terry_puro(sessao_bd):
     """Só os jogos de `FONTE_PRIOR_POR_JOGO` (CS -> valve, Valorant -> vlr,
     Dota 2 -> dltv) têm prior. Qualquer outro: `_carregar_ratings_externos`
     vazio, e o modelo volta a ser o Bradley-Terry puro - sem coluna a mais."""
-    from ml.confronto import FONTE_PRIOR_POR_JOGO, _carregar_ratings_externos
+    from services.ml.confronto import FONTE_PRIOR_POR_JOGO, _carregar_ratings_externos
 
     assert "leagueoflegends" not in FONTE_PRIOR_POR_JOGO
     assert _carregar_ratings_externos(sessao_bd, "leagueoflegends") == []

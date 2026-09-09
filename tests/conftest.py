@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-# Permite `import etl.transform_steam` rodando pytest da raiz do projeto.
+# Permite `import services.etl.transform_steam` rodando pytest da raiz do projeto.
 RAIZ = Path(__file__).resolve().parents[1]
 if str(RAIZ) not in sys.path:
     sys.path.insert(0, str(RAIZ))
@@ -32,7 +32,7 @@ def sem_opgg(monkeypatch):
     de um servico de terceiro estar no ar - alem de gastar uma chamada por
     teste num servico gratuito.
     """
-    from collectors import opgg_mcp
+    from services.collectors import opgg_mcp
 
     def fora_do_ar():
         raise opgg_mcp.OpggIndisponivel("desligado no teste")

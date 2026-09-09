@@ -13,7 +13,7 @@ from datetime import datetime, timedelta, timezone
 import numpy as np
 import pytest
 
-from ml.confronto import (
+from services.ml.confronto import (
     Confronto,
     Equipe,
     _ajustar,

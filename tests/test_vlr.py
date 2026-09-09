@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from datetime import timezone
 
-from collectors.vlr import _parse_pagina
+from services.collectors.vlr import _parse_pagina
 
 _RESULTADO = """
 <div class="wf-label mod-large"> Fri, September 5, 2026 </div>

@@ -24,15 +24,32 @@ destruiria informação:
 | **Equipes** | Dota 2 | uma equipe profissional | Fase 9 — alimenta o modelo |
 | **Agenda** | Liquipedia | um confronto futuro | Fase 10 — calendário, não fato |
 
+## Arquitetura (MVC + camada de serviços)
+
+O backend Python é organizado em camadas nomeadas. MVC é um padrão de interface, então o
+pipeline de ingestão (que não é interface) fica numa camada de **serviços** à parte.
+
+| Pasta | Camada | O que tem |
+|---|---|---|
+| `models/` | **Model** | ORM (`models.py`), sessão do banco (`session.py`), `schema.sql`, vocabulário de domínio de cada esporte (`vocabulario_esports.py`) |
+| `views/` | **View** (API) | `schemas.py` — os contratos de resposta (Pydantic) que o dashboard consome |
+| `controllers/` | **Controller** | `main.py` (app FastAPI) + `routers/` — um por área da API |
+| `services/` | Serviços | `collectors/` (ingestão), `etl/` (transform + load), `ml/` (previsão de confronto, sentimento, assistente) |
+| `migrations/` | — | Alembic |
+| `dashboard/src/` | **View** (cliente) | React, também em camadas: `models/` (acesso a dado + hooks), `views/` (componentes, layout, tema), `controllers/` (páginas + rotas) |
+
+`config.py`, `logging_config.py`, `cli.py` (comandos manuais) e `agendador.py` (o laço de
+coleta) ficam na raiz — infra transversal e pontos de entrada.
+
 ## Princípios de design
 
 - **O payload bruto é gravado antes de qualquer normalização.** Cada resposta de API vai para
   `data/raw/<fonte>/<endpoint>/<data>/` e é registrada em `raw_data`. Quando o ETL muda, dá para
   reprocessar tudo sem gastar rate limit chamando a API de novo.
 - **Cada coletor é independente**, com a mesma interface (`collect()` / `save_raw()` / `parse()` /
-  `load()`), definida em `collectors/base.py`. Adicionar ou remover uma fonte não afeta as outras.
+  `load()`), definida em `services/collectors/base.py`. Adicionar ou remover uma fonte não afeta as outras.
 - **Idempotência:** rodar um coletor duas vezes não duplica registros. Tudo é upsert por chave natural.
-- **Rate limiting e backoff exponencial** por fonte, em `collectors/http_client.py`.
+- **Rate limiting e backoff exponencial** por fonte, em `services/collectors/http_client.py`.
 - **Nenhuma credencial em código.** Tudo vem de variáveis de ambiente (`config.py`).
 
 ## Pré-requisitos
@@ -73,8 +90,8 @@ necessária para a Fase 1.
 .\.venv\Scripts\python.exe cli.py init-db
 ```
 
-Aplica as migrations do Alembic (`db/migrations/versions/`). As migrations são a fonte da verdade do
-schema; `db/schema.sql` é só uma referência de leitura.
+Aplica as migrations do Alembic (`migrations/versions/`). As migrations são a fonte da verdade do
+schema; `models/schema.sql` é só uma referência de leitura.
 
 ### 4. Subir tudo junto (API e dashboard incluídos)
 
@@ -250,7 +267,7 @@ Ou dentro do Docker:
 docker compose run --rm collector collect steam
 ```
 
-A lista de jogos monitorados fica em `collectors/seeds/steam_apps.json` — edite à vontade.
+A lista de jogos monitorados fica em `services/collectors/seeds/steam_apps.json` — edite à vontade.
 
 **Tabelas:** `dim_jogo_steam` (atributos estáveis) e `fato_snapshot_jogo_steam` (série temporal:
 jogadores simultâneos, avaliações e preço a cada coleta).

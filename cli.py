@@ -215,7 +215,7 @@ def _cmd_init_db() -> int:
     from alembic.config import Config
 
     cfg = Config(str(BASE_DIR / "alembic.ini"))
-    cfg.set_main_option("script_location", str(BASE_DIR / "db" / "migrations"))
+    cfg.set_main_option("script_location", str(BASE_DIR / "migrations"))
     command.upgrade(cfg, "head")
     print("Migrations aplicadas (head).")
     return 0
@@ -226,7 +226,7 @@ def _construir_coletor(args: argparse.Namespace, storage):
     settings = get_settings()
 
     if args.fonte == "steam":
-        from collectors.steam_collector import SteamCollector
+        from services.collectors.steam_collector import SteamCollector
 
         app_ids = None
         if args.apps:
@@ -236,9 +236,9 @@ def _construir_coletor(args: argparse.Namespace, storage):
         )
         # Prioridade: --apps > --top-jogados > --steamspy-top > --all-apps
         if args.top_jogados:
-            from collectors.steam_collector import top_mais_jogados
-            from db.models import DimJogoSteam
-            from db.session import session_scope
+            from services.collectors.steam_collector import top_mais_jogados
+            from models.models import DimJogoSteam
+            from models.session import session_scope
             from sqlalchemy import select
 
             # Soma ao que ja esta no banco, nunca substitui: um jogo que
@@ -262,19 +262,19 @@ def _construir_coletor(args: argparse.Namespace, storage):
         return coletor
 
     if args.fonte == "steam-online":
-        from collectors.steam_online import SteamOnlineCollector
+        from services.collectors.steam_online import SteamOnlineCollector
 
         return SteamOnlineCollector(raw_storage=storage)
 
     if args.fonte == "liquipedia":
-        from collectors.liquipedia_collector import LiquipediaCollector
+        from services.collectors.liquipedia_collector import LiquipediaCollector
 
         return LiquipediaCollector(
             raw_storage=storage, settings=settings, wiki=args.wiki
         )
 
     if args.fonte == "liquipedia-times":
-        from collectors.liquipedia_wiki_collector import LiquipediaWikiCollector
+        from services.collectors.liquipedia_wiki_collector import LiquipediaWikiCollector
 
         return LiquipediaWikiCollector(
             raw_storage=storage,
@@ -284,7 +284,7 @@ def _construir_coletor(args: argparse.Namespace, storage):
         )
 
     if args.fonte == "liquipedia-bracket":
-        from collectors.liquipedia_bracket_collector import LiquipediaBracketCollector
+        from services.collectors.liquipedia_bracket_collector import LiquipediaBracketCollector
 
         return LiquipediaBracketCollector(
             raw_storage=storage,
@@ -294,7 +294,7 @@ def _construir_coletor(args: argparse.Namespace, storage):
         )
 
     if args.fonte == "valve-standings":
-        from collectors.valve_standings_collector import ValveStandingsCollector
+        from services.collectors.valve_standings_collector import ValveStandingsCollector
 
         return ValveStandingsCollector(
             raw_storage=storage,
@@ -303,7 +303,7 @@ def _construir_coletor(args: argparse.Namespace, storage):
         )
 
     if args.fonte == "itad":
-        from collectors.itad_collector import ItadCollector
+        from services.collectors.itad_collector import ItadCollector
 
         return ItadCollector(
             raw_storage=storage,
@@ -313,67 +313,67 @@ def _construir_coletor(args: argparse.Namespace, storage):
         )
 
     if args.fonte == "lol-campeoes":
-        from collectors.lol_campeoes import CampeoesLolCollector
+        from services.collectors.lol_campeoes import CampeoesLolCollector
 
         return CampeoesLolCollector(raw_storage=storage)
 
     if args.fonte == "dota-herois":
-        from collectors.dota_herois import HeroisDotaCollector
+        from services.collectors.dota_herois import HeroisDotaCollector
 
         return HeroisDotaCollector(raw_storage=storage)
 
     if args.fonte == "opgg-esports":
-        from collectors.opgg_esports import OpggEsportsCollector
+        from services.collectors.opgg_esports import OpggEsportsCollector
 
         return OpggEsportsCollector(raw_storage=storage)
 
     if args.fonte == "vlr":
-        from collectors.vlr import VlrCollector
+        from services.collectors.vlr import VlrCollector
 
         return VlrCollector(raw_storage=storage)
 
     if args.fonte == "vlr-rankings":
-        from collectors.vlr_rankings import VlrRankingsCollector
+        from services.collectors.vlr_rankings import VlrRankingsCollector
 
         return VlrRankingsCollector(raw_storage=storage)
 
     if args.fonte == "vlr-detalhes":
-        from collectors.vlr_detalhes import VlrDetalhesCollector
+        from services.collectors.vlr_detalhes import VlrDetalhesCollector
 
         return VlrDetalhesCollector(raw_storage=storage)
 
     if args.fonte == "lolesports":
-        from collectors.lolesports import LolEsportsCollector
+        from services.collectors.lolesports import LolEsportsCollector
 
         return LolEsportsCollector(raw_storage=storage)
 
     if args.fonte == "hltv":
-        from collectors.hltv import HltvCollector
+        from services.collectors.hltv import HltvCollector
 
         return HltvCollector(raw_storage=storage)
 
     if args.fonte == "ubi-r6":
-        from collectors.ubi_r6 import UbiR6Collector
+        from services.collectors.ubi_r6 import UbiR6Collector
 
         return UbiR6Collector(raw_storage=storage)
 
     if args.fonte == "owcs-standings":
-        from collectors.owcs_standings import OwcsStandingsCollector
+        from services.collectors.owcs_standings import OwcsStandingsCollector
 
         return OwcsStandingsCollector(raw_storage=storage)
 
     if args.fonte == "rlcs-rankings":
-        from collectors.rlcs_rankings import RlcsRankingsCollector
+        from services.collectors.rlcs_rankings import RlcsRankingsCollector
 
         return RlcsRankingsCollector(raw_storage=storage)
 
     if args.fonte == "dltv-ranking":
-        from collectors.dltv_ranking import DltvRankingCollector
+        from services.collectors.dltv_ranking import DltvRankingCollector
 
         return DltvRankingCollector(raw_storage=storage)
 
     if args.fonte.startswith("pandascore-"):
-        from collectors.pandascore import PandaScoreCollector
+        from services.collectors.pandascore import PandaScoreCollector
 
         jogo_ps = {
             "pandascore-cs": "csgo",
@@ -389,14 +389,14 @@ def _construir_coletor(args: argparse.Namespace, storage):
         )
 
     if args.fonte == "valorant-agentes":
-        from collectors.valorant_agentes import AgentesValorantCollector
+        from services.collectors.valorant_agentes import AgentesValorantCollector
 
         # Sem `settings` nem `limite`: e uma chamada so, sem paginacao e
         # sem escolha de quais agentes trazer - o elenco e o elenco.
         return AgentesValorantCollector(raw_storage=storage)
 
     if args.fonte == "hltb":
-        from collectors.hltb_collector import HltbCollector
+        from services.collectors.hltb_collector import HltbCollector
 
         return HltbCollector(
             raw_storage=storage,
@@ -404,7 +404,7 @@ def _construir_coletor(args: argparse.Namespace, storage):
             limite=args.limite_jogos,
         )
 
-    from collectors.opendota_collector import OpenDotaCollector
+    from services.collectors.opendota_collector import OpenDotaCollector
 
     return OpenDotaCollector(
         raw_storage=storage,
@@ -416,67 +416,67 @@ def _construir_coletor(args: argparse.Namespace, storage):
 
 def _carregador(fonte: str):
     if fonte == "steam":
-        from etl.load_steam import carregar
+        from services.etl.load_steam import carregar
 
         return carregar
     if fonte == "liquipedia":
-        from etl.load_liquipedia import carregar
+        from services.etl.load_liquipedia import carregar
 
         return carregar
     if fonte == "liquipedia-times":
-        from etl.load_liquipedia_wiki import carregar
+        from services.etl.load_liquipedia_wiki import carregar
 
         return carregar
     if fonte == "liquipedia-bracket":
-        from etl.load_liquipedia import carregar
+        from services.etl.load_liquipedia import carregar
 
         return carregar
     if fonte == "valve-standings":
-        from etl.load_valve_standings import carregar
+        from services.etl.load_valve_standings import carregar
 
         return carregar
     if fonte == "itad":
-        from etl.load_itad import carregar
+        from services.etl.load_itad import carregar
 
         return carregar
     if fonte == "hltb":
-        from etl.load_hltb import carregar
+        from services.etl.load_hltb import carregar
 
         return carregar
     if fonte == "valorant-agentes":
-        from etl.load_valorant import carregar_agentes
+        from services.etl.load_valorant import carregar_agentes
 
         return carregar_agentes
     if fonte == "opgg-esports":
-        from etl.load_opgg_esports import carregar
+        from services.etl.load_opgg_esports import carregar
 
         return carregar
     if fonte == "vlr":
-        from etl.load_vlr import carregar
+        from services.etl.load_vlr import carregar
 
         return carregar
     if fonte == "hltv":
-        from etl.load_hltv import carregar
+        from services.etl.load_hltv import carregar
 
         return carregar
     if fonte == "ubi-r6":
-        from etl.load_ubi_r6 import carregar
+        from services.etl.load_ubi_r6 import carregar
 
         return carregar
     if fonte == "owcs-standings":
-        from etl.load_owcs_standings import carregar
+        from services.etl.load_owcs_standings import carregar
 
         return carregar
     if fonte == "rlcs-rankings":
-        from etl.load_rlcs_rankings import carregar
+        from services.etl.load_rlcs_rankings import carregar
 
         return carregar
     if fonte == "dltv-ranking":
-        from etl.load_dltv_ranking import carregar
+        from services.etl.load_dltv_ranking import carregar
 
         return carregar
     if fonte.startswith("pandascore-"):
-        from etl.load_agenda import carregar_agenda
+        from services.etl.load_agenda import carregar_agenda
 
         def _carregar_ps(resultado):
             return carregar_agenda(
@@ -485,24 +485,24 @@ def _carregador(fonte: str):
 
         return _carregar_ps
     if fonte == "vlr-rankings":
-        from etl.load_vlr_rankings import carregar
+        from services.etl.load_vlr_rankings import carregar
 
         return carregar
     if fonte == "lol-campeoes":
-        from etl.load_lol import carregar_campeoes
+        from services.etl.load_lol import carregar_campeoes
 
         return carregar_campeoes
     if fonte == "dota-herois":
-        from etl.load_dota_herois import carregar_herois
+        from services.etl.load_dota_herois import carregar_herois
 
         return carregar_herois
-    from etl.load_dota import carregar
+    from services.etl.load_dota import carregar
 
     return carregar
 
 
 def _cmd_collect(args: argparse.Namespace) -> int:
-    from etl.raw_storage import RawStorage
+    from services.etl.raw_storage import RawStorage
 
     settings = get_settings()
     storage = RawStorage(settings.raw_data_path, registrar_no_banco=not args.no_load)
@@ -553,7 +553,7 @@ def _cmd_collect(args: argparse.Namespace) -> int:
 def _cmd_stats() -> int:
     from sqlalchemy import func, select
 
-    from db.models import (
+    from models.models import (
         DimJogador,
         DimJogoSteam,
         DimPartida,
@@ -563,7 +563,7 @@ def _cmd_stats() -> int:
         FatoSnapshotJogoSteam,
         RawData,
     )
-    from db.session import session_scope
+    from models.session import session_scope
 
     grupos = {
         "transversal": (RawData,),
@@ -587,8 +587,8 @@ def _cmd_stats() -> int:
 
 
 def _cmd_seed_jogos() -> int:
-    from etl.load_jogos import sincronizar
-    from etl.wikis import registro
+    from services.etl.load_jogos import sincronizar
+    from services.etl.wikis import registro
 
     criados = sincronizar()
     print(f"{len(registro())} wikis no registro; {criados} jogos criados agora")
@@ -596,7 +596,7 @@ def _cmd_seed_jogos() -> int:
 
 
 def _cmd_train_sentimento(args) -> int:
-    from ml.sentimento import treinar
+    from services.ml.sentimento import treinar
 
     relatorio = treinar(idioma=args.idioma)
     conjunto = relatorio["conjunto"]
@@ -628,7 +628,7 @@ def _cmd_train_sentimento(args) -> int:
 
 
 def _cmd_train_confronto(args) -> int:
-    from ml.confronto import ajustar_e_salvar, ranking
+    from services.ml.confronto import ajustar_e_salvar, ranking
 
     relatorio = ajustar_e_salvar(jogo=args.jogo)
     validacao = relatorio["validacao"]

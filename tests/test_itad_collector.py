@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import pytest
 
-from collectors.itad_collector import ItadCollector, SemChaveItadError
+from services.collectors.itad_collector import ItadCollector, SemChaveItadError
 
 
 class _StorageFake:
@@ -36,7 +36,7 @@ def test_collect_sem_chave_recusa():
 
 def test_preco_sob_demanda_sem_chave_nao_toca_no_coletor(monkeypatch):
     """Sem `ITAD_API_KEY` o helper do `/coletar` sai sem tocar em storage/rede."""
-    from api.routers import catalogo
+    from controllers.routers import catalogo
 
     class _StubSettings:
         itad_api_key = None
@@ -46,6 +46,6 @@ def test_preco_sob_demanda_sem_chave_nao_toca_no_coletor(monkeypatch):
     def _proibido(*_a, **_k):  # pragma: no cover - nao deve ser chamado
         raise AssertionError("ItadCollector nao deveria ser instanciado sem chave")
 
-    monkeypatch.setattr("collectors.itad_collector.ItadCollector", _proibido)
+    monkeypatch.setattr("services.collectors.itad_collector.ItadCollector", _proibido)
 
     catalogo._coletar_preco_sob_demanda(730)  # nao levanta

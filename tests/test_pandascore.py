@@ -7,7 +7,7 @@ torneio junta liga + etapa do jeito que a tela mostra.
 
 from __future__ import annotations
 
-from collectors.pandascore import (
+from services.collectors.pandascore import (
     PandaScoreCollector,
     _canal_de_stream,
     _instante,

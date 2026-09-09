@@ -7,7 +7,7 @@ O HTML é um recorte fiel de uma linha do leaderboard renderizado no servidor:
 
 from __future__ import annotations
 
-from etl.transform_rlcs_rankings import parse_leaderboard
+from services.etl.transform_rlcs_rankings import parse_leaderboard
 
 
 def _linha(rank: str, nome: str, pts: str | None) -> str:

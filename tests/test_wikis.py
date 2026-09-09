@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import json
 
-from etl.wikis import (
+from services.etl.wikis import (
     ARQUIVO_REGISTRO,
     UNIDADE_PLACAR,
     Wiki,

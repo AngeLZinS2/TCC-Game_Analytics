@@ -25,8 +25,8 @@ from datetime import timezone
 
 import pytest
 
-from etl.load_liquipedia import _sem_enfeites, normalizar
-from etl.transform_liquipedia import parse_agenda, transformar
+from services.etl.load_liquipedia import _sem_enfeites, normalizar
+from services.etl.transform_liquipedia import parse_agenda, transformar
 
 
 @pytest.fixture(scope="module")

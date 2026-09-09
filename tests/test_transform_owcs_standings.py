@@ -8,7 +8,7 @@ desses por semana da temporada - o parser tem de ler só o último.
 
 from __future__ import annotations
 
-from etl.transform_owcs_standings import parse_standings
+from services.etl.transform_owcs_standings import parse_standings
 
 
 def _bloco(linhas: str) -> str:

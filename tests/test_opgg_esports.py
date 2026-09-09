@@ -7,13 +7,13 @@ tela, e placar errado e pior do que tela vazia.
 
 from __future__ import annotations
 
-from collectors.opgg_esports import (
+from services.collectors.opgg_esports import (
     LIGAS_CONHECIDAS,
     OpggEsportsCollector,
     ResultadoOpggEsports,
     _converter,
 )
-from collectors.base import RawRecord
+from services.collectors.base import RawRecord
 
 
 def _partida(**extra):

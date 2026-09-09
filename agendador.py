@@ -42,9 +42,9 @@ import time
 from dataclasses import dataclass, field
 from typing import Callable
 
-from collectors.base import CollectionResult
+from services.collectors.base import CollectionResult
 from config import Settings, get_settings
-from etl.raw_storage import RawStorage
+from services.etl.raw_storage import RawStorage
 from logging_config import configurar_logging
 
 logger = logging.getLogger("agendador")
@@ -94,15 +94,15 @@ def _apps_monitorados() -> list[int]:
     """
     from sqlalchemy import select
 
-    from db.models import DimJogoSteam
-    from db.session import session_scope
+    from models.models import DimJogoSteam
+    from models.session import session_scope
 
     with session_scope() as sessao:
         return list(sessao.scalars(select(DimJogoSteam.app_id)))
 
 
 def _coletar_steam(settings: Settings, storage: RawStorage) -> CollectionResult:
-    from collectors.steam_collector import SteamCollector, top_mais_jogados
+    from services.collectors.steam_collector import SteamCollector, top_mais_jogados
 
     monitorados = _apps_monitorados()
 
@@ -139,13 +139,13 @@ def _coletar_steam(settings: Settings, storage: RawStorage) -> CollectionResult:
 
 def _coletar_steam_online(settings: Settings, storage: RawStorage) -> CollectionResult:
     """Usuarios simultaneos da plataforma Steam (numero da Valve, nao a soma)."""
-    from collectors.steam_online import SteamOnlineCollector
+    from services.collectors.steam_online import SteamOnlineCollector
 
     return SteamOnlineCollector(raw_storage=storage).run(carregar=True)
 
 
 def _coletar_opendota(settings: Settings, storage: RawStorage) -> CollectionResult:
-    from collectors.opendota_collector import OpenDotaCollector
+    from services.collectors.opendota_collector import OpenDotaCollector
 
     coletor = OpenDotaCollector(
         raw_storage=storage,
@@ -185,8 +185,8 @@ def _coletar_liquipedia(settings: Settings, storage: RawStorage) -> CollectionRe
     Uma chamada por wiki - sao 66, cerca de tres minutos no intervalo padrao.
     Barato o suficiente para varrer tudo a cada rodada.
     """
-    from collectors.liquipedia_collector import LiquipediaCollector
-    from etl.wikis import com_agenda
+    from services.collectors.liquipedia_collector import LiquipediaCollector
+    from services.etl.wikis import com_agenda
 
     parciais: list[CollectionResult] = []
     wikis = com_agenda()
@@ -229,8 +229,8 @@ def _coletar_equipes(settings: Settings, storage: RawStorage) -> CollectionResul
     """
     global _proxima_wiki_de_equipes
 
-    from collectors.liquipedia_wiki_collector import LiquipediaWikiCollector
-    from etl.wikis import com_times
+    from services.collectors.liquipedia_wiki_collector import LiquipediaWikiCollector
+    from services.etl.wikis import com_times
 
     todas = com_times()
     if not todas:
@@ -292,11 +292,11 @@ def _coletar_brackets(settings: Settings, storage: RawStorage) -> CollectionResu
     """
     global _proxima_wiki_de_brackets
 
-    from collectors.liquipedia_bracket_collector import (
+    from services.collectors.liquipedia_bracket_collector import (
         LiquipediaBracketCollector,
         torneios_conhecidos,
     )
-    from etl.wikis import com_agenda
+    from services.etl.wikis import com_agenda
 
     todas = com_agenda()
     if not todas:
@@ -351,7 +351,7 @@ def _coletar_ranking(settings: Settings, storage: RawStorage) -> CollectionResul
     O backfill dos meses anteriores e um `cli.py collect valve-standings
     --todos` manual, uma vez; daqui em diante o snapshot novo entra sozinho.
     """
-    from collectors.valve_standings_collector import ValveStandingsCollector
+    from services.collectors.valve_standings_collector import ValveStandingsCollector
 
     coletor = ValveStandingsCollector(raw_storage=storage, settings=settings)
     try:
@@ -362,7 +362,7 @@ def _coletar_ranking(settings: Settings, storage: RawStorage) -> CollectionResul
 
 def _coletar_precos(settings: Settings, storage: RawStorage) -> CollectionResult:
     """Preco dos jogos pagos nas outras lojas (IsThereAnyDeal)."""
-    from collectors.itad_collector import ItadCollector
+    from services.collectors.itad_collector import ItadCollector
 
     coletor = ItadCollector(raw_storage=storage, settings=settings)
     try:
@@ -373,7 +373,7 @@ def _coletar_precos(settings: Settings, storage: RawStorage) -> CollectionResult
 
 def _coletar_tempo_jogo(settings: Settings, storage: RawStorage) -> CollectionResult:
     """Tempo estimado pra zerar cada jogo (HowLongToBeat)."""
-    from collectors.hltb_collector import HltbCollector
+    from services.collectors.hltb_collector import HltbCollector
 
     coletor = HltbCollector(raw_storage=storage, settings=settings)
     try:
@@ -386,7 +386,7 @@ def _coletar_agentes_valorant(
     settings: Settings, storage: RawStorage
 ) -> CollectionResult:
     """Elenco de agentes do VALORANT (valorant-api.com)."""
-    from collectors.valorant_agentes import AgentesValorantCollector
+    from services.collectors.valorant_agentes import AgentesValorantCollector
 
     coletor = AgentesValorantCollector(raw_storage=storage)
     try:
@@ -397,7 +397,7 @@ def _coletar_agentes_valorant(
 
 def _coletar_campeoes_lol(settings: Settings, storage: RawStorage) -> CollectionResult:
     """Elenco de campeoes de LoL e o desempenho na rota principal (OP.GG)."""
-    from collectors.lol_campeoes import CampeoesLolCollector
+    from services.collectors.lol_campeoes import CampeoesLolCollector
 
     coletor = CampeoesLolCollector(raw_storage=storage)
     try:
@@ -408,7 +408,7 @@ def _coletar_campeoes_lol(settings: Settings, storage: RawStorage) -> Collection
 
 def _coletar_herois_dota(settings: Settings, storage: RawStorage) -> CollectionResult:
     """Lore e habilidades de cada heroi de Dota (datafeed da Valve)."""
-    from collectors.dota_herois import HeroisDotaCollector
+    from services.collectors.dota_herois import HeroisDotaCollector
 
     coletor = HeroisDotaCollector(raw_storage=storage)
     try:
@@ -421,7 +421,7 @@ def _coletar_esports_opgg(
     settings: Settings, storage: RawStorage
 ) -> CollectionResult:
     """Agenda e resultados do cenario profissional de LoL (OP.GG)."""
-    from collectors.opgg_esports import OpggEsportsCollector
+    from services.collectors.opgg_esports import OpggEsportsCollector
 
     coletor = OpggEsportsCollector(raw_storage=storage)
     try:
@@ -432,35 +432,35 @@ def _coletar_esports_opgg(
 
 def _coletar_vlr(settings: Settings, storage: RawStorage) -> CollectionResult:
     """Resultados e agenda de Valorant do vlr.gg."""
-    from collectors.vlr import VlrCollector
+    from services.collectors.vlr import VlrCollector
 
     return VlrCollector(raw_storage=storage).run(carregar=True)
 
 
 def _coletar_vlr_rankings(settings: Settings, storage: RawStorage) -> CollectionResult:
     """Snapshot do rating de equipes de Valorant do vlr.gg (prior do modelo)."""
-    from collectors.vlr_rankings import VlrRankingsCollector
+    from services.collectors.vlr_rankings import VlrRankingsCollector
 
     return VlrRankingsCollector(raw_storage=storage).run(carregar=True)
 
 
 def _coletar_vlr_agenda(settings: Settings, storage: RawStorage) -> CollectionResult:
     """Só as próximas partidas de Valorant do vlr.gg (tarefa de 5 min)."""
-    from collectors.vlr import VlrCollector
+    from services.collectors.vlr import VlrCollector
 
     return VlrCollector(raw_storage=storage, apenas_agenda=True).run(carregar=True)
 
 
 def _coletar_hltv(settings: Settings, storage: RawStorage) -> CollectionResult:
     """Próximas partidas de Counter-Strike do hltv.org (tarefa de 5 min)."""
-    from collectors.hltv import HltvCollector
+    from services.collectors.hltv import HltvCollector
 
     return HltvCollector(raw_storage=storage).run(carregar=True)
 
 
 def _coletar_pandascore_cs(settings: Settings, storage: RawStorage) -> CollectionResult:
     """Agenda + resultados de CS via PandaScore (troca o scraping do hltv)."""
-    from collectors.pandascore import PandaScoreCollector
+    from services.collectors.pandascore import PandaScoreCollector
 
     return PandaScoreCollector(raw_storage=storage, jogo="csgo").run(carregar=True)
 
@@ -472,7 +472,7 @@ def _coletar_pandascore_lol(settings: Settings, storage: RawStorage) -> Collecti
     histórico, o OP.GG segue povoando escudo de time. O `_preferir_fonte_dedicada`
     faz a PandaScore mandar no que aparece na tela e no modelo.
     """
-    from collectors.pandascore import PandaScoreCollector
+    from services.collectors.pandascore import PandaScoreCollector
 
     return PandaScoreCollector(raw_storage=storage, jogo="lol").run(carregar=True)
 
@@ -483,56 +483,56 @@ def _coletar_pandascore_cod(settings: Settings, storage: RawStorage) -> Collecti
     CoD não tinha nenhuma fonte — a tela de Partidas ficava vazia. Fora de
     temporada da CDL há só o histórico; em temporada, a agenda também.
     """
-    from collectors.pandascore import PandaScoreCollector
+    from services.collectors.pandascore import PandaScoreCollector
 
     return PandaScoreCollector(raw_storage=storage, jogo="codmw").run(carregar=True)
 
 
 def _coletar_pandascore_ow(settings: Settings, storage: RawStorage) -> CollectionResult:
     """Agenda + resultados de Overwatch via PandaScore (OWCS, World Cup)."""
-    from collectors.pandascore import PandaScoreCollector
+    from services.collectors.pandascore import PandaScoreCollector
 
     return PandaScoreCollector(raw_storage=storage, jogo="ow").run(carregar=True)
 
 
 def _coletar_pandascore_r6(settings: Settings, storage: RawStorage) -> CollectionResult:
     """Agenda + resultados de Rainbow Six Siege via PandaScore (as ligas regionais)."""
-    from collectors.pandascore import PandaScoreCollector
+    from services.collectors.pandascore import PandaScoreCollector
 
     return PandaScoreCollector(raw_storage=storage, jogo="r6siege").run(carregar=True)
 
 
 def _coletar_pandascore_rl(settings: Settings, storage: RawStorage) -> CollectionResult:
     """Agenda + resultados de Rocket League via PandaScore (RLCS, EWC)."""
-    from collectors.pandascore import PandaScoreCollector
+    from services.collectors.pandascore import PandaScoreCollector
 
     return PandaScoreCollector(raw_storage=storage, jogo="rl").run(carregar=True)
 
 
 def _coletar_ubi_r6(settings: Settings, storage: RawStorage) -> CollectionResult:
     """Ranking oficial de R6 (SI Points Standings da Ubisoft)."""
-    from collectors.ubi_r6 import UbiR6Collector
+    from services.collectors.ubi_r6 import UbiR6Collector
 
     return UbiR6Collector(raw_storage=storage).run(carregar=True)
 
 
 def _coletar_owcs(settings: Settings, storage: RawStorage) -> CollectionResult:
     """Classificacao do Stage corrente do OWCS (Liquipedia)."""
-    from collectors.owcs_standings import OwcsStandingsCollector
+    from services.collectors.owcs_standings import OwcsStandingsCollector
 
     return OwcsStandingsCollector(raw_storage=storage).run(carregar=True)
 
 
 def _coletar_rlcs(settings: Settings, storage: RawStorage) -> CollectionResult:
     """Leaderboard oficial de pontos da RLCS (blast.tv), por regiao."""
-    from collectors.rlcs_rankings import RlcsRankingsCollector
+    from services.collectors.rlcs_rankings import RlcsRankingsCollector
 
     return RlcsRankingsCollector(raw_storage=storage).run(carregar=True)
 
 
 def _coletar_dltv(settings: Settings, storage: RawStorage) -> CollectionResult:
     """Ranking mundial de Dota 2 do DLTV (não há ranking oficial da Valve)."""
-    from collectors.dltv_ranking import DltvRankingCollector
+    from services.collectors.dltv_ranking import DltvRankingCollector
 
     return DltvRankingCollector(raw_storage=storage).run(carregar=True)
 
@@ -545,21 +545,21 @@ def _coletar_pandascore_val(settings: Settings, storage: RawStorage) -> Collecti
     valor é o `image_url` de cada time, que o `carregar_agenda` faz backfill no
     `dim_equipe` que a raspagem do vlr.gg deixou sem logo.
     """
-    from collectors.pandascore import PandaScoreCollector
+    from services.collectors.pandascore import PandaScoreCollector
 
     return PandaScoreCollector(raw_storage=storage, jogo="valorant").run(carregar=True)
 
 
 def _coletar_vlr_detalhes(settings: Settings, storage: RawStorage) -> CollectionResult:
     """Detalhe por mapa e por jogador das partidas de Valorant ja decididas."""
-    from collectors.vlr_detalhes import VlrDetalhesCollector
+    from services.collectors.vlr_detalhes import VlrDetalhesCollector
 
     return VlrDetalhesCollector(raw_storage=storage).run(carregar=True)
 
 
 def _coletar_lolesports(settings: Settings, storage: RawStorage) -> CollectionResult:
     """Scoreboard ao vivo (campeao/KDA/ouro) das partidas de LoL em andamento."""
-    from collectors.lolesports import LolEsportsCollector
+    from services.collectors.lolesports import LolEsportsCollector
 
     return LolEsportsCollector(raw_storage=storage).run(carregar=True)
 
@@ -586,9 +586,9 @@ def _treinar_confronto(settings: Settings, storage: RawStorage) -> CollectionRes
     """
     from sqlalchemy import func, select
 
-    from db.models import AgendaPartida, DimJogo, DimPartida
-    from db.session import session_scope
-    from ml.confronto import ajustar_e_salvar
+    from models.models import AgendaPartida, DimJogo, DimPartida
+    from models.session import session_scope
+    from services.ml.confronto import ajustar_e_salvar
 
     with session_scope() as sessao:
         # Um jogo entra se tem confronto decidido em QUALQUER uma das duas
@@ -904,7 +904,7 @@ def rodar(parada: Parada | None = None) -> int:
     # `dim_jogo` precisa ter as wikis antes de qualquer carga: o loader da
     # agenda resolve o `id_jogo` pelo codigo e falha se ele nao existir.
     try:
-        from etl.load_jogos import sincronizar
+        from services.etl.load_jogos import sincronizar
 
         sincronizar()
     except Exception as exc:  # noqa: BLE001 - banco fora do ar nao trava o boot

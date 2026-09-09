@@ -50,7 +50,7 @@ services:
       - ./data:/app/data
     command: >
       sh -c "python cli.py init-db &&
-             uvicorn api.main:app --host 0.0.0.0 --port 8000"
+             uvicorn controllers.main:app --host 0.0.0.0 --port 8000"
 
   dashboard:
     build: ./dashboard

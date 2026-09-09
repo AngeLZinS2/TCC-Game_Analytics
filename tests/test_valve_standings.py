@@ -14,7 +14,7 @@ from pathlib import Path
 
 import pytest
 
-from etl.transform_valve_standings import (
+from services.etl.transform_valve_standings import (
     data_do_arquivo,
     parse_standings,
     transformar,

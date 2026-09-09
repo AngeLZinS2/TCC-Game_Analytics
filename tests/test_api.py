@@ -16,8 +16,8 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import text
 
-from api.main import app
-from db.session import get_engine
+from controllers.main import app
+from models.session import get_engine
 
 
 @pytest.fixture(scope="module")
@@ -307,7 +307,7 @@ def test_icone_do_personagem_sai_da_cdn_de_cada_jogo() -> None:
     """A tabela mostrava quadrado cinza com a inicial para agente e campeao: o
     componente so sabia derivar o caminho da CDN da Valve do `npc_dota_hero_*`.
     Cada jogo tem a sua."""
-    from api.routers.dota import _icone_personagem
+    from controllers.routers.dota import _icone_personagem
 
     assert _icone_personagem(
         "dota2", "npc_dota_hero_razor", None

@@ -16,9 +16,9 @@ from __future__ import annotations
 
 import pytest
 
-from collectors import steam_descoberta
-from db.session import session_scope
-from ml.assistente import (
+from services.collectors import steam_descoberta
+from models.session import session_scope
+from services.ml.assistente import (
     GATILHOS,
     INSTRUCAO,
     Bloco,
@@ -635,7 +635,7 @@ def test_escopo_marca_o_vocabulario_de_jogos(pergunta, no_dominio):
     ],
 )
 def test_fora_escopo_so_conta_a_resposta_curta(texto, fora):
-    from ml.assistente import _fora_escopo
+    from services.ml.assistente import _fora_escopo
 
     assert _fora_escopo(texto) is fora
 

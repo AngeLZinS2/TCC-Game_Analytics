@@ -9,9 +9,9 @@ from __future__ import annotations
 
 import json as json_module
 
-from collectors.base import RawRecord
-from collectors.lol_campeoes import CampeoesLolCollector
-from collectors.opgg_mcp import analisar_notacao_compacta
+from services.collectors.base import RawRecord
+from services.collectors.lol_campeoes import CampeoesLolCollector
+from services.collectors.opgg_mcp import analisar_notacao_compacta
 
 ELENCO = """class LolListChampions: lang,data
 class Data: champions
@@ -125,7 +125,7 @@ def test_campeao_sem_estatistica_entra_sem_metrica():
 
 # --- videos de habilidade do Valorant (ficha oficial da Riot) ---
 
-from collectors.valorant_agentes import _casar_video, _chave_habilidade, _extrair_videos, _slug_riot
+from services.collectors.valorant_agentes import _casar_video, _chave_habilidade, _extrair_videos, _slug_riot
 
 
 def test_slug_riot_cobre_os_nomes_torto():
@@ -202,8 +202,8 @@ def test_extrair_videos_devolve_vazio_se_a_forma_mudar():
 
 # --- dado estatico: LoL (Data Dragon) e Dota (datafeed da Valve) ---
 
-from collectors.lol_campeoes import _limpar_html, _metadados_ddragon
-from collectors.dota_herois import _limpar as _limpar_dota, _normalizar_heroi
+from services.collectors.lol_campeoes import _limpar_html, _metadados_ddragon
+from services.collectors.dota_herois import _limpar as _limpar_dota, _normalizar_heroi
 
 
 def test_metadados_ddragon_monta_habilidades_com_slot():
@@ -280,9 +280,9 @@ def test_limpar_dota_tira_token_de_atributo():
 
 # --- guia de build: parser da arvore do OP.GG e montagem por jogo ---
 
-from collectors.opgg_mcp import analisar_objeto_compacto
-from collectors.lol_campeoes import _montar_guia_lol
-from collectors.dota_herois import _montar_guia_dota
+from services.collectors.opgg_mcp import analisar_objeto_compacto
+from services.collectors.lol_campeoes import _montar_guia_lol
+from services.collectors.dota_herois import _montar_guia_dota
 
 _ARVORE_GUIA = (
     "class Raiz: champion,data\n"
@@ -383,7 +383,7 @@ _GUIA_VAZIA = (
 
 def test_guia_do_opgg_repete_a_resposta_vazia(monkeypatch):
     """A resposta vazia do OP.GG dispara uma nova tentativa; a boa nela vale."""
-    import collectors.lol_campeoes as mod
+    import services.collectors.lol_campeoes as mod
 
     chamadas: list[int] = []
 
@@ -402,7 +402,7 @@ def test_guia_do_opgg_repete_a_resposta_vazia(monkeypatch):
 
 
 def test_guia_do_opgg_desiste_depois_da_segunda(monkeypatch):
-    import collectors.lol_campeoes as mod
+    import services.collectors.lol_campeoes as mod
 
     chamadas: list[int] = []
     monkeypatch.setattr(

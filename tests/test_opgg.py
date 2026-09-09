@@ -12,9 +12,9 @@ import json
 
 import pytest
 
-from collectors import opgg_mcp
-from db.session import session_scope
-from ml.assistente import _desempenho_externo, _elenco_com_desempenho
+from services.collectors import opgg_mcp
+from models.session import session_scope
+from services.ml.assistente import _desempenho_externo, _elenco_com_desempenho
 
 
 class RespostaFalsa:

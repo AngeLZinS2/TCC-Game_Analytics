@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from datetime import timezone
 
-from etl.transform_steam import parse_avaliacoes
+from services.etl.transform_steam import parse_avaliacoes
 
 APP_ID = 570
 

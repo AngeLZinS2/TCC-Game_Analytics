@@ -22,7 +22,7 @@ from agendador import (
     _executar,
     montar_tarefas,
 )
-from collectors.base import CollectionResult
+from services.collectors.base import CollectionResult
 
 
 def _tarefa(executar, intervalo: float = 600.0) -> Tarefa:

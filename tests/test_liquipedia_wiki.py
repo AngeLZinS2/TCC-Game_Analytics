@@ -21,7 +21,7 @@ from __future__ import annotations
 
 import pytest
 
-from etl.transform_liquipedia_wiki import (
+from services.etl.transform_liquipedia_wiki import (
     EquipeWiki,
     campos_do_template,
     parse_equipe,

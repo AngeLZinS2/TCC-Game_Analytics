@@ -7,7 +7,7 @@ e o que evita isso.
 
 from __future__ import annotations
 
-from collectors.hltb_collector import _normalizar_busca
+from services.collectors.hltb_collector import _normalizar_busca
 
 
 def test_remove_simbolos_de_marca_colados_na_palavra():

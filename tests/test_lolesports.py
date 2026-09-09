@@ -7,7 +7,7 @@ nosso time A, o placar de série, o scoreboard por jogo e o status.
 
 from __future__ import annotations
 
-from collectors.lolesports import _montar_detalhe, _streams_do_evento
+from services.collectors.lolesports import _montar_detalhe, _streams_do_evento
 
 _EVENTO = {
     "streams": [
