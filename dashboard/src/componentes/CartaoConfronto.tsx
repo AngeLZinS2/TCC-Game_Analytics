@@ -235,11 +235,7 @@ export function CartaoConfronto({
             {agendada ? fmtDataHora(c.inicio_previsto) : fmtRelativo(c.inicio_previsto)}
           </span>
         </span>
-        {agendada && c.streams && c.streams.length > 0 ? (
-          <span className="shrink-0" onClick={(e) => e.stopPropagation()}>
-            <CanaisTransmissao streams={c.streams} compacto />
-          </span>
-        ) : c.tem_detalhe ? (
+        {c.tem_detalhe ? (
           <span className="inline-flex shrink-0 items-center gap-space-xxs text-primary">
             <Icone nome="scoreboard" className="text-[13px]" />
             por mapa
@@ -253,6 +249,15 @@ export function CartaoConfronto({
           )
         )}
       </div>
+
+      {agendada && c.streams && c.streams.length > 0 && (
+        <div
+          className="border-t border-outline-variant/20 px-space-sm py-space-xs"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <CanaisTransmissao streams={c.streams} />
+        </div>
+      )}
     </>
   );
 

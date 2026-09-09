@@ -170,13 +170,14 @@ function LinhaLista({
     <li
       onClick={aoClicar}
       className={[
-        "flex flex-col gap-space-xxs px-space-sm py-space-xs sm:flex-row sm:items-center sm:gap-space-md",
+        "flex flex-col gap-space-xxs px-space-sm py-space-xs",
         par ? "bg-white/[0.015]" : "",
         aoClicar
           ? "cursor-pointer transition-colors hover:bg-surface-container-high/50"
           : "",
       ].join(" ")}
     >
+      <div className="flex flex-col gap-space-xxs sm:flex-row sm:items-center sm:gap-space-md">
       <div className="flex shrink-0 items-center gap-space-xs sm:w-[23rem] lg:w-[28rem]">
         <span className={`min-w-0 flex-1 text-right ${nomeA}`} title={c.equipe_a_nome}>
           {c.equipe_a_nome}
@@ -223,12 +224,17 @@ function LinhaLista({
         <span className="tabular-nums">
           {semResultado ? fmtDataHora(c.inicio_previsto) : fmtRelativo(c.inicio_previsto)}
         </span>
-        {semResultado && c.streams && c.streams.length > 0 && (
-          <span onClick={(e) => e.stopPropagation()}>
-            <CanaisTransmissao streams={c.streams} compacto />
-          </span>
-        )}
       </div>
+      </div>
+
+      {semResultado && c.streams && c.streams.length > 0 && (
+        <div
+          className="sm:pl-[calc(23rem+1rem)] lg:pl-[calc(28rem+1rem)]"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <CanaisTransmissao streams={c.streams} />
+        </div>
+      )}
     </li>
   );
 }
