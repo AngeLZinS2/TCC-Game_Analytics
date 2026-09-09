@@ -140,6 +140,17 @@ export function TrilhoLateral() {
             </NavLink>
           );
         })}
+
+        {/* Sai da SPA: `/mobile.html` é página estática (Vite `public/`). Por
+            isso `<a>` de verdade, não `<NavLink>`. */}
+        <a
+          href="/mobile.html"
+          className={`${ITEM} ${INATIVO} mt-space-sm border-t border-outline-variant/25 pt-space-md`}
+        >
+          <Icone nome="install_mobile" className="text-[19px]" />
+          <span className="truncate">APK Mobile</span>
+          <Icone nome="arrow_outward" className="ml-auto text-[15px] opacity-50" />
+        </a>
       </nav>
     </aside>
   );
