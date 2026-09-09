@@ -16,7 +16,14 @@
     "types": ["vite/client"],
     "skipLibCheck": true,
     "noEmit": true,
-    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.app.tsbuildinfo"
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.app.tsbuildinfo",
+    "baseUrl": ".",
+    "paths": {
+      "@models/*": ["src/models/*"],
+      "@views/*": ["src/views/*"],
+      "@controllers/*": ["src/controllers/*"],
+      "@util/*": ["src/utilitarios/*"]
+    }
   },
   "include": ["src"]
 }

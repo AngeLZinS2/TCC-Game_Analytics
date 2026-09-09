@@ -1,10 +1,22 @@
+import { fileURLToPath, URL } from "node:url";
+
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
+
+const raiz = (p: string) => fileURLToPath(new URL(p, import.meta.url));
 
 // O proxy /api evita CORS no desenvolvimento e faz o dashboard funcionar
 // tambem quando servido pela mesma origem da API em producao.
 export default defineConfig({
   plugins: [react()],
+  resolve: {
+    alias: {
+      "@models": raiz("./src/models"),
+      "@views": raiz("./src/views"),
+      "@controllers": raiz("./src/controllers"),
+      "@util": raiz("./src/utilitarios"),
+    },
+  },
   server: {
     port: 5173,
     proxy: {
