@@ -218,6 +218,13 @@ function Cabecalho({ d }: { d: DetalheConfronto }) {
         )}
         <span className="text-outline/70">fonte {d.fonte}</span>
       </div>
+
+      {d.veto && (
+        <p className="rounded-lg bg-surface-container-lowest px-space-sm py-space-xs font-body-sm text-body-sm text-on-surface-variant">
+          <Icone nome="rule" className="mr-space-xxs text-[13px] text-outline" />
+          {d.veto}
+        </p>
+      )}
     </div>
   );
 }
@@ -416,7 +423,10 @@ export function ModalConfrontoDetalhe({
         {(d) => {
           const temScoreboard = d.mapas.some((m) => m.jogadores.length > 0);
           const semNada =
-            !temScoreboard && d.mapas_resultado.length === 0 && d.streams.length === 0;
+            !temScoreboard &&
+            d.mapas_resultado.length === 0 &&
+            d.streams.length === 0 &&
+            !d.veto;
 
           return (
             <div className="space-y-space-base">

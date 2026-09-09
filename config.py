@@ -240,10 +240,12 @@ class Settings(BaseSettings):
     agendador_vlr_rankings_minutos: int = Field(default=10080, ge=1440)
 
     #: Intervalo da raspagem do detalhe por mapa/jogador das partidas de
-    #: Valorant do vlr.gg. Diario e so algumas por rodada: a pagina e pesada
-    #: (~700 KB) e a fila (partida decidida sem `detalhe`) so cresce quando ha
-    #: jogo novo, entao a rodada diaria alcanca sem pressa.
-    agendador_vlr_detalhes_minutos: int = Field(default=1440, ge=60)
+    #: Valorant do vlr.gg. A cada 20 min: a fila normal (partida decidida sem
+    #: `detalhe`) so cresce quando ha jogo novo, mas uma partida AO VIVO precisa
+    #: revalidar de tempos em tempos pro placar/mapas da tela andarem. O coletor
+    #: so busca as partidas perto do horario + as marcadas ao vivo (poucas), a
+    #: pagina e pesada (~700 KB).
+    agendador_vlr_detalhes_minutos: int = Field(default=20, ge=5)
 
     #: Intervalo entre reajustes da previsao de confronto, em minutos.
     #:

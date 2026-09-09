@@ -1024,6 +1024,8 @@ class DetalheConfronto(BaseModel):
     torneio: str | None = None
     formato: str | None = None
     inicio_previsto: datetime | None = None
+    #: Pick/ban da série, quando a fonte publica (vlr.gg).
+    veto: str | None = None
     #: `em_breve` | `ao_vivo` | `encerrada`.
     status: str = "em_breve"
     #: Placar de serie (parcial no ao vivo, final no encerrado).

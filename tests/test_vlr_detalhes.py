@@ -56,4 +56,45 @@ def test_dez_jogadores_por_mapa_com_stats():
 
 def test_pagina_sem_bloco_de_mapa_volta_vazia():
     d = _parse_partida("<html><body>manutencao</body></html>")
-    assert d == {"fonte": "vlr.gg", "mapas": []}
+    assert d["fonte"] == "vlr.gg"
+    assert d["mapas"] == []
+    # Sem cabeçalho reconhecível: nada de status ao vivo, nada de canais.
+    assert d["status"] == "em_breve"
+    assert "streams" not in d and "placar_serie" not in d
+
+
+def test_cabecalho_le_status_placar_e_canais():
+    """A fixture agregada não tem cabeçalho de série; um recorte sintético
+    exercita o parser do topo da página (status ao vivo, placar, transmissão)."""
+    from collectors.vlr_detalhes import _parse_cabecalho
+
+    trecho = """
+    <div class="match-header-vs-score">
+      <div class="match-header-vs-note">
+        <span class="match-header-vs-note mod-live">live</span>
+      </div>
+      <div class="match-header-vs-score">
+        <div class="sp-hide">
+          <span class="">1</span>
+          <span class="match-header-vs-score-colon">:</span>
+          <span class="">0</span>
+        </div>
+      </div>
+      <div class="match-header-vs-note">Bo3</div>
+    </div>
+    <div class="match-header-note">TS ban Split; HER pick Abyss</div>
+    <div class="match-streams-container">
+      <div class="wf-card mod-dark match-streams-btn">
+        <i class="flag mod-us"></i><span style="">VCT Americas</span>
+      </div>
+      <a class="match-streams-btn-external" href="https://www.twitch.tv/valorant_americas"></a>
+    </div>
+    <div class="match-vods">
+    Maps/Stats
+    """
+    cab = _parse_cabecalho(trecho)
+    assert cab["status"] == "ao_vivo"
+    assert cab["placar_serie"] == {"a": 1, "b": 0}
+    assert cab["formato"] == "Bo3"
+    assert "ban Split" in cab["veto"]
+    assert cab["streams"] and cab["streams"][0]["plataforma"] == "twitch"

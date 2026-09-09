@@ -537,12 +537,18 @@ def confronto_detalhe(
     detalhe: dict[str, Any] = linha[2] or {}
     vitoria_a = linha[6]
 
-    # Status: o resultado publicado manda; senão o que a fonte marcou no
-    # detalhe; senão o relógio (passou do horário = já era pra ter começado).
-    if vitoria_a is not None or linha[7] is not None or linha[8] is not None:
+    # Status: "ao vivo" do detalhe manda mesmo com placar parcial na tabela
+    # (o ticker às vezes grava o placar sem o resultado); depois o resultado
+    # publicado; depois o que a fonte marcou; por último o placar solto.
+    ds = _STATUS_PARTIDA.get(detalhe.get("status") or "")
+    if ds == "ao_vivo":
+        status = "ao_vivo"
+    elif vitoria_a is not None:
         status = "encerrada"
-    elif detalhe.get("status"):
-        status = _STATUS_PARTIDA.get(detalhe["status"], "em_breve")
+    elif ds:
+        status = ds
+    elif linha[7] is not None or linha[8] is not None:
+        status = "encerrada"
     else:
         status = "em_breve"
 
@@ -564,8 +570,11 @@ def confronto_detalhe(
         jogo=linha[13],
         jogo_nome=linha[14],
         torneio=linha[3],
-        formato=linha[4],
+        # O formato do detalhe vem da página da partida (scrape direto); o da
+        # tabela às vezes é herdado errado do ticker.
+        formato=detalhe.get("formato") or linha[4],
         inicio_previsto=linha[5],
+        veto=detalhe.get("veto"),
         status=status,
         placar_a=placar_a,
         placar_b=placar_b,

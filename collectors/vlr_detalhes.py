@@ -16,9 +16,10 @@ import html
 import logging
 import re
 from dataclasses import dataclass, field
+from datetime import datetime, timedelta, timezone
 from typing import Any, Sequence
 
-from sqlalchemy import select
+from sqlalchemy import func, or_, select
 
 from collectors.base import BaseCollector, RawRecord
 from collectors.http_client import RateLimitedClient
@@ -34,6 +35,17 @@ BASE = "https://www.vlr.gg"
 #: Quantas partidas buscar por rodada. A pagina e grande; a rodada e diaria e a
 #: fila (partidas decididas sem `detalhe`) so cresce quando ha jogo novo.
 POR_RODADA = 15
+
+#: Janela para a PRIMEIRA coleta de uma partida (pega status/canais/veto uma
+#: vez). Larga para trás porque o `inicio_previsto` de algumas linhas vem de
+#: fonte imprecisa e a partida pode já estar rolando.
+JANELA_PRIMEIRA_ANTES = timedelta(hours=12)
+JANELA_PRIMEIRA_DEPOIS = timedelta(hours=24)
+
+#: Janela onde a partida provavelmente está AO VIVO — essas revalidam a cada
+#: rodada (placar, mapas e status andam). Estreita: são poucas por vez.
+JANELA_AO_VIVO_ANTES = timedelta(hours=6)
+JANELA_AO_VIVO_DEPOIS = timedelta(minutes=30)
 
 #: Um bloco de mapa: `<div class="vm-stats-game ..." data-game-id="280058">`.
 #: `all` (o agregado da serie) fica de fora - a tela quer o recorte por mapa.
@@ -106,17 +118,44 @@ class VlrDetalhesCollector(BaseCollector[ResultadoDetalhes]):
 
     def collect(self) -> list[RawRecord]:
         settings = get_settings()
+        agora = datetime.now(timezone.utc)
         with session_scope() as sessao:
+            # Quatro filas, ordenadas por proximidade de "agora" (a partida
+            # perto do horário é a que provavelmente está ao vivo, prioritária):
+            #   (a) decidida sem `detalhe` — fila histórica, preenche uma vez;
+            #   (b) sem `detalhe` e perto de hoje — primeira coleta (status,
+            #       canais, veto), uma vez;
+            #   (c) na janela de ao vivo — revalida a cada rodada;
+            #   (d) marcada `ao_vivo` no `detalhe` mas fora da janela (horário
+            #       impreciso, ou travou) — revalida até fechar.
+            sem_detalhe = AgendaPartida.detalhe.is_(None)
+            primeira_coleta = sem_detalhe & AgendaPartida.inicio_previsto.between(
+                agora - JANELA_PRIMEIRA_ANTES, agora + JANELA_PRIMEIRA_DEPOIS
+            )
+            na_janela_ao_vivo = AgendaPartida.inicio_previsto.between(
+                agora - JANELA_AO_VIVO_ANTES, agora + JANELA_AO_VIVO_DEPOIS
+            )
+            ainda_ao_vivo = AgendaPartida.detalhe["status"].astext == "ao_vivo"
             pendentes = sessao.execute(
                 select(AgendaPartida.id, AgendaPartida.id_externo)
                 .join(DimJogo, DimJogo.id_jogo == AgendaPartida.id_jogo)
                 .where(
                     DimJogo.codigo == JOGO,
                     AgendaPartida.id_externo.like("vlr:%"),
-                    AgendaPartida.vitoria_a.is_not(None),
-                    AgendaPartida.detalhe.is_(None),
+                    or_(
+                        AgendaPartida.vitoria_a.is_not(None) & sem_detalhe,
+                        primeira_coleta,
+                        na_janela_ao_vivo,
+                        ainda_ao_vivo,
+                    ),
                 )
-                .order_by(AgendaPartida.inicio_previsto.desc())
+                .order_by(
+                    func.abs(
+                        func.extract(
+                            "epoch", AgendaPartida.inicio_previsto - agora
+                        )
+                    )
+                )
                 .limit(POR_RODADA)
             ).all()
 
@@ -158,7 +197,13 @@ class VlrDetalhesCollector(BaseCollector[ResultadoDetalhes]):
             if not isinstance(pagina, str):
                 continue
             detalhe = _parse_partida(pagina)
-            if detalhe["mapas"]:
+            # Guarda se pegou QUALQUER coisa útil — uma partida ao vivo sem
+            # mapa começado ainda tem status + placar + canais pra mostrar.
+            if (
+                detalhe["mapas"]
+                or detalhe.get("streams")
+                or detalhe.get("status") in ("ao_vivo", "encerrada")
+            ):
                 itens.append(DetalhePartida(int(registro.identificador), detalhe))
         return ResultadoDetalhes(itens=itens)
 
@@ -209,7 +254,12 @@ def _parse_partida(pagina: str) -> dict[str, Any]:
                 }
             )
 
-        if not jogadores:
+        # Numa série ao vivo o vlr.gg já renderiza a linha do elenco dos mapas
+        # que ainda não começaram — sem nenhum número. Esses ficam de fora.
+        if not jogadores or not any(
+            j["rating"] is not None or j["acs"] is not None or j["k"] is not None
+            for j in jogadores
+        ):
             continue
         mapas.append(
             {
@@ -221,9 +271,111 @@ def _parse_partida(pagina: str) -> dict[str, Any]:
             }
         )
 
-    return {"fonte": "vlr.gg", "mapas": mapas}
+    return {"fonte": "vlr.gg", "mapas": mapas, **_parse_cabecalho(pagina)}
 
 
 def _extrai(padrao: re.Pattern[str], texto: str) -> str | None:
     m = padrao.search(texto)
     return m.group(1) if m else None
+
+
+# ---------------------------------------------------------------------------
+# Cabeçalho da partida (status, placar de série, transmissões, veto)
+# ---------------------------------------------------------------------------
+
+_PLACAR_SERIE = re.compile(
+    r'match-header-vs-score">\s*<div class="sp-hide">\s*'
+    r'<span[^>]*>\s*(\d+)\s*</span>\s*'
+    r'<span class="match-header-vs-score-colon">\s*:\s*</span>\s*'
+    r'<span[^>]*>\s*(\d+)\s*</span>',
+    re.S,
+)
+_FORMATO_SERIE = re.compile(r'match-header-vs-note">\s*(Bo\d)\s*<', re.S)
+_VETO_SERIE = re.compile(r'<div class="match-header-note">\s*(.*?)\s*</div>', re.S)
+
+#: Bloco `match-streams-container` até os VODs — onde ficam os canais ao vivo.
+_BLOCO_STREAMS = re.compile(
+    r'<div class="match-streams-container">(.*?)(?:<div class="match-vods">|</div>\s*</div>\s*<div class="match-stream-embed)',
+    re.S,
+)
+_FLAG_LINGUA = {
+    "us": "EN", "gb": "EN", "eu": "EN", "br": "PT", "kr": "KO", "jp": "JA",
+    "cn": "ZH", "ru": "RU", "es": "ES", "fr": "FR", "de": "DE", "tr": "TR",
+}
+_HOST_PLATAFORMA_VLR = {
+    "twitch.tv": "twitch",
+    "youtube.com": "youtube",
+    "youtu.be": "youtube",
+    "kick.com": "kick",
+}
+
+
+def _plataforma(url: str) -> str:
+    m = re.match(r"https?://(?:www\.)?([^/]+)/", url + "/")
+    host = (m.group(1) if m else "").lower()
+    return _HOST_PLATAFORMA_VLR.get(host, "other")
+
+
+def _parse_streams(pagina: str) -> list[dict[str, Any]]:
+    bloco = _BLOCO_STREAMS.search(pagina)
+    if not bloco:
+        return []
+    trecho = bloco.group(1)
+    saida: list[dict[str, Any]] = []
+    vistos: set[str] = set()
+
+    for card in re.split(r'<a href="|<div class="wf-card', trecho):
+        url_m = re.search(r'href="(https?://[^"]+)"', "<a href=\"" + card) or re.search(
+            r'href="(https?://[^"]+)"', card
+        )
+        nome_m = re.search(r'<span[^>]*>\s*([^<]+?)\s*</span>', card)
+        flag_m = re.search(r"flag mod-(\w+)", card)
+        if not url_m or not nome_m:
+            continue
+        url = html.unescape(url_m.group(1))
+        if url in vistos:
+            continue
+        vistos.add(url)
+        saida.append(
+            {
+                "url": url,
+                "nome": html.unescape(nome_m.group(1)).strip()[:60],
+                "plataforma": _plataforma(url),
+                "lingua": _FLAG_LINGUA.get((flag_m.group(1) if flag_m else "").lower()),
+                "principal": not saida,
+            }
+        )
+    return saida[:8]
+
+
+def _parse_cabecalho(pagina: str) -> dict[str, Any]:
+    cab = pagina[: pagina.find("Maps/Stats")] if "Maps/Stats" in pagina else pagina[:8000]
+
+    if "match-header-vs-note mod-live" in cab:
+        status = "ao_vivo"
+    elif re.search(r"match-header-vs-note[^>]*>\s*final\b", cab):
+        status = "encerrada"
+    else:
+        status = "em_breve"
+
+    out: dict[str, Any] = {"status": status}
+
+    placar = _PLACAR_SERIE.search(cab)
+    if placar and status in ("ao_vivo", "encerrada"):
+        out["placar_serie"] = {"a": int(placar.group(1)), "b": int(placar.group(2))}
+
+    fmt = _FORMATO_SERIE.search(cab)
+    if fmt:
+        out["formato"] = fmt.group(1)
+
+    veto = _VETO_SERIE.search(cab)
+    if veto:
+        texto = html.unescape(re.sub(r"<[^>]+>", "", veto.group(1))).strip()
+        if texto:
+            out["veto"] = texto[:400]
+
+    streams = _parse_streams(pagina)
+    if streams:
+        out["streams"] = streams
+
+    return out

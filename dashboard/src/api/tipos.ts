@@ -870,6 +870,7 @@ export interface DetalheConfronto {
   torneio: string | null;
   formato: string | null;
   inicio_previsto: string | null;
+  veto: string | null;
   status: StatusPartida;
   placar_a: number | null;
   placar_b: number | null;
