@@ -9,9 +9,11 @@ from __future__ import annotations
 
 from collectors.pandascore import (
     PandaScoreCollector,
+    _canal_de_stream,
     _instante,
     _para_confronto,
     _rotulo_torneio,
+    _streams_da_partida,
 )
 
 
@@ -111,6 +113,42 @@ def test_sem_horario_e_descartada():
 def test_rotulo_so_com_serie_quando_falta_liga_e_etapa():
     p = {"league": {"name": ""}, "tournament": {"name": ""}, "serie": {"full_name": "Season 12"}}
     assert _rotulo_torneio(p) == "Season 12"
+
+
+def test_canal_de_stream_reconhece_plataforma_e_nome():
+    assert _canal_de_stream("https://www.twitch.tv/PGL") == ("PGL", "twitch")
+    assert _canal_de_stream("https://kick.com/fissure-cs") == ("fissure-cs", "kick")
+    nome, plataforma = _canal_de_stream("https://exemplo.tv/live")
+    assert plataforma == "other" and nome == "live"
+
+
+def test_streams_da_partida_ordena_oficial_e_dedup():
+    canais = _streams_da_partida(
+        {
+            "streams_list": [
+                {"raw_url": "https://kick.com/fissure-a", "language": "en", "main": False},
+                {"raw_url": "https://www.twitch.tv/PGL", "language": "en", "official": True},
+                {"raw_url": "https://www.twitch.tv/PGL", "language": "en"},  # repetido
+            ],
+            "official_stream_url": None,
+        }
+    )
+    assert [c["url"] for c in canais] == [
+        "https://www.twitch.tv/PGL",
+        "https://kick.com/fissure-a",
+    ]
+    assert canais[0]["principal"] is True and canais[0]["lingua"] == "EN"
+
+
+def test_por_vir_carrega_os_canais_de_transmissao():
+    c = _para_confronto(
+        _partida(
+            status="not_started",
+            winner_id=None,
+            streams_list=[{"raw_url": "https://www.twitch.tv/PGL", "official": True}],
+        )
+    )
+    assert c is not None and c.streams and c.streams[0]["plataforma"] == "twitch"
 
 
 def test_instante_normaliza_para_utc():

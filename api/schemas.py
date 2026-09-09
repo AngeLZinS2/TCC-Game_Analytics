@@ -45,6 +45,19 @@ class VisaoGeral(BaseModel):
     coletas: list[ColetaFonte]
 
 
+class StreamCanal(BaseModel):
+    """Um canal de transmissão de uma partida (Twitch/YouTube/Kick/…)."""
+
+    url: str
+    #: Nome do canal ("PGL", "BLASTPremier") ou a plataforma.
+    nome: str
+    plataforma: str = "other"
+    #: Idioma da transmissão, quando a fonte informa ("EN", "PT", "RU").
+    lingua: str | None = None
+    #: `True` para a transmissão oficial / principal do torneio.
+    principal: bool = False
+
+
 class PartidaAgendada(BaseModel):
     """Uma partida que ainda vai acontecer (aba Partidas → Próximas)."""
 
@@ -59,6 +72,8 @@ class PartidaAgendada(BaseModel):
     inicio_previsto: datetime
     torneio: str | None = None
     formato: str | None = None
+    #: Canais onde a partida vai passar (PandaScore). Vazio quando não há dado.
+    streams: list[StreamCanal] = Field(default_factory=list)
 
 
 class MaisJogadoSteam(BaseModel):
@@ -1090,8 +1105,8 @@ class ConfrontoAoVivo(BaseModel):
     inicio_previsto: datetime
     #: `True` quando esta MESMO acontecendo (status running, ou comecou ha pouco).
     ao_vivo: bool = False
-    #: URL da transmissao oficial, quando a fonte expoe uma (PandaScore).
-    stream_url: str | None = None
+    #: Canais de transmissao (PandaScore). Oficial primeiro. Vazio quando nao ha.
+    streams: list[StreamCanal] = Field(default_factory=list)
 
 
 class DestaqueConfronto(ConfrontoAoVivo):

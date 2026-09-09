@@ -18,6 +18,7 @@ import type { ConfrontoAoVivo, DestaqueConfronto } from "../api/tipos";
 import { corDoJogo, TOKENS } from "../tema";
 import { fmtDataHora, fmtQuando } from "../utilitarios/formatos";
 import { Icone, Selo } from "./base";
+import { CanaisTransmissao } from "./CanaisTransmissao";
 import { Velocimetro } from "./Velocimetro";
 
 /** Escudo pequeno — logo quando há, senão as iniciais. */
@@ -68,8 +69,11 @@ function EtiquetaJogo({ jogo, nome }: { jogo: string; nome: string }) {
 }
 
 function CartaoAoVivo({ c }: { c: ConfrontoAoVivo }) {
-  const corpo = (
-    <>
+  return (
+    <div
+      className="flex flex-col gap-space-xs overflow-visible rounded-lg border border-outline-variant/25 bg-surface-container-lowest"
+      style={{ borderLeft: `3px solid ${corDoJogo(c.jogo)}` }}
+    >
       <div className="flex items-center justify-between gap-space-xs px-space-sm pt-space-xs">
         <EtiquetaJogo jogo={c.jogo} nome={c.jogo_nome} />
         {c.ao_vivo ? (
@@ -104,36 +108,8 @@ function CartaoAoVivo({ c }: { c: ConfrontoAoVivo }) {
 
       <div className="flex items-center justify-between gap-space-xs px-space-sm pb-space-xs font-body-sm text-body-sm text-outline">
         <span className="min-w-0 truncate">{c.torneio ?? "—"}</span>
-        {c.stream_url && (
-          <span className="inline-flex shrink-0 items-center gap-space-xxs text-primary">
-            <Icone nome="play_circle" className="text-[14px]" />
-            assistir
-          </span>
-        )}
+        <CanaisTransmissao streams={c.streams} compacto />
       </div>
-    </>
-  );
-
-  const classe =
-    "flex flex-col gap-space-xs overflow-hidden rounded-lg border border-outline-variant/25 bg-surface-container-lowest";
-  const estilo = { borderLeft: `3px solid ${corDoJogo(c.jogo)}` };
-
-  if (c.stream_url) {
-    return (
-      <a
-        href={c.stream_url}
-        target="_blank"
-        rel="noreferrer"
-        className={`${classe} transition-colors hover:border-primary-container/50 hover:bg-surface-container`}
-        style={estilo}
-      >
-        {corpo}
-      </a>
-    );
-  }
-  return (
-    <div className={classe} style={estilo}>
-      {corpo}
     </div>
   );
 }
@@ -240,17 +216,7 @@ function DestaqueCard({ c }: { c: DestaqueConfronto }) {
           <span className="tabular-nums" title={fmtDataHora(c.inicio_previsto)}>
             {c.ao_vivo ? "ao vivo" : fmtQuando(c.inicio_previsto)}
           </span>
-          {c.stream_url && (
-            <a
-              href={c.stream_url}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center gap-space-xxs text-primary hover:text-primary-fixed"
-            >
-              <Icone nome="play_circle" className="text-[14px]" />
-              assistir
-            </a>
-          )}
+          <CanaisTransmissao streams={c.streams} />
           <Link
             to={`/esports/${c.jogo}/previsao`}
             className="ml-auto inline-flex items-center gap-space-xxs text-primary hover:text-primary-fixed"

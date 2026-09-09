@@ -572,6 +572,7 @@ def agenda_proximas(
             equipe_b.logo_url,
             equipe_a.tag,
             equipe_b.tag,
+            AgendaPartida.detalhe,
         )
         .outerjoin(equipe_a, equipe_a.id_equipe == AgendaPartida.id_equipe_a)
         .outerjoin(equipe_b, equipe_b.id_equipe == AgendaPartida.id_equipe_b)
@@ -599,6 +600,7 @@ def agenda_proximas(
             equipe_b_logo=linha[7],
             equipe_a_tag=linha[8],
             equipe_b_tag=linha[9],
+            streams=(linha[10] or {}).get("streams") or [],
         )
         for linha in linhas
     ]

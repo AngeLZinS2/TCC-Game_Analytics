@@ -29,6 +29,7 @@ contra o `dim_equipe` que a wiki já povoou, os que não casam entram com
 from __future__ import annotations
 
 import logging
+import re
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Iterable, Sequence
@@ -84,10 +85,11 @@ class ConfrontoPandaScore:
     equipe_a_tag: str | None = None
     equipe_b_tag: str | None = None
     #: `status` da PandaScore: `not_started`, `running`, `finished`, ... — a
-    #: verdade sobre se a partida está mesmo acontecendo. `stream_url` é a live
-    #: oficial quando há. Vão para `agenda_partida.detalhe`.
+    #: verdade sobre se a partida está mesmo acontecendo. `streams` é a lista de
+    #: canais de transmissão (Twitch/YouTube/Kick, um por idioma/caster). Vão
+    #: para `agenda_partida.detalhe`.
     status: str | None = None
-    stream_url: str | None = None
+    streams: list[dict[str, Any]] | None = None
 
 
 @dataclass
@@ -113,31 +115,62 @@ def _instante(*candidatos: str | None) -> datetime | None:
     return None
 
 
-def _stream_da_partida(partida: dict[str, Any]) -> str | None:
-    """A URL da transmissão oficial, se a PandaScore expõe uma.
+#: `twitch.tv/PGL` -> `("PGL", "twitch")`; `kick.com/x` -> `("x", "kick")`.
+_HOST_PLATAFORMA = {
+    "twitch.tv": "twitch",
+    "youtube.com": "youtube",
+    "youtu.be": "youtube",
+    "kick.com": "kick",
+    "trovo.live": "trovo",
+    "afreecatv.com": "afreecatv",
+    "vk.com": "vk",
+    "vkplay.live": "vkplay",
+}
 
-    Prefere a marcada como `official` e `main`; depois qualquer `main`; depois
-    `official_stream_url` / `live.url`. Devolve o link cru (para abrir), não o
-    embed.
-    """
-    lista = partida.get("streams_list") or []
-    marcadas = [s for s in lista if isinstance(s, dict) and (s.get("raw_url") or s.get("embed_url"))]
 
-    def _url(s: dict[str, Any]) -> str | None:
-        return s.get("raw_url") or s.get("embed_url")
+def _canal_de_stream(url: str) -> tuple[str, str]:
+    """`https://www.twitch.tv/PGL` -> `("PGL", "twitch")`. Fallback: (host, other)."""
+    m = re.match(r"https?://(?:www\.|player\.)?([^/]+)/?([^/?#]*)", url)
+    if not m:
+        return (url[:40], "other")
+    host, caminho = m.group(1).lower(), m.group(2)
+    plataforma = _HOST_PLATAFORMA.get(host, "other")
+    nome = caminho.lstrip("@") or host.split(".")[0]
+    if plataforma == "youtube" and caminho in ("watch", ""):
+        nome = "YouTube"
+    return (nome[:60], plataforma)
 
-    for filtro in (
-        lambda s: s.get("official") and s.get("main"),
-        lambda s: s.get("main"),
-        lambda s: s.get("official"),
-        lambda s: True,
-    ):
-        for s in marcadas:
-            if filtro(s):
-                return _url(s)
 
+def _streams_da_partida(partida: dict[str, Any]) -> list[dict[str, Any]]:
+    """A lista de canais de transmissão. Oficial/main primeiro; dedup por URL."""
+    saida: list[dict[str, Any]] = []
+    vistos: set[str] = set()
+
+    fontes = list(partida.get("streams_list") or [])
     direto = partida.get("official_stream_url") or (partida.get("live") or {}).get("url")
-    return direto or None
+    if direto:
+        fontes.append({"raw_url": direto, "official": True, "main": True})
+
+    for s in fontes:
+        if not isinstance(s, dict):
+            continue
+        url = s.get("raw_url") or s.get("embed_url")
+        if not url or url in vistos:
+            continue
+        vistos.add(url)
+        nome, plataforma = _canal_de_stream(url)
+        saida.append(
+            {
+                "url": url,
+                "nome": nome,
+                "plataforma": plataforma,
+                "lingua": (s.get("language") or "").upper()[:5] or None,
+                "principal": bool(s.get("main") or s.get("official")),
+            }
+        )
+
+    saida.sort(key=lambda s: (not s["principal"], s["plataforma"] != "twitch"))
+    return saida[:8]
 
 
 def _rotulo_torneio(partida: dict[str, Any]) -> str | None:
@@ -226,7 +259,12 @@ def _para_confronto(
         equipe_a_tag=_sigla(a),
         equipe_b_tag=_sigla(b),
         status=status if isinstance(status, str) else None,
-        stream_url=_stream_da_partida(partida) if status in ("running", "not_started") else None,
+        streams=(
+            _streams_da_partida(partida)
+            if status in ("running", "not_started")
+            else None
+        )
+        or None,
     )
 
 

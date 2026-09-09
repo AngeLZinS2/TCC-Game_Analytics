@@ -18,6 +18,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { ConfrontoResultado, Partida, PartidaAgendada } from "../api/tipos";
 import { PALETA_POLOS } from "../tema";
 import { fmtDataHora, fmtRelativo } from "../utilitarios/formatos";
+import { CanaisTransmissao } from "./CanaisTransmissao";
 import { CartaoConfronto, paraCartao, type DadosConfronto } from "./CartaoConfronto";
 import { ModalConfrontoDetalhe } from "./ModalConfrontoDetalhe";
 import { Icone } from "./base";
@@ -222,6 +223,11 @@ function LinhaLista({
         <span className="tabular-nums">
           {semResultado ? fmtDataHora(c.inicio_previsto) : fmtRelativo(c.inicio_previsto)}
         </span>
+        {semResultado && c.streams && c.streams.length > 0 && (
+          <span onClick={(e) => e.stopPropagation()}>
+            <CanaisTransmissao streams={c.streams} compacto />
+          </span>
+        )}
       </div>
     </li>
   );

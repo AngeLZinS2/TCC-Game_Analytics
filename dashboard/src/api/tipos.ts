@@ -800,6 +800,8 @@ export interface PartidaAgendada {
   inicio_previsto: string;
   torneio: string | null;
   formato: string | null;
+  /** Canais onde a partida vai passar (PandaScore). Vazio quando não há dado. */
+  streams?: StreamCanal[];
 }
 
 export interface ConfrontoResultado {
@@ -866,6 +868,17 @@ export interface ConfrontoAgendado {
 
 // --- Home: acontecendo agora + destaque ---
 
+export interface StreamCanal {
+  url: string;
+  /** Nome do canal ("PGL") ou a plataforma. */
+  nome: string;
+  plataforma: string;
+  /** Idioma da transmissão ("EN", "PT", "RU"). */
+  lingua: string | null;
+  /** `true` para a transmissão oficial / principal. */
+  principal: boolean;
+}
+
 export interface ConfrontoAoVivo {
   id_externo: string;
   jogo: string;
@@ -881,8 +894,8 @@ export interface ConfrontoAoVivo {
   inicio_previsto: string;
   /** `true` quando está mesmo acontecendo (status running, ou começou há pouco). */
   ao_vivo: boolean;
-  /** URL da transmissão oficial, quando a fonte expõe uma. */
-  stream_url: string | null;
+  /** Canais de transmissão (PandaScore). Oficial primeiro. */
+  streams: StreamCanal[];
 }
 
 export interface DestaqueConfronto extends ConfrontoAoVivo {

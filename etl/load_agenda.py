@@ -95,21 +95,21 @@ def _preencher_escudos(
 
 
 def _detalhe(c: ConfrontoAgenda) -> dict | None:
-    """`{status, stream_url}` para `agenda_partida.detalhe`, se a fonte trouxe.
+    """`{status, streams}` para `agenda_partida.detalhe`, se a fonte trouxe.
 
-    Só a PandaScore preenche `status`/`stream_url` (o resto usa `getattr`, que
+    Só a PandaScore preenche `status`/`streams` (o resto usa `getattr`, que
     devolve `None`). Sem nenhum dos dois, retorna `None` e o `coalesce` do
     upsert preserva o que já estava.
     """
     status = getattr(c, "status", None)
-    stream = getattr(c, "stream_url", None)
-    if not status and not stream:
+    streams = getattr(c, "streams", None)
+    if not status and not streams:
         return None
     d: dict = {"fonte": "pandascore"}
     if status:
         d["status"] = status
-    if stream:
-        d["stream_url"] = stream
+    if streams:
+        d["streams"] = streams
     return d
 
 

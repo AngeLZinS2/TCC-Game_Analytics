@@ -150,7 +150,7 @@ def destaques(db: Session = Depends(get_db)) -> DestaquesHome:
             formato=linha[9],
             inicio_previsto=inicio,
             ao_vivo=status == "running" or (inicio <= agora and status != "not_started"),
-            stream_url=detalhe.get("stream_url"),
+            streams=detalhe.get("streams") or [],
             **extra,
         )
 

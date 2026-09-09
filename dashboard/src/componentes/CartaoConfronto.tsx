@@ -11,10 +11,16 @@
 
 import type { ReactNode } from "react";
 
-import type { ConfrontoResultado, Partida, PartidaAgendada } from "../api/tipos";
+import type {
+  ConfrontoResultado,
+  Partida,
+  PartidaAgendada,
+  StreamCanal,
+} from "../api/tipos";
 import { PALETA_POLOS } from "../tema";
 import { fmtDataHora, fmtDuracao, fmtRelativo } from "../utilitarios/formatos";
 import { Icone } from "./base";
+import { CanaisTransmissao } from "./CanaisTransmissao";
 
 /** O mínimo que o cartão precisa — o resto é opcional e cai no "por vir". */
 export interface DadosConfronto {
@@ -36,6 +42,8 @@ export interface DadosConfronto {
   nota?: string | null;
   /** Rota do detalhe quando o clique navega em vez de abrir o modal. */
   id_rota?: number;
+  /** Onde a partida por vir vai passar — um ou vários canais. */
+  streams?: StreamCanal[];
 }
 
 export function paraCartao(
@@ -227,7 +235,11 @@ export function CartaoConfronto({
             {agendada ? fmtDataHora(c.inicio_previsto) : fmtRelativo(c.inicio_previsto)}
           </span>
         </span>
-        {c.tem_detalhe ? (
+        {agendada && c.streams && c.streams.length > 0 ? (
+          <span className="shrink-0" onClick={(e) => e.stopPropagation()}>
+            <CanaisTransmissao streams={c.streams} compacto />
+          </span>
+        ) : c.tem_detalhe ? (
           <span className="inline-flex shrink-0 items-center gap-space-xxs text-primary">
             <Icone nome="scoreboard" className="text-[13px]" />
             por mapa
