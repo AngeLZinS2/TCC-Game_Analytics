@@ -7,7 +7,9 @@
  * desktop (`md:` para cima) este componente não renderiza.
  *
  * "Perfil" fica de fora: depende de autenticação, que o projeto não tem, e um
- * sexto item sem destino só rouba espaço dos que funcionam.
+ * item sem destino só rouba espaço dos que funcionam. O "APK" no fim TEM
+ * destino (a landing estática `/mobile.html`), por isso entra — como `<a>` de
+ * verdade, fora da SPA.
  *
  * `pb-[env(safe-area-inset-bottom)]` reserva a faixa do gesto de home nos
  * aparelhos sem botão físico — sem isso o último item fica embaixo da barra do
@@ -59,6 +61,14 @@ export function NavInferior() {
           {item.rotulo}
         </NavLink>
       ))}
+
+      <a
+        href="/mobile.html"
+        className="flex min-h-[54px] flex-1 flex-col items-center justify-center gap-0.5 py-space-xs font-badge-status text-badge-status uppercase tracking-wide text-on-surface-variant transition-colors"
+      >
+        <Icone nome="install_mobile" className="text-[22px]" />
+        APK
+      </a>
     </nav>
   );
 }

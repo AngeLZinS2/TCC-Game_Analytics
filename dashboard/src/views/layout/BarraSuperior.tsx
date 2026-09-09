@@ -178,6 +178,14 @@ export function BarraSuperior() {
         {NAVEGACAO.map((item) => (
           <ItemNav key={item.rotulo} item={item} />
         ))}
+        {/* Landing do app: página estática, fora da SPA — `<a>` de verdade. */}
+        <a
+          href="/mobile.html"
+          className="group relative flex h-10 w-10 items-center justify-center rounded-lg text-on-surface-variant transition-colors hover:bg-surface-container hover:text-on-surface"
+        >
+          <Icone nome="install_mobile" className="text-[19px]" />
+          <Dica texto="APK Mobile ↗" />
+        </a>
       </nav>
 
       <span className="hidden h-6 w-px shrink-0 bg-outline-variant/40 md:block lg:hidden" aria-hidden />
