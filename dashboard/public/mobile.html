@@ -427,6 +427,79 @@
     try{ localStorage.setItem("playdb_mobile_notify", "1"); }catch(_){}
   });
   try{ if(localStorage.getItem("playdb_mobile_notify")) document.getElementById("ndone").classList.add("show"); }catch(_){}
+
+  /* ---------- dentro do celular: sem barra de scroll + deslizar segurando o clique (feito touch) ---------- */
+  frame.addEventListener("load", function(){
+    var d, w;
+    try{ d = frame.contentDocument; w = frame.contentWindow; }catch(_){ return; }
+    if(!d || !d.head) return;
+
+    // 1. some com toda barra de rolagem lá dentro
+    var st = d.getElementById("__pd_kiosk") || d.createElement("style");
+    st.id = "__pd_kiosk";
+    st.textContent =
+      "*::-webkit-scrollbar{width:0!important;height:0!important;display:none!important}" +
+      "html{scrollbar-width:none!important;-ms-overflow-style:none!important;overscroll-behavior:none}" +
+      "body{cursor:grab}body.__pd_grab{cursor:grabbing;user-select:none}";
+    d.head.appendChild(st);
+
+    // 2. segura o botão 1 e arrasta → rola o conteúdo, com inércia. Tap normal
+    //    (sem arrastar) continua clicando no que o app tem embaixo.
+    var alvo = null, down = false, moved = false, sy = 0, sx = 0, t0 = 0, l0 = 0;
+    var lastY = 0, lastT = 0, vel = 0, fling = 0;
+
+    function rolavel(node){
+      while(node && node !== d.body && node.nodeType === 1){
+        try{
+          var cs = w.getComputedStyle(node);
+          if(/(auto|scroll)/.test(cs.overflowY + cs.overflow) && node.scrollHeight - node.clientHeight > 2) return node;
+        }catch(_){}
+        node = node.parentElement;
+      }
+      return d.scrollingElement || d.documentElement;
+    }
+    d.addEventListener("mousedown", function(e){
+      if(e.button !== 0) return;
+      cancelAnimationFrame(fling);
+      alvo = rolavel(e.target);
+      down = true; moved = false;
+      sy = e.clientY; sx = e.clientX;
+      t0 = alvo.scrollTop; l0 = alvo.scrollLeft;
+      lastY = e.clientY; lastT = e.timeStamp; vel = 0;
+    }, true);
+    d.addEventListener("mousemove", function(e){
+      if(!down) return;
+      var dy = e.clientY - sy, dx = e.clientX - sx;
+      if(!moved){
+        if(Math.abs(dy) < 4 && Math.abs(dx) < 4) return;
+        moved = true; d.body.classList.add("__pd_grab");
+      }
+      e.preventDefault();
+      alvo.scrollTop = t0 - dy;
+      alvo.scrollLeft = l0 - dx;
+      var dt = e.timeStamp - lastT;
+      if(dt > 0) vel = (e.clientY - lastY) / dt;
+      lastY = e.clientY; lastT = e.timeStamp;
+    }, true);
+    function solta(){
+      if(!down) return;
+      down = false; d.body.classList.remove("__pd_grab");
+      if(!moved) return;
+      // engole o clique que sairia do "arrastar"
+      var mata = function(ev){ ev.stopPropagation(); ev.preventDefault(); };
+      d.addEventListener("click", mata, true);
+      setTimeout(function(){ d.removeEventListener("click", mata, true); }, 60);
+      // inércia
+      var v = vel * 14, el = alvo;
+      (function passo(){
+        if(Math.abs(v) < 0.35) return;
+        el.scrollTop -= v; v *= 0.94;
+        fling = requestAnimationFrame(passo);
+      })();
+    }
+    d.addEventListener("mouseup", solta, true);
+    d.addEventListener("mouseleave", solta, true);
+  });
 })();
 </script>
 </body>
