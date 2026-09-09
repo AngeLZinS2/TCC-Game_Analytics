@@ -297,9 +297,6 @@ export function VisaoGeralPagina() {
         </div>
       </section>
 
-      {/* ============ ACONTECENDO AGORA ============ */}
-      <AcontecendoAgora />
-
       {/* ==================== QUATRO KPIS ==================== */}
       <Consulta estado={geral} altura={160}>
         {(dados: VisaoGeral) => {
@@ -507,8 +504,9 @@ export function VisaoGeralPagina() {
         </Painel>
       </section>
 
-      {/* ======= DESTAQUE DO DIA (velocímetro do modelo) ======= */}
+      {/* ======= DESTAQUE DO DIA + ACONTECENDO AGORA ======= */}
       <DestaqueDoDia />
+      <AcontecendoAgora />
 
       {/* ==================== COLETAS POR FONTE ==================== */}
       <Painel
