@@ -264,14 +264,24 @@ export function CartaoConfronto({
   const classe =
     "flex flex-col overflow-hidden rounded-lg border border-outline-variant/25 bg-surface-container-lowest";
 
+  // `div role="button"` e não `<button>`: o rodapé pode ter o dropdown de
+  // canais (`<a>`/`<details>`), e conteúdo interativo dentro de `<button>` é
+  // HTML inválido — o navegador tira os links de dentro.
   return clicavel ? (
-    <button
-      type="button"
+    <div
+      role="button"
+      tabIndex={0}
       onClick={aoClicar}
-      className={`${classe} text-left transition-colors hover:border-primary-container/50 hover:bg-surface-container-high/40`}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          aoClicar?.();
+        }
+      }}
+      className={`${classe} cursor-pointer text-left transition-colors hover:border-primary-container/50 hover:bg-surface-container-high/40`}
     >
       {corpo}
-    </button>
+    </div>
   ) : (
     <div className={classe}>{corpo}</div>
   );

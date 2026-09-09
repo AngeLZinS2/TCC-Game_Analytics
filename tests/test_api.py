@@ -221,9 +221,35 @@ def test_confronto_detalhe_bate_com_a_flag_da_lista(cliente: TestClient) -> None
 
 def test_confronto_detalhe_sem_dado_devolve_404(cliente: TestClient) -> None:
     resposta = cliente.get(
-        "/api/partidas/confronto-detalhe", params={"id_externo": "vlr:0"}
+        "/api/partidas/confronto-detalhe", params={"id_externo": "vlr:x-inexistente"}
     )
     assert resposta.status_code == 404
+
+
+def test_confronto_detalhe_serve_partida_por_vir_com_status(
+    cliente: TestClient,
+) -> None:
+    """Toda partida abre o detalhe — não só as de Valorant já decididas.
+
+    Uma partida da agenda (ainda sem resultado) tem que devolver 200 com o
+    cabeçalho: status, equipes, evento. O scoreboard por mapa pode vir vazio.
+    """
+    agenda = cliente.get(
+        "/api/partidas/agenda", params={"jogo": "counterstrike", "limite": 5}
+    ).json()
+    if not agenda:
+        pytest.skip("sem partida de CS na agenda")
+
+    corpo = cliente.get(
+        "/api/partidas/confronto-detalhe",
+        params={"id_externo": agenda[0]["id_externo"]},
+    )
+    assert corpo.status_code == 200
+    dados = corpo.json()
+    assert dados["status"] in {"em_breve", "ao_vivo", "encerrada"}
+    assert dados["equipe_a_nome"] and dados["equipe_b_nome"]
+    assert isinstance(dados["mapas"], list)
+    assert isinstance(dados["mapas_resultado"], list)
 
 
 def test_perfil_declara_o_vocabulario_de_cada_esporte(cliente: TestClient) -> None:

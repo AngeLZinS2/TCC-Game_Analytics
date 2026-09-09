@@ -90,6 +90,12 @@ class ConfrontoPandaScore:
     #: para `agenda_partida.detalhe`.
     status: str | None = None
     streams: list[dict[str, Any]] | None = None
+    #: Placar PARCIAL da série (também no `running` — a PandaScore devolve o
+    #: parcial) como `{"a": int|None, "b": int|None}`. E `mapas` é a lista de
+    #: jogos da série (`games[]`): posição, status e quem ganhou cada um — o
+    #: plano free não dá o placar de rounds, só o vencedor do mapa.
+    placar_serie: dict[str, int | None] | None = None
+    mapas: list[dict[str, Any]] | None = None
 
 
 @dataclass
@@ -185,6 +191,38 @@ def _rotulo_torneio(partida: dict[str, Any]) -> str | None:
     return " — ".join(partes) or None
 
 
+#: `status` de um jogo da série (`games[].status`) -> rótulo do detalhe.
+_STATUS_MAPA = {
+    "finished": "encerrado",
+    "running": "ao_vivo",
+    "not_started": "em_breve",
+    "not_played": "nao_jogado",
+}
+
+
+def _mapas_da_serie(
+    partida: dict[str, Any], id_a: Any
+) -> list[dict[str, Any]] | None:
+    """`games[]` -> lista de mapas: posição, status e se o lado A venceu.
+
+    O plano free da PandaScore não traz o placar de rounds de cada mapa, só o
+    vencedor — o suficiente para "Mapa 1 ✓ Time A · Mapa 2 ao vivo".
+    """
+    saida: list[dict[str, Any]] = []
+    for g in partida.get("games") or []:
+        if not isinstance(g, dict):
+            continue
+        vencedor = (g.get("winner") or {}).get("id")
+        saida.append(
+            {
+                "posicao": g.get("position"),
+                "status": _STATUS_MAPA.get(g.get("status"), g.get("status")),
+                "vitoria_a": (vencedor == id_a) if vencedor else None,
+            }
+        )
+    return saida or None
+
+
 def _para_confronto(
     partida: dict[str, Any], tiers: set[str] | None = None
 ) -> ConfrontoPandaScore | None:
@@ -232,6 +270,16 @@ def _para_confronto(
     placar_a = placar.get(a.get("id")) if decidida else None
     placar_b = placar.get(b.get("id")) if decidida else None
 
+    # Placar de série vale também no `running` (parcial) — o detalhe da partida
+    # mostra "1 : 0" durante o jogo. Só quando algum dos lados tem número.
+    placar_serie: dict[str, int | None] | None = None
+    mapas_serie: list[dict[str, Any]] | None = None
+    if status in ("running", "finished"):
+        pa, pb = placar.get(a.get("id")), placar.get(b.get("id"))
+        if pa is not None or pb is not None:
+            placar_serie = {"a": pa, "b": pb}
+        mapas_serie = _mapas_da_serie(partida, a.get("id"))
+
     vitoria_a: bool | None = None
     vencedor = partida.get("winner_id")
     if decidida and vencedor:
@@ -265,6 +313,8 @@ def _para_confronto(
             else None
         )
         or None,
+        placar_serie=placar_serie,
+        mapas=mapas_serie,
     )
 
 

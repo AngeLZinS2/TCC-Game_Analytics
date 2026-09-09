@@ -11,6 +11,7 @@
  * Cada um some sozinho quando não há o que mostrar.
  */
 
+import { useState } from "react";
 import { Link } from "react-router-dom";
 
 import { useDestaquesHome } from "../api/consultas";
@@ -19,6 +20,7 @@ import { corDoJogo, TOKENS } from "../tema";
 import { fmtDataHora, fmtQuando } from "../utilitarios/formatos";
 import { Icone, Selo } from "./base";
 import { CanaisTransmissao } from "./CanaisTransmissao";
+import { ModalConfrontoDetalhe } from "./ModalConfrontoDetalhe";
 import { Velocimetro } from "./Velocimetro";
 
 /** Escudo pequeno — logo quando há, senão as iniciais. */
@@ -68,10 +70,25 @@ function EtiquetaJogo({ jogo, nome }: { jogo: string; nome: string }) {
   );
 }
 
-function CartaoAoVivo({ c }: { c: ConfrontoAoVivo }) {
+function CartaoAoVivo({
+  c,
+  aoSelecionar,
+}: {
+  c: ConfrontoAoVivo;
+  aoSelecionar: () => void;
+}) {
   return (
     <div
-      className="flex flex-col gap-space-xs overflow-visible rounded-lg border border-outline-variant/25 bg-surface-container-lowest"
+      role="button"
+      tabIndex={0}
+      onClick={aoSelecionar}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          aoSelecionar();
+        }
+      }}
+      className="flex cursor-pointer flex-col gap-space-xs overflow-visible rounded-lg border border-outline-variant/25 bg-surface-container-lowest transition-colors hover:border-primary-container/50 hover:bg-surface-container-high/40"
       style={{ borderLeft: `3px solid ${corDoJogo(c.jogo)}` }}
     >
       <div className="flex items-center justify-between gap-space-xs px-space-sm pt-space-xs">
@@ -116,6 +133,7 @@ function CartaoAoVivo({ c }: { c: ConfrontoAoVivo }) {
 
 export function AcontecendoAgora() {
   const { data } = useDestaquesHome();
+  const [aberto, setAberto] = useState<string | null>(null);
   const itens = data?.ao_vivo ?? [];
   if (itens.length === 0) return null;
 
@@ -134,14 +152,25 @@ export function AcontecendoAgora() {
       </div>
       <div className="grid grid-cols-1 gap-space-sm sm:grid-cols-2 xl:grid-cols-3">
         {itens.map((c) => (
-          <CartaoAoVivo key={`${c.jogo}:${c.id_externo}`} c={c} />
+          <CartaoAoVivo
+            key={`${c.jogo}:${c.id_externo}`}
+            c={c}
+            aoSelecionar={() => setAberto(c.id_externo)}
+          />
         ))}
       </div>
+      <ModalConfrontoDetalhe idExterno={aberto} aoFechar={() => setAberto(null)} />
     </section>
   );
 }
 
-function DestaqueCard({ c }: { c: DestaqueConfronto }) {
+function DestaqueCard({
+  c,
+  aoAbrirPartida,
+}: {
+  c: DestaqueConfronto;
+  aoAbrirPartida: () => void;
+}) {
   const favoritoA = c.probabilidade_a >= 0.5;
   const pctA = Math.round(c.probabilidade_a * 100);
 
@@ -217,6 +246,13 @@ function DestaqueCard({ c }: { c: DestaqueConfronto }) {
             {c.ao_vivo ? "ao vivo" : fmtQuando(c.inicio_previsto)}
           </span>
           <CanaisTransmissao streams={c.streams} />
+          <button
+            type="button"
+            onClick={aoAbrirPartida}
+            className="inline-flex items-center gap-space-xxs text-primary hover:text-primary-fixed"
+          >
+            <Icone nome="open_in_full" className="text-[13px]" /> ver partida
+          </button>
           <Link
             to={`/esports/${c.jogo}/previsao`}
             className="ml-auto inline-flex items-center gap-space-xxs text-primary hover:text-primary-fixed"
@@ -231,6 +267,15 @@ function DestaqueCard({ c }: { c: DestaqueConfronto }) {
 
 export function DestaqueDoDia() {
   const { data } = useDestaquesHome();
+  const [aberto, setAberto] = useState<string | null>(null);
   if (!data?.destaque) return null;
-  return <DestaqueCard c={data.destaque} />;
+  return (
+    <>
+      <DestaqueCard
+        c={data.destaque}
+        aoAbrirPartida={() => setAberto(data.destaque!.id_externo)}
+      />
+      <ModalConfrontoDetalhe idExterno={aberto} aoFechar={() => setAberto(null)} />
+    </>
+  );
 }

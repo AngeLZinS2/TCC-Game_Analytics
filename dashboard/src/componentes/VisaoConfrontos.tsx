@@ -263,7 +263,9 @@ export function VisaoConfrontos<T extends Entrada = ConfrontoResultado | Partida
 
   const abrir = (c: DadosConfronto) => {
     if (aoClicarItem) return () => aoClicarItem(c);
-    return c.tem_detalhe ? () => setAberto(c.id_externo) : undefined;
+    // Qualquer partida abre o detalhe — o modal serve por vir, ao vivo e
+    // decidida (só de Valorant vem o scoreboard por jogador).
+    return () => setAberto(c.id_externo);
   };
 
   const porTorneio = useMemo(() => {

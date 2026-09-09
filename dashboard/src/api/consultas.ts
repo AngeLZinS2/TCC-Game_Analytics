@@ -369,6 +369,10 @@ export function useConfrontoDetalhe(idExterno: string | null) {
   return useQuery({
     queryKey: ["partidas", "confronto-detalhe", idExterno],
     enabled: idExterno !== null,
+    // Enquanto o modal está aberto, revalida de minuto em minuto — se a
+    // partida estiver ao vivo o placar/mapa anda.
+    staleTime: 30_000,
+    refetchInterval: 60_000,
     queryFn: () =>
       buscar<DetalheConfronto>("/api/partidas/confronto-detalhe", {
         id_externo: idExterno as string,

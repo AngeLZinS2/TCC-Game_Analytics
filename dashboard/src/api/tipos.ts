@@ -844,11 +844,39 @@ export interface MapaDoConfronto {
   jogadores: JogadorNoMapa[];
 }
 
+/** Um mapa da série, só o resultado (sem stats de jogador). */
+export interface ResultadoMapa {
+  nome: string | null;
+  posicao: number | null;
+  /** `encerrado` | `ao_vivo` | `em_breve` | `nao_jogado`. */
+  status: string | null;
+  placar_a: number | null;
+  placar_b: number | null;
+  vitoria_a: boolean | null;
+}
+
+export type StatusPartida = "em_breve" | "ao_vivo" | "encerrada";
+
 export interface DetalheConfronto {
   id_externo: string;
   equipe_a_nome: string;
   equipe_b_nome: string;
+  equipe_a_logo: string | null;
+  equipe_b_logo: string | null;
+  equipe_a_tag: string | null;
+  equipe_b_tag: string | null;
+  jogo: string | null;
+  jogo_nome: string | null;
+  torneio: string | null;
+  formato: string | null;
+  inicio_previsto: string | null;
+  status: StatusPartida;
+  placar_a: number | null;
+  placar_b: number | null;
+  vitoria_a: boolean | null;
   fonte: string;
+  streams: StreamCanal[];
+  mapas_resultado: ResultadoMapa[];
   mapas: MapaDoConfronto[];
 }
 

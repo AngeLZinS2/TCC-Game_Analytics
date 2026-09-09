@@ -442,7 +442,10 @@ def listar_confrontos(
             equipe_b.logo_url,
             equipe_a.tag,
             equipe_b.tag,
-            AgendaPartida.detalhe.is_not(None),
+            # `tem_detalhe` = tem o scoreboard por jogador (chave `mapas`, do
+            # vlr_detalhes) — não o `mapas_resultado` de vencedor de mapa que a
+            # PandaScore agora grava em toda partida decidida.
+            AgendaPartida.detalhe.has_key("mapas"),
         )
         .join(DimJogo, DimJogo.id_jogo == AgendaPartida.id_jogo)
         .outerjoin(equipe_a, equipe_a.id_equipe == AgendaPartida.id_equipe_a)
@@ -481,32 +484,101 @@ def listar_confrontos(
     ]
 
 
+#: `status` do `agenda_partida.detalhe` (PandaScore/vlr) -> rótulo da tela.
+_STATUS_PARTIDA = {
+    "running": "ao_vivo",
+    "ao_vivo": "ao_vivo",
+    "not_started": "em_breve",
+    "em_breve": "em_breve",
+    "finished": "encerrada",
+    "encerrada": "encerrada",
+}
+
+
 @router.get("/confronto-detalhe", response_model=DetalheConfronto)
 def confronto_detalhe(
     id_externo: str, sessao: Session = Depends(get_db)
 ) -> DetalheConfronto:
-    """O placar por mapa e a linha de cada jogador de um confronto decidido.
+    """A tela de detalhe de uma partida — de qualquer estado.
 
-    Vem de `agenda_partida.detalhe` (JSONB), preenchido pelo coletor
-    `vlr-detalhes` para Valorant. 404 quando o confronto nao existe ou ainda
-    nao tem detalhe coletado.
+    Cabeçalho (status, placar de série, evento, formato, horário), os canais de
+    transmissão e o resultado mapa a mapa vêm de `agenda_partida` +
+    `agenda_partida.detalhe` (JSONB). O scoreboard por jogador só existe para
+    Valorant, do coletor `vlr-detalhes`. 404 só quando a partida não existe.
     """
+    equipe_a = aliased(DimEquipe)
+    equipe_b = aliased(DimEquipe)
     linha = sessao.execute(
         select(
             AgendaPartida.equipe_a_nome,
             AgendaPartida.equipe_b_nome,
             AgendaPartida.detalhe,
-        ).where(AgendaPartida.id_externo == id_externo)
+            AgendaPartida.torneio,
+            AgendaPartida.formato,
+            AgendaPartida.inicio_previsto,
+            AgendaPartida.vitoria_a,
+            AgendaPartida.placar_a,
+            AgendaPartida.placar_b,
+            equipe_a.logo_url,
+            equipe_b.logo_url,
+            equipe_a.tag,
+            equipe_b.tag,
+            DimJogo.codigo,
+            DimJogo.nome,
+        )
+        .join(DimJogo, DimJogo.id_jogo == AgendaPartida.id_jogo)
+        .outerjoin(equipe_a, equipe_a.id_equipe == AgendaPartida.id_equipe_a)
+        .outerjoin(equipe_b, equipe_b.id_equipe == AgendaPartida.id_equipe_b)
+        .where(AgendaPartida.id_externo == id_externo)
     ).first()
-    if linha is None or not linha[2]:
-        raise HTTPException(status_code=404, detail="confronto sem detalhe coletado")
+    if linha is None:
+        raise HTTPException(status_code=404, detail="partida não encontrada")
 
-    detalhe = linha[2]
+    detalhe: dict[str, Any] = linha[2] or {}
+    vitoria_a = linha[6]
+
+    # Status: o resultado publicado manda; senão o que a fonte marcou no
+    # detalhe; senão o relógio (passou do horário = já era pra ter começado).
+    if vitoria_a is not None or linha[7] is not None or linha[8] is not None:
+        status = "encerrada"
+    elif detalhe.get("status"):
+        status = _STATUS_PARTIDA.get(detalhe["status"], "em_breve")
+    else:
+        status = "em_breve"
+
+    # Placar de série: o da tabela (confronto decidido) tem prioridade; no ao
+    # vivo cai no parcial que a PandaScore/vlr guardaram no detalhe.
+    placar_a, placar_b = linha[7], linha[8]
+    if placar_a is None and placar_b is None:
+        ps = detalhe.get("placar_serie") or {}
+        placar_a, placar_b = ps.get("a"), ps.get("b")
+
     return DetalheConfronto(
         id_externo=id_externo,
         equipe_a_nome=linha[0],
         equipe_b_nome=linha[1],
+        equipe_a_logo=linha[9],
+        equipe_b_logo=linha[10],
+        equipe_a_tag=linha[11],
+        equipe_b_tag=linha[12],
+        jogo=linha[13],
+        jogo_nome=linha[14],
+        torneio=linha[3],
+        formato=linha[4],
+        inicio_previsto=linha[5],
+        status=status,
+        placar_a=placar_a,
+        placar_b=placar_b,
+        vitoria_a=vitoria_a,
         fonte=detalhe.get("fonte", "vlr.gg"),
+        streams=[
+            s
+            for s in (detalhe.get("streams") or [])
+            if isinstance(s, dict) and s.get("url")
+        ],
+        mapas_resultado=[
+            m for m in (detalhe.get("mapas_resultado") or []) if isinstance(m, dict)
+        ],
         mapas=[
             MapaDoConfronto(
                 nome=m.get("nome"),

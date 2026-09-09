@@ -991,14 +991,50 @@ class MapaDoConfronto(BaseModel):
     jogadores: list[JogadorNoMapa] = []
 
 
+class ResultadoMapa(BaseModel):
+    """Um mapa da serie, so o resultado (sem stats de jogador).
+
+    Vem do `games[]` da PandaScore: o plano free da o vencedor de cada mapa,
+    nao o placar de rounds. Serve o "Mapa 1 ✓ Time A · Mapa 2 ao vivo".
+    """
+
+    nome: str | None = None
+    posicao: int | None = None
+    #: `encerrado` | `ao_vivo` | `em_breve` | `nao_jogado`.
+    status: str | None = None
+    placar_a: int | None = None
+    placar_b: int | None = None
+    vitoria_a: bool | None = None
+
+
 class DetalheConfronto(BaseModel):
-    """Placar por mapa e linha de cada jogador - o que a tela de detalhe da
-    partida mostra, como a do vlr.gg. So Valorant tem, por ora."""
+    """A tela de detalhe da partida: cabecalho com status/placar/evento, os
+    canais de transmissao, o resultado mapa a mapa e — quando a fonte tem
+    (Valorant, do vlr.gg) — a linha de cada jogador por mapa."""
 
     id_externo: str
     equipe_a_nome: str
     equipe_b_nome: str
+    equipe_a_logo: str | None = None
+    equipe_b_logo: str | None = None
+    equipe_a_tag: str | None = None
+    equipe_b_tag: str | None = None
+    jogo: str | None = None
+    jogo_nome: str | None = None
+    torneio: str | None = None
+    formato: str | None = None
+    inicio_previsto: datetime | None = None
+    #: `em_breve` | `ao_vivo` | `encerrada`.
+    status: str = "em_breve"
+    #: Placar de serie (parcial no ao vivo, final no encerrado).
+    placar_a: int | None = None
+    placar_b: int | None = None
+    vitoria_a: bool | None = None
     fonte: str
+    streams: list[StreamCanal] = Field(default_factory=list)
+    #: Resultado mapa a mapa (todos os jogos da serie).
+    mapas_resultado: list[ResultadoMapa] = Field(default_factory=list)
+    #: Scoreboard por jogador, por mapa — so Valorant, por ora.
     mapas: list[MapaDoConfronto] = []
 
 
