@@ -144,39 +144,6 @@
   }
   .hint b{color:var(--ink-dim);font-weight:500}
 
-  /* ---- reel (landscape auto-demo) ---- */
-  .reel{padding:clamp(46px,8vw,88px) 0;border-top:1px solid var(--line)}
-  .reel-h{font-size:clamp(24px,3.6vw,40px);margin:14px 0 38px;max-width:20ch}
-  .tablet{
-    position:relative;width:min(960px,95vw);aspect-ratio:16/9;margin:0 auto;
-    border-radius:26px;padding:13px;
-    background:linear-gradient(160deg,#2b303a,#111419 55%,#0b0d11);
-    box-shadow:0 0 0 2px #05070a,0 44px 100px -34px rgba(0,0,0,.8),inset 0 0 0 6px #0b0d11;
-  }
-  .tablet .cam{position:absolute;left:5px;top:50%;transform:translateY(-50%);width:5px;height:5px;border-radius:50%;background:#05070a;box-shadow:inset 0 0 0 1px #23262c}
-  .tablet .scr{
-    position:relative;width:100%;height:100%;border-radius:14px;overflow:hidden;
-    display:flex;justify-content:center;
-    background:radial-gradient(ellipse 70% 90% at 50% 50%,#15181d,#0b0d11);
-  }
-  .tablet .scr::before,.tablet .scr::after{content:"";position:absolute;top:0;bottom:0;width:64px;z-index:3;pointer-events:none}
-  .tablet .scr::before{left:0;background:linear-gradient(90deg,#0b0d11,transparent)}
-  .tablet .scr::after{right:0;background:linear-gradient(270deg,#0b0d11,transparent)}
-  .tablet iframe{position:relative;width:min(440px,100%);height:100%;border:0;color-scheme:dark;background:var(--bg)}
-  .reel-veil{position:absolute;inset:0;background:var(--bg);opacity:0;transition:opacity .45s;pointer-events:none;z-index:4}
-  .reel-veil.on{opacity:1}
-  .tablet .prog{position:absolute;left:13px;right:13px;bottom:5px;height:2px;background:rgba(255,255,255,.08);border-radius:2px;overflow:hidden}
-  .tablet .prog i{display:block;height:100%;width:0;background:var(--blue)}
-  .reel-pill{
-    position:absolute;left:24px;top:22px;z-index:5;
-    font-family:var(--mono);font-size:10px;letter-spacing:.09em;text-transform:uppercase;color:var(--ink);
-    background:rgba(12,14,18,.74);backdrop-filter:blur(4px);
-    border:1px solid var(--line-strong);border-radius:999px;padding:6px 12px;
-    display:inline-flex;align-items:center;gap:6px;
-  }
-  .reel-pill .rd{width:5px;height:5px;border-radius:50%;background:var(--green)}
-  @media(max-width:640px){.tablet{aspect-ratio:4/3}.tablet iframe{width:100%}.tablet .scr::before,.tablet .scr::after{display:none}}
-
   section.blk{padding:clamp(60px,10vw,120px) 0;border-top:1px solid var(--line)}
   .blk h2{font-size:clamp(28px,4.2vw,46px);margin-top:14px;max-width:16ch}
   .blk .sub{margin-top:16px;color:var(--ink-dim);max-width:52ch}
@@ -281,23 +248,6 @@
         </div>
         <p class="hint"><b>arraste a borda</b> pra girar · <b>a tela é o site de verdade</b></p>
       </div>
-    </div>
-  </section>
-
-  <section class="reel">
-    <div class="wrap">
-      <span class="eyebrow">Demo · ao vivo</span>
-      <h2 class="reel-h">Roda sozinho — o site passando tela por tela.</h2>
-      <div class="tablet" id="tablet">
-        <span class="cam"></span>
-        <div class="scr">
-          <iframe id="reelFrame" title="PlayDB rodando — demo automático" src="/?ctx=reel" loading="lazy"></iframe>
-          <div class="reel-veil" id="reelVeil"></div>
-        </div>
-        <div class="prog"><i id="reelBar"></i></div>
-        <span class="reel-pill"><span class="rd"></span><span id="reelLabel">visão geral</span></span>
-      </div>
-      <p class="hint"><b>passa o mouse</b> pra pausar · <b>toque</b> pra assumir o controle</p>
     </div>
   </section>
 
@@ -477,83 +427,6 @@
     try{ localStorage.setItem("playdb_mobile_notify", "1"); }catch(_){}
   });
   try{ if(localStorage.getItem("playdb_mobile_notify")) document.getElementById("ndone").classList.add("show"); }catch(_){}
-
-  /* ---------- reel: demo automático, tela por tela ---------- */
-  (function(){
-    var f = document.getElementById("reelFrame");
-    var veil = document.getElementById("reelVeil");
-    var bar = document.getElementById("reelBar");
-    var label = document.getElementById("reelLabel");
-    var tablet = document.getElementById("tablet");
-    if(!f || !tablet) return;
-
-    var pages = [
-      { p:"/",              label:"visão geral",      marks:[0, .45, .85] },
-      { p:"/steam",         label:"jogos da steam",   marks:[0, .5] },
-      { p:"/esports",       label:"e-sports · partidas", marks:[0, .5, .88] },
-      { p:"/recomendacoes", label:"reviews · nlp",    marks:[0, .55] },
-      { p:"/assistente",    label:"assistente de ia", marks:[0] }
-    ];
-    var STEP = 5400;
-    var i = 0, paused = false, gen = 0, started = false;
-
-    function docwin(){
-      try{ return { d:f.contentDocument, w:f.contentWindow }; }catch(_){ return { d:null, w:null }; }
-    }
-    function findLink(d, path){
-      if(!d) return null;
-      return d.querySelector('nav[aria-label="Navegação principal"] a[href="'+path+'"]')
-          || d.querySelector('a[href="'+path+'"]');
-    }
-    function go(page){
-      if(label) label.textContent = page.label;
-      var dw = docwin(), link = findLink(dw.d, page.p);
-      if(link){ link.click(); }
-      else if(dw.w){
-        veil && veil.classList.add("on");
-        try{ dw.w.location.assign(page.p + "?ctx=reel"); }catch(_){}
-        setTimeout(function(){ veil && veil.classList.remove("on"); }, 850);
-      }
-      var mine = ++gen;
-      page.marks.forEach(function(m, k){
-        setTimeout(function(){
-          if(mine !== gen || paused) return;
-          var w = docwin().w; if(!w) return;
-          try{
-            var el = w.document.scrollingElement || w.document.documentElement;
-            var max = el.scrollHeight - w.innerHeight;
-            w.scrollTo({ top: Math.max(0, max * m), behavior: reduce ? "auto" : "smooth" });
-          }catch(_){}
-        }, 550 + k * (STEP / (page.marks.length + 0.4)));
-      });
-    }
-    function loop(){
-      var t0 = performance.now();
-      function frame(now){
-        if(!paused){
-          var e = Math.min(1, (now - t0) / STEP);
-          if(bar) bar.style.width = (e * 100) + "%";
-          if(e >= 1){ i = (i + 1) % pages.length; go(pages[i]); t0 = now; }
-        } else { t0 = now - (bar ? parseFloat(bar.style.width || 0) / 100 * STEP : 0); }
-        requestAnimationFrame(frame);
-      }
-      requestAnimationFrame(frame);
-    }
-    function begin(){
-      if(started) return;
-      var dw = docwin();
-      if(!dw.d || !dw.d.body || !dw.d.body.children.length){ setTimeout(begin, 700); return; }
-      started = true;
-      go(pages[0]);
-      if(!reduce) loop();
-    }
-    f.addEventListener("load", begin);
-    begin();
-
-    tablet.addEventListener("mouseenter", function(){ paused = true; });
-    tablet.addEventListener("mouseleave", function(){ paused = false; });
-    tablet.addEventListener("touchstart", function(){ paused = true; }, {passive:true});
-  })();
 })();
 </script>
 </body>
