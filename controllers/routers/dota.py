@@ -49,6 +49,7 @@ from models.models import (
     DimPartida,
     DimPersonagem,
     FatoEstatisticaPersonagem,
+    FatoLolJogadorPartida,
     FatoPartidaJogador,
 )
 from models.session import get_db
@@ -1054,15 +1055,122 @@ def listar_personagens(
     ]
 
 
+def _jogadores_lol(
+    sessao: Session, id_jogo: int, min_partidas: int, limite: int
+) -> list[ResumoJogador]:
+    """Elenco de LoL (dim_jogador) com o stat por jogo (fato_lol_jogador_partida)
+    sobreposto — `LEFT JOIN` de propósito: os 500+ jogadores das ligas
+    principais aparecem mesmo sem partida coletada (o feed oficial só guarda
+    ~2 semanas, então o histórico de stat é fino). `min_partidas=0` mostra todos;
+    subir o filtro deixa só quem tem jogo registrado."""
+    fjp = FatoLolJogadorPartida
+
+    vezes_campeao = (
+        select(
+            fjp.id_jogador.label("id_jogador"),
+            fjp.campeao.label("campeao"),
+            func.count().label("vezes"),
+            func.row_number()
+            .over(
+                partition_by=fjp.id_jogador,
+                order_by=(desc(func.count()), fjp.campeao),
+            )
+            .label("posicao"),
+        )
+        .where(fjp.campeao.is_not(None))
+        .group_by(fjp.id_jogador, fjp.campeao)
+        .subquery()
+    )
+    assinatura = (
+        select(
+            vezes_campeao.c.id_jogador,
+            vezes_campeao.c.campeao,
+            vezes_campeao.c.vezes,
+        )
+        .where(vezes_campeao.c.posicao == 1)
+        .subquery()
+    )
+
+    jogos = func.count(fjp.id).label("jogos")
+    series = func.count(func.distinct(fjp.id_agenda)).label("series")
+    vitorias = func.sum(case((fjp.vitoria.is_(True), 1), else_=0)).label("vitorias")
+    kda = func.avg(
+        (cast(fjp.k, Float) + cast(fjp.a, Float)) / func.greatest(fjp.d, 1)
+    ).label("kda")
+
+    consulta = (
+        select(
+            DimJogador.id_jogador,
+            DimJogador.nome,
+            DimJogador.papel,
+            DimJogador.imagem,
+            DimEquipe.nome.label("equipe_nome"),
+            jogos,
+            series,
+            vitorias,
+            (100.0 * cast(vitorias, Float) / func.nullif(jogos, 0)).label("winrate"),
+            kda,
+            func.avg(fjp.ouro).label("ouro"),
+            assinatura.c.campeao.label("assinatura"),
+            assinatura.c.vezes.label("assinatura_vezes"),
+        )
+        .select_from(DimJogador)
+        .outerjoin(fjp, fjp.id_jogador == DimJogador.id_jogador)
+        .outerjoin(DimEquipe, DimEquipe.id_equipe == DimJogador.id_equipe)
+        .outerjoin(assinatura, assinatura.c.id_jogador == DimJogador.id_jogador)
+        .where(DimJogador.id_jogo == id_jogo)
+        .group_by(
+            DimJogador.id_jogador,
+            DimJogador.nome,
+            DimJogador.papel,
+            DimJogador.imagem,
+            DimEquipe.nome,
+            assinatura.c.campeao,
+            assinatura.c.vezes,
+        )
+        # `min_partidas` filtra por JOGOS coletados. `0` (padrão do LoL no
+        # front) mostra o elenco inteiro; subir deixa só quem tem partida.
+        .having(func.count(fjp.id) >= min_partidas)
+        # ASC no Postgres já joga NULL (jogador sem time resolvido) pro fim.
+        .order_by(desc(jogos), DimEquipe.nome.asc(), DimJogador.nome.asc())
+        .limit(limite)
+    )
+
+    return [
+        ResumoJogador(
+            id_jogador=linha.id_jogador,
+            nome=linha.nome,
+            partidas=linha.jogos,
+            vitorias=linha.vitorias,
+            winrate=round(float(linha.winrate), 1) if linha.winrate is not None else 0.0,
+            kda_medio=_media(linha.kda),
+            economia_por_minuto_media=_media(linha.ouro),
+            personagem_assinatura=linha.assinatura,
+            partidas_assinatura=linha.assinatura_vezes,
+            equipe_nome=linha.equipe_nome,
+            papel=linha.papel,
+            imagem=linha.imagem,
+        )
+        for linha in sessao.execute(consulta)
+    ]
+
+
 @router.get("/jogadores", response_model=list[ResumoJogador])
 def listar_jogadores(
     sessao: Session = Depends(get_db),
     jogo: str = "dota2",
-    min_partidas: int = Query(3, ge=1),
-    limite: int = Query(50, ge=1, le=200),
+    # `ge=0`: no LoL o front manda 0 pra listar o elenco inteiro (partida
+    # coletada é rara — o feed oficial só guarda ~2 semanas).
+    min_partidas: int = Query(3, ge=0),
+    # `le=600`: o elenco de LoL das ligas principais passa de 500 jogadores; a
+    # aba pagina no cliente, então busca tudo de uma vez.
+    limite: int = Query(50, ge=1, le=600),
 ) -> list[ResumoJogador]:
     """Jogadores identificados, ordenados por volume de partidas."""
     id_jogo = _id_jogo(sessao, jogo)
+
+    if jogo == "leagueoflegends":
+        return _jogadores_lol(sessao, id_jogo, min_partidas, limite)
 
     # Heroi assinatura: o mais escolhido pelo jogador, com quantas vezes.
     # Sai de uma janela em vez de um segundo GROUP BY porque o que se quer e

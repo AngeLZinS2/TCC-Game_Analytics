@@ -155,12 +155,15 @@ def test_intervalos_vem_da_configuracao():
         agendador_dltv_minutos = 1440
         agendador_vlr_detalhes_minutos = 1440
         agendador_lolesports_minutos = 1440
+        agendador_lolesports_cenario_minutos = 720
         agendador_treino_confronto_minutos = 480
         agendador_pandascore_minutos = 30
+        agendador_xbox_minutos = 180
         opgg_enabled = True
         itad_api_key = "chave-de-teste"
         pandascore_api_key = None
         hltb_enabled = True
+        xbox_enabled = True
 
     tarefas = {t.nome: t.intervalo_segundos for t in montar_tarefas(FakeSettings())}
     assert tarefas == {
@@ -175,6 +178,7 @@ def test_intervalos_vem_da_configuracao():
         "ranking": 5400,
         "precos": 7200,
         "tempo_jogo": 9000,
+        "xbox": 10800,
         "esports_opgg": 21600,
         "vlr": 86400,
         "vlr_rankings": 604800,
@@ -184,6 +188,7 @@ def test_intervalos_vem_da_configuracao():
         "dltv": 86400,
         "vlr_detalhes": 86400,
         "lolesports": 86400,
+        "lol_cenario": 43200,
         "treino_confronto": 28800,
         "agentes_valorant": 604800,
         "campeoes_lol": 604800,
@@ -214,12 +219,15 @@ def test_tarefa_de_preco_so_entra_com_chave_do_itad():
         agendador_dltv_minutos = 1440
         agendador_vlr_detalhes_minutos = 1440
         agendador_lolesports_minutos = 1440
+        agendador_lolesports_cenario_minutos = 720
         agendador_treino_confronto_minutos = 480
         agendador_pandascore_minutos = 30
         opgg_enabled = True
         itad_api_key = None
         pandascore_api_key = None
         hltb_enabled = True
+        xbox_enabled = False
+        agendador_xbox_minutos = 360
 
     nomes = {t.nome for t in montar_tarefas(SemChave())}
     assert "precos" not in nomes
@@ -248,15 +256,55 @@ def test_tarefa_de_tempo_jogo_nao_entra_quando_desabilitada():
         agendador_dltv_minutos = 1440
         agendador_vlr_detalhes_minutos = 1440
         agendador_lolesports_minutos = 1440
+        agendador_lolesports_cenario_minutos = 720
         agendador_treino_confronto_minutos = 480
         agendador_pandascore_minutos = 30
         opgg_enabled = True
         itad_api_key = None
         pandascore_api_key = None
         hltb_enabled = False
+        xbox_enabled = False
+        agendador_xbox_minutos = 360
 
     nomes = {t.nome for t in montar_tarefas(Desabilitada())}
     assert "tempo_jogo" not in nomes
+
+
+def test_tarefa_de_xbox_nao_entra_quando_desabilitada():
+    class Desabilitada:
+        agendador_steam_minutos = 60
+        agendador_steam_online_minutos = 15
+        agendador_agenda_proxima_minutos = 5
+        agendador_opendota_minutos = 360
+        agendador_liquipedia_minutos = 720
+        agendador_equipes_minutos = 1440
+        agendador_brackets_minutos = 1440
+        agendador_ranking_minutos = 10080
+        agendador_precos_minutos = 720
+        agendador_opendota_limite = 100
+        agendador_tempo_jogo_minutos = 1440
+        agendador_agentes_minutos = 10080
+        agendador_esports_opgg_minutos = 360
+        agendador_vlr_minutos = 1440
+        agendador_vlr_rankings_minutos = 10080
+        agendador_ubi_r6_minutos = 10080
+        agendador_owcs_minutos = 1440
+        agendador_rlcs_minutos = 1440
+        agendador_dltv_minutos = 1440
+        agendador_vlr_detalhes_minutos = 1440
+        agendador_lolesports_minutos = 1440
+        agendador_lolesports_cenario_minutos = 720
+        agendador_treino_confronto_minutos = 480
+        agendador_pandascore_minutos = 30
+        agendador_xbox_minutos = 360
+        opgg_enabled = True
+        itad_api_key = None
+        pandascore_api_key = None
+        hltb_enabled = True
+        xbox_enabled = False
+
+    nomes = {t.nome for t in montar_tarefas(Desabilitada())}
+    assert "xbox" not in nomes
 
 
 def test_pandascore_troca_o_hltv_quando_ha_chave():
@@ -282,12 +330,15 @@ def test_pandascore_troca_o_hltv_quando_ha_chave():
         agendador_dltv_minutos = 1440
         agendador_vlr_detalhes_minutos = 1440
         agendador_lolesports_minutos = 1440
+        agendador_lolesports_cenario_minutos = 720
         agendador_treino_confronto_minutos = 480
         agendador_pandascore_minutos = 30
         opgg_enabled = True
         itad_api_key = None
         pandascore_api_key = "chave-de-teste"
         hltb_enabled = True
+        xbox_enabled = False
+        agendador_xbox_minutos = 360
 
     tarefas = {t.nome: t.intervalo_segundos for t in montar_tarefas(ComPandaScore())}
     for nome in ("pandascore_cs", "pandascore_lol", "pandascore_cod",
@@ -301,7 +352,8 @@ def test_pandascore_troca_o_hltv_quando_ha_chave():
 
 @pytest.mark.parametrize(
     "fonte",
-    ["steam", "opendota", "liquipedia", "equipes", "brackets", "ranking", "tempo_jogo"],
+    ["steam", "opendota", "liquipedia", "equipes", "brackets", "ranking",
+     "tempo_jogo", "lolesports", "lol_cenario"],
 )
 def test_as_tres_fontes_estao_agendadas(fonte: str):
     from config import get_settings

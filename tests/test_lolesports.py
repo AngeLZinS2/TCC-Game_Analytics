@@ -7,7 +7,11 @@ nosso time A, o placar de série, o scoreboard por jogo e o status.
 
 from __future__ import annotations
 
-from services.collectors.lolesports import _montar_detalhe, _streams_do_evento
+from services.collectors.lolesports import (
+    _linhas_fato,
+    _montar_detalhe,
+    _streams_do_evento,
+)
 
 _EVENTO = {
     "streams": [
@@ -164,6 +168,86 @@ def test_status_encerrada_quando_todos_os_jogos_fecharam():
     d = _montar_detalhe(evento, janelas, "Gen.G")
     assert d["status"] == "encerrada"
     assert len(d["mapas"]) == 2
+
+
+_EVENTO_BACKFILL = {
+    "match": {
+        "teams": [
+            {"id": "111692118851466302", "name": "Karmine Corp", "code": "KC",
+             "result": {"gameWins": 1}},
+            {"id": "98767991926151025", "name": "G2 Esports", "code": "G2",
+             "result": {"gameWins": 3}},
+        ],
+        "games": [
+            {"number": 1, "id": "115548681803406304", "state": "completed",
+             "teams": [
+                 {"id": "111692118851466302", "side": "blue"},
+                 {"id": "98767991926151025", "side": "red"},
+             ]},
+        ],
+    }
+}
+
+
+def test_frame_final_do_feed_vira_scoreboard_por_jogador(carregar_fixture):
+    """O frame final que o backfill puxa do `livestats` (fixture real) sai como
+    `mapas[].jogadores` com K/D/A e o `id_externo` do jogador (esportsPlayerId)."""
+    janela = carregar_fixture("lolesports_window_final")
+    d = _montar_detalhe(
+        _EVENTO_BACKFILL,
+        {"115548681803406304": janela},
+        "Karmine Corp",
+        "G2 Esports",
+    )
+
+    assert d["placar_serie"] == {"a": 1, "b": 3}
+    (mapa,) = d["mapas"]
+    assert mapa["posicao"] == 1
+    assert mapa["time_a"] == "Karmine Corp"
+
+    canna = mapa["jogadores"][0]
+    assert canna["id_externo"] == "103495716771322725"
+    assert canna["time"] == "Karmine Corp"
+    assert (canna["k"], canna["d"], canna["a"]) == (1, 2, 4)
+    assert canna["cs"] == 304 and canna["ouro"] == 12642
+    assert all(j.get("id_externo") for j in mapa["jogadores"])
+
+
+def test_linhas_fato_resolve_vitoria_pelo_mapas_resultado():
+    detalhe = {
+        "mapas_resultado": [
+            {"posicao": 1, "status": "encerrado", "vitoria_a": True},
+            {"posicao": 2, "status": "ao_vivo", "vitoria_a": None},
+        ],
+        "mapas": [
+            {
+                "posicao": 1,
+                "time_a": "Karmine Corp",
+                "jogadores": [
+                    {"id_externo": "1", "time": "Karmine Corp", "campeao": "Jayce",
+                     "k": 3, "d": 1, "a": 5, "cs": 250, "ouro": 13000, "nivel": 16},
+                    {"id_externo": "2", "time": "G2 Esports", "campeao": "Gnar",
+                     "k": 1, "d": 4, "a": 2, "cs": 210, "ouro": 9000, "nivel": 14},
+                ],
+            },
+            {
+                "posicao": 2,
+                "time_a": "Karmine Corp",
+                "jogadores": [
+                    {"id_externo": "1", "time": "Karmine Corp", "campeao": "Ksante",
+                     "k": 0, "d": 0, "a": 0, "cs": 20, "ouro": 2500, "nivel": 4},
+                ],
+            },
+        ],
+    }
+
+    linhas = _linhas_fato(detalhe)
+    # jogo 2 ainda nao encerrou -> fora
+    assert {l["jogo_numero"] for l in linhas} == {1}
+    por_ext = {l["id_externo"]: l for l in linhas}
+    assert por_ext["1"]["vitoria"] is True and por_ext["1"]["campeao"] == "Jayce"
+    assert por_ext["2"]["vitoria"] is False
+    assert por_ext["1"]["k"] == 3 and por_ext["2"]["d"] == 4
 
 
 def test_streams_do_evento_monta_url_por_provedor():

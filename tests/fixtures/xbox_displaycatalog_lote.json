@@ -1,0 +1,1690 @@
+{
+  "Products": [
+    {
+      "ProductId": "9NPDN9R45JX4",
+      "ProductType": "Game",
+      "ProductFamily": "Games",
+      "LastModifiedDate": "2026-02-11T21:21:39.2325623Z",
+      "LocalizedProperties": [
+        {
+          "DeveloperName": "sunset visitor 斜陽過客",
+          "PublisherName": "Fellow Traveller",
+          "PublisherWebsiteUri": "",
+          "ProductTitle": "1000xRESIST",
+          "ShortTitle": "1000xRESIST",
+          "ShortDescription": "1000xRESIST é uma eletrizante aventura de ficção científica. O ano é incerto, e uma doença trazida por uma invasão alienígena força a humanidade a viver no subsolo. Você é a Observadora, servindo fielmente à GRANDE MÃE, até descobrir um segredo chocante que muda tudo. ",
+          "Language": "pt",
+          "Images": [
+            {
+              "ImagePurpose": "Poster",
+              "Uri": "//store-images.s-microsoft.com/image/apps.42712.13724740810259939.b66dd818-9d75-4097-b510-7e4f8f43131a.ac32cda4-2fd9-4049-a090-966d3ace3e22",
+              "Height": 2160,
+              "Width": 1440
+            },
+            {
+              "ImagePurpose": "BoxArt",
+              "Uri": "//store-images.s-microsoft.com/image/apps.26170.13724740810259939.b66dd818-9d75-4097-b510-7e4f8f43131a.ae40357e-1af2-40ef-8179-06b7546b3e9e",
+              "Height": 2160,
+              "Width": 2160
+            },
+            {
+              "ImagePurpose": "Logo",
+              "Uri": "//store-images.s-microsoft.com/image/apps.53060.13724740810259939.b66dd818-9d75-4097-b510-7e4f8f43131a.74c4340f-97f1-4465-8a44-64b96d397d4a",
+              "Height": 300,
+              "Width": 300
+            },
+            {
+              "ImagePurpose": "SuperHeroArt",
+              "Uri": "//store-images.s-microsoft.com/image/apps.38663.13724740810259939.b66dd818-9d75-4097-b510-7e4f8f43131a.17207052-a7ae-4ad3-afaa-030774844c4d",
+              "Height": 2160,
+              "Width": 3840
+            },
+            {
+              "ImagePurpose": "TitledHeroArt",
+              "Uri": "//store-images.s-microsoft.com/image/apps.63905.13724740810259939.b66dd818-9d75-4097-b510-7e4f8f43131a.7a304175-8b49-46f4-aa42-c2391059a29d",
+              "Height": 1080,
+              "Width": 1920
+            },
+            {
+              "ImagePurpose": "Screenshot",
+              "Uri": "//store-images.s-microsoft.com/image/apps.65229.13724740810259939.b66dd818-9d75-4097-b510-7e4f8f43131a.110cc837-4226-4730-8d4c-e36a920cda42",
+              "Height": 2160,
+              "Width": 3840
+            },
+            {
+              "ImagePurpose": "Screenshot",
+              "Uri": "//store-images.s-microsoft.com/image/apps.65229.13724740810259939.b66dd818-9d75-4097-b510-7e4f8f43131a.110cc837-4226-4730-8d4c-e36a920cda42",
+              "Height": 2160,
+              "Width": 3840
+            },
+            {
+              "ImagePurpose": "Screenshot",
+              "Uri": "//store-images.s-microsoft.com/image/apps.10765.13724740810259939.b66dd818-9d75-4097-b510-7e4f8f43131a.e996b78c-ced3-43d6-bef8-bd23af4ca86a",
+              "Height": 2160,
+              "Width": 3840
+            }
+          ],
+          "Videos": [],
+          "CMSVideos": [
+            {
+              "DASH": "https://cdn-dynmedia-1.microsoft.com/is/content/microsoftassets/aaaa-AVS.mpd",
+              "HLS": "https://cdn-dynmedia-1.microsoft.com/is/content/microsoftassets/aaaa-AVS.m3u8?packagedStreaming=true",
+              "VideoPurpose": "trailer",
+              "Height": 1080,
+              "Width": 1920,
+              "Caption": "1000xRESIST — Trailer de anúncio",
+              "PreviewImage": {
+                "Uri": "//store-images.s-microsoft.com/image/trailer.poster.1000x",
+                "Height": 1080,
+                "Width": 1920,
+                "ImagePurpose": "trailer"
+              }
+            }
+          ]
+        }
+      ],
+      "MarketProperties": [
+        {
+          "OriginalReleaseDate": "2025-11-04T16:00:00.0000000Z",
+          "MinimumUserAge": 16,
+          "ContentRatings": [
+            {
+              "RatingSystem": "COB-AU",
+              "RatingId": "COB-AU:MA",
+              "RatingDescriptors": [
+                "COB-AU:StrVio"
+              ],
+              "RatingDisclaimers": [],
+              "InteractiveElements": []
+            },
+            {
+              "RatingSystem": "DJCTQ",
+              "RatingId": "DJCTQ:14",
+              "RatingDescriptors": [
+                "DJCTQ:Vio",
+                "DJCTQ:SexCon",
+                "DJCTQ:LegDru",
+                "DJCTQ:Dru"
+              ],
+              "RatingDisclaimers": [],
+              "InteractiveElements": []
+            },
+            {
+              "RatingSystem": "ESRB",
+              "RatingId": "ESRB:M",
+              "RatingDescriptors": [
+                "ESRB:Vio",
+                "ESRB:Blo",
+                "ESRB:StrLan"
+              ],
+              "RatingDisclaimers": [],
+              "InteractiveElements": []
+            },
+            {
+              "RatingSystem": "GRB",
+              "RatingId": "GRB:15",
+              "RatingDescriptors": [
+                "GRB:AlcTobDru",
+                "GRB:Lan"
+              ],
+              "RatingDisclaimers": [],
+              "InteractiveElements": []
+            },
+            {
+              "RatingSystem": "PEGI",
+              "RatingId": "PEGI:16",
+              "RatingDescriptors": [
+                "PEGI:StrVio",
+                "PEGI:StrLang"
+              ],
+              "RatingDisclaimers": [],
+              "InteractiveElements": []
+            },
+            {
+              "RatingSystem": "TCA",
+              "RatingId": "TCA:R",
+              "RatingDescriptors": [
+                "TCA:Dru",
+                "TCA:Vio",
+                "TCA:TobAndAlc",
+                "TCA:InaLan",
+                "TCA:Sex",
+                "TCA:Hor"
+              ],
+              "RatingDisclaimers": [],
+              "InteractiveElements": []
+            },
+            {
+              "RatingSystem": "USK",
+              "RatingId": "USK:16",
+              "RatingDescriptors": [
+                "USK:Vio",
+                "USK:StrThe"
+              ],
+              "RatingDisclaimers": [],
+              "InteractiveElements": []
+            },
+            {
+              "RatingSystem": "PCBP",
+              "RatingId": "PCBP:18",
+              "RatingDescriptors": [
+                "PCBP:Vio",
+                "PCBP:Sex",
+                "PCBP:Dru",
+                "PCBP:Fea",
+                "PCBP:Lan"
+              ],
+              "RatingDisclaimers": [],
+              "InteractiveElements": []
+            },
+            {
+              "RatingSystem": "IARC",
+              "RatingId": "IARC:16",
+              "RatingDescriptors": [
+                "IARC:StrVio",
+                "IARC:StrLan"
+              ],
+              "RatingDisclaimers": [],
+              "InteractiveElements": []
+            },
+            {
+              "RatingSystem": "CCC",
+              "RatingId": "CCC:18",
+              "RatingDescriptors": [],
+              "RatingDisclaimers": [],
+              "InteractiveElements": []
+            },
+            {
+              "RatingSystem": "Microsoft",
+              "RatingId": "Microsoft:16",
+              "RatingDescriptors": [],
+              "RatingDisclaimers": [],
+              "InteractiveElements": []
+            }
+          ],
+          "UsageData": [
+            {
+              "AggregateTimeSpan": "7Days",
+              "AverageRating": 3.7,
+              "PlayCount": 0,
+              "RatingCount": 6,
+              "RentalCount": "0",
+              "TrialCount": "0",
+              "PurchaseCount": "0"
+            },
+            {
+              "AggregateTimeSpan": "30Days",
+              "AverageRating": 3.7,
+              "PlayCount": 0,
+              "RatingCount": 35,
+              "RentalCount": "0",
+              "TrialCount": "0",
+              "PurchaseCount": "0"
+            },
+            {
+              "AggregateTimeSpan": "AllTime",
+              "AverageRating": 3.8,
+              "PlayCount": 0,
+              "RatingCount": 1473,
+              "RentalCount": "0",
+              "TrialCount": "0",
+              "PurchaseCount": "0"
+            }
+          ],
+          "Markets": [
+            "BR"
+          ]
+        }
+      ],
+      "Properties": {
+        "Category": "Action & adventure",
+        "Categories": [
+          "Action & adventure"
+        ],
+        "Subcategory": null,
+        "Attributes": [
+          {
+            "Name": "BroadcastSupport",
+            "Minimum": null,
+            "Maximum": null,
+            "ApplicablePlatforms": null,
+            "Group": null
+          },
+          {
+            "Name": "Capability4k",
+            "Minimum": null,
+            "Maximum": null,
+            "ApplicablePlatforms": [
+              "Xbox"
+            ],
+            "Group": null
+          },
+          {
+            "Name": "SinglePlayer",
+            "Minimum": null,
+            "Maximum": null,
+            "ApplicablePlatforms": [
+              "Xbox",
+              "Desktop"
+            ],
+            "Group": null
+          },
+          {
+            "Name": "ConsoleGen9Optimized",
+            "Minimum": null,
+            "Maximum": null,
+            "ApplicablePlatforms": null,
+            "Group": null
+          },
+          {
+            "Name": "ConsoleKeyboardMouse",
+            "Minimum": null,
+            "Maximum": null,
+            "ApplicablePlatforms": null,
+            "Group": null
+          },
+          {
+            "Name": "XblAchievements",
+            "Minimum": null,
+            "Maximum": null,
+            "ApplicablePlatforms": null,
+            "Group": null
+          },
+          {
+            "Name": "XblCloudSaves",
+            "Minimum": null,
+            "Maximum": null,
+            "ApplicablePlatforms": null,
+            "Group": null
+          },
+          {
+            "Name": "XPA",
+            "Minimum": null,
+            "Maximum": null,
+            "ApplicablePlatforms": null,
+            "Group": null
+          },
+          {
+            "Name": "XboxLive",
+            "Minimum": null,
+            "Maximum": null,
+            "ApplicablePlatforms": null,
+            "Group": null
+          }
+        ],
+        "XboxLiveGoldRequired": false
+      },
+      "DisplaySkuAvailabilities": [
+        {
+          "Sku": {
+            "SkuId": "0010",
+            "SkuType": "full",
+            "Properties": {
+              "IsPreOrder": false
+            }
+          },
+          "Availabilities": [
+            {
+              "AvailabilityId": "B05PV9HRS9PH",
+              "Actions": [
+                "Details",
+                "Fulfill",
+                "Purchase",
+                "Browse",
+                "Curate",
+                "Redeem"
+              ],
+              "RemediationRequired": null,
+              "Markets": [
+                "BR"
+              ],
+              "OrderManagementData": {
+                "Price": {
+                  "CurrencyCode": "BRL",
+                  "IsPIRequired": false,
+                  "ListPrice": 97.95,
+                  "MSRP": 97.95,
+                  "TaxType": "SalesTax",
+                  "WholesaleCurrencyCode": "BRL",
+                  "WholesalePrice": 61.64
+                }
+              },
+              "Conditions": {
+                "EndDate": "2026-11-01T09:59:59.0000000Z",
+                "StartDate": "2026-03-05T10:00:00.0000000Z"
+              }
+            },
+            {
+              "AvailabilityId": "9QNZJZX2LFCN",
+              "Actions": [
+                "Details",
+                "Purchase",
+                "Curate"
+              ],
+              "RemediationRequired": true,
+              "Markets": [
+                "BR"
+              ],
+              "OrderManagementData": {
+                "Price": {
+                  "CurrencyCode": "BRL",
+                  "IsPIRequired": false,
+                  "ListPrice": 0.0,
+                  "MSRP": 0.0,
+                  "TaxType": "SalesTax",
+                  "WholesaleCurrencyCode": "BRL",
+                  "WholesalePrice": 0.0
+                }
+              },
+              "Conditions": {
+                "EndDate": "2026-11-01T09:59:59.0000000Z",
+                "StartDate": "2026-03-05T10:00:00.0000000Z"
+              }
+            },
+            {
+              "AvailabilityId": "9MWZVTQ5H0GM",
+              "Actions": [
+                "Details",
+                "Purchase",
+                "Curate"
+              ],
+              "RemediationRequired": true,
+              "Markets": [
+                "BR"
+              ],
+              "OrderManagementData": {
+                "Price": {
+                  "CurrencyCode": "BRL",
+                  "IsPIRequired": false,
+                  "ListPrice": 0.0,
+                  "MSRP": 0.0,
+                  "TaxType": "SalesTax",
+                  "WholesaleCurrencyCode": "BRL",
+                  "WholesalePrice": 0.0
+                }
+              },
+              "Conditions": {
+                "EndDate": "2026-11-01T09:59:59.0000000Z",
+                "StartDate": "2026-03-05T10:00:00.0000000Z"
+              }
+            },
+            {
+              "AvailabilityId": "9S33MFW19S6C",
+              "Actions": [
+                "Details",
+                "Purchase",
+                "Curate"
+              ],
+              "RemediationRequired": true,
+              "Markets": [
+                "BR"
+              ],
+              "OrderManagementData": {
+                "Price": {
+                  "CurrencyCode": "BRL",
+                  "IsPIRequired": false,
+                  "ListPrice": 0.0,
+                  "MSRP": 0.0,
+                  "TaxType": "SalesTax",
+                  "WholesaleCurrencyCode": "BRL",
+                  "WholesalePrice": 0.0
+                }
+              },
+              "Conditions": {
+                "EndDate": "2026-11-01T09:59:59.0000000Z",
+                "StartDate": "2026-03-05T10:00:00.0000000Z"
+              }
+            },
+            {
+              "AvailabilityId": "B26PJ36RDZZZ",
+              "Actions": [
+                "Details",
+                "Fulfill",
+                "Browse",
+                "Curate",
+                "Gift"
+              ],
+              "RemediationRequired": null,
+              "Markets": [
+                "BR"
+              ],
+              "OrderManagementData": {
+                "Price": {
+                  "CurrencyCode": "BRL",
+                  "IsPIRequired": false,
+                  "ListPrice": 97.95,
+                  "MSRP": 97.95,
+                  "TaxType": "SalesTax",
+                  "WholesaleCurrencyCode": "BRL",
+                  "WholesalePrice": 61.64
+                }
+              },
+              "Conditions": {
+                "EndDate": "2026-11-01T09:59:59.0000000Z",
+                "StartDate": "2026-03-05T10:00:00.0000000Z"
+              }
+            },
+            {
+              "AvailabilityId": "9Z22F4587KBL",
+              "Actions": [
+                "License",
+                "Browse",
+                "Details"
+              ],
+              "RemediationRequired": null,
+              "Markets": [
+                "BR"
+              ],
+              "OrderManagementData": {
+                "Price": {
+                  "CurrencyCode": "USD",
+                  "IsPIRequired": false,
+                  "ListPrice": 0.0,
+                  "MSRP": 0.0,
+                  "TaxType": "",
+                  "WholesaleCurrencyCode": ""
+                }
+              },
+              "Conditions": {
+                "EndDate": "2026-11-01T09:59:59.0000000Z",
+                "StartDate": "2026-03-05T10:00:00.0000000Z"
+              }
+            },
+            {
+              "AvailabilityId": "B0964T2JCF58",
+              "Actions": [
+                "License",
+                "Browse",
+                "Details"
+              ],
+              "RemediationRequired": null,
+              "Markets": [
+                "BR"
+              ],
+              "OrderManagementData": {
+                "Price": {
+                  "CurrencyCode": "USD",
+                  "IsPIRequired": false,
+                  "ListPrice": 0.0,
+                  "MSRP": 0.0,
+                  "TaxType": "",
+                  "WholesaleCurrencyCode": ""
+                }
+              },
+              "Conditions": {
+                "EndDate": "2026-11-01T09:59:59.0000000Z",
+                "StartDate": "2026-03-05T10:00:00.0000000Z"
+              }
+            },
+            {
+              "AvailabilityId": "9XN7ZW0MNHVP",
+              "Actions": [
+                "License",
+                "Browse",
+                "Details"
+              ],
+              "RemediationRequired": null,
+              "Markets": [
+                "BR"
+              ],
+              "OrderManagementData": {
+                "Price": {
+                  "CurrencyCode": "USD",
+                  "IsPIRequired": false,
+                  "ListPrice": 0.0,
+                  "MSRP": 0.0,
+                  "TaxType": "",
+                  "WholesaleCurrencyCode": ""
+                }
+              },
+              "Conditions": {
+                "EndDate": "2026-11-01T09:59:59.0000000Z",
+                "StartDate": "2026-03-05T10:00:00.0000000Z"
+              }
+            },
+            {
+              "AvailabilityId": "B3B6S7VC71SJ",
+              "Actions": [
+                "License",
+                "Browse",
+                "Details"
+              ],
+              "RemediationRequired": null,
+              "Markets": [
+                "BR"
+              ],
+              "OrderManagementData": {
+                "Price": {
+                  "CurrencyCode": "USD",
+                  "IsPIRequired": false,
+                  "ListPrice": 0.0,
+                  "MSRP": 0.0,
+                  "TaxType": "",
+                  "WholesaleCurrencyCode": ""
+                }
+              },
+              "Conditions": {
+                "EndDate": "2026-11-01T10:00:00.0000000Z",
+                "StartDate": "2026-03-05T10:00:00.0000000Z"
+              }
+            },
+            {
+              "AvailabilityId": "B1LQ4D89980D",
+              "Actions": [
+                "License",
+                "Browse",
+                "Details"
+              ],
+              "RemediationRequired": null,
+              "Markets": [
+                "BR"
+              ],
+              "OrderManagementData": {
+                "Price": {
+                  "CurrencyCode": "USD",
+                  "IsPIRequired": false,
+                  "ListPrice": 0.0,
+                  "MSRP": 0.0,
+                  "TaxType": "",
+                  "WholesaleCurrencyCode": ""
+                }
+              },
+              "Conditions": {
+                "EndDate": "2026-11-01T10:00:00.0000000Z",
+                "StartDate": "2026-03-05T10:00:00.0000000Z"
+              }
+            },
+            {
+              "AvailabilityId": "B4G6B7QMRP8M",
+              "Actions": [
+                "License",
+                "Browse",
+                "Details"
+              ],
+              "RemediationRequired": null,
+              "Markets": [
+                "BR"
+              ],
+              "OrderManagementData": {
+                "Price": {
+                  "CurrencyCode": "USD",
+                  "IsPIRequired": false,
+                  "ListPrice": 0.0,
+                  "MSRP": 0.0,
+                  "TaxType": "",
+                  "WholesaleCurrencyCode": ""
+                }
+              },
+              "Conditions": {
+                "EndDate": "2026-11-01T10:00:00.0000000Z",
+                "StartDate": "2026-03-05T10:00:00.0000000Z"
+              }
+            },
+            {
+              "AvailabilityId": "9P7PPKT2Q0KV",
+              "Actions": [
+                "License",
+                "Details"
+              ],
+              "RemediationRequired": null,
+              "Markets": [
+                "BR"
+              ],
+              "OrderManagementData": {
+                "Price": {
+                  "CurrencyCode": "USD",
+                  "IsPIRequired": false,
+                  "ListPrice": 0.0,
+                  "MSRP": 0.0,
+                  "TaxType": "",
+                  "WholesaleCurrencyCode": ""
+                }
+              },
+              "Conditions": {
+                "EndDate": "9998-12-30T00:00:00.0000000Z",
+                "StartDate": "1753-01-01T00:00:00.0000000Z"
+              }
+            }
+          ]
+        },
+        {
+          "Sku": {
+            "SkuId": "0011",
+            "SkuType": "trial",
+            "Properties": {
+              "IsPreOrder": false
+            }
+          },
+          "Availabilities": [
+            {
+              "AvailabilityId": "9TXWBQGVRMFK",
+              "Actions": [
+                "Details",
+                "License",
+                "Fulfill"
+              ],
+              "RemediationRequired": null,
+              "Markets": [
+                "BR"
+              ],
+              "OrderManagementData": {
+                "Price": {
+                  "CurrencyCode": "USD",
+                  "IsPIRequired": false,
+                  "ListPrice": 0.0,
+                  "MSRP": 0.0,
+                  "TaxType": "",
+                  "WholesaleCurrencyCode": ""
+                }
+              },
+              "Conditions": {
+                "EndDate": "9998-12-30T00:00:00.0000000Z",
+                "StartDate": "1753-01-01T00:00:00.0000000Z"
+              }
+            },
+            {
+              "AvailabilityId": "B212QQ4H734N",
+              "Actions": [
+                "License",
+                "Details"
+              ],
+              "RemediationRequired": null,
+              "Markets": [
+                "BR"
+              ],
+              "OrderManagementData": {
+                "Price": {
+                  "CurrencyCode": "USD",
+                  "IsPIRequired": false,
+                  "ListPrice": 0.0,
+                  "MSRP": 0.0,
+                  "TaxType": "",
+                  "WholesaleCurrencyCode": ""
+                }
+              },
+              "Conditions": {
+                "EndDate": "9998-12-30T00:00:00.0000000Z",
+                "StartDate": "1753-01-01T00:00:00.0000000Z"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "ProductId": "9P8LR42PTRGJ",
+      "ProductType": "Game",
+      "ProductFamily": "Games",
+      "LastModifiedDate": "2026-09-09T03:56:13.1835645Z",
+      "LocalizedProperties": [
+        {
+          "DeveloperName": "Thunder Lotus",
+          "PublisherName": "Thunder Lotus",
+          "PublisherWebsiteUri": "https://thunderlotusgames.com/",
+          "ProductTitle": "33 Immortals",
+          "ShortTitle": "",
+          "ShortDescription": "33 Immortals é um jogo roguelike de ação cooperativo para 33 jogadores. Entre direto nas incursões, só ou com amigos. Enfrente hordas de monstros, derrote chefes imensos e fique mais forte a cada incursão. Use emotes do jogo para se coordenar e combinar poderes com seus aliados rebeldes, e enfrentem juntos a Ira de Deus.",
+          "Language": "pt",
+          "Images": [
+            {
+              "ImagePurpose": "SuperHeroArt",
+              "Uri": "//store-images.s-microsoft.com/image/apps.3461.14090162823233215.2d39e9bd-f341-4d5f-9638-b1a6c75a4e3a.72ec0057-de44-41e8-8f55-3697194006ad",
+              "Height": 1080,
+              "Width": 1920
+            },
+            {
+              "ImagePurpose": "Logo",
+              "Uri": "//store-images.s-microsoft.com/image/apps.47637.14090162823233215.13794def-6f5d-4292-86b7-5b23a5e557e5.c63f8e2a-be17-47e2-a9a1-d040fc2f3532",
+              "Height": 300,
+              "Width": 300
+            },
+            {
+              "ImagePurpose": "TitledHeroArt",
+              "Uri": "//store-images.s-microsoft.com/image/apps.31149.14090162823233215.5f027b60-c9ed-4eea-ad07-8091580faccc.8396a274-309e-44e1-9824-48f7246bf3f0",
+              "Height": 1080,
+              "Width": 1920
+            },
+            {
+              "ImagePurpose": "Poster",
+              "Uri": "//store-images.s-microsoft.com/image/apps.51551.14090162823233215.5f027b60-c9ed-4eea-ad07-8091580faccc.1129aa1a-4841-4079-b300-e9051e479ea3",
+              "Height": 1080,
+              "Width": 720
+            },
+            {
+              "ImagePurpose": "BoxArt",
+              "Uri": "//store-images.s-microsoft.com/image/apps.2377.14090162823233215.5f027b60-c9ed-4eea-ad07-8091580faccc.a49b63e1-962f-4afc-ba9a-6385aba2159d",
+              "Height": 1080,
+              "Width": 1080
+            },
+            {
+              "ImagePurpose": "Screenshot",
+              "Uri": "//store-images.s-microsoft.com/image/apps.9732.14090162823233215.13794def-6f5d-4292-86b7-5b23a5e557e5.f6082d65-cd83-42b2-bbf2-2873ea04cc3e",
+              "Height": 1080,
+              "Width": 1920
+            },
+            {
+              "ImagePurpose": "Screenshot",
+              "Uri": "//store-images.s-microsoft.com/image/apps.9732.14090162823233215.13794def-6f5d-4292-86b7-5b23a5e557e5.f6082d65-cd83-42b2-bbf2-2873ea04cc3e",
+              "Height": 1080,
+              "Width": 1920
+            },
+            {
+              "ImagePurpose": "Screenshot",
+              "Uri": "//store-images.s-microsoft.com/image/apps.11350.14090162823233215.13794def-6f5d-4292-86b7-5b23a5e557e5.ae970392-3f4c-453c-9dd8-5ddca02a715f",
+              "Height": 1080,
+              "Width": 1920
+            }
+          ],
+          "Videos": []
+        }
+      ],
+      "MarketProperties": [
+        {
+          "OriginalReleaseDate": "2026-06-11T15:00:00.0000000Z",
+          "MinimumUserAge": 12,
+          "ContentRatings": [
+            {
+              "RatingSystem": "ESRB",
+              "RatingId": "ESRB:T",
+              "RatingDescriptors": [
+                "ESRB:Vio",
+                "ESRB:Blo"
+              ],
+              "RatingDisclaimers": [],
+              "InteractiveElements": [
+                "ESRB:InGamPur"
+              ]
+            },
+            {
+              "RatingSystem": "PEGI",
+              "RatingId": "PEGI:12",
+              "RatingDescriptors": [
+                "PEGI:ModVio"
+              ],
+              "RatingDisclaimers": [],
+              "InteractiveElements": [
+                "PEGI:InGamPur"
+              ]
+            },
+            {
+              "RatingSystem": "DJCTQ",
+              "RatingId": "DJCTQ:12",
+              "RatingDescriptors": [
+                "DJCTQ:Vio",
+                "DJCTQ:Fea",
+                "DJCTQ:InaLan"
+              ],
+              "RatingDisclaimers": [],
+              "InteractiveElements": [
+                "DJCTQ:InGamPur"
+              ]
+            },
+            {
+              "RatingSystem": "USK",
+              "RatingId": "USK:12",
+              "RatingDescriptors": [
+                "USK:FanVio"
+              ],
+              "RatingDisclaimers": [],
+              "InteractiveElements": [
+                "USK:InGamPur"
+              ]
+            },
+            {
+              "RatingSystem": "IARC",
+              "RatingId": "IARC:12",
+              "RatingDescriptors": [
+                "IARC:ModVio"
+              ],
+              "RatingDisclaimers": [],
+              "InteractiveElements": [
+                "IARC:InGamPur"
+              ]
+            },
+            {
+              "RatingSystem": "COB-AU",
+              "RatingId": "COB-AU:M",
+              "RatingDescriptors": [
+                "COB-AU:Vio",
+                "COB-AU:InGamPurDescr",
+                "COB-AU:OnlIntAndCha"
+              ],
+              "RatingDisclaimers": [],
+              "InteractiveElements": [
+                "COB-AU:UseInt",
+                "COB-AU:InGamPur"
+              ]
+            },
+            {
+              "RatingSystem": "GRB",
+              "RatingId": "GRB:12",
+              "RatingDescriptors": [
+                "GRB:Vio",
+                "GRB:FeaHorThr"
+              ],
+              "RatingDisclaimers": [],
+              "InteractiveElements": [
+                "GRB:InGamPur"
+              ]
+            },
+            {
+              "RatingSystem": "PCBP",
+              "RatingId": "PCBP:16",
+              "RatingDescriptors": [
+                "PCBP:Vio",
+                "PCBP:Fea",
+                "PCBP:Lan"
+              ],
+              "RatingDisclaimers": [],
+              "InteractiveElements": [
+                "PCBP:InGamPur"
+              ]
+            },
+            {
+              "RatingSystem": "TCA",
+              "RatingId": "TCA:R",
+              "RatingDescriptors": [
+                "TCA:Vio",
+                "TCA:Hor"
+              ],
+              "RatingDisclaimers": [],
+              "InteractiveElements": []
+            },
+            {
+              "RatingSystem": "CCC",
+              "RatingId": "CCC:14",
+              "RatingDescriptors": [],
+              "RatingDisclaimers": [],
+              "InteractiveElements": []
+            },
+            {
+              "RatingSystem": "Microsoft",
+              "RatingId": "Microsoft:12",
+              "RatingDescriptors": [],
+              "RatingDisclaimers": [],
+              "InteractiveElements": []
+            }
+          ],
+          "UsageData": [
+            {
+              "AggregateTimeSpan": "7Days",
+              "AverageRating": 2.9,
+              "PlayCount": 0,
+              "RatingCount": 9,
+              "RentalCount": "0",
+              "TrialCount": "0",
+              "PurchaseCount": "0"
+            },
+            {
+              "AggregateTimeSpan": "30Days",
+              "AverageRating": 2.9,
+              "PlayCount": 0,
+              "RatingCount": 38,
+              "RentalCount": "0",
+              "TrialCount": "0",
+              "PurchaseCount": "0"
+            },
+            {
+              "AggregateTimeSpan": "AllTime",
+              "AverageRating": 3.9,
+              "PlayCount": 0,
+              "RatingCount": 2900,
+              "RentalCount": "0",
+              "TrialCount": "0",
+              "PurchaseCount": "0"
+            }
+          ],
+          "Markets": [
+            "BR"
+          ]
+        }
+      ],
+      "Properties": {
+        "Category": "Action & adventure",
+        "Categories": [
+          "Action & adventure"
+        ],
+        "Subcategory": null,
+        "Attributes": [
+          {
+            "Name": "XblOnlineCoop",
+            "Minimum": 33,
+            "Maximum": 33,
+            "ApplicablePlatforms": null,
+            "Group": null
+          },
+          {
+            "Name": "BroadcastSupport",
+            "Minimum": null,
+            "Maximum": null,
+            "ApplicablePlatforms": null,
+            "Group": null
+          },
+          {
+            "Name": "XblCrossPlatformMultiPlayer",
+            "Minimum": null,
+            "Maximum": null,
+            "ApplicablePlatforms": null,
+            "Group": null
+          },
+          {
+            "Name": "XboxLiveCrossGenMP",
+            "Minimum": null,
+            "Maximum": null,
+            "ApplicablePlatforms": null,
+            "Group": null
+          },
+          {
+            "Name": "ConsoleGen9Optimized",
+            "Minimum": null,
+            "Maximum": null,
+            "ApplicablePlatforms": null,
+            "Group": null
+          },
+          {
+            "Name": "ConsoleCrossGen",
+            "Minimum": null,
+            "Maximum": null,
+            "ApplicablePlatforms": null,
+            "Group": null
+          },
+          {
+            "Name": "XblAchievements",
+            "Minimum": null,
+            "Maximum": null,
+            "ApplicablePlatforms": null,
+            "Group": null
+          },
+          {
+            "Name": "XblCloudSaves",
+            "Minimum": null,
+            "Maximum": null,
+            "ApplicablePlatforms": null,
+            "Group": null
+          },
+          {
+            "Name": "XPA",
+            "Minimum": null,
+            "Maximum": null,
+            "ApplicablePlatforms": null,
+            "Group": null
+          },
+          {
+            "Name": "XboxLive",
+            "Minimum": null,
+            "Maximum": null,
+            "ApplicablePlatforms": null,
+            "Group": null
+          }
+        ],
+        "XboxLiveGoldRequired": true
+      },
+      "DisplaySkuAvailabilities": [
+        {
+          "Sku": {
+            "SkuId": "0010",
+            "SkuType": "full",
+            "Properties": {
+              "IsPreOrder": false
+            }
+          },
+          "Availabilities": [
+            {
+              "AvailabilityId": "B15KHHSM68WL",
+              "Actions": [
+                "Details",
+                "Fulfill",
+                "Purchase",
+                "Browse",
+                "Curate",
+                "Redeem"
+              ],
+              "RemediationRequired": null,
+              "Markets": [
+                "BR"
+              ],
+              "OrderManagementData": {
+                "Price": {
+                  "CurrencyCode": "BRL",
+                  "IsPIRequired": false,
+                  "ListPrice": 72.95,
+                  "MSRP": 72.95,
+                  "TaxType": "SalesTax",
+                  "WholesaleCurrencyCode": "BRL",
+                  "WholesalePrice": 45.91
+                }
+              },
+              "Conditions": {
+                "EndDate": "2027-03-16T09:59:59.0000000Z",
+                "StartDate": "2026-07-15T14:51:37.6240000Z"
+              }
+            },
+            {
+              "AvailabilityId": "9WBCT59HWLNF",
+              "Actions": [
+                "Details",
+                "Purchase",
+                "Curate"
+              ],
+              "RemediationRequired": true,
+              "Markets": [
+                "BR"
+              ],
+              "OrderManagementData": {
+                "Price": {
+                  "CurrencyCode": "BRL",
+                  "IsPIRequired": false,
+                  "ListPrice": 0.0,
+                  "MSRP": 0.0,
+                  "TaxType": "SalesTax",
+                  "WholesaleCurrencyCode": "BRL",
+                  "WholesalePrice": 0.0
+                }
+              },
+              "Conditions": {
+                "EndDate": "2027-03-16T09:59:59.0000000Z",
+                "StartDate": "2026-07-15T14:51:37.6240000Z"
+              }
+            },
+            {
+              "AvailabilityId": "B51CMJD2ZZ3P",
+              "Actions": [
+                "Details",
+                "Purchase",
+                "Curate"
+              ],
+              "RemediationRequired": true,
+              "Markets": [
+                "BR"
+              ],
+              "OrderManagementData": {
+                "Price": {
+                  "CurrencyCode": "BRL",
+                  "IsPIRequired": false,
+                  "ListPrice": 0.0,
+                  "MSRP": 0.0,
+                  "TaxType": "SalesTax",
+                  "WholesaleCurrencyCode": "BRL",
+                  "WholesalePrice": 0.0
+                }
+              },
+              "Conditions": {
+                "EndDate": "2027-03-16T09:59:59.0000000Z",
+                "StartDate": "2026-07-15T14:51:37.6240000Z"
+              }
+            },
+            {
+              "AvailabilityId": "9PJMPM1DNNK6",
+              "Actions": [
+                "Details",
+                "Purchase",
+                "Curate"
+              ],
+              "RemediationRequired": true,
+              "Markets": [
+                "BR"
+              ],
+              "OrderManagementData": {
+                "Price": {
+                  "CurrencyCode": "BRL",
+                  "IsPIRequired": false,
+                  "ListPrice": 0.0,
+                  "MSRP": 0.0,
+                  "TaxType": "SalesTax",
+                  "WholesaleCurrencyCode": "BRL",
+                  "WholesalePrice": 0.0
+                }
+              },
+              "Conditions": {
+                "EndDate": "2027-03-16T09:59:59.0000000Z",
+                "StartDate": "2026-07-15T14:51:37.6240000Z"
+              }
+            },
+            {
+              "AvailabilityId": "9RCW9DBKLGR3",
+              "Actions": [
+                "Details",
+                "Fulfill",
+                "Browse",
+                "Curate",
+                "Gift"
+              ],
+              "RemediationRequired": null,
+              "Markets": [
+                "BR"
+              ],
+              "OrderManagementData": {
+                "Price": {
+                  "CurrencyCode": "BRL",
+                  "IsPIRequired": false,
+                  "ListPrice": 72.95,
+                  "MSRP": 72.95,
+                  "TaxType": "SalesTax",
+                  "WholesaleCurrencyCode": "BRL",
+                  "WholesalePrice": 45.91
+                }
+              },
+              "Conditions": {
+                "EndDate": "2027-03-16T09:59:59.0000000Z",
+                "StartDate": "2026-07-15T14:51:37.6240000Z"
+              }
+            },
+            {
+              "AvailabilityId": "9R4DFRDMSCX6",
+              "Actions": [
+                "License",
+                "Browse",
+                "Details"
+              ],
+              "RemediationRequired": null,
+              "Markets": [
+                "BR"
+              ],
+              "OrderManagementData": {
+                "Price": {
+                  "CurrencyCode": "USD",
+                  "IsPIRequired": false,
+                  "ListPrice": 0.0,
+                  "MSRP": 0.0,
+                  "TaxType": "",
+                  "WholesaleCurrencyCode": ""
+                }
+              },
+              "Conditions": {
+                "EndDate": "2027-03-16T09:59:59.0000000Z",
+                "StartDate": "2026-07-15T14:51:37.6240000Z"
+              }
+            },
+            {
+              "AvailabilityId": "9N78T886SSP9",
+              "Actions": [
+                "License",
+                "Browse",
+                "Details"
+              ],
+              "RemediationRequired": null,
+              "Markets": [
+                "BR"
+              ],
+              "OrderManagementData": {
+                "Price": {
+                  "CurrencyCode": "USD",
+                  "IsPIRequired": false,
+                  "ListPrice": 0.0,
+                  "MSRP": 0.0,
+                  "TaxType": "",
+                  "WholesaleCurrencyCode": ""
+                }
+              },
+              "Conditions": {
+                "EndDate": "2027-03-16T09:59:59.0000000Z",
+                "StartDate": "2026-07-15T14:51:37.6240000Z"
+              }
+            },
+            {
+              "AvailabilityId": "9N7KFG032BMM",
+              "Actions": [
+                "License",
+                "Browse",
+                "Details"
+              ],
+              "RemediationRequired": null,
+              "Markets": [
+                "BR"
+              ],
+              "OrderManagementData": {
+                "Price": {
+                  "CurrencyCode": "USD",
+                  "IsPIRequired": false,
+                  "ListPrice": 0.0,
+                  "MSRP": 0.0,
+                  "TaxType": "",
+                  "WholesaleCurrencyCode": ""
+                }
+              },
+              "Conditions": {
+                "EndDate": "2027-03-16T09:59:59.0000000Z",
+                "StartDate": "2026-07-15T14:51:37.6240000Z"
+              }
+            },
+            {
+              "AvailabilityId": "B244GZX357RS",
+              "Actions": [
+                "License",
+                "Browse",
+                "Details"
+              ],
+              "RemediationRequired": null,
+              "Markets": [
+                "BR"
+              ],
+              "OrderManagementData": {
+                "Price": {
+                  "CurrencyCode": "USD",
+                  "IsPIRequired": false,
+                  "ListPrice": 0.0,
+                  "MSRP": 0.0,
+                  "TaxType": "",
+                  "WholesaleCurrencyCode": ""
+                }
+              },
+              "Conditions": {
+                "EndDate": "2027-03-16T10:00:00.0000000Z",
+                "StartDate": "2026-07-15T14:51:37.6240000Z"
+              }
+            },
+            {
+              "AvailabilityId": "9S9HDBV6M6GP",
+              "Actions": [
+                "License",
+                "Browse",
+                "Details"
+              ],
+              "RemediationRequired": null,
+              "Markets": [
+                "BR"
+              ],
+              "OrderManagementData": {
+                "Price": {
+                  "CurrencyCode": "USD",
+                  "IsPIRequired": false,
+                  "ListPrice": 0.0,
+                  "MSRP": 0.0,
+                  "TaxType": "",
+                  "WholesaleCurrencyCode": ""
+                }
+              },
+              "Conditions": {
+                "EndDate": "2027-03-16T10:00:00.0000000Z",
+                "StartDate": "2026-07-15T14:51:37.6240000Z"
+              }
+            },
+            {
+              "AvailabilityId": "9PSBQDRB982Q",
+              "Actions": [
+                "License",
+                "Browse",
+                "Details"
+              ],
+              "RemediationRequired": null,
+              "Markets": [
+                "BR"
+              ],
+              "OrderManagementData": {
+                "Price": {
+                  "CurrencyCode": "USD",
+                  "IsPIRequired": false,
+                  "ListPrice": 0.0,
+                  "MSRP": 0.0,
+                  "TaxType": "",
+                  "WholesaleCurrencyCode": ""
+                }
+              },
+              "Conditions": {
+                "EndDate": "2027-03-16T10:00:00.0000000Z",
+                "StartDate": "2026-07-15T14:51:37.6240000Z"
+              }
+            },
+            {
+              "AvailabilityId": "9N8B4TZ8KKZN",
+              "Actions": [
+                "License",
+                "Details"
+              ],
+              "RemediationRequired": null,
+              "Markets": [
+                "BR"
+              ],
+              "OrderManagementData": {
+                "Price": {
+                  "CurrencyCode": "USD",
+                  "IsPIRequired": false,
+                  "ListPrice": 0.0,
+                  "MSRP": 0.0,
+                  "TaxType": "",
+                  "WholesaleCurrencyCode": ""
+                }
+              },
+              "Conditions": {
+                "EndDate": "9998-12-30T00:00:00.0000000Z",
+                "StartDate": "1753-01-01T00:00:00.0000000Z"
+              }
+            }
+          ]
+        },
+        {
+          "Sku": {
+            "SkuId": "0011",
+            "SkuType": "trial",
+            "Properties": {
+              "IsPreOrder": false
+            }
+          },
+          "Availabilities": [
+            {
+              "AvailabilityId": "9WCWXS397XN5",
+              "Actions": [
+                "Details",
+                "Fulfill",
+                "Purchase"
+              ],
+              "RemediationRequired": null,
+              "Markets": [
+                "BR"
+              ],
+              "OrderManagementData": {
+                "Price": {
+                  "CurrencyCode": "BRL",
+                  "IsPIRequired": false,
+                  "ListPrice": 0.0,
+                  "MSRP": 0.0,
+                  "TaxType": "SalesTax",
+                  "WholesaleCurrencyCode": ""
+                }
+              },
+              "Conditions": {
+                "EndDate": "9998-12-30T00:00:00.0000000Z",
+                "StartDate": "2025-03-18T16:00:00.0000000Z"
+              }
+            },
+            {
+              "AvailabilityId": "9QXZJNWDWK2L",
+              "Actions": [
+                "License",
+                "Details"
+              ],
+              "RemediationRequired": null,
+              "Markets": [
+                "BR"
+              ],
+              "OrderManagementData": {
+                "Price": {
+                  "CurrencyCode": "USD",
+                  "IsPIRequired": false,
+                  "ListPrice": 0.0,
+                  "MSRP": 0.0,
+                  "TaxType": "",
+                  "WholesaleCurrencyCode": ""
+                }
+              },
+              "Conditions": {
+                "EndDate": "9998-12-30T00:00:00.0000000Z",
+                "StartDate": "1753-01-01T00:00:00.0000000Z"
+              }
+            },
+            {
+              "AvailabilityId": "9N0J0CFN47M9",
+              "Actions": [
+                "License",
+                "Details"
+              ],
+              "RemediationRequired": null,
+              "Markets": [
+                "BR"
+              ],
+              "OrderManagementData": {
+                "Price": {
+                  "CurrencyCode": "USD",
+                  "IsPIRequired": false,
+                  "ListPrice": 0.0,
+                  "MSRP": 0.0,
+                  "TaxType": "",
+                  "WholesaleCurrencyCode": ""
+                }
+              },
+              "Conditions": {
+                "EndDate": "9998-12-30T00:00:00.0000000Z",
+                "StartDate": "2025-03-18T16:00:00.0000000Z"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "ProductId": "9DISCOUNT0001",
+      "ProductType": "Game",
+      "ProductFamily": "Games",
+      "LastModifiedDate": "2026-09-01T00:00:00.0000000Z",
+      "LocalizedProperties": [
+        {
+          "DeveloperName": "Estudio Teste",
+          "PublisherName": "Editora Teste",
+          "PublisherWebsiteUri": "https://exemplo.com/",
+          "ProductTitle": "Jogo Em Promocao",
+          "ShortTitle": "",
+          "ShortDescription": "Um jogo de teste com desconto.",
+          "Language": "pt",
+          "Images": [
+            {
+              "ImagePurpose": "BoxArt",
+              "Uri": "//store-images.s-microsoft.com/image/boxart.promo",
+              "Height": 1080,
+              "Width": 1080
+            },
+            {
+              "ImagePurpose": "SuperHeroArt",
+              "Uri": "//store-images.s-microsoft.com/image/hero.promo",
+              "Height": 1080,
+              "Width": 1920
+            },
+            {
+              "ImagePurpose": "Screenshot",
+              "Uri": "//store-images.s-microsoft.com/image/ss1.promo",
+              "Height": 1080,
+              "Width": 1920
+            }
+          ],
+          "Videos": []
+        }
+      ],
+      "MarketProperties": [
+        {
+          "OriginalReleaseDate": "2024-05-01T00:00:00.0000000Z",
+          "MinimumUserAge": 10,
+          "Markets": [
+            "BR"
+          ],
+          "ContentRatings": [
+            {
+              "RatingSystem": "DJCTQ",
+              "RatingId": "DJCTQ:12",
+              "RatingDescriptors": [
+                "DJCTQ:Vio",
+                "DJCTQ:Dru"
+              ]
+            }
+          ],
+          "UsageData": [
+            {
+              "AggregateTimeSpan": "7Days",
+              "AverageRating": 4.1,
+              "RatingCount": 12
+            },
+            {
+              "AggregateTimeSpan": "30Days",
+              "AverageRating": 4.0,
+              "RatingCount": 55
+            },
+            {
+              "AggregateTimeSpan": "AllTime",
+              "AverageRating": 4.2,
+              "RatingCount": 830
+            }
+          ]
+        }
+      ],
+      "Properties": {
+        "Category": "Role playing",
+        "Categories": [
+          "Role playing",
+          "Strategy"
+        ],
+        "Subcategory": null,
+        "Attributes": [
+          {
+            "Name": "SinglePlayer"
+          },
+          {
+            "Name": "Capability4k"
+          },
+          {
+            "Name": "XblAchievements"
+          },
+          {
+            "Name": "XblCloudSaves"
+          }
+        ],
+        "XboxLiveGoldRequired": false
+      },
+      "DisplaySkuAvailabilities": [
+        {
+          "Sku": {
+            "SkuId": "0010",
+            "SkuType": "full",
+            "Properties": {
+              "IsPreOrder": false
+            }
+          },
+          "Availabilities": [
+            {
+              "AvailabilityId": "B_PROMO_RETAIL",
+              "Actions": [
+                "Details",
+                "Purchase",
+                "Browse"
+              ],
+              "RemediationRequired": null,
+              "Markets": [
+                "BR"
+              ],
+              "OrderManagementData": {
+                "Price": {
+                  "CurrencyCode": "BRL",
+                  "ListPrice": 49.99,
+                  "MSRP": 99.99
+                }
+              },
+              "Conditions": {
+                "EndDate": "2027-01-01T00:00:00.0000000Z",
+                "StartDate": "2026-01-01T00:00:00.0000000Z"
+              }
+            },
+            {
+              "AvailabilityId": "B_PROMO_GP",
+              "Actions": [
+                "Details",
+                "Purchase"
+              ],
+              "RemediationRequired": true,
+              "Markets": [
+                "BR"
+              ],
+              "OrderManagementData": {
+                "Price": {
+                  "CurrencyCode": "BRL",
+                  "ListPrice": 0.0,
+                  "MSRP": 0.0
+                }
+              },
+              "Conditions": {
+                "EndDate": "2027-01-01T00:00:00.0000000Z",
+                "StartDate": "2026-01-01T00:00:00.0000000Z"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "ProductId": "9FREEGAME0001",
+      "ProductType": "Game",
+      "ProductFamily": "Games",
+      "LastModifiedDate": "2026-09-01T00:00:00.0000000Z",
+      "LocalizedProperties": [
+        {
+          "DeveloperName": "Estudio Gratis",
+          "PublisherName": "Editora Gratis",
+          "PublisherWebsiteUri": "",
+          "ProductTitle": "Jogo Gratuito",
+          "ShortTitle": "",
+          "ShortDescription": "Um jogo free-to-play de teste.",
+          "Language": "pt",
+          "Images": [
+            {
+              "ImagePurpose": "Poster",
+              "Uri": "//store-images.s-microsoft.com/image/poster.free",
+              "Height": 2160,
+              "Width": 1440
+            }
+          ],
+          "Videos": []
+        }
+      ],
+      "MarketProperties": [
+        {
+          "OriginalReleaseDate": "2023-01-01T00:00:00.0000000Z",
+          "MinimumUserAge": 12,
+          "Markets": [
+            "BR"
+          ],
+          "ContentRatings": [],
+          "UsageData": []
+        }
+      ],
+      "Properties": {
+        "Category": "Shooter",
+        "Categories": [
+          "Shooter"
+        ],
+        "Subcategory": null,
+        "Attributes": [
+          {
+            "Name": "XblOnlineMultiPlayer"
+          },
+          {
+            "Name": "XblCrossPlatformMultiPlayer"
+          }
+        ],
+        "XboxLiveGoldRequired": false
+      },
+      "DisplaySkuAvailabilities": [
+        {
+          "Sku": {
+            "SkuId": "0010",
+            "SkuType": "full",
+            "Properties": {
+              "IsPreOrder": false
+            }
+          },
+          "Availabilities": [
+            {
+              "AvailabilityId": "B_FREE_RETAIL",
+              "Actions": [
+                "Details",
+                "Purchase",
+                "Browse",
+                "Fulfill"
+              ],
+              "RemediationRequired": null,
+              "Markets": [
+                "BR"
+              ],
+              "OrderManagementData": {
+                "Price": {
+                  "CurrencyCode": "BRL",
+                  "ListPrice": 0.0,
+                  "MSRP": 0.0
+                }
+              },
+              "Conditions": {
+                "EndDate": "2027-01-01T00:00:00.0000000Z",
+                "StartDate": "2026-01-01T00:00:00.0000000Z"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

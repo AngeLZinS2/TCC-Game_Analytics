@@ -40,6 +40,7 @@ import {
   Sparkline,
 } from "@views/componentes/hud";
 import { EstatisticasConfrontos } from "@views/componentes/EstatisticasConfrontos";
+import { useEhMobile } from "@models/hooks/media";
 import { paraCartaoPartida } from "@views/componentes/CartaoConfronto";
 import {
   SeletorModoConfrontos,
@@ -155,7 +156,12 @@ export function PartidasPagina({
   const [modoHistorico, setModoHistorico] = useModoConfrontos(
     "playdb:dota-partidas-modo",
   );
-  const [porPagina, setPorPagina] = useState(25);
+  // 5 por página no celular, 25/20 no desktop (só o valor inicial depende da tela).
+  const ehMobile = useEhMobile();
+  const [porPagina, setPorPagina] = useState(() => (ehMobile ? 5 : 25));
+  const [porPaginaConfrontos, setPorPaginaConfrontos] = useState(() =>
+    ehMobile ? 5 : 20,
+  );
 
   const desde = useMemo(() => {
     if (periodo === null) return undefined;
@@ -169,7 +175,13 @@ export function PartidasPagina({
   // O calendario decidido existe para os 14 jogos; `dim_partida`, so para
   // Dota 2. Por isso este hook nao depende dos filtros da tabela abaixo -
   // eles falam de partida com detalhe, que os outros jogos nao tem.
-  const confrontos = useConfrontos(jogo, paginaConfrontos);
+  // `+ 1`: uma linha extra pra saber se há próxima página (o endpoint não
+  // devolve total).
+  const confrontos = useConfrontos(
+    jogo,
+    paginaConfrontos,
+    porPaginaConfrontos + 1,
+  );
   const resumoConfrontos = useResumoConfrontos(jogo);
   const agenda = useAgendaPartidas(jogo);
   // Zero aqui nao e "sem dado": e "a fonte deste jogo nao publica partida,
@@ -188,7 +200,7 @@ export function PartidasPagina({
 
   // Qualquer troca de filtro volta para a primeira pagina - continuar na pagina
   // 7 de um recorte novo mostraria uma tela vazia sem explicacao.
-  useEffect(() => setPaginaConfrontos(1), [jogo]);
+  useEffect(() => setPaginaConfrontos(1), [jogo, porPaginaConfrontos]);
   useEffect(() => setPagina(1), [jogo, liga, modo, periodo, busca, porPagina]);
 
   const online = saude.data?.status === "ok";
@@ -576,7 +588,9 @@ export function PartidasPagina({
         meta={
           <div className="flex flex-wrap items-center gap-space-sm">
             <SeletorModoConfrontos modo={modoConfrontos} aoMudar={setModoConfrontos} />
-            <Selo>{confrontos.data?.length ?? 0} em tela</Selo>
+            <Selo>
+              {Math.min(confrontos.data?.length ?? 0, porPaginaConfrontos)} em tela
+            </Selo>
           </div>
         }
       >
@@ -585,32 +599,26 @@ export function PartidasPagina({
           altura={200}
           vazio="Nenhum confronto decidido no calendário deste jogo."
         >
-          {(lista) => (
-            <>
-              <VisaoConfrontos confrontos={lista} modo={modoConfrontos} />
-              <div className="flex items-center justify-between gap-space-sm pt-space-sm">
-                <Botao
-                  icone="chevron_left"
-                  aoClicar={() => setPaginaConfrontos((p) => Math.max(1, p - 1))}
-                  desabilitado={paginaConfrontos === 1}
-                >
-                  Anteriores
-                </Botao>
-                <span className="font-badge-status text-badge-status uppercase tracking-wider text-outline">
-                  página {paginaConfrontos}
-                </span>
-                <Botao
-                  icone="chevron_right"
-                  aoClicar={() => setPaginaConfrontos((p) => p + 1)}
-                  // Sem total no endpoint: a página cheia é o único sinal de
-                  // que pode haver mais. Melhor que inventar uma contagem.
-                  desabilitado={lista.length < 20}
-                >
-                  Seguintes
-                </Botao>
-              </div>
-            </>
-          )}
+          {(lista) => {
+            const naPagina = lista.slice(0, porPaginaConfrontos);
+            const temProxima = lista.length > porPaginaConfrontos;
+            return (
+              <>
+                <VisaoConfrontos confrontos={naPagina} modo={modoConfrontos} />
+                <Paginacao
+                  pagina={paginaConfrontos}
+                  // Sem total no endpoint: a página cheia + 1 é o único sinal
+                  // de que pode haver mais.
+                  totalPaginas={temProxima ? paginaConfrontos + 1 : paginaConfrontos}
+                  porPagina={porPaginaConfrontos}
+                  opcoesPorPagina={[5, 15, 25, 50]}
+                  aoMudarPagina={setPaginaConfrontos}
+                  aoMudarPorPagina={setPorPaginaConfrontos}
+                  resumo={<>{naPagina.length} confrontos nesta página</>}
+                />
+              </>
+            );
+          }}
         </Consulta>
       </Painel>
       )}
@@ -731,6 +739,7 @@ export function PartidasPagina({
           pagina={pagina}
           totalPaginas={totalPaginas}
           porPagina={porPagina}
+          opcoesPorPagina={[5, 15, 25, 50]}
           aoMudarPagina={setPagina}
           aoMudarPorPagina={setPorPagina}
           resumo={

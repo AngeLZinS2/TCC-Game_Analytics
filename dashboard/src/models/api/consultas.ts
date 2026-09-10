@@ -29,7 +29,10 @@ import type {
   ConfrontoResultado,
   DestaquesHome,
   DetalheConfronto,
+  DetalheJogoXbox,
   DetalhePersonagem,
+  FiltrosJogosXbox,
+  JogoXbox,
   PerfilEsporte,
   ResumoConfrontos,
   EquipeConfronto,
@@ -267,7 +270,8 @@ export function useAvaliacoesClassificadas(
         app_id: appId ?? undefined,
         apenas_erros: apenasErros,
         modelo,
-        limite: 20,
+        // A tela pagina no client (10/página); traz um lote maior de uma vez.
+        limite: 120,
       }),
     placeholderData: (anterior) => anterior,
     retry: false,
@@ -532,5 +536,34 @@ export function useColetarJogo() {
         cliente.invalidateQueries({ queryKey: chave });
       }
     },
+  });
+}
+
+// --- Catalogo Xbox (Fase 26) — vitrine de loja ---
+//
+// Sem `refetchInterval`: o coletor roda de 6 em 6 horas e a lista nao muda
+// entre uma coleta e outra. `placeholderData` segura a lista atual enquanto
+// um filtro novo carrega, como no catalogo da Steam.
+
+export function useJogosXbox(filtros: FiltrosJogosXbox = {}) {
+  return useQuery({
+    queryKey: ["xbox", "jogos", filtros],
+    queryFn: () => buscar<JogoXbox[]>("/api/xbox/jogos", { ...filtros }),
+    placeholderData: (anterior) => anterior,
+  });
+}
+
+export function useGenerosXbox() {
+  return useQuery({
+    queryKey: ["xbox", "generos"],
+    queryFn: () => buscar<AgregadoGenero[]>("/api/xbox/generos"),
+  });
+}
+
+export function useJogoXbox(productId?: string) {
+  return useQuery({
+    queryKey: ["xbox", "jogo", productId],
+    queryFn: () => buscar<DetalheJogoXbox>(`/api/xbox/jogos/${productId}`),
+    enabled: !!productId,
   });
 }

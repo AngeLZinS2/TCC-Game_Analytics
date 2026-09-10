@@ -7,7 +7,7 @@
  * gerado - as classes sao as mesmas.
  */
 
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 
 import { useContagem, useEntrarNaTela } from "@models/hooks/animacao";
 import { Icone } from "./base";
@@ -650,11 +650,16 @@ export function Paginacao({
             onChange={(evento) => aoMudarPorPagina(Number(evento.target.value))}
             className="rounded bg-surface-container px-space-xs py-space-xxs font-title-code text-title-code text-on-surface outline-none"
           >
-            {opcoesPorPagina.map((opcao) => (
-              <option key={opcao} value={opcao}>
-                {opcao}
-              </option>
-            ))}
+            {/* `porPagina` sempre entra na lista: um valor fora de
+                `opcoesPorPagina` (ex. um padrao de mobile) faria o <select>
+                controlado exibir a 1ª opcao em vez do valor real. */}
+            {[...new Set([porPagina, ...opcoesPorPagina])]
+              .sort((a, b) => a - b)
+              .map((opcao) => (
+                <option key={opcao} value={opcao}>
+                  {opcao}
+                </option>
+              ))}
           </select>
         </label>
       </div>
@@ -711,6 +716,79 @@ export function Paginacao({
       </div>
     </div>
   );
+}
+
+/**
+ * Alterna a forma de uma lista (Tabela / Cartões / …), com a escolha
+ * persistida por tela. É a generalização do `SeletorModoConfrontos` de
+ * `VisaoConfrontos.tsx` — mesma pílula segmentada — para qualquer conjunto de
+ * modos. O `SeletorModoConfrontos` continua existindo à parte (é específico de
+ * partidas e tem lógica própria); este serve os catálogos e o que vier.
+ */
+export function SeletorModo<M extends string>({
+  modos,
+  valor,
+  aoMudar,
+}: {
+  modos: readonly { id: M; icone: string; rotulo: string }[];
+  valor: M;
+  aoMudar: (modo: M) => void;
+}) {
+  return (
+    <div className="flex items-center rounded bg-surface-container-low p-space-xxs shadow-sm">
+      {modos.map((modo) => (
+        <button
+          key={modo.id}
+          type="button"
+          aria-pressed={valor === modo.id}
+          title={modo.rotulo}
+          onClick={() => aoMudar(modo.id)}
+          className={`flex h-8 items-center gap-space-xxs rounded px-space-sm font-title-code text-title-code transition-colors ${
+            valor === modo.id
+              ? "bg-surface-container-high text-primary shadow-sm"
+              : "text-on-surface-variant hover:text-on-surface"
+          }`}
+        >
+          <Icone nome={modo.icone} className="text-[16px]" />
+          <span className="hidden sm:inline">{modo.rotulo}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * Estado de "modo de exibição" com persistência em `localStorage` — o mesmo
+ * contrato do `useModoConfrontos`, mas genérico no conjunto de valores. Cai no
+ * `padrao` quando o storage está vazio, indisponível ou com um valor que não
+ * está mais na lista.
+ */
+export function useModoPersistente<M extends string>(
+  chave: string,
+  valores: readonly M[],
+  padrao: M,
+): readonly [M, (modo: M) => void] {
+  const [modo, setModo] = useState<M>(() => {
+    try {
+      const guardado = localStorage.getItem(chave);
+      if (guardado && (valores as readonly string[]).includes(guardado)) {
+        return guardado as M;
+      }
+    } catch {
+      /* localStorage indisponível: usa o padrão */
+    }
+    return padrao;
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(chave, modo);
+    } catch {
+      /* ok */
+    }
+  }, [chave, modo]);
+
+  return [modo, setModo] as const;
 }
 
 /**

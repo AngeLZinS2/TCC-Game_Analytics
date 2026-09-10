@@ -20,6 +20,8 @@ export interface ColetaFonte {
 export interface VisaoGeral {
   jogos_steam: number;
   snapshots_steam: number;
+  /** Jogos no catálogo da Xbox Store coletados (mercado BR). */
+  jogos_xbox: number;
   /** Soma do último snapshot dos jogos monitorados — NÃO é o total da Steam. */
   jogadores_simultaneos_total: number | null;
   /** Usuários conectados à Steam agora (número da plataforma, da Valve). */
@@ -193,6 +195,77 @@ export interface AgregadoGenero {
   jogos: number;
   jogadores_simultaneos: number | null;
   nota_avaliacoes_media: Decimal | null;
+}
+
+// ---------------------------------------------------------------------------
+// Catalogo Xbox (Fase 26) — vitrine de loja, sem CCU nem ML
+// ---------------------------------------------------------------------------
+
+export interface JogoXbox {
+  product_id: string;
+  nome: string;
+  tipo: string | null;
+  desenvolvedora: string | null;
+  publicadora: string | null;
+  data_lancamento: string | null;
+  generos: string[];
+  gratuito: boolean | null;
+  preco_no_momento: Decimal | null;
+  preco_normal: Decimal | null;
+  moeda: string | null;
+  desconto_percentual: number | null;
+  /** Está no catálogo do Game Pass agora. */
+  no_game_pass: boolean | null;
+  /** Arte larga (SuperHeroArt), para o topo da ficha. */
+  imagem_header: string | null;
+  /** Arte quadrada (Poster/BoxArt), para a lista. */
+  imagem_capa: string | null;
+  url_loja: string | null;
+  faixa_etaria: number | null;
+  janela_coleta: string | null;
+  /** Descrição curta da loja (ShortDescription). */
+  descricao: string | null;
+  /** Estrela da Microsoft Store, 0–5, desde sempre. */
+  nota: number | null;
+  numero_avaliacoes: number | null;
+  /** Estrela dos últimos 7 dias — o sinal de "como anda a recepção agora". */
+  nota_recente: number | null;
+  /** Recursos em pt-BR: "4K", "HDR", "Co-op online", "Smart Delivery"... */
+  recursos: string[];
+  tem_conquistas: boolean | null;
+  /** Faixa etária declarada ("14", "M", "18"...). */
+  classificacao_etaria: string | null;
+  /** Descritores de conteúdo em pt-BR ("Violência", "Linguagem imprópria"...). */
+  descritores_conteudo: string[];
+}
+
+export interface PontoSerieXbox {
+  janela_coleta: string;
+  preco_no_momento: Decimal | null;
+  preco_normal: Decimal | null;
+  desconto_percentual: number | null;
+  no_game_pass: boolean | null;
+  /** Estrela da loja nessa coleta — satisfação ao longo do tempo. */
+  nota: number | null;
+}
+
+export interface DetalheJogoXbox {
+  jogo: JogoXbox;
+  serie: PontoSerieXbox[];
+  /**
+   * Trailers e capturas da página da loja, no mesmo formato da galeria da
+   * Steam (`MidiaJogo`) — o `CarrosselMidia` é o mesmo componente. Trailer
+   * (HLS) primeiro, capturas depois.
+   */
+  midias: MidiaJogo[];
+}
+
+export interface FiltrosJogosXbox {
+  busca?: string;
+  genero?: string;
+  ordenar_por?: "game_pass" | "nome" | "preco" | "nota";
+  ordem?: "asc" | "desc";
+  limite?: number;
 }
 
 export interface JogoDisponivel {
@@ -428,10 +501,15 @@ export interface ResumoJogador {
   vitorias: number;
   winrate: number;
   kda_medio: number | null;
+  /** Dota: ouro/min. LoL: ouro por jogo (o feed não dá duração confiável). */
   economia_por_minuto_media: number | null;
   /** Heroi mais escolhido pelo jogador, e em quantas partidas. */
   personagem_assinatura: string | null;
   partidas_assinatura: number | null;
+  /** Só LoL (elenco da API oficial): time atual, rota e foto do jogador. */
+  equipe_nome: string | null;
+  papel: string | null;
+  imagem: string | null;
 }
 
 export interface Saude {
@@ -967,6 +1045,19 @@ export interface CandidatoJogo {
   /** `tiny_image` da busca da loja — já é a URL real, com hash. */
   imagem: string | null;
 }
+
+/**
+ * Uma linha do catálogo Steam: as duas procedências que a tela junta.
+ *
+ * `coletado` é um jogo que o pipeline já trouxe (tem telemetria e histórico);
+ * `loja` é um jogo que existe na Steam e ainda não entrou. Um union em vez de
+ * um `JogoSteam` com tudo nulo — preencher as células de telemetria com zero
+ * afirmaria algo falso. Mora aqui (e não em `Steam.tsx`) para o `CartaoJogoSteam`
+ * poder importar sem ciclo.
+ */
+export type LinhaCatalogo =
+  | { tipo: "coletado"; jogo: JogoSteam }
+  | { tipo: "loja"; candidato: CandidatoJogo };
 
 export interface ResumoColeta {
   app_id: number;

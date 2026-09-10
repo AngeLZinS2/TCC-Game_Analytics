@@ -27,6 +27,7 @@ FONTES = (
     "valve-standings",
     "itad",
     "hltb",
+    "xbox",
     "valorant-agentes",
     "opgg-esports",
     "lol-campeoes",
@@ -35,6 +36,7 @@ FONTES = (
     "vlr-rankings",
     "vlr-detalhes",
     "lolesports",
+    "lolesports-cenario",
     "hltv",
     "pandascore-cs",
     "pandascore-lol",
@@ -310,12 +312,18 @@ def _construir_coletor(args: argparse.Namespace, storage):
             settings=settings,
             limite=args.limite_jogos,
             forcar_lookup=args.forcar_lookup,
+            revalidar_vazios_dias=settings.itad_revalidar_vazios_dias,
         )
 
     if args.fonte == "lol-campeoes":
         from services.collectors.lol_campeoes import CampeoesLolCollector
 
         return CampeoesLolCollector(raw_storage=storage)
+
+    if args.fonte == "xbox":
+        from services.collectors.xbox_collector import XboxCollector
+
+        return XboxCollector(raw_storage=storage, settings=settings)
 
     if args.fonte == "dota-herois":
         from services.collectors.dota_herois import HeroisDotaCollector
@@ -346,6 +354,11 @@ def _construir_coletor(args: argparse.Namespace, storage):
         from services.collectors.lolesports import LolEsportsCollector
 
         return LolEsportsCollector(raw_storage=storage)
+
+    if args.fonte == "lolesports-cenario":
+        from services.collectors.lolesports_cenario import LolCenarioCollector
+
+        return LolCenarioCollector(raw_storage=storage)
 
     if args.fonte == "hltv":
         from services.collectors.hltv import HltvCollector
@@ -443,6 +456,10 @@ def _carregador(fonte: str):
         from services.etl.load_hltb import carregar
 
         return carregar
+    if fonte == "xbox":
+        from services.etl.load_xbox import carregar
+
+        return carregar
     if fonte == "valorant-agentes":
         from services.etl.load_valorant import carregar_agentes
 
@@ -457,6 +474,10 @@ def _carregador(fonte: str):
         return carregar
     if fonte == "hltv":
         from services.etl.load_hltv import carregar
+
+        return carregar
+    if fonte == "lolesports-cenario":
+        from services.etl.load_lol_cenario import carregar
 
         return carregar
     if fonte == "ubi-r6":

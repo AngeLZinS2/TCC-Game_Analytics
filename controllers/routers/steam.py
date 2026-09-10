@@ -340,7 +340,9 @@ def listar_jogos(
     coluna = ordenacoes[ordenar_por]
     alvo = desc(coluna) if ordem == "desc" else coluna.asc()
     # nulls_last nas duas direcoes: jogo sem snapshot nunca lidera o ranking.
-    consulta = consulta.order_by(nulls_last(alvo)).limit(limite)
+    # `app_id` como desempate: sem ele a fatia da paginacao client-side "pula"
+    # entre jogos empatados quando o front revalida.
+    consulta = consulta.order_by(nulls_last(alvo), DimJogoSteam.app_id.asc()).limit(limite)
 
     return [
         _montar_jogo(jogo, snapshot, pico, anterior)

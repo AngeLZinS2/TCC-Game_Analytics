@@ -6,9 +6,10 @@
  * com abas de ordenacao e paginacao.
  */
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 
 import { useJogadores, useSaude } from "@models/api/consultas";
+import { usePaginacaoLocal } from "@models/hooks/paginacao";
 import type { ResumoJogador } from "@models/api/tipos";
 import { Botao, Consulta, Icone, Selo } from "@views/componentes/base";
 import {
@@ -42,6 +43,41 @@ const MEDALHAS = ["#ffd700", "#e0e0e0", "#cd7f32"];
 /** Nome do jogador, ou o id quando a fonte anonimizou o participante. */
 function nomeDe(jogador: ResumoJogador): string {
   return jogador.nome ?? `#${jogador.id_jogador}`;
+}
+
+/**
+ * Retrato do jogador — só o LoL traz foto (elenco da API oficial). Sem URL, ou
+ * quando ela falha, cai na inicial, igual à `CapaXbox`.
+ */
+function RetratoJogador({
+  nome,
+  imagem,
+  className = "h-8 w-8 font-title-code text-title-code",
+}: {
+  nome: string;
+  imagem?: string | null;
+  className?: string;
+}) {
+  const [falhou, setFalhou] = useState(false);
+  if (falhou || !imagem) {
+    return (
+      <span
+        className={`flex shrink-0 items-center justify-center rounded-full bg-surface-container-high text-on-surface-variant ${className}`}
+        aria-hidden
+      >
+        {nome.charAt(0).toUpperCase()}
+      </span>
+    );
+  }
+  return (
+    <img
+      src={imagem}
+      alt=""
+      loading="lazy"
+      onError={() => setFalhou(true)}
+      className={`shrink-0 rounded-full bg-surface-container object-cover ${className}`}
+    />
+  );
 }
 
 function valorDe(jogador: ResumoJogador, ordem: Ordenacao): number {
@@ -85,9 +121,11 @@ function CartaoMvp({
       <div className="flex items-start justify-between gap-space-sm">
         <div className="flex min-w-0 items-center gap-space-sm">
           <div className="relative shrink-0">
-            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-surface-container-high font-headline-md text-headline-md text-on-surface-variant shadow-md">
-              {nomeDe(jogador).charAt(0).toUpperCase()}
-            </div>
+            <RetratoJogador
+              nome={nomeDe(jogador)}
+              imagem={jogador.imagem}
+              className="h-14 w-14 font-headline-md text-headline-md shadow-md"
+            />
             <span
               className="absolute -left-1 -top-1 rounded bg-surface-container-highest px-1.5 py-0.5 font-badge-status text-badge-status shadow"
               style={{ color: MEDALHAS[posicao] }}
@@ -118,7 +156,7 @@ function CartaoMvp({
       <div className="grid grid-cols-3 gap-space-xs rounded bg-surface-container-lowest/80 p-space-sm">
         <div className="flex min-w-0 flex-col">
           <span className="font-label-caps text-label-caps uppercase text-outline">
-            Herói assinatura
+            {jogo === "leagueoflegends" ? "Campeão" : "Herói"} assinatura
           </span>
           <span className="truncate font-title-code text-title-code text-on-surface">
             {jogador.personagem_assinatura ?? "—"}
@@ -152,19 +190,23 @@ function CartaoMvp({
 
 export function JogadoresPagina() {
   const { jogo } = useJogoAtual();
+  // LoL traz elenco (foto/rota/time) e o "GPM" na verdade é ouro por jogo — o
+  // feed não dá duração de jogo confiável.
+  const ehLol = jogo === "leagueoflegends";
 
-  const [minPartidas, setMinPartidas] = useState(3);
+  // LoL começa em 0 (mostra o elenco inteiro — partida com stat é rara, o feed
+  // oficial só guarda ~2 semanas). Dota/resto começa em 3.
+  const [minPartidas, setMinPartidas] = useState(
+    jogo === "leagueoflegends" ? 0 : 3,
+  );
   const [ordenacao, setOrdenacao] = useState<Ordenacao>("partidas");
   const [busca, setBusca] = useState("");
-  const [pagina, setPagina] = useState(1);
-  const [porPagina, setPorPagina] = useState(25);
 
-  const jogadores = useJogadores(jogo, minPartidas, 200);
+  // LoL: elenco inteiro (500+); a paginação é no cliente.
+  const jogadores = useJogadores(jogo, minPartidas, ehLol ? 600 : 200);
   const saude = useSaude();
 
   const online = saude.data?.status === "ok";
-
-  useEffect(() => setPagina(1), [jogo, minPartidas, ordenacao, busca, porPagina]);
 
   const ordenados = useMemo(() => {
     const lista = (jogadores.data ?? []).filter((jogador) =>
@@ -173,8 +215,11 @@ export function JogadoresPagina() {
     return [...lista].sort((a, b) => valorDe(b, ordenacao) - valorDe(a, ordenacao));
   }, [jogadores.data, ordenacao, busca]);
 
-  const totalPaginas = Math.max(1, Math.ceil(ordenados.length / porPagina));
-  const daPagina = ordenados.slice((pagina - 1) * porPagina, pagina * porPagina);
+  // 5 por página no celular, 25 no desktop (o leitor troca).
+  const pag = usePaginacaoLocal(ordenados, {
+    porPaginaInicial: { mobile: 5, desktop: 25 },
+    chaveReset: `${jogo}|${minPartidas}|${ordenacao}|${busca}`,
+  });
 
   // O podio segue a ordenacao escolhida: "os tres melhores" depende de por qual
   // metrica se esta olhando, e travar em volume contradiria a aba ativa.
@@ -217,25 +262,25 @@ export function JogadoresPagina() {
           </div>
 
           <p className="font-body-sm text-body-sm text-on-surface-variant">
-            Cada linha agrega o fato por jogador. Partidas em que a API anonimiza o
-            participante geram fato sem jogador — o KDA continua analisável, mas elas não
-            aparecem aqui.
+            {ehLol
+              ? "Cada linha agrega os stats por jogo (K/D/A, ouro, CS) das partidas da cena que foram coletadas — o feed oficial guarda ~2 semanas, então o histórico cresce com o tempo."
+              : "Cada linha agrega o fato por jogador. Partidas em que a API anonimiza o participante geram fato sem jogador — o KDA continua analisável, mas elas não aparecem aqui."}
           </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-space-sm">
           <label className={LABEL_CAMPO}>
             <span className="font-label-caps text-label-caps uppercase tracking-widest text-outline">
-              Mín. partidas
+              {ehLol ? "Mín. jogos" : "Mín. partidas"}
             </span>
             <select
               value={minPartidas}
               onChange={(evento) => setMinPartidas(Number(evento.target.value))}
               className={CAMPO}
             >
-              {[1, 3, 5, 10].map((valor) => (
+              {(ehLol ? [0, 1, 3, 5, 10] : [1, 3, 5, 10]).map((valor) => (
                 <option key={valor} value={valor}>
-                  {valor}
+                  {valor === 0 ? "Todos" : valor}
                 </option>
               ))}
             </select>
@@ -283,7 +328,7 @@ export function JogadoresPagina() {
             <section className="grid grid-cols-1 gap-space-base md:grid-cols-2 xl:grid-cols-4">
               <KpiHud
                 etiqueta="Jogadores no recorte"
-                canto={`MÍN. ${minPartidas}`}
+                canto={minPartidas === 0 ? "ELENCO TODO" : `MÍN. ${minPartidas}`}
                 valor={fmtNumero(lista.length)}
                 valorNumerico={lista.length}
                 formatarValor={fmtNumero}
@@ -332,7 +377,7 @@ export function JogadoresPagina() {
               </KpiHud>
 
               <KpiHud
-                etiqueta="Heróis assinatura"
+                etiqueta={ehLol ? "Campeões assinatura" : "Heróis assinatura"}
                 canto="DIVERSIDADE"
                 valor={fmtNumero(
                   new Set(
@@ -345,7 +390,7 @@ export function JogadoresPagina() {
                   ).size
                 }
                 formatarValor={fmtNumero}
-                rotulo="Heróis distintos como principal"
+                rotulo={`${ehLol ? "Campeões" : "Heróis"} distintos como principal`}
                 acento="primaria"
                 notaVariacao="entre os jogadores do recorte"
               />
@@ -397,7 +442,7 @@ export function JogadoresPagina() {
       >
         <Consulta estado={jogadores} vazio="Nenhum jogador atinge esse mínimo.">
           {() =>
-            daPagina.length === 0 ? (
+            pag.fatia.length === 0 ? (
               <p className="rounded bg-surface-container px-space-base py-space-md font-body-md text-body-md text-on-surface-variant">
                 Nenhum jogador bate com a busca.
               </p>
@@ -408,18 +453,22 @@ export function JogadoresPagina() {
                     <tr className="bg-surface-container font-label-caps text-label-caps uppercase tracking-wider text-outline">
                       <th className="px-space-md py-space-sm">#</th>
                       <th className="px-space-md py-space-sm">Jogador</th>
-                      <th className="px-space-md py-space-sm">Herói assinatura</th>
+                      <th className="px-space-md py-space-sm">
+                        {ehLol ? "Campeão assinatura" : "Herói assinatura"}
+                      </th>
                       <th className="px-space-md py-space-sm text-right">Partidas</th>
                       <th className="px-space-md py-space-sm text-right">Vitórias</th>
                       <th className="px-space-md py-space-sm">Winrate</th>
                       <th className="px-space-md py-space-sm text-right">KDA</th>
-                      <th className="px-space-md py-space-sm text-right">GPM</th>
+                      <th className="px-space-md py-space-sm text-right">
+                        {ehLol ? "Ouro/jogo" : "GPM"}
+                      </th>
                     </tr>
                   </thead>
 
                   <tbody className="font-body-md text-body-sm">
-                    {daPagina.map((jogador, indice) => {
-                      const posicao = (pagina - 1) * porPagina + indice;
+                    {pag.fatia.map((jogador, indice) => {
+                      const posicao = (pag.pagina - 1) * pag.porPagina + indice;
                       return (
                         <tr
                           key={jogador.id_jogador}
@@ -438,15 +487,27 @@ export function JogadoresPagina() {
 
                           <td className="px-space-md py-space-sm">
                             <div className="flex items-center gap-space-sm">
-                              <span
-                                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-surface-container-high font-title-code text-title-code text-on-surface-variant"
-                                aria-hidden
-                              >
-                                {nomeDe(jogador).charAt(0).toUpperCase()}
-                              </span>
-                              <span className="font-headline-sm text-headline-sm text-on-surface">
-                                {nomeDe(jogador)}
-                              </span>
+                              <RetratoJogador
+                                nome={nomeDe(jogador)}
+                                imagem={jogador.imagem}
+                              />
+                              <div className="flex min-w-0 flex-col">
+                                <span className="flex items-center gap-space-xs">
+                                  <span className="truncate font-headline-sm text-headline-sm text-on-surface">
+                                    {nomeDe(jogador)}
+                                  </span>
+                                  {jogador.papel && (
+                                    <span className="shrink-0 rounded bg-surface-container px-space-xxs py-[1px] font-badge-status text-badge-status uppercase text-secondary">
+                                      {jogador.papel}
+                                    </span>
+                                  )}
+                                </span>
+                                {jogador.equipe_nome && (
+                                  <span className="truncate font-label-caps text-label-caps text-outline">
+                                    {jogador.equipe_nome}
+                                  </span>
+                                )}
+                              </div>
                             </div>
                           </td>
 
@@ -503,11 +564,12 @@ export function JogadoresPagina() {
         </Consulta>
 
         <Paginacao
-          pagina={pagina}
-          totalPaginas={totalPaginas}
-          porPagina={porPagina}
-          aoMudarPagina={setPagina}
-          aoMudarPorPagina={setPorPagina}
+          pagina={pag.pagina}
+          totalPaginas={pag.totalPaginas}
+          porPagina={pag.porPagina}
+          opcoesPorPagina={[5, 15, 25, 50]}
+          aoMudarPagina={pag.setPagina}
+          aoMudarPorPagina={pag.setPorPagina}
           resumo={<>{fmtNumero(ordenados.length)} jogadores no recorte</>}
         />
       </Painel>

@@ -129,11 +129,16 @@ export function SeletorDeJogo({
           top-full (sem gap) e da o respiro visual por dentro da propria area
           hoveravel, nao por fora dela. */}
       {aberto && (
-        <div className="absolute left-0 top-full z-30 w-max pt-space-xs">
+        // No celular o painel tem largura fixa que cabe na tela (a linha de
+        // contagem — "161 partidas · 28 equipes · …" — o esticava pra fora, e a
+        // raiz do app é `overflow-x-clip`, então cortava em vez de rolar). As
+        // ~11rem reservadas cobrem o "E-SPORTS ›" + o gap antes do botão (medido
+        // ~154px). No desktop volta a ser `w-max` (largura do conteúdo).
+        <div className="absolute left-0 top-full z-30 w-[min(20rem,calc(100vw-11rem))] pt-space-xs sm:w-max sm:max-w-none">
           <div
             role="listbox"
             aria-label="Selecionar jogo"
-            className="rolagem-discreta flex max-h-80 min-w-52 flex-col gap-space-xxs overflow-y-auto rounded-lg border border-outline-variant/30 bg-surface-container-low p-space-xs shadow-2xl"
+            className="rolagem-discreta flex max-h-80 w-full min-w-0 max-w-full flex-col gap-space-xxs overflow-y-auto rounded-lg border border-outline-variant/30 bg-surface-container-low p-space-xs shadow-2xl sm:min-w-52"
           >
             {listados.map((jogo) => {
               const podeEscolher = disponivel(jogo);
@@ -151,7 +156,7 @@ export function SeletorDeJogo({
                     setAberto(false);
                   }}
                   className={[
-                    "flex flex-col items-start gap-0.5 rounded px-space-sm py-space-xs text-left transition-colors",
+                    "flex w-full min-w-0 flex-col items-start gap-0.5 rounded px-space-sm py-space-xs text-left transition-colors",
                     !podeEscolher
                       ? "cursor-not-allowed opacity-50"
                       : ativo
@@ -159,7 +164,7 @@ export function SeletorDeJogo({
                         : "hover:bg-surface-container-high",
                   ].join(" ")}
                 >
-                  <span className="flex items-center gap-space-xs font-title-code text-title-code text-on-surface">
+                  <span className="flex w-full min-w-0 items-center gap-space-xs font-title-code text-title-code text-on-surface">
                     <span
                       className="h-2 w-2 shrink-0 rounded-full"
                       style={{ background: corDoJogo(jogo.codigo) }}
@@ -167,7 +172,7 @@ export function SeletorDeJogo({
                     />
                     <span className="truncate">{jogo.nome}</span>
                   </span>
-                  <span className="pl-[16px] font-label-caps text-label-caps text-outline">
+                  <span className="w-full truncate pl-[16px] font-label-caps text-label-caps text-outline">
                     {podeEscolher ? oQueTem(jogo) : SEM_DADO}
                   </span>
                 </button>

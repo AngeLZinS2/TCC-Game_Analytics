@@ -86,6 +86,22 @@ export function corDoJogo(codigo: string | null | undefined): string {
   return (codigo && CORES_JOGO[codigo]) || TOKENS.primaria;
 }
 
+/**
+ * Cor estavel de um genero, por hash do nome.
+ *
+ * O desenho pinta os chips de genero em cores diferentes. Como a lista de
+ * generos vem da coleta e nao de uma constante, a cor sai de um hash: "RPG" e
+ * sempre da mesma cor, sem um mapa mantido a mao a cada genero novo. Usado
+ * pelos catalogos Steam e Xbox (lista e cartao).
+ */
+export function corDoGenero(genero: string): string {
+  let hash = 0;
+  for (let i = 0; i < genero.length; i += 1) {
+    hash = (hash * 31 + genero.charCodeAt(i)) | 0;
+  }
+  return PALETA_SERIES[Math.abs(hash) % PALETA_SERIES.length];
+}
+
 /** Cor de um valor de winrate em relacao a linha de 50%. */
 export function corDoWinrate(winrate: number): string {
   if (winrate > 50) return PALETA_POLOS.positivo;

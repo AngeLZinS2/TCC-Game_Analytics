@@ -14,6 +14,7 @@ from views.schemas import ColetaFonte, VisaoGeral
 from models.models import (
     DimJogador,
     DimJogoSteam,
+    DimJogoXbox,
     DimPartida,
     DimPersonagem,
     FatoPartidaJogador,
@@ -77,6 +78,7 @@ def visao_geral(sessao: Session = Depends(get_db)) -> VisaoGeral:
     return VisaoGeral(
         jogos_steam=contar(DimJogoSteam),
         snapshots_steam=contar(FatoSnapshotJogoSteam),
+        jogos_xbox=contar(DimJogoXbox),
         jogadores_simultaneos_total=(
             int(jogadores_simultaneos) if jogadores_simultaneos is not None else None
         ),

@@ -364,7 +364,11 @@ def _coletar_precos(settings: Settings, storage: RawStorage) -> CollectionResult
     """Preco dos jogos pagos nas outras lojas (IsThereAnyDeal)."""
     from services.collectors.itad_collector import ItadCollector
 
-    coletor = ItadCollector(raw_storage=storage, settings=settings)
+    coletor = ItadCollector(
+        raw_storage=storage,
+        settings=settings,
+        revalidar_vazios_dias=settings.itad_revalidar_vazios_dias,
+    )
     try:
         return coletor.run(carregar=True)
     finally:
@@ -376,6 +380,17 @@ def _coletar_tempo_jogo(settings: Settings, storage: RawStorage) -> CollectionRe
     from services.collectors.hltb_collector import HltbCollector
 
     coletor = HltbCollector(raw_storage=storage, settings=settings)
+    try:
+        return coletor.run(carregar=True)
+    finally:
+        coletor.close()
+
+
+def _coletar_xbox(settings: Settings, storage: RawStorage) -> CollectionResult:
+    """Catalogo do Game Pass + ficha/preco da Microsoft Store (mercado BR)."""
+    from services.collectors.xbox_collector import XboxCollector
+
+    coletor = XboxCollector(raw_storage=storage, settings=settings)
     try:
         return coletor.run(carregar=True)
     finally:
@@ -564,6 +579,15 @@ def _coletar_lolesports(settings: Settings, storage: RawStorage) -> CollectionRe
     return LolEsportsCollector(raw_storage=storage).run(carregar=True)
 
 
+def _coletar_lolesports_cenario(
+    settings: Settings, storage: RawStorage
+) -> CollectionResult:
+    """Classificacao por split (LCK/LPL/LEC...) e elencos, da API oficial de LoL."""
+    from services.collectors.lolesports_cenario import LolCenarioCollector
+
+    return LolCenarioCollector(raw_storage=storage).run(carregar=True)
+
+
 #: Minimo de confrontos decididos para valer a pena reajustar um jogo.
 #:
 #: O mesmo piso que `ml.confronto.ajustar_e_salvar` exige - abaixo dele ele
@@ -695,6 +719,14 @@ def montar_tarefas(settings: Settings) -> list[Tarefa]:
                 executar=_coletar_tempo_jogo,
             )
         )
+    if settings.xbox_enabled:
+        tarefas.append(
+            Tarefa(
+                nome="xbox",
+                intervalo_segundos=settings.agendador_xbox_minutos * 60,
+                executar=_coletar_xbox,
+            )
+        )
     if settings.opgg_enabled:
         tarefas.append(
             Tarefa(
@@ -793,6 +825,13 @@ def montar_tarefas(settings: Settings) -> list[Tarefa]:
             nome="lolesports",
             intervalo_segundos=settings.agendador_lolesports_minutos * 60,
             executar=_coletar_lolesports,
+        )
+    )
+    tarefas.append(
+        Tarefa(
+            nome="lol_cenario",
+            intervalo_segundos=settings.agendador_lolesports_cenario_minutos * 60,
+            executar=_coletar_lolesports_cenario,
         )
     )
     tarefas.append(

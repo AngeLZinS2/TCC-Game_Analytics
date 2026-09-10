@@ -5,8 +5,9 @@ import { NavInferior } from "@views/layout/NavInferior";
 import { TrilhoLateral } from "@views/layout/TrilhoLateral";
 import { ProvedorJogo } from "@views/layout/JogoAtual";
 import { VisaoGeralPagina } from "./paginas/VisaoGeral";
-import { SteamPagina } from "./paginas/Steam";
+import { CatalogoLayout } from "./paginas/catalogo/CatalogoLayout";
 import { JogoSteamPagina } from "./paginas/JogoSteam";
+import { JogoXboxPagina } from "./paginas/JogoXbox";
 import { HeroiDetalhePagina } from "./paginas/HeroiDetalhe";
 import { PartidaPagina } from "./paginas/Partida";
 import { RecomendacoesReviewsPagina } from "./paginas/RecomendacoesReviews";
@@ -47,8 +48,18 @@ export function App() {
         <main className="space-y-space-xl px-space-base pb-[calc(3.5rem+env(safe-area-inset-bottom)+1rem)] pt-[calc(4rem+1.25rem)] sm:px-space-lg md:pb-space-3xl md:pt-[calc(4rem+1.5rem)] lg:pl-[calc(15rem+1.25rem)]">
           <Routes>
             <Route path="/" element={<VisaoGeralPagina />} />
-            <Route path="/steam" element={<SteamPagina />} />
+
+            {/* Catálogo de Jogos: a loja é o segmento da rota; as telas de
+                detalhe continuam soltas, fora das abas. `/steam` redireciona
+                (não quebra a landing `/mobile.html` nem links salvos). */}
+            <Route
+              path="/catalogo"
+              element={<Navigate to="/catalogo/steam" replace />}
+            />
+            <Route path="/catalogo/:loja" element={<CatalogoLayout />} />
+            <Route path="/steam" element={<Navigate to="/catalogo/steam" replace />} />
             <Route path="/steam/:appId" element={<JogoSteamPagina />} />
+            <Route path="/xbox/:productId" element={<JogoXboxPagina />} />
 
             {/* Area E-Sports: jogo no 1o segmento, sub-aba no 2o. */}
             <Route path="/esports" element={<EsportsSemAba />} />

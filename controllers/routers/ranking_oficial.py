@@ -43,6 +43,7 @@ FONTES = {
     ),
     "rlcs": ("RLCS (blast.tv)", "https://blast.tv/rl/leaderboard"),
     "dltv": ("DLTV World Ranking", "https://dltv.org/ranking"),
+    "lolesports": ("LoL Esports (oficial)", "https://lolesports.com/standings"),
 }
 
 #: Nome de exibicao e ORDEM das regioes. Uma regiao fora deste mapa ainda
@@ -62,6 +63,17 @@ REGIOES = {
     "sub-saharan-africa": "África Subsaariana",
     "la-s": "LATAM Sul",
     "la-n": "LATAM Norte",
+    # LoL Esports — splits regionais (a fonte publica V-D, não rating).
+    "lck": "LCK (Coreia)",
+    "lpl": "LPL (China)",
+    "lec": "LEC (Europa)",
+    "lta-north": "LTA Norte",
+    "lta-south": "LTA Sul",
+    "cblol": "CBLOL (Brasil)",
+    "ljl": "LJL (Japão)",
+    "lcp": "LCP (Ásia-Pacífico)",
+    "nacl": "NACL (Américas)",
+    "international": "Internacional",
     "global": "Global",
 }
 
@@ -116,6 +128,8 @@ def ranking_oficial(
             RankingExterno.posicao,
             RankingExterno.equipe_nome,
             RankingExterno.pontos,
+            RankingExterno.vitorias,
+            RankingExterno.derrotas,
             RankingExterno.fonte,
             RankingExterno.id_equipe,
             DimEquipe.tag,
@@ -147,6 +161,8 @@ def ranking_oficial(
                 tag=linha.tag,
                 logo_url=linha.logo_url,
                 pontos=linha.pontos,
+                vitorias=linha.vitorias,
+                derrotas=linha.derrotas,
             )
         )
 

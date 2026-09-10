@@ -27,6 +27,7 @@ from controllers.routers import (
     ranking_oficial,
     sentimento,
     steam,
+    xbox,
 )
 from config import get_settings
 from models.session import get_engine
@@ -60,6 +61,7 @@ app.add_middleware(
 app.include_router(meta.router)
 app.include_router(steam.router)
 app.include_router(catalogo.router)
+app.include_router(xbox.router)
 app.include_router(dota.router)
 app.include_router(sentimento.router)
 app.include_router(confronto.router)

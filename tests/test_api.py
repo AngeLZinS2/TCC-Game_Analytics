@@ -41,7 +41,7 @@ def test_visao_geral_traz_os_dois_dominios(cliente: TestClient) -> None:
     assert resposta.status_code == 200
 
     corpo = resposta.json()
-    for campo in ("jogos_steam", "snapshots_steam", "partidas", "jogadores"):
+    for campo in ("jogos_steam", "snapshots_steam", "jogos_xbox", "partidas", "jogadores"):
         assert isinstance(corpo[campo], int)
     assert isinstance(corpo["coletas"], list)
 
@@ -69,6 +69,92 @@ def test_ordenacao_por_jogadores_e_decrescente(cliente: TestClient) -> None:
 
 def test_jogo_inexistente_da_404(cliente: TestClient) -> None:
     assert cliente.get("/api/steam/jogos/1").status_code == 404
+
+
+# --- Catalogo Xbox --------------------------------------------------------
+
+
+def test_xbox_lista_de_jogos_tem_a_forma_da_vitrine(cliente: TestClient) -> None:
+    corpo = cliente.get("/api/xbox/jogos", params={"limite": 5}).json()
+    assert isinstance(corpo, list)
+    if not corpo:
+        pytest.skip("catalogo Xbox vazio")
+
+    jogo = corpo[0]
+    for campo in (
+        "product_id", "nome", "generos", "no_game_pass",
+        "nota", "recursos", "tem_conquistas",
+    ):
+        assert campo in jogo
+    assert isinstance(jogo["generos"], list)
+    assert isinstance(jogo["recursos"], list)
+
+
+def test_xbox_detalhe_traz_serie_e_midias(cliente: TestClient) -> None:
+    lista = cliente.get("/api/xbox/jogos", params={"limite": 1}).json()
+    if not lista:
+        pytest.skip("catalogo Xbox vazio")
+    corpo = cliente.get(f"/api/xbox/jogos/{lista[0]['product_id']}").json()
+    assert set(corpo) >= {"jogo", "serie", "midias"}
+    assert isinstance(corpo["serie"], list) and isinstance(corpo["midias"], list)
+
+
+def test_xbox_ordenar_por_game_pass_poe_os_incluidos_no_topo(cliente: TestClient) -> None:
+    corpo = cliente.get(
+        "/api/xbox/jogos", params={"ordenar_por": "game_pass", "limite": 50}
+    ).json()
+    if len(corpo) < 2:
+        pytest.skip("catalogo Xbox insuficiente")
+    flags = [1 if j["no_game_pass"] else 0 for j in corpo]
+    assert flags == sorted(flags, reverse=True)
+
+
+def test_xbox_generos_e_uma_lista(cliente: TestClient) -> None:
+    resposta = cliente.get("/api/xbox/generos")
+    assert resposta.status_code == 200
+    assert isinstance(resposta.json(), list)
+
+
+def test_xbox_produto_inexistente_da_404(cliente: TestClient) -> None:
+    assert cliente.get("/api/xbox/jogos/NAOEXISTE").status_code == 404
+
+
+def test_xbox_jogos_ordem_estavel_entre_chamadas(cliente: TestClient) -> None:
+    """Duas chamadas identicas devem devolver a MESMA sequencia - a paginacao
+    client-side depende disso (o desempate por `product_id` no order_by)."""
+    def ids() -> list[str]:
+        return [
+            j["product_id"]
+            for j in cliente.get("/api/xbox/jogos", params={"limite": 500}).json()
+        ]
+
+    primeira = ids()
+    if len(primeira) < 2:
+        pytest.skip("catalogo Xbox insuficiente")
+    assert primeira == ids()
+
+
+def test_steam_jogos_ordem_estavel_entre_chamadas(cliente: TestClient) -> None:
+    def ids() -> list[int]:
+        return [
+            j["app_id"]
+            for j in cliente.get("/api/steam/jogos", params={"limite": 500}).json()
+        ]
+
+    primeira = ids()
+    if len(primeira) < 2:
+        pytest.skip("catalogo Steam insuficiente")
+    assert primeira == ids()
+
+
+def test_avaliacoes_aceita_limite_alto(cliente: TestClient) -> None:
+    resposta = cliente.get(
+        "/api/ml/sentimento/avaliacoes", params={"limite": 300}
+    )
+    if resposta.status_code == 503:
+        pytest.skip("modelo de sentimento nao treinado")
+    assert resposta.status_code == 200
+    assert isinstance(resposta.json(), list)
 
 
 def test_jogo_desconhecido_da_404(cliente: TestClient) -> None:
@@ -441,3 +527,42 @@ def test_home_destaques_tem_o_contrato_da_home(cliente: TestClient) -> None:
         # É um `ConfrontoAoVivo` mais a probabilidade — o velocímetro precisa dela.
         assert 0.0 <= destaque["probabilidade_a"] <= 1.0
         assert destaque["jogo"] and destaque["equipe_a_nome"] and destaque["equipe_b_nome"]
+
+
+# --- LoL Esports: ranking oficial + aba Jogadores -----------------------
+
+
+def test_ranking_oficial_lol_expoe_vitorias_e_derrotas(cliente: TestClient) -> None:
+    """A classificacao de LoL (LCK/LPL/LEC...) publica V-D por split, nao um
+    rating. Quando ha snapshot, cada equipe traz as chaves `vitorias`/`derrotas`
+    que a coluna V-D da tela le."""
+    resposta = cliente.get(
+        "/api/esports/ranking-oficial", params={"jogo": "leagueoflegends"}
+    )
+    if resposta.status_code == 404:
+        pytest.skip("nenhum snapshot de ranking de LoL coletado")
+    assert resposta.status_code == 200
+
+    corpo = resposta.json()
+    assert corpo["regioes"]
+    for regiao in corpo["regioes"]:
+        for equipe in regiao["equipes"]:
+            assert "vitorias" in equipe and "derrotas" in equipe
+
+
+def test_jogadores_lol_trazem_elenco_no_contrato(cliente: TestClient) -> None:
+    """A aba Jogadores de LoL agrega `fato_lol_jogador_partida` e anexa o elenco
+    (time/rota/foto) — as chaves `equipe_nome`/`papel`/`imagem` do card."""
+    resposta = cliente.get(
+        "/api/partidas/jogadores",
+        params={"jogo": "leagueoflegends", "min_partidas": 1, "limite": 5},
+    )
+    assert resposta.status_code == 200
+    corpo = resposta.json()
+    assert isinstance(corpo, list)
+    if not corpo:
+        pytest.skip("sem stats de jogador de LoL coletados")
+    for jogador in corpo:
+        for campo in ("equipe_nome", "papel", "imagem"):
+            assert campo in jogador
+        assert isinstance(jogador["partidas"], int)

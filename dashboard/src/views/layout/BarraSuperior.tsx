@@ -52,12 +52,21 @@ function useTituloDaRota(): string {
   const { pathname } = useLocation();
 
   if (pathname.startsWith("/steam/")) return "Detalhe do Jogo";
+  if (pathname.startsWith("/xbox/")) return "Detalhe do Jogo";
   if (pathname.startsWith("/partidas/")) return "Detalhe da Partida";
   if (pathname.startsWith("/herois/")) return "Detalhe do Heroi";
   if (pathname.startsWith("/esports/")) {
     const aba = pathname.split("/")[3];
     const sufixo = aba && ABAS_ESPORTS[aba] ? ` · ${ABAS_ESPORTS[aba]}` : "";
     return `E-Sports${sufixo}`;
+  }
+  if (pathname.startsWith("/catalogo")) {
+    const loja = pathname.split("/")[2];
+    const nome = ({ steam: "Steam", playstation: "PlayStation", xbox: "Xbox" } as Record<
+      string,
+      string
+    >)[loja ?? ""];
+    return nome ? `Catálogo · ${nome}` : "Catálogo de Jogos";
   }
 
   const item = NAVEGACAO.find((i) => i.rota === pathname);

@@ -30,14 +30,16 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from typing import Any, Sequence
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import and_, func, or_, select, text
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from services.collectors.base import BaseCollector, RawRecord
 from services.collectors.http_client import RateLimitedClient
 from config import get_settings
-from models.models import AgendaPartida, DimJogo
+from models.models import AgendaPartida, DimJogador, DimJogo, FatoLolJogadorPartida
 from models.session import session_scope
 from services.etl.load_liquipedia import normalizar
+from services.etl.lotes import em_lotes
 
 logger = logging.getLogger(__name__)
 
@@ -49,6 +51,18 @@ CHAVE_API = "0TvQnueqKa5mxJntVWt0w4LpLfEkrV1Ta8rQBb9Z"
 ESPORTS_API = "https://esports-api.lolesports.com/persisted/gw"
 FEED = "https://feed.lolesports.com/livestats/v1"
 
+#: Ligas cujo calendário completo o `getSchedule` (só perto de agora) não cobre —
+#: usadas para montar o índice de casamento das partidas decididas no backfill,
+#: e para o `lolesports_cenario` puxar classificação/elenco.
+LIGAS_TIER1 = frozenset(
+    {
+        "worlds", "msi", "first_stand",
+        "lck", "lpl", "lec", "lcs", "lta_n", "lta_s", "lta_north", "lta_south",
+        "lcp", "ljl", "ljl-japan", "cblol", "cblol-brazil", "nacl",
+        "nlc", "lfl", "superliga", "tcl", "vcs", "pcs", "emea_masters",
+    }
+)
+
 #: Janela em torno de "agora" onde uma partida pode estar ao vivo. O feed é
 #: ao vivo, então não adianta olhar mais longe do que isso.
 JANELA_ANTES = timedelta(hours=8)
@@ -58,6 +72,22 @@ JANELA_DEPOIS = timedelta(minutes=30)
 #: window por jogo em andamento); o normal é 0-2 partidas ao vivo.
 POR_RODADA = 8
 
+#: Backfill de partidas JÁ decididas — o `feed.lolesports.com/livestats` guarda
+#: o histórico de frames por ~1-2 semanas, então dá pra pegar o frame final
+#: (K/D/A/ouro/CS reais) de partidas recentes que a gente não flagrou ao vivo.
+#: 20/rodada: a cena tem ~130 partidas decididas na janela e o coletor roda de
+#: 5 em 5 min — a 5/rodada levaria horas; a 20 fecha o backlog em ~30 min.
+POR_RODADA_BACKFILL = 20
+BACKFILL_JANELA = timedelta(days=12)
+
+#: O índice de partidas encerradas (getLeagues + getTournamentsForLeague +
+#: getCompletedEvents) é caro — dezenas de chamadas. Cacheado no processo.
+_TTL_INDICE_COMPLETOS = timedelta(hours=1)
+_indice_completos_cache: dict[str, Any] = {}
+
+#: literal JSONB `[]` pra usar em `coalesce` no filtro de candidatos.
+_JSONB_VAZIO = text("'[]'::jsonb")
+
 _PAPEL_ORDEM = {"top": 0, "jungle": 1, "mid": 2, "bottom": 3, "support": 4}
 
 
@@ -65,6 +95,7 @@ _PAPEL_ORDEM = {"top": 0, "jungle": 1, "mid": 2, "bottom": 3, "support": 4}
 class DetalheLol:
     id_agenda: int
     detalhe: dict[str, Any]
+    backfill: bool = False
 
 
 @dataclass
@@ -127,6 +158,48 @@ class LolEsportsCollector(BaseCollector[ResultadoLolEsports]):
             ).all()
         return [(r[0], r[1], r[2], r[3]) for r in linhas]
 
+    def _candidatos_backfill(self) -> list[tuple[int, str, str, datetime]]:
+        """Partidas de LoL já decididas, recentes, ainda sem scoreboard por
+        jogador — pra puxar o frame final do feed (que guarda ~1-2 semanas)."""
+        agora = datetime.now(timezone.utc)
+        tem_mapas = (
+            func.jsonb_array_length(
+                func.coalesce(AgendaPartida.detalhe["mapas"], _JSONB_VAZIO)
+            )
+            > 0
+        )
+        # `detalhe ? 'lol_backfill_em'` — já tentamos (e não veio dado / não deu
+        # pra casar); não insiste toda rodada.
+        ja_carimbada = AgendaPartida.detalhe.has_key("lol_backfill_em")  # noqa: W601
+        decidida = or_(
+            AgendaPartida.vitoria_a.is_not(None),
+            AgendaPartida.placar_a.is_not(None),
+        )
+        with session_scope() as sessao:
+            linhas = sessao.execute(
+                select(
+                    AgendaPartida.id,
+                    AgendaPartida.equipe_a_nome,
+                    AgendaPartida.equipe_b_nome,
+                    AgendaPartida.inicio_previsto,
+                )
+                .join(DimJogo, DimJogo.id_jogo == AgendaPartida.id_jogo)
+                .where(
+                    DimJogo.codigo == JOGO,
+                    AgendaPartida.inicio_previsto.between(
+                        agora - BACKFILL_JANELA, agora - timedelta(minutes=45)
+                    ),
+                    decidida,
+                    or_(
+                        AgendaPartida.detalhe.is_(None),
+                        and_(func.not_(tem_mapas), func.not_(ja_carimbada)),
+                    ),
+                )
+                .order_by(AgendaPartida.inicio_previsto.desc())
+                .limit(POR_RODADA_BACKFILL)
+            ).all()
+        return [(r[0], r[1], r[2], r[3]) for r in linhas]
+
     # -- casamento com a lolesports ---------------------------------------
 
     @staticmethod
@@ -169,69 +242,175 @@ class LolEsportsCollector(BaseCollector[ResultadoLolEsports]):
     # -- coleta ------------------------------------------------------------
 
     def collect(self) -> list[RawRecord]:
-        candidatos = self._candidatos()
-        if not candidatos:
+        ao_vivo = self._candidatos()
+        backfill = self._candidatos_backfill()
+        if not ao_vivo and not backfill:
             return []
 
         cliente = self._cliente()
         registros: list[RawRecord] = []
         try:
-            agenda = cliente.get_json(
-                f"{ESPORTS_API}/getSchedule",
-                params={"hl": "en-US"},
-                headers={"x-api-key": CHAVE_API},
-            )
-            eventos = (
-                (agenda or {}).get("data", {}).get("schedule", {}).get("events", [])
-            )
-            indice = self._indice_schedule(eventos)
-
-            for id_agenda, nome_a, nome_b, inicio in candidatos:
-                match_id = self._achar_match_id(indice, nome_a, nome_b, inicio)
-                if match_id is None:
-                    continue
-                try:
-                    evento = cliente.get_json(
-                        f"{ESPORTS_API}/getEventDetails",
-                        params={"hl": "en-US", "id": match_id},
-                        headers={"x-api-key": CHAVE_API},
-                    )
-                except Exception as exc:  # noqa: BLE001
-                    self.logger.warning(
-                        "getEventDetails falhou",
-                        extra={"match_id": match_id, "erro": str(exc)},
-                    )
-                    continue
-
-                dados_evento = (evento or {}).get("data", {}).get("event") or {}
-                jogos = ((dados_evento.get("match") or {}).get("games")) or []
-                janelas: dict[str, Any] = {}
-                for jogo in jogos:
-                    if jogo.get("state") not in ("inProgress", "completed"):
-                        continue
-                    gid = jogo.get("id")
-                    if not gid:
-                        continue
-                    janela = _buscar_janela(cliente, gid)
-                    if janela is not None:
-                        janelas[gid] = janela
-
-                registros.append(
-                    RawRecord(
-                        fonte=self.fonte,
-                        endpoint="/match",
-                        identificador=str(id_agenda),
-                        payload={
-                            "nome_a": nome_a,
-                            "nome_b": nome_b,
-                            "evento": dados_evento,
-                            "janelas": janelas,
-                        },
-                    )
+            if ao_vivo:
+                agenda = cliente.get_json(
+                    f"{ESPORTS_API}/getSchedule",
+                    params={"hl": "en-US"},
+                    headers={"x-api-key": CHAVE_API},
                 )
+                eventos = (
+                    (agenda or {})
+                    .get("data", {})
+                    .get("schedule", {})
+                    .get("events", [])
+                )
+                indice = self._indice_schedule(eventos)
+                for id_agenda, nome_a, nome_b, inicio in ao_vivo:
+                    reg = self._coletar_match(
+                        cliente, indice, id_agenda, nome_a, nome_b, inicio, False
+                    )
+                    if reg is not None:
+                        registros.append(reg)
+
+            if backfill:
+                indice_c = self._indice_completos(cliente)
+                for id_agenda, nome_a, nome_b, inicio in backfill:
+                    reg = self._coletar_match(
+                        cliente, indice_c, id_agenda, nome_a, nome_b, inicio, True
+                    )
+                    registros.append(
+                        reg
+                        if reg is not None
+                        else RawRecord(
+                            fonte=self.fonte,
+                            endpoint="/match-backfill",
+                            identificador=str(id_agenda),
+                            payload={"sem_dados": True},
+                        )
+                    )
         finally:
             cliente.close()
         return registros
+
+    def _coletar_match(
+        self,
+        cliente: RateLimitedClient,
+        indice: dict[Any, dict[str, Any]],
+        id_agenda: int,
+        nome_a: str,
+        nome_b: str,
+        inicio: datetime,
+        backfill: bool,
+    ) -> RawRecord | None:
+        match_id = self._achar_match_id(indice, nome_a, nome_b, inicio)
+        if match_id is None:
+            return None
+        try:
+            evento = cliente.get_json(
+                f"{ESPORTS_API}/getEventDetails",
+                params={"hl": "en-US", "id": match_id},
+                headers={"x-api-key": CHAVE_API},
+            )
+        except Exception as exc:  # noqa: BLE001
+            self.logger.warning(
+                "getEventDetails falhou",
+                extra={"match_id": match_id, "erro": str(exc)},
+            )
+            return None
+
+        dados_evento = (evento or {}).get("data", {}).get("event") or {}
+        jogos = ((dados_evento.get("match") or {}).get("games")) or []
+        if inicio.tzinfo is None:
+            inicio = inicio.replace(tzinfo=timezone.utc)
+        janelas: dict[str, Any] = {}
+        for jogo in jogos:
+            gid = jogo.get("id")
+            if not gid:
+                continue
+            if backfill:
+                if jogo.get("state") != "completed":
+                    continue
+                janela = _frame_final(
+                    cliente, gid, inicio, jogo.get("number") or 1
+                )
+            else:
+                if jogo.get("state") not in ("inProgress", "completed"):
+                    continue
+                janela = _buscar_janela(cliente, gid)
+            if janela is not None:
+                janelas[gid] = janela
+
+        if backfill and not janelas:
+            return None
+        return RawRecord(
+            fonte=self.fonte,
+            endpoint="/match-backfill" if backfill else "/match",
+            identificador=str(id_agenda),
+            payload={
+                "nome_a": nome_a,
+                "nome_b": nome_b,
+                "evento": dados_evento,
+                "janelas": janelas,
+            },
+        )
+
+    def _indice_completos(
+        self, cliente: RateLimitedClient
+    ) -> dict[Any, dict[str, Any]]:
+        """`{(par de times normalizados, dia) -> evento}` das partidas já
+        encerradas das ligas tier 1. Caro de montar — cacheado 1h no processo."""
+        agora = datetime.now(timezone.utc)
+        cache = _indice_completos_cache
+        if cache.get("indice") is not None and agora - cache["em"] < _TTL_INDICE_COMPLETOS:
+            return cache["indice"]
+
+        indice: dict[Any, dict[str, Any]] = {}
+        try:
+            ligas_resp = cliente.get_json(
+                f"{ESPORTS_API}/getLeagues",
+                params={"hl": "en-US"},
+                headers={"x-api-key": CHAVE_API},
+            )
+        except Exception as exc:  # noqa: BLE001
+            self.logger.warning("getLeagues (backfill) falhou", extra={"erro": str(exc)})
+            return cache.get("indice") or {}
+
+        limite_torneio = (agora.date() - timedelta(days=20)).isoformat()
+        for liga in (ligas_resp or {}).get("data", {}).get("leagues") or []:
+            if (liga.get("slug") or "").lower() not in LIGAS_TIER1:
+                continue
+            try:
+                tresp = cliente.get_json(
+                    f"{ESPORTS_API}/getTournamentsForLeague",
+                    params={"hl": "en-US", "leagueId": liga.get("id")},
+                    headers={"x-api-key": CHAVE_API},
+                )
+            except Exception:  # noqa: BLE001
+                continue
+            ligas_t = (tresp or {}).get("data", {}).get("leagues") or []
+            torneios = ligas_t[0].get("tournaments") if ligas_t else []
+            for t in torneios or []:
+                tid = t.get("id")
+                if not tid or (t.get("endDate") or "") < limite_torneio:
+                    continue
+                try:
+                    cresp = cliente.get_json(
+                        f"{ESPORTS_API}/getCompletedEvents",
+                        params={"hl": "en-US", "tournamentId": tid},
+                        headers={"x-api-key": CHAVE_API},
+                    )
+                except Exception:  # noqa: BLE001
+                    continue
+                eventos = (
+                    (cresp or {})
+                    .get("data", {})
+                    .get("schedule", {})
+                    .get("events", [])
+                ) or []
+                for chave, ev in self._indice_schedule(eventos).items():
+                    indice.setdefault(chave, ev)
+
+        cache["indice"] = indice
+        cache["em"] = agora
+        return indice
 
     # -- parse -----------------------------------------------------------
 
@@ -240,6 +419,14 @@ class LolEsportsCollector(BaseCollector[ResultadoLolEsports]):
         for registro in registros:
             if not isinstance(registro.payload, dict):
                 continue
+            backfill = registro.endpoint == "/match-backfill"
+            if registro.payload.get("sem_dados"):
+                # partida de backfill sem dado na lolesports — só carimba pra
+                # não tentar de novo toda rodada.
+                itens.append(
+                    DetalheLol(int(registro.identificador), {}, backfill=True)
+                )
+                continue
             detalhe = _montar_detalhe(
                 registro.payload.get("evento") or {},
                 registro.payload.get("janelas") or {},
@@ -247,33 +434,65 @@ class LolEsportsCollector(BaseCollector[ResultadoLolEsports]):
                 registro.payload.get("nome_b") or "",
             )
             if detalhe and (detalhe.get("mapas") or detalhe.get("mapas_resultado")):
-                itens.append(DetalheLol(int(registro.identificador), detalhe))
+                itens.append(
+                    DetalheLol(int(registro.identificador), detalhe, backfill=backfill)
+                )
+            elif backfill:
+                itens.append(
+                    DetalheLol(int(registro.identificador), {}, backfill=True)
+                )
         return ResultadoLolEsports(itens=itens)
 
     def load(self, dados: ResultadoLolEsports) -> int:
         if not dados.itens:
             return 0
+        agora_iso = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        linhas_fato: list[tuple[int, dict[str, Any]]] = []
+        atualizadas = 0
         with session_scope() as sessao:
             for item in dados.itens:
-                # Preserva os canais que outra fonte (PandaScore) já tinha
-                # gravado, quando a lolesports não trouxe os seus.
                 existente = sessao.execute(
                     select(AgendaPartida.detalhe).where(
                         AgendaPartida.id == item.id_agenda
                     )
                 ).scalar()
-                novo = dict(item.detalhe)
-                if not novo.get("streams") and (existente or {}).get("streams"):
-                    novo["streams"] = existente["streams"]
+
+                if item.backfill:
+                    novo = dict(existente or {})
+                    gerado = item.detalhe or {}
+                    if gerado.get("mapas"):
+                        novo["mapas"] = gerado["mapas"]
+                    if not novo.get("mapas_resultado") and gerado.get("mapas_resultado"):
+                        novo["mapas_resultado"] = gerado["mapas_resultado"]
+                    if not novo.get("placar_serie") and gerado.get("placar_serie"):
+                        novo["placar_serie"] = gerado["placar_serie"]
+                    novo.setdefault("fonte", gerado.get("fonte") or "lolesports")
+                    if not novo.get("status") and gerado.get("status"):
+                        novo["status"] = gerado["status"]
+                    novo["lol_backfill_em"] = agora_iso
+                else:
+                    # Preserva os canais que outra fonte (PandaScore) já tinha
+                    # gravado, quando a lolesports não trouxe os seus.
+                    novo = dict(item.detalhe)
+                    if not novo.get("streams") and (existente or {}).get("streams"):
+                        novo["streams"] = existente["streams"]
+
                 sessao.execute(
                     AgendaPartida.__table__.update()
                     .where(AgendaPartida.id == item.id_agenda)
                     .values(detalhe=novo)
                 )
+                atualizadas += 1
+                for linha in _linhas_fato(novo):
+                    linhas_fato.append((item.id_agenda, linha))
+
+            gravadas = _gravar_fato_jogador(sessao, linhas_fato)
+
         logger.info(
-            "detalhe ao vivo de LoL carregado", extra={"partidas": len(dados.itens)}
+            "detalhe de LoL carregado",
+            extra={"partidas": atualizadas, "linhas_jogador": gravadas},
         )
-        return len(dados.itens)
+        return atualizadas
 
 
 # ---------------------------------------------------------------------------
@@ -301,6 +520,39 @@ def _buscar_janela(cliente: RateLimitedClient, gid: str) -> dict[str, Any] | Non
             continue
         frames = (dados or {}).get("frames") or []
         if frames:
+            return dados
+    return None
+
+
+def _frame_final(
+    cliente: RateLimitedClient,
+    gid: str,
+    inicio_match: datetime,
+    jogo_numero: int,
+) -> dict[str, Any] | None:
+    """O frame FINAL de um jogo já encerrado. O feed guarda o histórico por
+    ~1-2 semanas; pedindo `startingTime` perto do fim provável do jogo ele
+    devolve a janela terminando no frame de pós-jogo (K/D/A/ouro reais)."""
+    teto = datetime.now(timezone.utc).replace(microsecond=0) - timedelta(seconds=20)
+    base = inicio_match + timedelta(minutes=(jogo_numero - 1) * 50 + 45)
+    for extra in (timedelta(0), timedelta(minutes=25), timedelta(minutes=50)):
+        alvo = min(base + extra, teto)
+        alvo = alvo.replace(second=alvo.second - alvo.second % 10)
+        try:
+            dados = cliente.get_json(
+                f"{FEED}/window/{gid}",
+                params={"startingTime": alvo.strftime("%Y-%m-%dT%H:%M:%SZ")},
+            )
+        except Exception:  # noqa: BLE001
+            continue
+        frames = (dados or {}).get("frames") or []
+        if not frames:
+            continue
+        ultimo = frames[-1]
+        ouro = ((ultimo.get("blueTeam") or {}).get("totalGold")) or 0
+        if ouro <= 0:
+            continue
+        if ultimo.get("gameState") == "finished" or extra == timedelta(minutes=50):
             return dados
     return None
 
@@ -402,6 +654,8 @@ def _montar_detalhe(
                 mapas.append(
                     {
                         "nome": f"Jogo {posicao}" if posicao else "Jogo",
+                        "posicao": posicao,
+                        "time_a": rotulo_a,
                         "duracao": None,
                         "placar_a": time_frame_a.get("totalKills"),
                         "placar_b": time_frame_b.get("totalKills"),
@@ -528,6 +782,7 @@ def _jogadores(
         saida.append(
             {
                 "nome": pm.get("summonerName") or "",
+                "id_externo": pm.get("esportsPlayerId"),
                 "time": nome_time,
                 "papel": pm.get("role"),
                 "campeao": pm.get("championId"),
@@ -541,3 +796,119 @@ def _jogadores(
         )
     saida.sort(key=lambda j: _PAPEL_ORDEM.get((j.get("papel") or "").lower(), 9))
     return saida
+
+
+# ---------------------------------------------------------------------------
+# fato_lol_jogador_partida — scoreboard por jogador/jogo
+# ---------------------------------------------------------------------------
+
+
+def _linhas_fato(detalhe: dict[str, Any]) -> list[dict[str, Any]]:
+    """Extrai as linhas por jogador dos `mapas` do detalhe, só dos jogos já
+    encerrados. `vitoria` sai do `mapas_resultado` (que quando vem da
+    PandaScore já traz o vencedor real de cada jogo)."""
+    vit_por_pos: dict[int, bool] = {}
+    status_por_pos: dict[int, str | None] = {}
+    for mr in detalhe.get("mapas_resultado") or []:
+        pos = mr.get("posicao")
+        if pos is None:
+            continue
+        status_por_pos[pos] = mr.get("status")
+        if mr.get("vitoria_a") is not None:
+            vit_por_pos[pos] = bool(mr["vitoria_a"])
+
+    linhas: list[dict[str, Any]] = []
+    for mapa in detalhe.get("mapas") or []:
+        pos = mapa.get("posicao")
+        if not pos:
+            continue
+        if status_por_pos.get(pos, "encerrado") != "encerrado":
+            continue
+        time_a = mapa.get("time_a")
+        vit_a = vit_por_pos.get(pos)
+        for j in mapa.get("jogadores") or []:
+            ext = j.get("id_externo")
+            if not ext:
+                continue
+            vitoria: bool | None = None
+            if vit_a is not None and time_a is not None:
+                vitoria = vit_a if j.get("time") == time_a else (not vit_a)
+            campeao = j.get("campeao")
+            linhas.append(
+                {
+                    "id_externo": str(ext),
+                    "jogo_numero": int(pos),
+                    "campeao": (str(campeao)[:48] if campeao else None),
+                    "k": j.get("k"),
+                    "d": j.get("d"),
+                    "a": j.get("a"),
+                    "cs": j.get("cs"),
+                    "ouro": j.get("ouro"),
+                    "nivel": j.get("nivel"),
+                    "vitoria": vitoria,
+                }
+            )
+    return linhas
+
+
+def _gravar_fato_jogador(
+    sessao, linhas: list[tuple[int, dict[str, Any]]]
+) -> int:
+    if not linhas:
+        return 0
+    id_jogo = sessao.scalar(select(DimJogo.id_jogo).where(DimJogo.codigo == JOGO))
+    if id_jogo is None:
+        return 0
+    externos = {linha["id_externo"] for _, linha in linhas}
+    mapa_jogador = {
+        ext: idj
+        for idj, ext in sessao.execute(
+            select(DimJogador.id_jogador, DimJogador.id_externo).where(
+                DimJogador.id_jogo == id_jogo,
+                DimJogador.id_externo.in_(externos),
+            )
+        )
+    }
+    agora = datetime.now(timezone.utc)
+    registros: list[dict[str, Any]] = []
+    for id_agenda, linha in linhas:
+        id_jogador = mapa_jogador.get(linha["id_externo"])
+        if id_jogador is None:
+            continue
+        registros.append(
+            {
+                "id_jogador": id_jogador,
+                "id_agenda": id_agenda,
+                "jogo_numero": linha["jogo_numero"],
+                "campeao": linha["campeao"],
+                "k": linha["k"],
+                "d": linha["d"],
+                "a": linha["a"],
+                "cs": linha["cs"],
+                "ouro": linha["ouro"],
+                "nivel": linha["nivel"],
+                "vitoria": linha["vitoria"],
+                "coletado_em": agora,
+            }
+        )
+    if not registros:
+        return 0
+    for lote in em_lotes(registros):
+        stmt = pg_insert(FatoLolJogadorPartida).values(lote)
+        sessao.execute(
+            stmt.on_conflict_do_update(
+                constraint="uq_lol_jgp",
+                set_={
+                    "campeao": stmt.excluded.campeao,
+                    "k": stmt.excluded.k,
+                    "d": stmt.excluded.d,
+                    "a": stmt.excluded.a,
+                    "cs": stmt.excluded.cs,
+                    "ouro": stmt.excluded.ouro,
+                    "nivel": stmt.excluded.nivel,
+                    "vitoria": stmt.excluded.vitoria,
+                    "coletado_em": stmt.excluded.coletado_em,
+                },
+            )
+        )
+    return len(registros)

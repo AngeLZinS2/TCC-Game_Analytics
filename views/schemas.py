@@ -29,6 +29,8 @@ class VisaoGeral(BaseModel):
 
     jogos_steam: int
     snapshots_steam: int
+    #: Jogos no catalogo Xbox (vitrine da aba "Xbox"). 0 ate a 1a coleta.
+    jogos_xbox: int = 0
     #: Soma do ultimo snapshot dos jogos monitorados. NAO e o total da Steam -
     #: mantido para "cobertura da nossa coleta", nao como headline.
     jogadores_simultaneos_total: int | None
@@ -261,8 +263,75 @@ class DetalheJogoSteam(BaseModel):
 class AgregadoGenero(BaseModel):
     genero: str
     jogos: int
-    jogadores_simultaneos: int | None
-    nota_avaliacoes_media: Decimal | None
+    #: Steam preenche; no catalogo Xbox ficam nulos (a fonte nao publica CCU).
+    jogadores_simultaneos: int | None = None
+    nota_avaliacoes_media: Decimal | None = None
+
+
+# ---------------------------------------------------------------------------
+# Catalogo Xbox (Game Pass + Microsoft Store) - vitrine de loja
+# ---------------------------------------------------------------------------
+
+
+class JogoXbox(BaseModel):
+    """Dimensao + o snapshot mais recente, achatados para a tabela da vitrine.
+
+    Raso de proposito: a Microsoft nao publica CCU nem texto de avaliacao em
+    API gratuita, entao nao ha `jogadores_simultaneos` nem `nota_avaliacoes`.
+    """
+
+    product_id: str
+    nome: str
+    tipo: str | None = None
+    desenvolvedora: str | None = None
+    publicadora: str | None = None
+    data_lancamento: date | None = None
+    generos: list[str] = Field(default_factory=list)
+    gratuito: bool | None = None
+    faixa_etaria: int | None = None
+
+    imagem_header: str | None = None
+    imagem_capa: str | None = None
+    url_loja: str | None = None
+    descricao: str | None = None
+
+    #: Estrela da Microsoft Store (0.0-5.0). O unico sinal de "gostaram?" que a
+    #: API gratuita da - `nota_recente` e a media dos ultimos 7 dias.
+    nota: Decimal | None = None
+    numero_avaliacoes: int | None = None
+    nota_recente: Decimal | None = None
+    #: Recursos ja traduzidos ("4K", "Co-op online"...).
+    recursos: list[str] = Field(default_factory=list)
+    #: O jogo tem conquistas? (a lista exige conta Xbox Live - so o sim/nao).
+    tem_conquistas: bool | None = None
+    classificacao_etaria: str | None = None
+    descritores_conteudo: list[str] = Field(default_factory=list)
+
+    janela_coleta: datetime | None = None
+    preco_no_momento: Decimal | None = None
+    preco_normal: Decimal | None = None
+    moeda: str | None = None
+    desconto_percentual: int | None = None
+    #: O jogo esta no catalogo do Game Pass agora?
+    no_game_pass: bool | None = None
+
+
+class PontoSerieXbox(BaseModel):
+    """Um ponto da serie temporal de um jogo do Xbox (preco, Game Pass, nota)."""
+
+    janela_coleta: datetime
+    preco_no_momento: Decimal | None = None
+    preco_normal: Decimal | None = None
+    desconto_percentual: int | None = None
+    no_game_pass: bool | None = None
+    nota: Decimal | None = None
+
+
+class DetalheJogoXbox(BaseModel):
+    jogo: JogoXbox
+    serie: list[PontoSerieXbox] = []
+    #: Capturas e trailers da ficha - so na tela de detalhe.
+    midias: list[dict] = Field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------
@@ -595,6 +664,10 @@ class ResumoJogador(BaseModel):
     #: Heroi mais escolhido pelo jogador, e em quantas partidas.
     personagem_assinatura: str | None = None
     partidas_assinatura: int | None = None
+    #: Elenco profissional (hoje so LoL Esports): time, rota e foto do jogador.
+    equipe_nome: str | None = None
+    papel: str | None = None
+    imagem: str | None = None
 
 
 

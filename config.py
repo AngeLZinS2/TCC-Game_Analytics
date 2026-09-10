@@ -159,12 +159,13 @@ class Settings(BaseSettings):
 
     #: Intervalo entre coletas de preco (IsThereAnyDeal), em minutos.
     #:
-    #: A cada 3h pega o inicio e o fim de uma promo sem atraso perceptivel. O
-    #: jogo recem-buscado nao espera por isso - o `/api/steam/coletar` ja puxa
-    #: o preco na hora; a rodada em lote e so para manter os jogos ja no banco
-    #: atualizados. Sao ~2 chamadas por rodada, longe do limite do ITAD
-    #: (1000 / 5 min). Sem `itad_api_key` a tarefa nem e agendada.
-    agendador_precos_minutos: int = Field(default=180, ge=15)
+    #: A cada 1h pega inicio e fim de promo sem atraso perceptivel. O jogo
+    #: recem-buscado nao espera por isso - o `/api/steam/coletar` ja puxa o
+    #: preco na hora; a rodada em lote e so para manter os jogos ja no banco
+    #: atualizados. Sao ~2 chamadas por lote de 200 jogos (os `lookup` de jogo
+    #: ja conhecido nao vao a rede), longe do limite do ITAD (1000 / 5 min).
+    #: Sem `itad_api_key` a tarefa nem e agendada.
+    agendador_precos_minutos: int = Field(default=60, ge=15)
 
     #: Coletar uma vez logo que o agendador sobe, em vez de esperar o intervalo.
     #:
@@ -184,6 +185,10 @@ class Settings(BaseSettings):
     #: Segundos entre chamadas. O limite deles e 1000 / 5 min; 0.4s da folga
     #: enorme e ainda cobre centenas de jogos numa rodada.
     itad_rate_limit_seconds: float = Field(default=0.4, gt=0)
+    #: Jogo marcado como "nao existe no ITAD" (`itad_id=""`) volta pra fila de
+    #: lookup depois desse tempo - pre-venda (ex.: Battlefield 6) que so foi
+    #: catalogada no ITAD semanas depois do cadastro na Steam.
+    itad_revalidar_vazios_dias: int = Field(default=14, ge=1)
 
     # --- Tempo pra zerar (HowLongToBeat) ---
     #: Sem API oficial nem chave - da pra desligar aqui se um dia o endpoint
@@ -252,6 +257,11 @@ class Settings(BaseSettings):
     #: coletor só olha as partidas perto do horário (0-2 por vez), mas o
     #: placar/farm anda rápido durante o jogo.
     agendador_lolesports_minutos: int = Field(default=5, ge=3)
+
+    #: Intervalo do snapshot de cenario de LoL (classificacao por split +
+    #: elencos, via `getStandings`/`getTeams` da API oficial). Dado estavel:
+    #: a tabela do split muda no maximo uma vez por dia de jogo. 12h.
+    agendador_lolesports_cenario_minutos: int = Field(default=720, ge=60)
 
     #: Intervalo entre reajustes da previsao de confronto, em minutos.
     #:
@@ -334,6 +344,28 @@ class Settings(BaseSettings):
 
     steam_country: str = "br"
     steam_language: str = "english"
+
+    # --- Catalogo Xbox (Game Pass + Microsoft Store) ---
+    #: Kill-switch. Os endpoints da Microsoft (`catalog.gamepass.com` +
+    #: `displaycatalog.mp.microsoft.com`) sao publicos mas NAO-oficiais - se um
+    #: dia mudarem o formato ou sumirem, desligar aqui tira a tarefa do
+    #: agendador sem mexer em codigo. Mesmo contrato do `hltb_enabled`.
+    xbox_enabled: bool = True
+    #: Mercado da Microsoft Store. Fixa o preco em BRL e o catalogo disponivel
+    #: no Brasil. `languages` fica hardcoded "pt-BR" no coletor.
+    xbox_market: str = "BR"
+    #: Intervalo entre varreduras do catalogo do Game Pass, em minutos. O
+    #: catalogo e os precos mudam devagar; 6h pega entra/sai do GP e promo sem
+    #: martelar um endpoint de terceiros.
+    agendador_xbox_minutos: int = Field(default=360, ge=30)
+    #: Segundos entre chamadas. Sem limite documentado (nao e API oficial);
+    #: conservador de proposito.
+    xbox_rate_limit_seconds: float = Field(default=1.0, gt=0)
+
+    # --- PlayStation Store (PlatPrices) ---
+    #: Reservado para a 2a etapa da vitrine PS. Sem chave, a aba PlayStation do
+    #: dashboard mostra so o painel "em breve".
+    platprices_api_key: str | None = None
 
     # --- ETL ---
     snapshot_bucket_minutes: int = Field(default=60, ge=1, le=1440)

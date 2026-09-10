@@ -15,6 +15,7 @@ import { Link } from "react-router-dom";
 
 import { usePerfilEsporte, usePersonagens, useSaude } from "@models/api/consultas";
 import type { ResumoPersonagem } from "@models/api/tipos";
+import { usePaginacaoLocal } from "@models/hooks/paginacao";
 import { Botao, Consulta, Icone, Selo } from "@views/componentes/base";
 import { RetratoHeroi } from "@views/componentes/RetratoHeroi";
 import {
@@ -23,6 +24,7 @@ import {
   CAMPO,
   KpiHud,
   LABEL_CAMPO,
+  Paginacao,
   Painel,
   Pilula,
   Segmentos,
@@ -201,6 +203,12 @@ export function HeroisPagina() {
           : h.winrate;
     return [...filtrados].sort((a, b) => chave(b) - chave(a));
   }, [filtrados, ordenacao]);
+
+  // 5 linhas por página no celular, 25 no desktop.
+  const pag = usePaginacaoLocal(tabela, {
+    porPaginaInicial: { mobile: 5, desktop: 25 },
+    chaveReset: `${jogo}|${minPartidas}|${ordenacao}|${busca}`,
+  });
 
   // A lista ja chega ordenada por winrate, entao o corte para o grafico e nas
   // duas pontas dela - nao da ordenacao escolhida para a tabela.
@@ -517,7 +525,7 @@ export function HeroisPagina() {
                 </thead>
 
                 <tbody className="font-body-md text-body-sm">
-                  {tabela.map((heroi, indice) => {
+                  {pag.fatia.map((heroi, indice) => {
                     const positivo = heroi.winrate > 50;
                     const cor = positivo ? PALETA_POLOS.positivo : PALETA_POLOS.negativo;
 
@@ -597,10 +605,21 @@ export function HeroisPagina() {
           )}
         </Consulta>
 
-        <div className="flex flex-wrap items-center justify-between gap-space-sm border-t border-outline-variant/30 pt-space-sm font-label-caps text-label-caps uppercase tracking-widest text-outline">
-          <span>
-            {fmtNumero(tabela.length)} heróis · corte de {minPartidas} partidas
-          </span>
+        <Paginacao
+          pagina={pag.pagina}
+          totalPaginas={pag.totalPaginas}
+          porPagina={pag.porPagina}
+          opcoesPorPagina={[5, 15, 25, 50]}
+          aoMudarPagina={pag.setPagina}
+          aoMudarPorPagina={pag.setPorPagina}
+          resumo={
+            <>
+              {fmtNumero(tabela.length)} heróis · corte de {minPartidas} partidas
+            </>
+          }
+        />
+
+        <div className="flex flex-wrap items-center justify-end gap-space-sm border-t border-outline-variant/30 pt-space-sm font-label-caps text-label-caps uppercase tracking-widest text-outline">
           <Selo cor="primario">{jogo}</Selo>
         </div>
       </Painel>

@@ -25,6 +25,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 
+import { usePaginacaoLocal } from "@models/hooks/paginacao";
 import {
   useAvaliacoesClassificadas,
   useBuscaCatalogo,
@@ -44,7 +45,7 @@ import type {
 import { Consulta, Icone, MensagemErro, Selo } from "@views/componentes/base";
 import { ArteJogo, CapaJogo } from "@views/componentes/CapaJogo";
 import { AreaNeon } from "@views/componentes/graficos/AreaNeon";
-import { BarraFina, KpiHud, Painel, Pilula } from "@views/componentes/hud";
+import { BarraFina, KpiHud, Paginacao, Painel, Pilula } from "@views/componentes/hud";
 import { PALETA_POLOS, TOKENS } from "@views/tema";
 import {
   classificacaoSteam,
@@ -549,6 +550,28 @@ export function RecomendacoesReviewsPagina() {
   const avaliacoes = useAvaliacoesClassificadas(appId, apenasErros, modelo);
   const catalogo = useJogosSteam({ ordenar_por: "jogadores", limite: 200 });
 
+  const listaAvaliacoes = useMemo<AvaliacaoClassificada[]>(
+    () => avaliacoes.data ?? [],
+    [avaliacoes.data],
+  );
+  const pagAvaliacoes = usePaginacaoLocal(listaAvaliacoes, {
+    // `desktop` tem que ser uma das opções do seletor ([5, 15, 25, 50]) — senão
+    // o <select> controlado mostra a 1ª opção mesmo com o estado certo.
+    porPaginaInicial: { mobile: 5, desktop: 15 },
+    chaveReset: `${modelo ?? ""}|${appId ?? ""}|${apenasErros}`,
+  });
+
+  const listaPorJogo = useMemo(
+    () => panoramaGeral.data?.por_jogo ?? [],
+    [panoramaGeral.data],
+  );
+  // "Recepção por jogo" pagina nos dois: 5 por página no celular, 15 no
+  // desktop (~48 jogos monitorados — lista longa demais pra mostrar inteira).
+  const pagPorJogo = usePaginacaoLocal(listaPorJogo, {
+    porPaginaInicial: { mobile: 5, desktop: 15 },
+    chaveReset: String(listaPorJogo.length),
+  });
+
   // Abre no jogo com mais avaliacoes coletadas: e o que tem mais o que mostrar.
   useEffect(() => {
     if (appId !== null || !panoramaGeral.data?.por_jogo.length) return;
@@ -824,7 +847,12 @@ export function RecomendacoesReviewsPagina() {
             )}
           </Consulta>
 
-          {/* ==================== AVALIACOES DO JOGO ==================== */}
+          {/* ========= AVALIAÇÕES + RECEPÇÃO POR JOGO, LADO A LADO =========
+              A "Recepção por jogo" é o seletor de qual jogo aparece nas
+              avaliações à esquerda — juntar as duas aproveita a metade vazia
+              da tela (a lista de avaliações é estreita de propósito, pra
+              leitura). Empilha no mobile. */}
+          <div className="grid grid-cols-1 items-start gap-space-base xl:grid-cols-[minmax(0,42rem)_minmax(0,1fr)]">
           <Painel
             icone="reviews"
             titulo={
@@ -851,9 +879,9 @@ export function RecomendacoesReviewsPagina() {
                   : "Nenhuma avaliação com texto para este jogo."
               }
             >
-              {(lista: AvaliacaoClassificada[]) => (
+              {() => (
                 <div className="max-w-[42rem] space-y-space-sm">
-                  {lista.map((avaliacao) => (
+                  {pagAvaliacoes.fatia.map((avaliacao) => (
                     <CartaoAvaliacao
                       key={avaliacao.id_externo}
                       avaliacao={avaliacao}
@@ -863,6 +891,22 @@ export function RecomendacoesReviewsPagina() {
               )}
             </Consulta>
 
+            <div className="max-w-[42rem]">
+              <Paginacao
+                pagina={pagAvaliacoes.pagina}
+                totalPaginas={pagAvaliacoes.totalPaginas}
+                porPagina={pagAvaliacoes.porPagina}
+                opcoesPorPagina={[5, 15, 25, 50]}
+                aoMudarPagina={pagAvaliacoes.setPagina}
+                aoMudarPorPagina={pagAvaliacoes.setPorPagina}
+                resumo={
+                  <>
+                    {pagAvaliacoes.fatia.length} de {listaAvaliacoes.length}
+                  </>
+                }
+              />
+            </div>
+
             <p className="font-body-sm text-body-sm text-outline">
               O filtro de erro existe para a tela não virar folheto: é onde dá para ver o
               que o modelo não aprendeu — ironia, avaliação misturando idiomas, elogio
@@ -870,6 +914,75 @@ export function RecomendacoesReviewsPagina() {
               é o idioma em que o modelo foi treinado.
             </p>
           </Painel>
+
+          <Consulta estado={panoramaGeral} altura={200}>
+            {() => (
+              <Painel
+                icone="leaderboard"
+                titulo="Recepção por jogo"
+                descricao="Todos os jogos monitorados, pelo rótulo real. Clique para ver as avaliações."
+              >
+                {/* `max-w-3xl`: numa tela muito larga a coluna estica demais e
+                    os nomes ficam longe das barras. */}
+                <div className="max-w-3xl space-y-space-xs">
+                  {pagPorJogo.fatia.map((jogo) => (
+                    <button
+                      key={jogo.app_id}
+                      type="button"
+                      onClick={() => setAppId(jogo.app_id)}
+                      className={`flex w-full items-center gap-space-sm rounded px-space-sm py-space-xs text-left transition-colors ${
+                        jogo.app_id === appId
+                          ? "bg-surface-container ring-1 ring-primary-container"
+                          : "hover:bg-surface-container-high/60"
+                      }`}
+                    >
+                      <CapaJogo
+                        appId={jogo.app_id}
+                        nome={jogo.jogo}
+                        className="h-7 w-12 shrink-0"
+                      />
+                      <span className="min-w-0 flex-1 truncate font-headline-sm text-headline-sm text-on-surface">
+                        {jogo.jogo}
+                      </span>
+                      <div className="w-16 shrink-0 sm:w-24">
+                        <BarraFina
+                          largura={jogo.percentual_positivo}
+                          cor={corDaTaxa(jogo.percentual_positivo)}
+                          altura="h-2"
+                        />
+                      </div>
+                      <span
+                        className="w-10 shrink-0 text-right font-title-code text-title-code tabular-nums"
+                        style={{ color: corDaTaxa(jogo.percentual_positivo) }}
+                      >
+                        {fmtPercentual(jogo.percentual_positivo, 0)}
+                      </span>
+                      <span className="w-12 shrink-0 text-right font-label-caps text-label-caps text-outline">
+                        {fmtNumero(jogo.avaliacoes)}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+
+                <div className="max-w-3xl">
+                  <Paginacao
+                    pagina={pagPorJogo.pagina}
+                    totalPaginas={pagPorJogo.totalPaginas}
+                    porPagina={pagPorJogo.porPagina}
+                    opcoesPorPagina={[5, 15, 25, 50]}
+                    aoMudarPagina={pagPorJogo.setPagina}
+                    aoMudarPorPagina={pagPorJogo.setPorPagina}
+                    resumo={
+                      <>
+                        {pagPorJogo.fatia.length} de {listaPorJogo.length} jogos
+                      </>
+                    }
+                  />
+                </div>
+              </Painel>
+            )}
+          </Consulta>
+          </div>
 
           {/* ==================== O MODELO ==================== */}
           <section className="grid grid-cols-1 gap-space-base xl:grid-cols-2">
@@ -934,56 +1047,6 @@ export function RecomendacoesReviewsPagina() {
             </Painel>
           </section>
 
-          {/* ==================== COMPARATIVO ENTRE JOGOS ==================== */}
-          <Consulta estado={panoramaGeral} altura={200}>
-            {(geral: PanoramaSentimento) => (
-              <Painel
-                icone="leaderboard"
-                titulo="Recepção por jogo"
-                descricao="Todos os jogos monitorados, pelo rótulo real. Clique para colocar em destaque."
-              >
-                <div className="space-y-space-sm">
-                  {geral.por_jogo.map((jogo) => (
-                    <button
-                      key={jogo.app_id}
-                      type="button"
-                      onClick={() => setAppId(jogo.app_id)}
-                      className={`flex w-full items-center gap-space-sm rounded px-space-md py-space-sm text-left transition-colors ${
-                        jogo.app_id === appId
-                          ? "bg-surface-container ring-1 ring-primary-container"
-                          : "hover:bg-surface-container-high/60"
-                      }`}
-                    >
-                      <CapaJogo
-                        appId={jogo.app_id}
-                        nome={jogo.jogo}
-                        className="h-8 w-16"
-                      />
-                      <span className="w-44 shrink-0 truncate font-headline-sm text-headline-sm text-on-surface">
-                        {jogo.jogo}
-                      </span>
-                      <div className="flex-1">
-                        <BarraFina
-                          largura={jogo.percentual_positivo}
-                          cor={corDaTaxa(jogo.percentual_positivo)}
-                          altura="h-2"
-                        />
-                      </div>
-                      <span
-                        className="w-16 shrink-0 text-right font-title-code text-title-code tabular-nums"
-                        style={{ color: corDaTaxa(jogo.percentual_positivo) }}
-                      >
-                        {fmtPercentual(jogo.percentual_positivo, 0)}
-                      </span>
-                      <span className="w-20 shrink-0 text-right font-label-caps text-label-caps text-outline">
-                        {fmtNumero(jogo.avaliacoes)}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              </Painel>
-            )}
-          </Consulta>
         </>
       )}
     </Consulta>

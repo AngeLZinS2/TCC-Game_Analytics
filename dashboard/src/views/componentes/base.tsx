@@ -251,6 +251,34 @@ export function Consulta<T>({
   );
 }
 
+/**
+ * O contêiner de toda tabela larga: rola na horizontal em vez de espremer.
+ *
+ * Antes cada tela repetia `<div class="rolagem-discreta overflow-x-auto ...">`
+ * em volta de um `<table class="w-full">` SEM `min-width` - o que fazia a
+ * tabela encolher pra caber num celular, esmagando as colunas e empilhando as
+ * linhas em vários andares, sem nunca acionar a rolagem. O `minLargura` no div
+ * interno é o que garante que a tabela mantém a largura de leitura e o `<div>`
+ * de fora rola (com a barra fina do `rolagem-discreta`).
+ */
+export function TabelaRolavel({
+  minLargura = "48rem",
+  className = "",
+  children,
+}: {
+  minLargura?: string;
+  className?: string;
+  children: ReactNode;
+}) {
+  return (
+    <div
+      className={`rolagem-discreta overflow-x-auto rounded-lg bg-surface-container-lowest ${className}`}
+    >
+      <div style={{ minWidth: minLargura }}>{children}</div>
+    </div>
+  );
+}
+
 export function Etiquetas({ itens, maximo }: { itens: string[]; maximo?: number }) {
   if (itens.length === 0) {
     return <span className="text-outline">—</span>;

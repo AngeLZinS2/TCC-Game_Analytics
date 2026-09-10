@@ -1,0 +1,489 @@
+{
+ "data": {
+  "event": {
+   "id": "115548681803406303",
+   "type": "match",
+   "tournament": {
+    "id": "115548681802226458"
+   },
+   "league": {
+    "id": "98767991302996019",
+    "slug": "lec",
+    "image": "http://static.lolesports.com/leagues/1592516184297_LEC-01-FullonDark.png",
+    "name": "LEC"
+   },
+   "match": {
+    "strategy": {
+     "count": 5
+    },
+    "teams": [
+     {
+      "id": "111692118851466302",
+      "name": "Karmine Corp",
+      "code": "KC",
+      "image": "http://static.lolesports.com/teams/1704714951336_KC.png",
+      "result": {
+       "gameWins": 1
+      }
+     },
+     {
+      "id": "98767991926151025",
+      "name": "G2 Esports",
+      "code": "G2",
+      "image": "http://static.lolesports.com/teams/G2-FullonDark.png",
+      "result": {
+       "gameWins": 3
+      }
+     }
+    ],
+    "games": [
+     {
+      "number": 1,
+      "id": "115548681803406304",
+      "state": "completed",
+      "teams": [
+       {
+        "id": "111692118851466302",
+        "side": "blue"
+       },
+       {
+        "id": "98767991926151025",
+        "side": "red"
+       }
+      ],
+      "vods": [
+       {
+        "id": "117225698133957465",
+        "parameter": "ZRsJYluoq4w",
+        "locale": "en-GB",
+        "mediaLocale": {
+         "locale": "en-GB",
+         "englishName": "English (Europe)",
+         "translatedName": "English (Europe)"
+        },
+        "provider": "youtube",
+        "offset": 0,
+        "firstFrameTime": "2026-09-06T13:59:52.157Z",
+        "startMillis": 4070000,
+        "endMillis": 6907000
+       },
+       {
+        "id": "117225710357084166",
+        "parameter": "2866927748",
+        "locale": "es-ES",
+        "mediaLocale": {
+         "locale": "es-ES",
+         "englishName": "Spanish (Spain)",
+         "translatedName": "Español (España)"
+        },
+        "provider": "twitch",
+        "offset": 0,
+        "firstFrameTime": "2026-09-06T14:34:42.145Z",
+        "startMillis": 1980000,
+        "endMillis": 5177000
+       },
+       {
+        "id": "117228536814818168",
+        "parameter": "EAvnKmyDMTw",
+        "locale": "es-ES",
+        "mediaLocale": {
+         "locale": "es-ES",
+         "englishName": "Spanish (Spain)",
+         "translatedName": "Español (España)"
+        },
+        "provider": "youtube",
+        "offset": 0,
+        "firstFrameTime": "2026-09-06T14:59:46.959Z",
+        "startMillis": 454000,
+        "endMillis": 3291000
+       },
+       {
+        "id": "117226566443700517",
+        "parameter": "nl1wxPDhNSw",
+        "locale": "fr-FR",
+        "mediaLocale": {
+         "locale": "fr-FR",
+         "englishName": "French (France)",
+         "translatedName": "Français"
+        },
+        "provider": "youtube",
+        "offset": 0,
+        "firstFrameTime": "2026-09-06T14:48:23.652Z",
+        "startMillis": 2275000,
+        "endMillis": 4913000
+       },
+       {
+        "id": "117225724702965544",
+        "parameter": "2866904790",
+        "locale": "hu-HU",
+        "mediaLocale": {
+         "locale": "hu-HU",
+         "englishName": "Hungarian (Hungary)",
+         "translatedName": "Magyar"
+        },
+        "provider": "twitch",
+        "offset": 0,
+        "firstFrameTime": "2026-09-06T14:03:23.340Z",
+        "startMillis": 4034000,
+        "endMillis": 6871000
+       },
+       {
+        "id": "117225745317711640",
+        "parameter": "Yyr1fqMjHxI",
+        "locale": "pl-PL",
+        "mediaLocale": {
+         "locale": "pl-PL",
+         "englishName": "Polish (Poland)",
+         "translatedName": "Polski"
+        },
+        "provider": "youtube",
+        "offset": 0,
+        "firstFrameTime": "2026-09-06T14:29:46.956Z",
+        "startMillis": 2268000,
+        "endMillis": 5105000
+       }
+      ]
+     },
+     {
+      "number": 2,
+      "id": "115548681803406305",
+      "state": "completed",
+      "teams": [
+       {
+        "id": "98767991926151025",
+        "side": "blue"
+       },
+       {
+        "id": "111692118851466302",
+        "side": "red"
+       }
+      ],
+      "vods": [
+       {
+        "id": "117225698123347964",
+        "parameter": "ZRsJYluoq4w",
+        "locale": "en-GB",
+        "mediaLocale": {
+         "locale": "en-GB",
+         "englishName": "English (Europe)",
+         "translatedName": "English (Europe)"
+        },
+        "provider": "youtube",
+        "offset": 0,
+        "firstFrameTime": "2026-09-06T13:59:52.157Z",
+        "startMillis": 7740000,
+        "endMillis": 10980000
+       },
+       {
+        "id": "117225710336626434",
+        "parameter": "2866927748",
+        "locale": "es-ES",
+        "mediaLocale": {
+         "locale": "es-ES",
+         "englishName": "Spanish (Spain)",
+         "translatedName": "Español (España)"
+        },
+        "provider": "twitch",
+        "offset": 0,
+        "firstFrameTime": "2026-09-06T14:34:42.145Z",
+        "startMillis": 5731000,
+        "endMillis": 8971000
+       },
+       {
+        "id": "117228536821699449",
+        "parameter": "EAvnKmyDMTw",
+        "locale": "es-ES",
+        "mediaLocale": {
+         "locale": "es-ES",
+         "englishName": "Spanish (Spain)",
+         "translatedName": "Español (España)"
+        },
+        "provider": "youtube",
+        "offset": 0,
+        "firstFrameTime": "2026-09-06T14:59:46.959Z",
+        "startMillis": 4124000,
+        "endMillis": 7364000
+       },
+       {
+        "id": "117226566437944410",
+        "parameter": "nl1wxPDhNSw",
+        "locale": "fr-FR",
+        "mediaLocale": {
+         "locale": "fr-FR",
+         "englishName": "French (France)",
+         "translatedName": "Français"
+        },
+        "provider": "youtube",
+        "offset": 0,
+        "firstFrameTime": "2026-09-06T14:48:23.652Z",
+        "startMillis": 5464000,
+        "endMillis": 7950000
+       },
+       {
+        "id": "117225724698378023",
+        "parameter": "2866904790",
+        "locale": "hu-HU",
+        "mediaLocale": {
+         "locale": "hu-HU",
+         "englishName": "Hungarian (Hungary)",
+         "translatedName": "Magyar"
+        },
+        "provider": "twitch",
+        "offset": 0,
+        "firstFrameTime": "2026-09-06T14:03:23.340Z",
+        "startMillis": 7715000,
+        "endMillis": 10955000
+       },
+       {
+        "id": "117225745311292270",
+        "parameter": "Yyr1fqMjHxI",
+        "locale": "pl-PL",
+        "mediaLocale": {
+         "locale": "pl-PL",
+         "englishName": "Polish (Poland)",
+         "translatedName": "Polski"
+        },
+        "provider": "youtube",
+        "offset": 0,
+        "firstFrameTime": "2026-09-06T14:29:46.956Z",
+        "startMillis": 5940000,
+        "endMillis": 9180000
+       }
+      ]
+     },
+     {
+      "number": 3,
+      "id": "115548681803406306",
+      "state": "completed",
+      "teams": [
+       {
+        "id": "98767991926151025",
+        "side": "blue"
+       },
+       {
+        "id": "111692118851466302",
+        "side": "red"
+       }
+      ],
+      "vods": [
+       {
+        "id": "117225698133692152",
+        "parameter": "ZRsJYluoq4w",
+        "locale": "en-GB",
+        "mediaLocale": {
+         "locale": "en-GB",
+         "englishName": "English (Europe)",
+         "translatedName": "English (Europe)"
+        },
+        "provider": "youtube",
+        "offset": 0,
+        "firstFrameTime": "2026-09-06T13:59:52.157Z",
+        "startMillis": 11160000,
+        "endMillis": 13980000
+       },
+       {
+        "id": "117225710347632422",
+        "parameter": "2866927748",
+        "locale": "es-ES",
+        "mediaLocale": {
+         "locale": "es-ES",
+         "englishName": "Spanish (Spain)",
+         "translatedName": "Español (España)"
+        },
+        "provider": "twitch",
+        "offset": 0,
+        "firstFrameTime": "2026-09-06T14:34:42.145Z",
+        "startMillis": 9060000,
+        "endMillis": 11880000
+       },
+       {
+        "id": "117228536818342604",
+        "parameter": "EAvnKmyDMTw",
+        "locale": "es-ES",
+        "mediaLocale": {
+         "locale": "es-ES",
+         "englishName": "Spanish (Spain)",
+         "translatedName": "Español (España)"
+        },
+        "provider": "youtube",
+        "offset": 0,
+        "firstFrameTime": "2026-09-06T14:59:46.959Z",
+        "startMillis": 7534000,
+        "endMillis": 10354000
+       },
+       {
+        "id": "117226566439713883",
+        "parameter": "nl1wxPDhNSw",
+        "locale": "fr-FR",
+        "mediaLocale": {
+         "locale": "fr-FR",
+         "englishName": "French (France)",
+         "translatedName": "Français"
+        },
+        "provider": "youtube",
+        "offset": 0,
+        "firstFrameTime": "2026-09-06T14:48:23.652Z",
+        "startMillis": 8561000,
+        "endMillis": 10731000
+       },
+       {
+        "id": "117225724701134605",
+        "parameter": "2866904790",
+        "locale": "hu-HU",
+        "mediaLocale": {
+         "locale": "hu-HU",
+         "englishName": "Hungarian (Hungary)",
+         "translatedName": "Magyar"
+        },
+        "provider": "twitch",
+        "offset": 0,
+        "firstFrameTime": "2026-09-06T14:03:23.340Z",
+        "startMillis": 11135000,
+        "endMillis": 13955000
+       },
+       {
+        "id": "117225745317777177",
+        "parameter": "Yyr1fqMjHxI",
+        "locale": "pl-PL",
+        "mediaLocale": {
+         "locale": "pl-PL",
+         "englishName": "Polish (Poland)",
+         "translatedName": "Polski"
+        },
+        "provider": "youtube",
+        "offset": 0,
+        "firstFrameTime": "2026-09-06T14:29:46.956Z",
+        "startMillis": 9341000,
+        "endMillis": 12161000
+       }
+      ]
+     },
+     {
+      "number": 4,
+      "id": "115548681803406307",
+      "state": "completed",
+      "teams": [
+       {
+        "id": "111692118851466302",
+        "side": "blue"
+       },
+       {
+        "id": "98767991926151025",
+        "side": "red"
+       }
+      ],
+      "vods": [
+       {
+        "id": "117225698126755837",
+        "parameter": "ZRsJYluoq4w",
+        "locale": "en-GB",
+        "mediaLocale": {
+         "locale": "en-GB",
+         "englishName": "English (Europe)",
+         "translatedName": "English (Europe)"
+        },
+        "provider": "youtube",
+        "offset": 0,
+        "firstFrameTime": "2026-09-06T13:59:52.157Z",
+        "startMillis": 14340000,
+        "endMillis": 17400000
+       },
+       {
+        "id": "117225710336560897",
+        "parameter": "2866927748",
+        "locale": "es-ES",
+        "mediaLocale": {
+         "locale": "es-ES",
+         "englishName": "Spanish (Spain)",
+         "translatedName": "Español (España)"
+        },
+        "provider": "twitch",
+        "offset": 0,
+        "firstFrameTime": "2026-09-06T14:34:42.145Z",
+        "startMillis": 12300000,
+        "endMillis": 15060000
+       },
+       {
+        "id": "117228536806036343",
+        "parameter": "EAvnKmyDMTw",
+        "locale": "es-ES",
+        "mediaLocale": {
+         "locale": "es-ES",
+         "englishName": "Spanish (Spain)",
+         "translatedName": "Español (España)"
+        },
+        "provider": "youtube",
+        "offset": 0,
+        "firstFrameTime": "2026-09-06T14:59:46.959Z",
+        "startMillis": 10685000,
+        "endMillis": 13745000
+       },
+       {
+        "id": "117226566436549692",
+        "parameter": "nl1wxPDhNSw",
+        "locale": "fr-FR",
+        "mediaLocale": {
+         "locale": "fr-FR",
+         "englishName": "French (France)",
+         "translatedName": "Français"
+        },
+        "provider": "youtube",
+        "offset": 0,
+        "firstFrameTime": "2026-09-06T14:48:23.652Z",
+        "startMillis": 11364000,
+        "endMillis": 13640000
+       },
+       {
+        "id": "117225724701603847",
+        "parameter": "2866904790",
+        "locale": "hu-HU",
+        "mediaLocale": {
+         "locale": "hu-HU",
+         "englishName": "Hungarian (Hungary)",
+         "translatedName": "Magyar"
+        },
+        "provider": "twitch",
+        "offset": 0,
+        "firstFrameTime": "2026-09-06T14:03:23.340Z",
+        "startMillis": 14280000,
+        "endMillis": 17338000
+       },
+       {
+        "id": "117225745305466903",
+        "parameter": "Yyr1fqMjHxI",
+        "locale": "pl-PL",
+        "mediaLocale": {
+         "locale": "pl-PL",
+         "englishName": "Polish (Poland)",
+         "translatedName": "Polski"
+        },
+        "provider": "youtube",
+        "offset": 0,
+        "firstFrameTime": "2026-09-06T14:29:46.956Z",
+        "startMillis": 12498000,
+        "endMillis": 15078000
+       }
+      ]
+     },
+     {
+      "number": 5,
+      "id": "115548681803406308",
+      "state": "unneeded",
+      "teams": [
+       {
+        "id": "98767991926151025",
+        "side": "blue"
+       },
+       {
+        "id": "111692118851466302",
+        "side": "red"
+       }
+      ],
+      "vods": []
+     }
+    ]
+   },
+   "streams": []
+  }
+ }
+}

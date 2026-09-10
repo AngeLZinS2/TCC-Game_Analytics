@@ -1,0 +1,722 @@
+{
+ "data": {
+  "schedule": {
+   "events": [
+    {
+     "startTime": "2026-08-30T12:00:00Z",
+     "blockName": "Week 6",
+     "league": {
+      "name": "LEC"
+     },
+     "match": {
+      "id": "115548681803406179",
+      "type": "normal",
+      "teams": [
+       {
+        "name": "Team Vitality",
+        "code": "VIT",
+        "image": "http://static.lolesports.com/teams/1675865863968_Vitality_FullColor.png",
+        "result": {
+         "gameWins": 2
+        }
+       },
+       {
+        "name": "Shifters",
+        "code": "SHFT",
+        "image": "http://static.lolesports.com/teams/1765897071435_600px-Shifters_allmode.png",
+        "result": {
+         "gameWins": 0
+        }
+       }
+      ],
+      "strategy": {
+       "type": "bestOf",
+       "count": 3
+      }
+     },
+     "games": [
+      {
+       "id": "115548681803406180",
+       "vods": [
+        {
+         "parameter": "2860574513"
+        },
+        {
+         "parameter": "2860481340"
+        },
+        {
+         "parameter": "3kID3NN7SOU"
+        },
+        {
+         "parameter": "2860570745"
+        },
+        {
+         "parameter": "FAyqinAmJTE"
+        },
+        {
+         "parameter": "2860556470"
+        },
+        {
+         "parameter": "aj_ZfBK5ZAs"
+        }
+       ]
+      },
+      {
+       "id": "115548681803406181",
+       "vods": [
+        {
+         "parameter": "2860574513"
+        },
+        {
+         "parameter": "2860481340"
+        },
+        {
+         "parameter": "3kID3NN7SOU"
+        },
+        {
+         "parameter": "2860570745"
+        },
+        {
+         "parameter": "FAyqinAmJTE"
+        },
+        {
+         "parameter": "2860556470"
+        },
+        {
+         "parameter": "aj_ZfBK5ZAs"
+        }
+       ]
+      },
+      {
+       "id": "115548681803406182",
+       "vods": []
+      }
+     ]
+    },
+    {
+     "startTime": "2026-08-30T14:15:00Z",
+     "blockName": "Week 6",
+     "league": {
+      "name": "LEC"
+     },
+     "match": {
+      "id": "115548681803406131",
+      "type": "normal",
+      "teams": [
+       {
+        "name": "Team Heretics",
+        "code": "TH",
+        "image": "http://static.lolesports.com/teams/1672933861879_Heretics-Full-Color.png",
+        "result": {
+         "gameWins": 0
+        }
+       },
+       {
+        "name": "Movistar KOI",
+        "code": "MKOI",
+        "image": "http://static.lolesports.com/teams/1734012609283_MKOI_FullColor_Blue.png",
+        "result": {
+         "gameWins": 2
+        }
+       }
+      ],
+      "strategy": {
+       "type": "bestOf",
+       "count": 3
+      }
+     },
+     "games": [
+      {
+       "id": "115548681803406132",
+       "vods": [
+        {
+         "parameter": "2860574513"
+        },
+        {
+         "parameter": "2860481340"
+        },
+        {
+         "parameter": "PZwgZnnpfSg"
+        },
+        {
+         "parameter": "2860570745"
+        },
+        {
+         "parameter": "vdQmSgy1G28"
+        },
+        {
+         "parameter": "2860556470"
+        },
+        {
+         "parameter": "oxTS89YYd8M"
+        },
+        {
+         "parameter": "aj_ZfBK5ZAs"
+        }
+       ]
+      },
+      {
+       "id": "115548681803406133",
+       "vods": [
+        {
+         "parameter": "2860574513"
+        },
+        {
+         "parameter": "2860481340"
+        },
+        {
+         "parameter": "PZwgZnnpfSg"
+        },
+        {
+         "parameter": "2860570745"
+        },
+        {
+         "parameter": "vdQmSgy1G28"
+        },
+        {
+         "parameter": "2860556470"
+        },
+        {
+         "parameter": "oxTS89YYd8M"
+        },
+        {
+         "parameter": "aj_ZfBK5ZAs"
+        }
+       ]
+      },
+      {
+       "id": "115548681803406134",
+       "vods": []
+      }
+     ]
+    },
+    {
+     "startTime": "2026-08-30T16:30:00Z",
+     "blockName": "Week 6",
+     "league": {
+      "name": "LEC"
+     },
+     "match": {
+      "id": "115548681803406239",
+      "type": "normal",
+      "teams": [
+       {
+        "name": "GIANTX",
+        "code": "GX",
+        "image": "http://static.lolesports.com/teams/1765897105091_GIANTX-logotype-white.png",
+        "result": {
+         "gameWins": 2
+        }
+       },
+       {
+        "name": "Fnatic",
+        "code": "FNC",
+        "image": "http://static.lolesports.com/teams/1631819669150_fnc-2021-worlds.png",
+        "result": {
+         "gameWins": 1
+        }
+       }
+      ],
+      "strategy": {
+       "type": "bestOf",
+       "count": 3
+      }
+     },
+     "games": [
+      {
+       "id": "115548681803406240",
+       "vods": [
+        {
+         "parameter": "2860574513"
+        },
+        {
+         "parameter": "2860481340"
+        },
+        {
+         "parameter": "cqJ9cXirAtY"
+        },
+        {
+         "parameter": "2860570745"
+        },
+        {
+         "parameter": "X9kI94k2nNA"
+        },
+        {
+         "parameter": "2860556470"
+        },
+        {
+         "parameter": "oxTS89YYd8M"
+        },
+        {
+         "parameter": "aj_ZfBK5ZAs"
+        }
+       ]
+      },
+      {
+       "id": "115548681803406241",
+       "vods": [
+        {
+         "parameter": "2860574513"
+        },
+        {
+         "parameter": "2860481340"
+        },
+        {
+         "parameter": "cqJ9cXirAtY"
+        },
+        {
+         "parameter": "2860570745"
+        },
+        {
+         "parameter": "X9kI94k2nNA"
+        },
+        {
+         "parameter": "2860556470"
+        },
+        {
+         "parameter": "oxTS89YYd8M"
+        },
+        {
+         "parameter": "aj_ZfBK5ZAs"
+        }
+       ]
+      },
+      {
+       "id": "115548681803406242",
+       "vods": [
+        {
+         "parameter": "2860574513"
+        },
+        {
+         "parameter": "2860481340"
+        },
+        {
+         "parameter": "cqJ9cXirAtY"
+        },
+        {
+         "parameter": "2860570745"
+        },
+        {
+         "parameter": "X9kI94k2nNA"
+        },
+        {
+         "parameter": "2860556470"
+        },
+        {
+         "parameter": "oxTS89YYd8M"
+        },
+        {
+         "parameter": "aj_ZfBK5ZAs"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "startTime": "2026-09-05T10:00:00Z",
+     "blockName": "Playoffs",
+     "league": {
+      "name": "LEC"
+     },
+     "match": {
+      "id": "115548681803406297",
+      "type": "normal",
+      "teams": [
+       {
+        "name": "G2 Esports",
+        "code": "G2",
+        "image": "http://static.lolesports.com/teams/G2-FullonDark.png",
+        "result": {
+         "gameWins": 3
+        }
+       },
+       {
+        "name": "Team Vitality",
+        "code": "VIT",
+        "image": "http://static.lolesports.com/teams/1675865863968_Vitality_FullColor.png",
+        "result": {
+         "gameWins": 0
+        }
+       }
+      ],
+      "strategy": {
+       "type": "bestOf",
+       "count": 5
+      }
+     },
+     "games": [
+      {
+       "id": "115548681803406298",
+       "vods": [
+        {
+         "parameter": "TNHNaHOBYG8"
+        },
+        {
+         "parameter": "2865814079"
+        },
+        {
+         "parameter": "J49LrFJLbow"
+        },
+        {
+         "parameter": "2865804041"
+        },
+        {
+         "parameter": "zhPUQADsB44"
+        },
+        {
+         "parameter": "5KDnUL-h0TE"
+        }
+       ]
+      },
+      {
+       "id": "115548681803406299",
+       "vods": [
+        {
+         "parameter": "TNHNaHOBYG8"
+        },
+        {
+         "parameter": "2865814079"
+        },
+        {
+         "parameter": "J49LrFJLbow"
+        },
+        {
+         "parameter": "2865804041"
+        },
+        {
+         "parameter": "zhPUQADsB44"
+        },
+        {
+         "parameter": "5KDnUL-h0TE"
+        }
+       ]
+      },
+      {
+       "id": "115548681803406300",
+       "vods": [
+        {
+         "parameter": "2865772033"
+        },
+        {
+         "parameter": "2865774151"
+        },
+        {
+         "parameter": "TNHNaHOBYG8"
+        },
+        {
+         "parameter": "2865814079"
+        },
+        {
+         "parameter": "J49LrFJLbow"
+        },
+        {
+         "parameter": "2865804041"
+        },
+        {
+         "parameter": "zhPUQADsB44"
+        },
+        {
+         "parameter": "5KDnUL-h0TE"
+        }
+       ]
+      },
+      {
+       "id": "115548681803406301",
+       "vods": []
+      },
+      {
+       "id": "115548681803406302",
+       "vods": []
+      }
+     ]
+    },
+    {
+     "startTime": "2026-09-05T15:00:00Z",
+     "blockName": "Playoffs",
+     "league": {
+      "name": "LEC"
+     },
+     "match": {
+      "id": "115548681803406291",
+      "type": "normal",
+      "teams": [
+       {
+        "name": "Karmine Corp",
+        "code": "KC",
+        "image": "http://static.lolesports.com/teams/1704714951336_KC.png",
+        "result": {
+         "gameWins": 3
+        }
+       },
+       {
+        "name": "GIANTX",
+        "code": "GX",
+        "image": "http://static.lolesports.com/teams/1765897105091_GIANTX-logotype-white.png",
+        "result": {
+         "gameWins": 1
+        }
+       }
+      ],
+      "strategy": {
+       "type": "bestOf",
+       "count": 5
+      }
+     },
+     "games": [
+      {
+       "id": "115548681803406292",
+       "vods": [
+        {
+         "parameter": "2865772033"
+        },
+        {
+         "parameter": "2865774151"
+        },
+        {
+         "parameter": "P5nyLvcbrW8"
+        },
+        {
+         "parameter": "2865814079"
+        },
+        {
+         "parameter": "-w1v_c-qc6M"
+        },
+        {
+         "parameter": "2865804041"
+        },
+        {
+         "parameter": "zhPUQADsB44"
+        },
+        {
+         "parameter": "5KDnUL-h0TE"
+        }
+       ]
+      },
+      {
+       "id": "115548681803406293",
+       "vods": [
+        {
+         "parameter": "2865772033"
+        },
+        {
+         "parameter": "2865774151"
+        },
+        {
+         "parameter": "P5nyLvcbrW8"
+        },
+        {
+         "parameter": "2865814079"
+        },
+        {
+         "parameter": "-w1v_c-qc6M"
+        },
+        {
+         "parameter": "2865804041"
+        },
+        {
+         "parameter": "zhPUQADsB44"
+        },
+        {
+         "parameter": "5KDnUL-h0TE"
+        }
+       ]
+      },
+      {
+       "id": "115548681803406294",
+       "vods": [
+        {
+         "parameter": "2865772033"
+        },
+        {
+         "parameter": "2865774151"
+        },
+        {
+         "parameter": "P5nyLvcbrW8"
+        },
+        {
+         "parameter": "2865814079"
+        },
+        {
+         "parameter": "-w1v_c-qc6M"
+        },
+        {
+         "parameter": "2865804041"
+        },
+        {
+         "parameter": "zhPUQADsB44"
+        },
+        {
+         "parameter": "5KDnUL-h0TE"
+        }
+       ]
+      },
+      {
+       "id": "115548681803406295",
+       "vods": [
+        {
+         "parameter": "2865772033"
+        },
+        {
+         "parameter": "2865774151"
+        },
+        {
+         "parameter": "P5nyLvcbrW8"
+        },
+        {
+         "parameter": "2865814079"
+        },
+        {
+         "parameter": "-w1v_c-qc6M"
+        },
+        {
+         "parameter": "2865804041"
+        },
+        {
+         "parameter": "zhPUQADsB44"
+        },
+        {
+         "parameter": "5KDnUL-h0TE"
+        }
+       ]
+      },
+      {
+       "id": "115548681803406296",
+       "vods": []
+      }
+     ]
+    },
+    {
+     "startTime": "2026-09-06T15:00:00Z",
+     "blockName": "Playoffs",
+     "league": {
+      "name": "LEC"
+     },
+     "match": {
+      "id": "115548681803406303",
+      "type": "normal",
+      "teams": [
+       {
+        "name": "Karmine Corp",
+        "code": "KC",
+        "image": "http://static.lolesports.com/teams/1704714951336_KC.png",
+        "result": {
+         "gameWins": 1
+        }
+       },
+       {
+        "name": "G2 Esports",
+        "code": "G2",
+        "image": "http://static.lolesports.com/teams/G2-FullonDark.png",
+        "result": {
+         "gameWins": 3
+        }
+       }
+      ],
+      "strategy": {
+       "type": "bestOf",
+       "count": 5
+      }
+     },
+     "games": [
+      {
+       "id": "115548681803406304",
+       "vods": [
+        {
+         "parameter": "ZRsJYluoq4w"
+        },
+        {
+         "parameter": "2866927748"
+        },
+        {
+         "parameter": "EAvnKmyDMTw"
+        },
+        {
+         "parameter": "nl1wxPDhNSw"
+        },
+        {
+         "parameter": "2866904790"
+        },
+        {
+         "parameter": "Yyr1fqMjHxI"
+        }
+       ]
+      },
+      {
+       "id": "115548681803406305",
+       "vods": [
+        {
+         "parameter": "ZRsJYluoq4w"
+        },
+        {
+         "parameter": "2866927748"
+        },
+        {
+         "parameter": "EAvnKmyDMTw"
+        },
+        {
+         "parameter": "nl1wxPDhNSw"
+        },
+        {
+         "parameter": "2866904790"
+        },
+        {
+         "parameter": "Yyr1fqMjHxI"
+        }
+       ]
+      },
+      {
+       "id": "115548681803406306",
+       "vods": [
+        {
+         "parameter": "ZRsJYluoq4w"
+        },
+        {
+         "parameter": "2866927748"
+        },
+        {
+         "parameter": "EAvnKmyDMTw"
+        },
+        {
+         "parameter": "nl1wxPDhNSw"
+        },
+        {
+         "parameter": "2866904790"
+        },
+        {
+         "parameter": "Yyr1fqMjHxI"
+        }
+       ]
+      },
+      {
+       "id": "115548681803406307",
+       "vods": [
+        {
+         "parameter": "ZRsJYluoq4w"
+        },
+        {
+         "parameter": "2866927748"
+        },
+        {
+         "parameter": "EAvnKmyDMTw"
+        },
+        {
+         "parameter": "nl1wxPDhNSw"
+        },
+        {
+         "parameter": "2866904790"
+        },
+        {
+         "parameter": "Yyr1fqMjHxI"
+        }
+       ]
+      },
+      {
+       "id": "115548681803406308",
+       "vods": []
+      }
+     ]
+    }
+   ]
+  }
+ }
+}

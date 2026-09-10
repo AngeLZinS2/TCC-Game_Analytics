@@ -15,6 +15,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
+import { usePaginacaoLocal } from "@models/hooks/paginacao";
 import {
   useBuscaCatalogo,
   useColetarJogo,
@@ -28,20 +29,31 @@ import type {
   AgregadoGenero,
   CandidatoJogo,
   JogoSteam,
+  LinhaCatalogo,
   PontoSerieTotal,
 } from "@models/api/tipos";
-import { Botao, Consulta, Icone, MensagemErro } from "@views/componentes/base";
+import {
+  Botao,
+  Consulta,
+  Icone,
+  MensagemErro,
+  TabelaRolavel,
+} from "@views/componentes/base";
 import { CapaJogo } from "@views/componentes/CapaJogo";
+import { CartaoJogoSteam } from "@views/componentes/CartaoJogoSteam";
 import {
   BarraFina,
   BarraRanking,
   ChipContagem,
   KpiHud,
+  Paginacao,
   Pilula,
   Segmentos,
+  SeletorModo,
   Sparkline,
+  useModoPersistente,
 } from "@views/componentes/hud";
-import { PALETA_SERIES } from "@views/tema";
+import { corDoGenero } from "@views/tema";
 import {
   classificacaoSteam,
   fmtCurto,
@@ -64,40 +76,17 @@ const ORDENACOES: { valor: Ordenacao; rotulo: string; icone?: string }[] = [
   { valor: "trending", rotulo: "Trending 24h", icone: "local_fire_department" },
 ];
 
-/**
- * Cor de um genero, estavel entre renders e entre telas.
- *
- * O desenho pinta os chips de genero em cores diferentes. Como a lista de
- * generos vem da coleta e nao de uma constante, a cor sai de um hash do nome:
- * "FPS" e sempre da mesma cor, sem precisar de um mapa que teria de ser mantido
- * a mao toda vez que um jogo novo trouxer um genero novo.
- */
-function corDoGenero(genero: string): string {
-  let hash = 0;
-  for (let i = 0; i < genero.length; i += 1) {
-    hash = (hash * 31 + genero.charCodeAt(i)) | 0;
-  }
-  return PALETA_SERIES[Math.abs(hash) % PALETA_SERIES.length];
-}
+const MODOS_CATALOGO = [
+  { id: "tabela", icone: "table_rows", rotulo: "Tabela" },
+  { id: "cartoes", icone: "grid_view", rotulo: "Cartões" },
+] as const;
+type ModoCatalogo = (typeof MODOS_CATALOGO)[number]["id"];
 
 const CHIP_CLASSIFICACAO = {
   positiva: "bg-tertiary/10 text-tertiary",
   neutra: "bg-surface-container-highest text-on-surface-variant",
   negativa: "bg-error/10 text-error",
 } as const;
-
-/**
- * Uma linha da tabela.
- *
- * A tabela passou a ter duas procedencias, e o tipo diz qual: `coletado` e um
- * jogo que o pipeline ja trouxe, com telemetria e historico; `loja` e um jogo
- * que existe na Steam e ainda nao entrou. Um union em vez de um `JogoSteam`
- * com tudo nulo, porque as duas linhas nao respondem as mesmas perguntas - e
- * preencher as celulas de telemetria com zero afirmaria algo falso.
- */
-type LinhaCatalogo =
-  | { tipo: "coletado"; jogo: JogoSteam }
-  | { tipo: "loja"; candidato: CandidatoJogo };
 
 export function SteamPagina() {
   const navegar = useNavigate();
@@ -114,8 +103,13 @@ export function SteamPagina() {
     busca: busca.trim() || undefined,
     genero: genero || undefined,
     ordenar_por: ordenacao === "trending" ? "jogadores" : ordenacao,
-    limite: 200,
+    limite: 500,
   });
+  const [modo, setModo] = useModoPersistente<ModoCatalogo>(
+    "playdb:steam-catalogo-modo",
+    ["tabela", "cartoes"],
+    "tabela",
+  );
   const generos = useGenerosSteam();
   // O total do catalogo vem da contagem real da dimensao. Antes saia de
   // `Math.max` das contagens por genero - e um jogo conta em TODOS os
@@ -175,6 +169,11 @@ export function SteamPagina() {
     ...daLoja.map((candidato) => ({ tipo: "loja" as const, candidato })),
   ];
 
+  const paginacao = usePaginacaoLocal(linhas, {
+    porPaginaInicial: { mobile: 5, desktop: 25 },
+    chaveReset: `${termoBuscado}|${genero}|${ordenacao}`,
+  });
+
   //: O vazio dos paineis de telemetria.
   //:
   //: Os KPIs e o ranking agregam SO o que foi coletado - jogo da loja nao tem
@@ -209,76 +208,14 @@ export function SteamPagina() {
 
   return (
     <>
-      {/* ==================== CABECALHO E STATUS DO PIPELINE ==================== */}
-      <section className="relative overflow-hidden rounded-xl bg-surface-container-low p-space-lg shadow-2xl">
-        <div
-          className="pointer-events-none absolute -right-20 -top-20 h-64 w-64 rounded-full bg-primary-container/10 blur-3xl"
-          aria-hidden
-        />
+      {/* ==================== BUSCA, ORDENAÇÃO E GÊNEROS ====================
 
-        <div className="relative z-10 flex flex-col justify-between gap-space-base lg:flex-row lg:items-start">
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-space-sm">
-              <span className="font-title-code text-title-code uppercase tracking-wider text-outline">
-                SYS. ID: STEAM // PIPE 01
-              </span>
-              <span
-                className={`inline-flex items-center gap-space-xxs rounded px-space-xs py-space-xxs font-badge-status text-badge-status uppercase ${
-                  saude.data?.status === "ok"
-                    ? "bg-error/10 text-error"
-                    : "bg-surface-container-highest text-outline"
-                }`}
-              >
-                <span
-                  className={`h-1.5 w-1.5 rounded-full ${
-                    saude.data?.status === "ok" ? "animate-pulse bg-error" : "bg-outline"
-                  }`}
-                  aria-hidden
-                />
-                {saude.data?.status === "ok" ? "Ao vivo" : "Sem contato"}
-              </span>
-            </div>
-
-            <h1 className="mt-space-xs font-display-hero text-display-hero uppercase leading-none tracking-tight text-on-surface">
-              Jogos da
-              <br />
-              Steam
-            </h1>
-
-            <p className="mt-space-sm flex items-center gap-space-xs font-title-code text-title-code text-outline">
-              <Icone nome="sync" className="text-[16px] text-primary-container" />
-              Última sincronização:{" "}
-              <span className="text-on-surface-variant">
-                {serieTotal.data?.length
-                  ? fmtRelativo(serieTotal.data.at(-1)!.janela_coleta)
-                  : "—"}
-              </span>
-            </p>
-          </div>
-
-          <div className="flex shrink-0 flex-col items-start gap-space-sm lg:items-end">
-            <span className="font-title-code text-title-code uppercase text-outline">
-              // Telemetria de mercado [Steam Web API]
-            </span>
-            <span className="font-label-caps text-label-caps uppercase tracking-widest text-outline">
-              Latência da API:{" "}
-              <span className="text-primary">
-                {saude.data ? `${saude.data.latenciaMs}ms` : "—"}
-              </span>
-            </span>
-            <Botao
-              icone="refresh"
-              variante="primario"
-              aoClicar={() => jogos.refetch()}
-              desabilitado={jogos.isFetching}
-            >
-              {jogos.isFetching ? "Sincronizando…" : "Sincronizar"}
-            </Botao>
-          </div>
-        </div>
-
-        {/* ---------- Busca e ordenacao ---------- */}
-        <div className="relative z-10 mt-space-lg flex flex-col justify-between gap-space-md pt-space-md lg:flex-row lg:items-center">
+          O cabeçalho display-hero ("JOGOS DA STEAM" + status do pipeline) saiu
+          daqui: a barra de contexto do `CatalogoLayout` já diz onde estamos, e
+          dois títulos empilhados só empurravam a tabela pra baixo. Sobrou o
+          que a pessoa de fato usa — buscar, ordenar, filtrar por gênero. */}
+      <section className="space-y-space-md">
+        <div className="flex flex-col justify-between gap-space-md lg:flex-row lg:items-center">
           <div className="relative max-w-xl flex-1">
             <Icone
               nome="manage_search"
@@ -326,7 +263,7 @@ export function SteamPagina() {
         </div>
 
         {/* ---------- Chips de genero ---------- */}
-        <div className="rolagem-discreta relative z-10 mt-space-md flex items-center gap-space-xs overflow-x-auto pb-space-xs pt-space-xs">
+        <div className="rolagem-discreta flex items-center gap-space-xs overflow-x-auto pb-space-xs">
           <ChipContagem
             ativo={genero === ""}
             contagem={totalCatalogo || undefined}
@@ -489,9 +426,12 @@ export function SteamPagina() {
             </span>
           </div>
 
-          <Botao icone="file_download" aoClicar={() => exportarCsv(lista)}>
-            Exportar CSV
-          </Botao>
+          <div className="flex flex-wrap items-center gap-space-sm">
+            <SeletorModo modos={MODOS_CATALOGO} valor={modo} aoMudar={setModo} />
+            <Botao icone="file_download" aoClicar={() => exportarCsv(lista)}>
+              Exportar CSV
+            </Botao>
+          </div>
         </div>
 
         {coletar.isError && <MensagemErro erro={coletar.error} />}
@@ -508,8 +448,24 @@ export function SteamPagina() {
               : "Nenhum jogo bate com esse filtro."
           }
         >
-          {() => (
-            <div className="rolagem-discreta overflow-x-auto rounded-lg bg-surface-container-lowest">
+          {() =>
+            modo === "cartoes" ? (
+              <div className="grid grid-cols-1 gap-space-base sm:grid-cols-2 xl:grid-cols-3">
+                {paginacao.fatia.map((linha) => (
+                  <CartaoJogoSteam
+                    key={linha.tipo === "loja" ? `l${linha.candidato.app_id}` : linha.jogo.app_id}
+                    linha={linha}
+                    aoClicar={() => abrir(linha)}
+                    carregando={
+                      linha.tipo === "loja" &&
+                      coletar.isPending &&
+                      coletar.variables === linha.candidato.app_id
+                    }
+                  />
+                ))}
+              </div>
+            ) : (
+            <TabelaRolavel minLargura="60rem">
               <table className="w-full border-collapse text-left">
                 <thead>
                   <tr className="bg-surface-container font-label-caps text-label-caps uppercase tracking-wider text-outline">
@@ -525,7 +481,7 @@ export function SteamPagina() {
                 </thead>
 
                 <tbody className="font-body-md text-body-sm">
-                  {linhas.map((linha, indice) => {
+                  {paginacao.fatia.map((linha, indice) => {
                     if (linha.tipo === "loja") {
                       return (
                         <LinhaDaLoja
@@ -673,9 +629,24 @@ export function SteamPagina() {
                   })}
                 </tbody>
               </table>
-            </div>
-          )}
+            </TabelaRolavel>
+            )
+          }
         </Consulta>
+
+        <Paginacao
+          pagina={paginacao.pagina}
+          totalPaginas={paginacao.totalPaginas}
+          porPagina={paginacao.porPagina}
+          opcoesPorPagina={[5, 15, 25, 50]}
+          aoMudarPagina={paginacao.setPagina}
+          aoMudarPorPagina={paginacao.setPorPagina}
+          resumo={
+            <>
+              Exibindo {fmtNumero(paginacao.fatia.length)} de {fmtNumero(linhas.length)}
+            </>
+          }
+        />
 
         <div className="flex flex-wrap items-center justify-between gap-space-sm font-label-caps text-label-caps uppercase tracking-widest text-outline">
           <span>

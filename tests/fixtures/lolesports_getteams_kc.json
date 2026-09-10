@@ -1,0 +1,62 @@
+{
+ "data": {
+  "teams": [
+   {
+    "id": "111692118851466302",
+    "slug": "karmine-corp",
+    "name": "Karmine Corp",
+    "code": "KC",
+    "image": "http://static.lolesports.com/teams/1704714951336_KC.png",
+    "alternativeImage": "http://static.lolesports.com/teams/1704714951337_KC.png",
+    "backgroundImage": null,
+    "status": "active",
+    "homeLeague": {
+     "name": "LEC",
+     "region": "EMEA"
+    },
+    "players": [
+     {
+      "id": "103495716771322725",
+      "summonerName": "Canna",
+      "firstName": "Changdong",
+      "lastName": "Kim",
+      "image": "http://static.lolesports.com/players/1774651372836_canna.png",
+      "role": "top"
+     },
+     {
+      "id": "105537190986692036",
+      "summonerName": "Yike",
+      "firstName": "Martin",
+      "lastName": "Sundelin",
+      "image": "http://static.lolesports.com/players/1768550195190_Yike-01.png",
+      "role": "jungle"
+     },
+     {
+      "id": "109461265532592848",
+      "summonerName": "Caliste",
+      "firstName": "Caliste",
+      "lastName": "Henry-Hennebert",
+      "image": "http://static.lolesports.com/players/1774651348279_caliste.png",
+      "role": "bottom"
+     },
+     {
+      "id": "108205130709313212",
+      "summonerName": "kyeahoo",
+      "firstName": "Yeahoo",
+      "lastName": "Kang",
+      "image": "http://static.lolesports.com/players/1774652002153_kyeahoo.png",
+      "role": "mid"
+     },
+     {
+      "id": "106625308523122120",
+      "summonerName": "Busio",
+      "firstName": "Alan",
+      "lastName": "Cwalina",
+      "image": "http://static.lolesports.com/players/1774651329556_busio.png",
+      "role": "support"
+     }
+    ]
+   }
+  ]
+ }
+}

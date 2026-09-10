@@ -395,6 +395,133 @@ class FatoAvaliacaoSteam(Base):
 
 
 # ---------------------------------------------------------------------------
+# Dominio catalogo Xbox (Fase 26) - vitrine de loja
+# ---------------------------------------------------------------------------
+#
+# Espelha `dim_jogo_steam` + `fato_snapshot_jogo_steam`, mas raso de proposito:
+# nao ha CCU publico, nao ha texto de avaliacao em API gratuita da Microsoft. O
+# que a loja da e ficha + preco + se o jogo esta no Game Pass - e e isso que
+# estas tabelas guardam. Fonte: `catalog.gamepass.com` (a lista do GP) e
+# `displaycatalog.mp.microsoft.com` (a ficha), ambos publicos e NAO-oficiais,
+# fixados no mercado BR. Sem FK para o dominio Steam nem para o esports.
+
+
+class DimJogoXbox(Base):
+    """Dimensao de jogo da Xbox Store (atributos que mudam pouco)."""
+
+    __tablename__ = "dim_jogo_xbox"
+
+    #: `ProductId` do Microsoft Store (alfanumerico, ex. "9NKX70BBCDRN"). Chave
+    #: natural da fonte, nao um substituto.
+    product_id: Mapped[str] = mapped_column(String(64), primary_key=True, autoincrement=False)
+    nome: Mapped[str] = mapped_column(Text, nullable=False)
+    #: `ProductType` da Microsoft ("Game", "Durable"...). Guardado para filtrar.
+    tipo: Mapped[str | None] = mapped_column(String(32))
+    desenvolvedora: Mapped[str | None] = mapped_column(Text)
+    publicadora: Mapped[str | None] = mapped_column(Text)
+    data_lancamento: Mapped[date | None] = mapped_column(Date)
+    #: `OriginalReleaseDate` como veio, quando nao parseia para `date`.
+    data_lancamento_texto: Mapped[str | None] = mapped_column(String(64))
+    #: `Properties.Categories` da Microsoft - o equivalente aos generos.
+    generos: Mapped[list[str] | None] = mapped_column(ARRAY(Text))
+    gratuito: Mapped[bool | None] = mapped_column(Boolean)
+    #: Preco de venda no mercado BR na ultima coleta (o historico vai no snapshot).
+    preco_atual: Mapped[Decimal | None] = mapped_column(Numeric(10, 2))
+    #: Preco cheio (MSRP) - igual a `preco_atual` quando nao ha promo.
+    preco_normal: Mapped[Decimal | None] = mapped_column(Numeric(10, 2))
+    moeda: Mapped[str | None] = mapped_column(String(8))
+    desconto_percentual: Mapped[int | None] = mapped_column(Integer)
+    #: Idade minima (`MarketProperties[0].MinimumUserAge`).
+    faixa_etaria: Mapped[int | None] = mapped_column(Integer)
+    #: Arte larga (SuperHeroArt), para o topo da ficha.
+    imagem_header: Mapped[str | None] = mapped_column(Text)
+    #: Arte quadrada (Poster/BoxArt), para a lista.
+    imagem_capa: Mapped[str | None] = mapped_column(Text)
+    #: Link da pagina na Microsoft Store.
+    url_loja: Mapped[str | None] = mapped_column(Text)
+    #: `ShortDescription` da loja - o texto curto da ficha.
+    descricao: Mapped[str | None] = mapped_column(Text)
+
+    #: Nota da Microsoft Store (0.0-5.0), agregada de sempre (`UsageData.AllTime`).
+    #: E o unico sinal de "o publico gostou?" que a API gratuita da - nao ha
+    #: texto de avaliacao individual como na Steam.
+    nota: Mapped[Decimal | None] = mapped_column(Numeric(3, 1))
+    numero_avaliacoes: Mapped[int | None] = mapped_column(Integer)
+    #: Nota dos ultimos 7 dias (`UsageData.7Days`) - o "esta melhorando/piorando".
+    nota_recente: Mapped[Decimal | None] = mapped_column(Numeric(3, 1))
+    #: Recursos (`Properties.Attributes`) ja traduzidos: "4K", "HDR", "Co-op
+    #: online", "Otimizado p/ Series X|S"... So os conhecidos; ruido e descartado.
+    recursos: Mapped[list[str] | None] = mapped_column(ARRAY(Text))
+    #: O jogo tem conquistas? (flag `XblAchievements`). A LISTA de conquistas
+    #: exige conta Xbox Live autenticada, entao aqui e so o sim/nao.
+    tem_conquistas: Mapped[bool | None] = mapped_column(Boolean)
+    #: Classificacao indicativa preferindo a DJCTQ (Brasil): "14", "18", "L"...
+    classificacao_etaria: Mapped[str | None] = mapped_column(String(16))
+    #: Descritores de conteudo ja traduzidos ("Violencia", "Drogas"...).
+    descritores_conteudo: Mapped[list[str] | None] = mapped_column(ARRAY(Text))
+    #: Trailers e capturas da ficha, para a tela de detalhe:
+    #: [{"tipo": "imagem"|"video", "url", "cartaz"}].
+    midias: Mapped[list | None] = mapped_column(JSONB)
+
+    #: Estado atual: o jogo esta no catalogo do Game Pass agora? (o historico de
+    #: entra/sai fica no snapshot).
+    no_game_pass: Mapped[bool | None] = mapped_column(Boolean)
+    #: Primeira vez que o vimos no Game Pass - so preenche, nunca reescreve.
+    game_pass_desde: Mapped[date | None] = mapped_column(Date)
+
+    criado_em: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    atualizado_em: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    snapshots: Mapped[list["FatoSnapshotJogoXbox"]] = relationship(
+        back_populates="jogo", cascade="all, delete-orphan"
+    )
+
+
+class FatoSnapshotJogoXbox(Base):
+    """Serie temporal por jogo do Xbox: uma linha por (product_id, janela).
+
+    Mesmo desenho de `fato_snapshot_jogo_steam`: `janela_coleta` truncada em
+    `snapshot_bucket_minutes` da idempotencia - recoletar dentro da janela e um
+    upsert, nao uma linha nova. O que a vitrine acompanha aqui e preco e a
+    presenca no Game Pass ao longo do tempo.
+    """
+
+    __tablename__ = "fato_snapshot_jogo_xbox"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    product_id: Mapped[str] = mapped_column(
+        ForeignKey("dim_jogo_xbox.product_id", ondelete="CASCADE"), nullable=False
+    )
+    janela_coleta: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+    data_coleta: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+
+    preco_no_momento: Mapped[Decimal | None] = mapped_column(Numeric(10, 2))
+    preco_normal: Mapped[Decimal | None] = mapped_column(Numeric(10, 2))
+    moeda: Mapped[str | None] = mapped_column(String(8))
+    desconto_percentual: Mapped[int | None] = mapped_column(Integer)
+    no_game_pass: Mapped[bool | None] = mapped_column(Boolean)
+    #: Nota da Store no momento da coleta - para a serie de satisfacao no tempo.
+    nota: Mapped[Decimal | None] = mapped_column(Numeric(3, 1))
+    numero_avaliacoes: Mapped[int | None] = mapped_column(Integer)
+    nota_recente: Mapped[Decimal | None] = mapped_column(Numeric(3, 1))
+
+    jogo: Mapped[DimJogoXbox] = relationship(back_populates="snapshots")
+
+    __table_args__ = (
+        UniqueConstraint("product_id", "janela_coleta", name="uq_snapshot_xbox_janela"),
+        Index("ix_snapshot_xbox_janela", "janela_coleta"),
+    )
+
+
+# ---------------------------------------------------------------------------
 # Dominio partidas (esports) - star schema
 # ---------------------------------------------------------------------------
 #
@@ -423,6 +550,17 @@ class DimJogador(Base):
     id_externo: Mapped[str] = mapped_column(String(64), nullable=False)
     nome: Mapped[str | None] = mapped_column(Text)
     regiao: Mapped[str | None] = mapped_column(String(32))
+
+    # --- Elenco profissional (Fase 27, LoL Esports) ---------------------
+    #: Rota do jogador (top/jungle/mid/bottom/support). Nula no Dota (a
+    #: OpenDota nao classifica jogador por funcao de forma estavel).
+    papel: Mapped[str | None] = mapped_column(String(32))
+    #: Nome civil ("Changdong Kim") quando a fonte publica.
+    nome_completo: Mapped[str | None] = mapped_column(Text)
+    imagem: Mapped[str | None] = mapped_column(Text)
+    #: Time atual do jogador. So o elenco (LoL Esports) preenche; a linha de
+    #: `fato_partida_jogador` continua sendo a fonte de "quem jogou onde".
+    id_equipe: Mapped[int | None] = mapped_column(ForeignKey("dim_equipe.id_equipe"))
 
     __table_args__ = (
         UniqueConstraint("id_jogo", "id_externo", name="uq_jogador_jogo_externo"),
@@ -663,6 +801,10 @@ class RankingExterno(Base):
     #: A pontuacao que o metodo da fonte atribuiu. `NULL` se a fonte so
     #: publica ordem, sem numero.
     pontos: Mapped[int | None] = mapped_column(Integer)
+    #: Vitorias/derrotas de serie no split. Preenchido por fontes que publicam
+    #: a tabela de classificacao (LoL Esports), nao so a ordem.
+    vitorias: Mapped[int | None] = mapped_column(Integer)
+    derrotas: Mapped[int | None] = mapped_column(Integer)
     #: `"global"` ou uma regiao. A Valve publica os dois; guardamos o global.
     regiao: Mapped[str | None] = mapped_column(String(20))
 
@@ -783,6 +925,51 @@ class FatoPartidaJogador(Base):
     __table_args__ = (
         UniqueConstraint("id_partida", "slot", name="uq_fato_partida_slot"),
         Index("ix_fato_jogo_personagem", "id_jogo", "id_personagem"),
+    )
+
+
+class FatoLolJogadorPartida(Base):
+    """Uma linha por jogador por jogo de uma serie de LoL profissional.
+
+    Grao parecido com `fato_partida_jogador`, mas de LoL Esports e ligado a
+    `agenda_partida` (nao ha `dim_partida` de LoL - so Dota tem). Alimentado
+    pelo backfill do `lolesports.py`: quando uma serie decidida ainda esta na
+    janela de retencao do feed `livestats`, o frame final de cada jogo da
+    campeao/K/D/A/CS/ouro/nivel por jogador. E o que faz a aba Jogadores
+    funcionar para LoL, agregando estas linhas.
+    """
+
+    __tablename__ = "fato_lol_jogador_partida"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    id_jogador: Mapped[int] = mapped_column(
+        ForeignKey("dim_jogador.id_jogador"), nullable=False
+    )
+    id_agenda: Mapped[int] = mapped_column(
+        ForeignKey("agenda_partida.id", ondelete="CASCADE"), nullable=False
+    )
+    #: 1..5 - qual jogo da serie.
+    jogo_numero: Mapped[int] = mapped_column(Integer, nullable=False)
+
+    campeao: Mapped[str | None] = mapped_column(String(48))
+    k: Mapped[int | None] = mapped_column(Integer)
+    d: Mapped[int | None] = mapped_column(Integer)
+    a: Mapped[int | None] = mapped_column(Integer)
+    cs: Mapped[int | None] = mapped_column(Integer)
+    ouro: Mapped[int | None] = mapped_column(Integer)
+    nivel: Mapped[int | None] = mapped_column(Integer)
+    vitoria: Mapped[bool | None] = mapped_column(Boolean)
+
+    coletado_em: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "id_jogador", "id_agenda", "jogo_numero", name="uq_lol_jgp"
+        ),
+        Index("ix_lol_jgp_agenda", "id_agenda"),
+        Index("ix_lol_jgp_jogador", "id_jogador"),
     )
 
 

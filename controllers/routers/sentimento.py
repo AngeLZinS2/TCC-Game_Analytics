@@ -112,7 +112,7 @@ def avaliacoes_classificadas(
     sessao: Session = Depends(get_db),
     app_id: int | None = Query(None),
     apenas_erros: bool = Query(False, description="so onde o modelo discordou do autor"),
-    limite: int = Query(20, ge=1, le=100),
+    limite: int = Query(20, ge=1, le=300),
     modelo: str | None = Query(None),
 ) -> list[AvaliacaoClassificada]:
     """Avaliacoes reais com a previsao do modelo ao lado do rotulo verdadeiro.
@@ -140,7 +140,12 @@ def avaliacoes_classificadas(
             FatoAvaliacaoSteam.idioma == relatorio["idioma"],
             func.length(FatoAvaliacaoSteam.texto) >= sentimento.MINIMO_CARACTERES,
         )
-        .order_by(FatoAvaliacaoSteam.criada_em.desc().nullslast())
+        # `id` como desempate: sem ele, avaliacoes com o mesmo `criada_em` saem
+        # em ordem arbitraria e a fatia da paginacao client-side "pula".
+        .order_by(
+            FatoAvaliacaoSteam.criada_em.desc().nullslast(),
+            FatoAvaliacaoSteam.id.asc(),
+        )
     )
     if app_id is not None:
         consulta = consulta.where(FatoAvaliacaoSteam.app_id == app_id)

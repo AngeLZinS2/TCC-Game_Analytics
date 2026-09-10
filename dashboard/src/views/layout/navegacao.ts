@@ -30,9 +30,10 @@ export interface ItemNavegacao {
 export const NAVEGACAO: ItemNavegacao[] = [
   { rota: "/", rotulo: "Visão Geral", icone: "space_dashboard", selo: "LIVE" },
 
-  // As duas telas do catalogo da Steam ficam juntas: uma mostra o mercado
-  // (preco, jogadores), a outra o que o publico escreveu sobre o mesmo jogo.
-  { rota: "/steam", rotulo: "Jogos da Steam", icone: "sports_esports" },
+  // Catalogo de Jogos: Steam, PlayStation e Xbox em abas de `/catalogo/:loja`.
+  // `rota` e `/catalogo` (nao `/catalogo/steam`) para o `<NavLink>` casar por
+  // prefixo em qualquer aba, como o item de E-Sports faz.
+  { rota: "/catalogo", rotulo: "Catálogo de Jogos", icone: "sports_esports" },
   {
     rota: "/recomendacoes",
     rotulo: "Recomendações por Reviews",

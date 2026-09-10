@@ -83,6 +83,7 @@ function fonteExterna(jogo: string): string {
   if (jogo === "overwatch") return "OWCS";
   if (jogo === "rocketleague") return "RLCS";
   if (jogo === "dota2") return "DLTV";
+  if (jogo === "leagueoflegends") return "LoL Esports";
   return "Ranking";
 }
 
@@ -1176,7 +1177,13 @@ export function PrevisaoConfrontoPagina({
                   <tr className="bg-surface-container font-label-caps text-label-caps uppercase tracking-wider text-outline">
                     <th className="px-space-md py-space-sm">#</th>
                     <th className="px-space-md py-space-sm">Equipe</th>
-                    <th className="px-space-md py-space-sm text-right">Rating</th>
+                    <th className="px-space-md py-space-sm text-right">
+                      {/* Standings (LoL) publicam V-D; vlr.gg/Valve publicam
+                          um rating numérico. */}
+                      {regiaoRanking.equipes.some((e) => e.vitorias !== null)
+                        ? "V-D"
+                        : "Rating"}
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="font-body-md text-body-sm">
@@ -1210,7 +1217,9 @@ export function PrevisaoConfrontoPagina({
                         </span>
                       </td>
                       <td className="px-space-md py-space-sm text-right font-title-code text-title-code tabular-nums text-primary">
-                        {equipe.pontos ?? "—"}
+                        {equipe.vitorias !== null
+                          ? `${equipe.vitorias}-${equipe.derrotas ?? 0}`
+                          : equipe.pontos ?? "—"}
                       </td>
                     </tr>
                   ))}

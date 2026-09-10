@@ -85,7 +85,7 @@ export function JogoSteamPagina() {
               />
 
               <Link
-                to="/steam"
+                to="/catalogo/steam"
                 className="relative z-10 inline-flex items-center gap-space-xxs font-title-code text-title-code text-outline transition-colors hover:text-primary"
               >
                 <Icone nome="arrow_back" className="text-[16px]" />
