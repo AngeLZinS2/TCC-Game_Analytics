@@ -752,3 +752,39 @@ def test_instrucao_proibe_negar_jogo_coberto():
     """A regra que impede a resposta errada de voltar."""
     assert "não está no nosso banco" in INSTRUCAO
     assert "dado de PARTIDA" in INSTRUCAO
+
+
+def test_perguntar_usa_chave_pessoal_quando_fornecida(monkeypatch: pytest.MonkeyPatch):
+    """Fase 33: `chave_pessoal` tem que chegar no header da chamada real ao
+    OpenRouter no lugar da chave compartilhada - sem chamada de rede de
+    verdade, `_chamar_modelo` e trocado por um dublê que so registra o
+    `settings` que recebeu."""
+    from services.ml import assistente as modulo
+
+    settings_recebidos: list[object] = []
+
+    def _chamar_modelo_falso(corpo, settings):
+        settings_recebidos.append(settings)
+        return {"texto": "resposta de teste", "annotations": None, "modelo": "m", "uso": {}}
+
+    monkeypatch.setattr(modulo, "_chamar_modelo", _chamar_modelo_falso)
+
+    resposta = modulo.perguntar(
+        "quantos jogos vocês monitoram no total?", chave_pessoal="chave-pessoal-de-teste"
+    )
+
+    assert resposta.usando_chave_propria is True
+    assert settings_recebidos[-1].openrouter_api_key == "chave-pessoal-de-teste"
+
+
+def test_perguntar_usa_chave_compartilhada_sem_chave_pessoal(monkeypatch: pytest.MonkeyPatch):
+    from services.ml import assistente as modulo
+
+    def _chamar_modelo_falso(corpo, settings):
+        return {"texto": "resposta de teste", "annotations": None, "modelo": "m", "uso": {}}
+
+    monkeypatch.setattr(modulo, "_chamar_modelo", _chamar_modelo_falso)
+
+    resposta = modulo.perguntar("quantos jogos vocês monitoram no total?")
+
+    assert resposta.usando_chave_propria is False

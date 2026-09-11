@@ -792,6 +792,8 @@ export interface RespostaAssistente {
   series: SerieAssistente[];
   tokens_entrada: number | null;
   tokens_saida: number | null;
+  /** `true` quando esta resposta usou a chave do OpenRouter da propria conta. */
+  usando_chave_propria: boolean;
 }
 
 // --- Previsao de confronto entre equipes (Fase 9) ---
@@ -1224,6 +1226,8 @@ export interface PerfilUsuario {
   nome_exibicao: string | null;
   membro_desde: string;
   total_perguntas_assistente: number;
+  tem_chave_ia_propria: boolean;
+  chave_ia_mascarada: string | null;
 }
 
 export interface EntradaHistoricoAssistente {

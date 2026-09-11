@@ -49,6 +49,9 @@ services:
       ADMIN_SENHA: ${ADMIN_SENHA:-}
       ADMIN_TOKEN_HORAS: ${ADMIN_TOKEN_HORAS:-12}
       NETDATA_URL: ${NETDATA_URL:-http://host.docker.internal:19999}
+      # Chave de IA pessoal (/perfil). Sem isso, salvar/usar chave propria
+      # responde 503 - a chave compartilhada do site continua funcionando.
+      CHAVE_CIFRA_SECRETS: ${CHAVE_CIFRA_SECRETS:-}
     ports:
       - "8000:8000"
     volumes:

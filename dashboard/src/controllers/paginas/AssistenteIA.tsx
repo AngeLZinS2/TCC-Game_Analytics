@@ -31,7 +31,7 @@ import { useMemo, useState } from "react";
 
 import { usePerguntarAssistente, useStatusAssistente, useVisaoGeral } from "@models/api/consultas";
 import type { RespostaAssistente } from "@models/api/tipos";
-import { Icone, MensagemErro } from "@views/componentes/base";
+import { Icone, MensagemErro, Selo } from "@views/componentes/base";
 import { Painel } from "@views/componentes/hud";
 import { Modal } from "@views/componentes/Modal";
 import { AcoesResposta } from "./assistente/AcoesResposta";
@@ -251,9 +251,17 @@ export function AssistenteIAPagina() {
                     <Icone nome="chat" className="text-[16px]" />
                     Resposta
                   </span>
-                  <span className="font-badge-status text-badge-status uppercase tracking-wider text-outline">
-                    {fmtNumero(resposta.tokens_entrada)} → {fmtNumero(resposta.tokens_saida)}{" "}
-                    tokens
+                  <span className="flex items-center gap-space-xs">
+                    {resposta.usando_chave_propria && (
+                      <Selo cor="positivo">
+                        <Icone nome="vpn_key" className="text-[12px]" />
+                        Sua chave
+                      </Selo>
+                    )}
+                    <span className="font-badge-status text-badge-status uppercase tracking-wider text-outline">
+                      {fmtNumero(resposta.tokens_entrada)} → {fmtNumero(resposta.tokens_saida)}{" "}
+                      tokens
+                    </span>
                   </span>
                 </div>
 

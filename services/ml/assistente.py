@@ -276,6 +276,9 @@ class Resposta:
     fontes_web: list[dict[str, str]] = field(default_factory=list)
     tokens_entrada: int | None = None
     tokens_saida: int | None = None
+    #: `True` quando `perguntar()` recebeu `chave_pessoal` - a resposta usou a
+    #: chave do OpenRouter da propria conta, nao a compartilhada do site.
+    usando_chave_propria: bool = False
 
 
 class AssistenteIndisponivel(RuntimeError):
@@ -2169,9 +2172,17 @@ def _chamar_modelo(corpo: dict[str, Any], settings) -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 
-def perguntar(pergunta: str) -> Resposta:
-    """Monta o contexto, chama o modelo e devolve resposta + contexto usado."""
+def perguntar(pergunta: str, chave_pessoal: str | None = None) -> Resposta:
+    """Monta o contexto, chama o modelo e devolve resposta + contexto usado.
+
+    `chave_pessoal`: chave do OpenRouter da propria conta (Fase 33), ja
+    decifrada por quem chamou. Quando presente, substitui a chave
+    compartilhada do site so nesta chamada - `settings` vira uma copia local,
+    o `.env`/processo nunca muda.
+    """
     settings = get_settings()
+    if chave_pessoal:
+        settings = settings.model_copy(update={"openrouter_api_key": chave_pessoal})
     if not settings.openrouter_api_key:
         raise AssistenteIndisponivel(
             "OPENROUTER_API_KEY nao configurada. Defina no .env para usar o assistente."
@@ -2189,6 +2200,7 @@ def perguntar(pergunta: str) -> Resposta:
             ),
             modelo=settings.openrouter_model,
             blocos=[b for b in blocos if b.chave == "geral"],
+            usando_chave_propria=bool(chave_pessoal),
         )
 
     contexto = "\n\n".join(
@@ -2322,6 +2334,7 @@ def perguntar(pergunta: str) -> Resposta:
         fontes_web=fontes_web,
         tokens_entrada=uso.get("prompt_tokens"),
         tokens_saida=uso.get("completion_tokens"),
+        usando_chave_propria=bool(chave_pessoal),
     )
 
 

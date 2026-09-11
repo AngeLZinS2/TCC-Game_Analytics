@@ -601,6 +601,26 @@ export function useDesfavoritarEquipe() {
   });
 }
 
+// --- Chave de IA pessoal (Fase 33) ---
+
+export function useSalvarChaveIA() {
+  const cliente = useQueryClient();
+  return useMutation({
+    mutationFn: async (chave: string) =>
+      chamar("/api/usuario/chave-ia", "PUT", { chave }, await cabecalhoAuthUsuario()),
+    onSuccess: () => cliente.invalidateQueries({ queryKey: ["usuario", "perfil"] }),
+  });
+}
+
+export function useRemoverChaveIA() {
+  const cliente = useQueryClient();
+  return useMutation({
+    mutationFn: async () =>
+      chamar("/api/usuario/chave-ia", "DELETE", undefined, await cabecalhoAuthUsuario()),
+    onSuccess: () => cliente.invalidateQueries({ queryKey: ["usuario", "perfil"] }),
+  });
+}
+
 // --- Previsao de confronto entre equipes (Fase 9) ---
 //
 // Todos estes hooks recebem `jogo` e o mandam para a API.

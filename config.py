@@ -381,6 +381,13 @@ class Settings(BaseSettings):
     #: Cache do JWKS do Google em memoria, pra nao buscar a cada requisicao.
     firebase_jwks_cache_segundos: int = Field(default=3600, ge=60)
 
+    # --- Chave de IA pessoal (Fase 33) ---
+    #: Segredo mestre da cifra Fernet que protege a chave do OpenRouter de
+    #: cada conta (`services/cifra.py`). Gerado com `Fernet.generate_key()` -
+    #: sem ele configurado, salvar/usar chave propria responde 503, igual ao
+    #: assistente sem OPENROUTER_API_KEY.
+    chave_cifra_secrets: str | None = None
+
     #: Quantos jogos do ranking oficial de MAIS JOGADOS entram no catalogo a
     #: cada rodada da Steam (o mesmo "Most Played" que o SteamDB espelha).
     #:

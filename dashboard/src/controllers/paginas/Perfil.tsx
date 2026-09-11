@@ -36,6 +36,7 @@ import { MarcaGithub, MarcaGoogle } from "@views/componentes/MarcasOAuth";
 import { corDoJogo } from "@views/tema";
 import { fmtData, fmtMoeda, fmtNumero, fmtRelativo } from "@util/formatos";
 import { agruparPorDia, useHistoricoAssistente } from "./assistente/historico";
+import { PainelChaveIA } from "./conta/PainelChaveIA";
 
 function hora(iso: string): string {
   return new Date(iso).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
@@ -187,6 +188,8 @@ export function PerfilPagina() {
           </div>
         )}
       </Painel>
+
+      <PainelChaveIA perfil={perfil.data} />
 
       {/* ==================== O PLAYDB AGORA ==================== */}
       <Painel

@@ -117,15 +117,15 @@ export async function enviar<T>(
 }
 
 /**
- * PATCH/DELETE com corpo opcional - o historico de perguntas do Assistente
- * (Fase 31) e o primeiro caso que precisa de um metodo alem de GET/POST.
- * Separado de `enviar` (que sempre serializa `corpo`, mesmo `undefined`, e
- * sempre espera um corpo JSON de volta) porque um DELETE devolve 204 sem
- * corpo nenhum.
+ * PUT/PATCH/DELETE com corpo opcional - o historico de perguntas do
+ * Assistente (Fase 31) e o primeiro caso que precisa de um metodo alem de
+ * GET/POST. Separado de `enviar` (que sempre serializa `corpo`, mesmo
+ * `undefined`, e sempre espera um corpo JSON de volta) porque um DELETE
+ * devolve 204 sem corpo nenhum.
  */
 export async function chamar<T = void>(
   caminho: string,
-  metodo: "PATCH" | "DELETE",
+  metodo: "PUT" | "PATCH" | "DELETE",
   corpo?: unknown,
   cabecalhos?: Record<string, string>,
 ): Promise<T> {

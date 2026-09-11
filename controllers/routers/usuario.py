@@ -23,7 +23,13 @@ from config import get_settings
 from models.models import DimUsuario, FatoPerguntaAssistente
 from models.session import get_db, session_scope
 from services.autenticacao import TokenInvalido, verificar_token_firebase
-from views.schemas import EntradaAvaliarPergunta, EntradaHistoricoAssistente, PerfilUsuario
+from services.cifra import CifraIndisponivel, cifrar, decifrar, mascarar
+from views.schemas import (
+    EntradaAvaliarPergunta,
+    EntradaChaveIA,
+    EntradaHistoricoAssistente,
+    PerfilUsuario,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -97,9 +103,11 @@ def perfil(
     usuario: UsuarioAtual = Depends(exigir_usuario),
     sessao: Session = Depends(get_db),
 ) -> PerfilUsuario:
-    linha = sessao.execute(
-        select(DimUsuario.criado_em).where(DimUsuario.id_usuario == usuario.id_usuario)
-    ).scalar_one()
+    criado_em, chave_cifrada = sessao.execute(
+        select(DimUsuario.criado_em, DimUsuario.openrouter_api_key_cifrada).where(
+            DimUsuario.id_usuario == usuario.id_usuario
+        )
+    ).one()
 
     total = sessao.execute(
         select(func.count())
@@ -107,12 +115,58 @@ def perfil(
         .where(FatoPerguntaAssistente.id_usuario == usuario.id_usuario)
     ).scalar_one()
 
+    chave_mascarada = None
+    if chave_cifrada:
+        chave_texto = decifrar(chave_cifrada)
+        if chave_texto:
+            chave_mascarada = mascarar(chave_texto)
+
     return PerfilUsuario(
         email=usuario.email,
         nome_exibicao=usuario.nome_exibicao,
-        membro_desde=linha,
+        membro_desde=criado_em,
         total_perguntas_assistente=total,
+        tem_chave_ia_propria=bool(chave_cifrada),
+        chave_ia_mascarada=chave_mascarada,
     )
+
+
+@router.put("/chave-ia", status_code=204)
+def salvar_chave_ia(
+    entrada: EntradaChaveIA,
+    usuario: UsuarioAtual = Depends(exigir_usuario),
+    sessao: Session = Depends(get_db),
+) -> None:
+    """Cadastra/troca a chave do OpenRouter da propria conta.
+
+    Nao testa a chave contra o provedor aqui - so guarda cifrada. Uma chave
+    invalida so aparece na proxima pergunta ao assistente, com o mesmo erro
+    que a chave compartilhada ja mostra quando o provedor recusa.
+    """
+    try:
+        cifrada = cifrar(entrada.chave.strip())
+    except CifraIndisponivel as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+    sessao.execute(
+        update(DimUsuario)
+        .where(DimUsuario.id_usuario == usuario.id_usuario)
+        .values(openrouter_api_key_cifrada=cifrada)
+    )
+    sessao.commit()
+
+
+@router.delete("/chave-ia", status_code=204)
+def remover_chave_ia(
+    usuario: UsuarioAtual = Depends(exigir_usuario),
+    sessao: Session = Depends(get_db),
+) -> None:
+    sessao.execute(
+        update(DimUsuario)
+        .where(DimUsuario.id_usuario == usuario.id_usuario)
+        .values(openrouter_api_key_cifrada=None)
+    )
+    sessao.commit()
 
 
 @router.get("/historico-assistente", response_model=list[EntradaHistoricoAssistente])

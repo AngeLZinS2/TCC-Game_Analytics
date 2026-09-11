@@ -14,9 +14,11 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import text
 
+from config import get_settings
 from controllers.main import app
 from controllers.routers import usuario
 from models.session import get_engine
+from services import cifra
 
 CABECALHO = {"Authorization": "Bearer token-de-teste"}
 
@@ -80,3 +82,50 @@ def test_avaliar_pergunta_inexistente_da_404(cliente: TestClient, com_usuario):
 def test_limpar_historico_vazio_nao_da_erro(cliente: TestClient, com_usuario):
     resposta = cliente.delete("/api/usuario/historico-assistente", headers=CABECALHO)
     assert resposta.status_code == 204
+
+
+def test_perfil_comeca_sem_chave_ia_propria(cliente: TestClient, com_usuario):
+    resposta = cliente.get("/api/usuario/perfil", headers=CABECALHO)
+    corpo = resposta.json()
+    assert corpo["tem_chave_ia_propria"] is False
+    assert corpo["chave_ia_mascarada"] is None
+
+
+def test_salvar_e_remover_chave_ia(cliente: TestClient, com_usuario):
+    salvar = cliente.put(
+        "/api/usuario/chave-ia",
+        json={"chave": "sk-or-v1-chave-de-teste-nao-e-real-9999"},
+        headers=CABECALHO,
+    )
+    assert salvar.status_code == 204
+
+    perfil = cliente.get("/api/usuario/perfil", headers=CABECALHO).json()
+    assert perfil["tem_chave_ia_propria"] is True
+    assert perfil["chave_ia_mascarada"] == "••••9999"
+
+    remover = cliente.delete("/api/usuario/chave-ia", headers=CABECALHO)
+    assert remover.status_code == 204
+
+    perfil2 = cliente.get("/api/usuario/perfil", headers=CABECALHO).json()
+    assert perfil2["tem_chave_ia_propria"] is False
+    assert perfil2["chave_ia_mascarada"] is None
+
+
+def test_salvar_chave_curta_demais_da_422(cliente: TestClient, com_usuario):
+    resposta = cliente.put(
+        "/api/usuario/chave-ia", json={"chave": "abc"}, headers=CABECALHO
+    )
+    assert resposta.status_code == 422
+
+
+def test_salvar_chave_sem_cifra_configurada_da_503(
+    cliente: TestClient, com_usuario, monkeypatch: pytest.MonkeyPatch
+):
+    sem_cifra = get_settings().model_copy(update={"chave_cifra_secrets": None})
+    monkeypatch.setattr(cifra, "get_settings", lambda: sem_cifra)
+    resposta = cliente.put(
+        "/api/usuario/chave-ia",
+        json={"chave": "sk-or-v1-outra-chave-de-teste-000"},
+        headers=CABECALHO,
+    )
+    assert resposta.status_code == 503

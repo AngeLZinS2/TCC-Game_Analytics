@@ -924,6 +924,9 @@ class RespostaAssistente(BaseModel):
     series: list[SerieAssistente] = []
     tokens_entrada: int | None
     tokens_saida: int | None
+    #: `True` quando esta resposta usou a chave do OpenRouter da propria
+    #: conta (Fase 33), em vez da chave compartilhada do site.
+    usando_chave_propria: bool = False
 
 
 # ---------------------------------------------------------------------------
@@ -1422,6 +1425,11 @@ class PerfilUsuario(BaseModel):
     nome_exibicao: str | None = None
     membro_desde: datetime
     total_perguntas_assistente: int
+    #: `True` quando a conta tem chave propria do OpenRouter cadastrada - o
+    #: Assistente de IA passa a usar ELA em vez da chave compartilhada do
+    #: site. A chave em si nunca sai numa resposta de API, so a mascara.
+    tem_chave_ia_propria: bool = False
+    chave_ia_mascarada: str | None = None
 
 
 class EntradaHistoricoAssistente(BaseModel):
@@ -1486,3 +1494,12 @@ class EquipeFavorita(BaseModel):
     #: pode favoritar o mesmo nome de time em jogos diferentes.
     jogo_codigo: str
     proxima_partida: ProximaPartidaFavorita | None = None
+
+
+# ---------------------------------------------------------------------------
+# Chave de IA pessoal (Fase 33)
+# ---------------------------------------------------------------------------
+
+
+class EntradaChaveIA(BaseModel):
+    chave: str = Field(min_length=10, max_length=300)
