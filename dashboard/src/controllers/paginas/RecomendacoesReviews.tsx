@@ -34,6 +34,7 @@ import {
   useComparacaoSentimento,
   useJogosSteam,
   usePanoramaSentimento,
+  useResumoReviews,
 } from "@models/api/consultas";
 import type {
   AvaliacaoClassificada,
@@ -41,8 +42,9 @@ import type {
   JogoSentimento,
   JogoSteam,
   PanoramaSentimento,
+  ResumoReviews,
 } from "@models/api/tipos";
-import { Consulta, Icone, MensagemErro, Selo } from "@views/componentes/base";
+import { Aviso, Consulta, Icone, MensagemErro, Selo } from "@views/componentes/base";
 import { ArteJogo, CapaJogo } from "@views/componentes/CapaJogo";
 import { AreaNeon } from "@views/componentes/graficos/AreaNeon";
 import { BarraFina, KpiHud, Paginacao, Painel, Pilula } from "@views/componentes/hud";
@@ -400,6 +402,116 @@ function DestaqueDoJogo({
   );
 }
 
+/** Síntese por IA (Groq) do que as avaliações do jogo dizem - gerada em lote
+ * pelo agendador, não na hora. Sem chave do Groq configurada, ou jogo com
+ * poucas avaliações, ou rodada que ainda não chegou nele: a consulta dá 404
+ * e o painel mostra o motivo em vez de um erro genérico. */
+function ResumoPorIA({
+  consulta,
+  carregandoJogo,
+}: {
+  consulta: {
+    data: ResumoReviews | undefined;
+    isLoading: boolean;
+    isError: boolean;
+  };
+  carregandoJogo: boolean;
+}) {
+  if (carregandoJogo || consulta.isLoading) {
+    return (
+      <Painel icone="auto_awesome" titulo="Resumo por IA">
+        <div className="h-28 animate-pulse rounded-lg bg-surface-container-high/60" />
+      </Painel>
+    );
+  }
+
+  if (consulta.isError || !consulta.data) {
+    return (
+      <Painel icone="auto_awesome" titulo="Resumo por IA">
+        <Aviso>
+          Ainda sem resumo por IA para este jogo — falta chave do Groq
+          configurada, avaliações de sobra pra sintetizar, ou a próxima rodada
+          do agendador ainda não chegou nele.
+        </Aviso>
+      </Painel>
+    );
+  }
+
+  const resumo = consulta.data;
+
+  return (
+    <Painel
+      icone="auto_awesome"
+      titulo="Resumo por IA"
+      descricao="O que a comunidade está dizendo, sintetizado por IA a partir de uma amostra das avaliações."
+      meta={
+        <div className="flex flex-wrap items-center gap-space-xs">
+          <Selo cor="neutro">via {resumo.modelo || "IA"}</Selo>
+          <span
+            className="font-label-caps text-label-caps uppercase tracking-widest text-outline"
+            title={fmtDataHora(resumo.gerado_em)}
+          >
+            gerado {fmtRelativo(resumo.gerado_em)} · {fmtNumero(resumo.avaliacoes_usadas)}{" "}
+            avaliações na amostra
+          </span>
+        </div>
+      }
+    >
+      <p className="font-body-md text-[15px] leading-[1.65] text-on-surface">
+        {resumo.texto}
+      </p>
+
+      {(resumo.positivos.length > 0 || resumo.negativos.length > 0) && (
+        <div className="mt-space-base grid grid-cols-1 gap-space-base sm:grid-cols-2">
+          {resumo.positivos.length > 0 && (
+            <div className="rounded-xl border border-outline-variant/15 bg-surface-container-low/50 p-space-base">
+              <div
+                className="flex items-center gap-space-xxs font-badge-status text-badge-status uppercase tracking-wide"
+                style={{ color: PALETA_POLOS.positivo }}
+              >
+                <Icone nome="thumb_up" className="text-[13px]" />
+                O que agradou
+              </div>
+              <ul className="mt-space-sm flex flex-col gap-space-xs">
+                {resumo.positivos.map((ponto, i) => (
+                  <li
+                    key={i}
+                    className="font-body-sm text-body-sm leading-snug text-on-surface-variant"
+                  >
+                    {ponto}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {resumo.negativos.length > 0 && (
+            <div className="rounded-xl border border-outline-variant/15 bg-surface-container-low/50 p-space-base">
+              <div
+                className="flex items-center gap-space-xxs font-badge-status text-badge-status uppercase tracking-wide"
+                style={{ color: PALETA_POLOS.negativo }}
+              >
+                <Icone nome="thumb_down" className="text-[13px]" />
+                O que incomodou
+              </div>
+              <ul className="mt-space-sm flex flex-col gap-space-xs">
+                {resumo.negativos.map((ponto, i) => (
+                  <li
+                    key={i}
+                    className="font-body-sm text-body-sm leading-snug text-on-surface-variant"
+                  >
+                    {ponto}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
+    </Painel>
+  );
+}
+
 /** O classificador ao vivo: um texto entra, uma probabilidade sai. */
 function Classificador({ modelo }: { modelo?: string }) {
   const [texto, setTexto] = useState(EXEMPLOS[0]);
@@ -547,6 +659,7 @@ export function RecomendacoesReviewsPagina() {
   const comparacao = useComparacaoSentimento();
   const panoramaGeral = usePanoramaSentimento(null);
   const panorama = usePanoramaSentimento(appId);
+  const resumoIA = useResumoReviews(appId);
   const avaliacoes = useAvaliacoesClassificadas(appId, apenasErros, modelo);
   const catalogo = useJogosSteam({ ordenar_por: "jogadores", limite: 200 });
 
@@ -674,6 +787,9 @@ export function RecomendacoesReviewsPagina() {
               <div className="h-52 animate-pulse rounded-lg bg-surface-container-high/60" />
             )}
           </Painel>
+
+          {/* ==================== RESUMO POR IA ==================== */}
+          {appId !== null && <ResumoPorIA consulta={resumoIA} carregandoJogo={!jogoSelecionado} />}
 
           {/* ==================== KPIS DO JOGO ==================== */}
           <Consulta estado={panorama} altura={160}>

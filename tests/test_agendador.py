@@ -159,8 +159,10 @@ def test_intervalos_vem_da_configuracao():
         agendador_treino_confronto_minutos = 480
         agendador_pandascore_minutos = 30
         agendador_xbox_minutos = 180
+        agendador_resumo_reviews_minutos = 200
         opgg_enabled = True
         itad_api_key = "chave-de-teste"
+        groq_api_key = "chave-groq-teste"
         pandascore_api_key = None
         hltb_enabled = True
         xbox_enabled = True
@@ -177,6 +179,7 @@ def test_intervalos_vem_da_configuracao():
         "brackets": 4500,
         "ranking": 5400,
         "precos": 7200,
+        "resumo_reviews": 12000,
         "tempo_jogo": 9000,
         "xbox": 10800,
         "esports_opgg": 21600,
@@ -224,6 +227,7 @@ def test_tarefa_de_preco_so_entra_com_chave_do_itad():
         agendador_pandascore_minutos = 30
         opgg_enabled = True
         itad_api_key = None
+        groq_api_key = None
         pandascore_api_key = None
         hltb_enabled = True
         xbox_enabled = False
@@ -231,6 +235,44 @@ def test_tarefa_de_preco_so_entra_com_chave_do_itad():
 
     nomes = {t.nome for t in montar_tarefas(SemChave())}
     assert "precos" not in nomes
+
+
+def test_tarefa_de_resumo_reviews_so_entra_com_chave_do_groq():
+    class SemChave:
+        agendador_steam_minutos = 60
+        agendador_steam_online_minutos = 15
+        agendador_agenda_proxima_minutos = 5
+        agendador_opendota_minutos = 360
+        agendador_liquipedia_minutos = 720
+        agendador_equipes_minutos = 1440
+        agendador_brackets_minutos = 1440
+        agendador_ranking_minutos = 10080
+        agendador_precos_minutos = 720
+        agendador_opendota_limite = 100
+        agendador_tempo_jogo_minutos = 1440
+        agendador_agentes_minutos = 10080
+        agendador_esports_opgg_minutos = 360
+        agendador_vlr_minutos = 1440
+        agendador_vlr_rankings_minutos = 10080
+        agendador_ubi_r6_minutos = 10080
+        agendador_owcs_minutos = 1440
+        agendador_rlcs_minutos = 1440
+        agendador_dltv_minutos = 1440
+        agendador_vlr_detalhes_minutos = 1440
+        agendador_lolesports_minutos = 1440
+        agendador_lolesports_cenario_minutos = 720
+        agendador_treino_confronto_minutos = 480
+        agendador_pandascore_minutos = 30
+        opgg_enabled = True
+        itad_api_key = None
+        groq_api_key = None
+        pandascore_api_key = None
+        hltb_enabled = True
+        xbox_enabled = False
+        agendador_xbox_minutos = 360
+
+    nomes = {t.nome for t in montar_tarefas(SemChave())}
+    assert "resumo_reviews" not in nomes
 
 
 def test_tarefa_de_tempo_jogo_nao_entra_quando_desabilitada():
@@ -261,6 +303,7 @@ def test_tarefa_de_tempo_jogo_nao_entra_quando_desabilitada():
         agendador_pandascore_minutos = 30
         opgg_enabled = True
         itad_api_key = None
+        groq_api_key = None
         pandascore_api_key = None
         hltb_enabled = False
         xbox_enabled = False
@@ -299,6 +342,7 @@ def test_tarefa_de_xbox_nao_entra_quando_desabilitada():
         agendador_xbox_minutos = 360
         opgg_enabled = True
         itad_api_key = None
+        groq_api_key = None
         pandascore_api_key = None
         hltb_enabled = True
         xbox_enabled = False
@@ -335,6 +379,7 @@ def test_pandascore_troca_o_hltv_quando_ha_chave():
         agendador_pandascore_minutos = 30
         opgg_enabled = True
         itad_api_key = None
+        groq_api_key = None
         pandascore_api_key = "chave-de-teste"
         hltb_enabled = True
         xbox_enabled = False

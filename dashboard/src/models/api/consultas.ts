@@ -38,6 +38,7 @@ import type {
   EquipeConfronto,
   LigaConfronto,
   PanoramaSentimento,
+  ResumoReviews,
   PrevisaoConfronto,
   RankingOficial,
   RelatorioConfronto,
@@ -254,6 +255,19 @@ export function usePanoramaSentimento(appId: number | null) {
         "/api/ml/sentimento/panorama",
         appId ? { app_id: appId } : undefined,
       ),
+    retry: false,
+  });
+}
+
+/** Resumo por IA (Groq) das avaliacoes do jogo - cacheado, gerado em lote.
+ * 404 quando o jogo ainda nao tem avaliacoes suficientes ou a rodada do
+ * agendador ainda nao chegou nele; a tela trata como "ainda sem resumo". */
+export function useResumoReviews(appId: number | null) {
+  return useQuery({
+    queryKey: ["sentimento", "resumo", appId],
+    queryFn: () =>
+      buscar<ResumoReviews>("/api/ml/sentimento/resumo", { app_id: appId }),
+    enabled: appId !== null,
     retry: false,
   });
 }

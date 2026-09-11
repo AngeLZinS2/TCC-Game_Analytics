@@ -33,6 +33,7 @@ from views.schemas import (
     PanoramaSentimento,
     PontoSentimentoDia,
     ResultadoSentimento,
+    ResumoReviews,
 )
 from models.models import DimJogoSteam, FatoAvaliacaoSteam
 from models.session import get_db
@@ -276,4 +277,33 @@ def panorama(
         por_jogo=por_jogo,
         por_dia=por_dia,
         aspectos=aspectos,
+    )
+
+
+@router.get("/resumo", response_model=ResumoReviews)
+def resumo(
+    app_id: int = Query(...),
+    sessao: Session = Depends(get_db),
+) -> ResumoReviews:
+    """O resumo por IA (Groq) das avaliacoes de um jogo, ja cacheado.
+
+    Gerado em lote pelo agendador (`ResumoReviewsCollector`), nao na hora - um
+    jogo sem `resumo_reviews_texto` ainda (poucas avaliacoes, ou a rodada
+    ainda nao chegou nele) devolve 404, o mesmo padrao de "sem snapshot" do
+    ranking oficial.
+    """
+    jogo = sessao.execute(
+        select(DimJogoSteam).where(DimJogoSteam.app_id == app_id)
+    ).scalar_one_or_none()
+    if jogo is None or not jogo.resumo_reviews_texto:
+        raise HTTPException(status_code=404, detail="ainda sem resumo por IA para este jogo")
+
+    return ResumoReviews(
+        app_id=app_id,
+        texto=jogo.resumo_reviews_texto,
+        positivos=jogo.resumo_reviews_positivos or [],
+        negativos=jogo.resumo_reviews_negativos or [],
+        gerado_em=jogo.resumo_reviews_em,
+        modelo=jogo.resumo_reviews_modelo or "",
+        avaliacoes_usadas=jogo.resumo_reviews_avaliacoes or 0,
     )

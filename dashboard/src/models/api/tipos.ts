@@ -581,6 +581,19 @@ export interface PanoramaSentimento {
   aspectos: AspectoSentimento[];
 }
 
+/** Sintese por IA (Groq) do que as avaliacoes de um jogo dizem. Gerada em
+ * lote pelo agendador, nao em tempo real - `gerado_em`/`avaliacoes_usadas`
+ * deixam isso claro na tela. */
+export interface ResumoReviews {
+  app_id: number;
+  texto: string;
+  positivos: string[];
+  negativos: string[];
+  gerado_em: string;
+  modelo: string;
+  avaliacoes_usadas: number;
+}
+
 export interface ConjuntoSentimento {
   avaliacoes: number;
   total_no_banco: number;

@@ -180,6 +180,19 @@ class DimJogoSteam(Base):
     hltb_horas_completista: Mapped[Decimal | None] = mapped_column(Numeric(6, 1))
     coletado_tempo_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
+    # --- Resumo de avaliacoes por IA (Fase 28, Groq) ---------------------
+    #: Texto corrido (2-4 frases) sintetizando a recepcao, gerado a partir de
+    #: uma amostra de `fato_avaliacao_steam`. `None` = ainda nao resumido ou
+    #: avaliacoes de menos (`resumo_reviews_minimo_avaliacoes`).
+    resumo_reviews_texto: Mapped[str | None] = mapped_column(Text)
+    resumo_reviews_positivos: Mapped[list[str] | None] = mapped_column(ARRAY(Text))
+    resumo_reviews_negativos: Mapped[list[str] | None] = mapped_column(ARRAY(Text))
+    resumo_reviews_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    #: Qual modelo gerou - transparencia (a tela mostra "resumo por IA, via <modelo>").
+    resumo_reviews_modelo: Mapped[str | None] = mapped_column(String(80))
+    #: Quantas avaliacoes entraram na amostra - contexto de quao robusto e o resumo.
+    resumo_reviews_avaliacoes: Mapped[int | None] = mapped_column(Integer)
+
     criado_em: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

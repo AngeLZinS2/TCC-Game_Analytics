@@ -737,6 +737,24 @@ class PanoramaSentimento(BaseModel):
     aspectos: list[AspectoSentimento]
 
 
+class ResumoReviews(BaseModel):
+    """Sintese por IA (Groq) do que as avaliacoes de um jogo dizem.
+
+    Gerada periodicamente pelo agendador a partir de uma amostra de
+    `fato_avaliacao_steam` - nao e em tempo real, por isso `gerado_em` e
+    `avaliacoes_usadas` acompanham, pra tela deixar claro que e um retrato,
+    nao a contagem exata de agora.
+    """
+
+    app_id: int
+    texto: str
+    positivos: list[str]
+    negativos: list[str]
+    gerado_em: datetime
+    modelo: str
+    avaliacoes_usadas: int
+
+
 class ConjuntoSentimento(BaseModel):
     avaliacoes: int
     total_no_banco: int

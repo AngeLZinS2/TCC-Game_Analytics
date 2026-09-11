@@ -167,6 +167,13 @@ class Settings(BaseSettings):
     #: Sem `itad_api_key` a tarefa nem e agendada.
     agendador_precos_minutos: int = Field(default=60, ge=15)
 
+    #: Intervalo entre rodadas do resumo de avaliacoes por IA (Groq), em
+    #: minutos. 2h x 6 jogos/rodada (ver `services/collectors/resumo_reviews.py`)
+    #: cobre o catalogo inteiro em menos de um dia, bem dentro do orcamento
+    #: gratis do Groq (1000 req / 200 mil tokens por dia). Sem `groq_api_key`
+    #: a tarefa nem e agendada.
+    agendador_resumo_reviews_minutos: int = Field(default=120, ge=30)
+
     #: Coletar uma vez logo que o agendador sobe, em vez de esperar o intervalo.
     #:
     #: Seguro por construcao: a coleta da Steam e upsert na janela horaria e a
@@ -319,7 +326,7 @@ class Settings(BaseSettings):
     openrouter_api_key: str | None = None
     openrouter_base_url: str = "https://openrouter.ai/api/v1"
     #: Modelo do OpenRouter. O padrao e gratuito e responde bem em portugues.
-    openrouter_model: str = "minimax/minimax-m3:free"
+    openrouter_model: str = "google/gemma-4-26b-a4b-it:free"
     openrouter_timeout_seconds: float = Field(default=60.0, gt=0)
     #: Quando a nossa base e as APIs nao respondem uma pergunta do mundo dos
     #: jogos, o assistente deixa o OpenRouter buscar na web (plugin `web`) e
@@ -328,6 +335,27 @@ class Settings(BaseSettings):
     assistente_web_habilitada: bool = True
     #: Quantos resultados a busca da web traz. Mais e mais contexto e mais custo.
     assistente_web_max_resultados: int = Field(default=5, ge=1, le=10)
+
+    # --- Resumo de avaliacoes por IA (Groq) ---
+    #: Conta separada da do assistente de proposito: o Groq gratis da 1000
+    #: req/dia (contra as 50/dia do OpenRouter sem credito) - e o orcamento
+    #: certo pra resumir o catalogo inteiro sem competir com quem conversa
+    #: com o assistente. Sem chave, o endpoint devolve "ainda sem resumo" e a
+    #: tarefa do agendador nem entra - estado esperado, como o resto do
+    #: projeto que depende de chave de terceiro.
+    groq_api_key: str | None = None
+    groq_base_url: str = "https://api.groq.com/openai/v1"
+    groq_model: str = "llama-3.3-70b-versatile"
+    groq_timeout_seconds: float = Field(default=60.0, gt=0)
+    #: So vale resumir jogo com avaliacoes de sobra pra ter o que sintetizar.
+    resumo_reviews_minimo_avaliacoes: int = Field(default=15, ge=1)
+    #: Quantas avaliacoes (metade positivas, metade negativas) entram no
+    #: prompt. Mais e mais contexto pro modelo, mas mais token por chamada -
+    #: 12 cobre bem sem estourar o TPM gratis do Groq (8 mil/min).
+    resumo_reviews_amostra: int = Field(default=12, ge=4, le=40)
+    #: Resumo joga fora depois desse tempo e entra na fila de novo - captura
+    #: avaliacoes novas sem resumir tudo toda hora.
+    resumo_reviews_revalidar_dias: int = Field(default=7, ge=1)
 
     #: Quantos jogos do ranking oficial de MAIS JOGADOS entram no catalogo a
     #: cada rodada da Steam (o mesmo "Most Played" que o SteamDB espelha).

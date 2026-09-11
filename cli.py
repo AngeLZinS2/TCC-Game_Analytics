@@ -49,6 +49,7 @@ FONTES = (
     "owcs-standings",
     "rlcs-rankings",
     "dltv-ranking",
+    "resumo-reviews",
 )
 
 
@@ -159,14 +160,15 @@ def _parser() -> argparse.ArgumentParser:
         ),
     )
 
-    itad = coletar.add_argument_group("itad / hltb")
+    itad = coletar.add_argument_group("itad / hltb / resumo-reviews")
     itad.add_argument(
         "--limite-jogos",
         type=int,
         metavar="N",
         help=(
             "so os N primeiros jogos pendentes (preco pago no itad, "
-            "tempo pra zerar no hltb) - util para testar"
+            "tempo pra zerar no hltb, resumo por IA no resumo-reviews) - "
+            "util para testar"
         ),
     )
     itad.add_argument(
@@ -315,6 +317,15 @@ def _construir_coletor(args: argparse.Namespace, storage):
             revalidar_vazios_dias=settings.itad_revalidar_vazios_dias,
         )
 
+    if args.fonte == "resumo-reviews":
+        from services.collectors.resumo_reviews import ResumoReviewsCollector
+
+        return ResumoReviewsCollector(
+            raw_storage=storage,
+            settings=settings,
+            limite=args.limite_jogos,
+        )
+
     if args.fonte == "lol-campeoes":
         from services.collectors.lol_campeoes import CampeoesLolCollector
 
@@ -450,6 +461,10 @@ def _carregador(fonte: str):
         return carregar
     if fonte == "itad":
         from services.etl.load_itad import carregar
+
+        return carregar
+    if fonte == "resumo-reviews":
+        from services.etl.load_resumo_reviews import carregar
 
         return carregar
     if fonte == "hltb":
