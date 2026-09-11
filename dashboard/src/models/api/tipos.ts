@@ -612,6 +612,14 @@ export interface ResumoReviews {
   avaliacoes_usadas: number;
 }
 
+/** O `ResumoReviews` acima, cruzado da versão Steam do MESMO jogo — a Xbox
+ * Store não publica texto de avaliação, só nota agregada. */
+export interface ResumoReviewsXbox {
+  steam_app_id: number;
+  steam_nome: string;
+  resumo: ResumoReviews;
+}
+
 export interface ConjuntoSentimento {
   avaliacoes: number;
   total_no_banco: number;

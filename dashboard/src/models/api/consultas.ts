@@ -41,6 +41,7 @@ import type {
   LigaConfronto,
   PanoramaSentimento,
   ResumoReviews,
+  ResumoReviewsXbox,
   PrevisaoConfronto,
   RankingOficial,
   RelatorioConfronto,
@@ -621,6 +622,34 @@ export function useColetarJogoXbox() {
       for (const chave of [["xbox"], ["visao-geral"]]) {
         cliente.invalidateQueries({ queryKey: chave });
       }
+    },
+  });
+}
+
+/** O resumo por IA da versão Steam do mesmo jogo, se já estiver pronto — a
+ * Xbox Store não publica texto de avaliação. 404 (`isError`) quando ainda
+ * não há cruzamento pronto; o botão "buscar na Steam" (`useBuscarResumoSteamXbox`
+ * abaixo) é quem resolve isso na hora. */
+export function useResumoSteamXbox(productId?: string) {
+  return useQuery({
+    queryKey: ["xbox", "resumo-steam", productId],
+    queryFn: () => buscar<ResumoReviewsXbox>(`/api/xbox/jogos/${productId}/resumo-steam`),
+    enabled: !!productId,
+    retry: false,
+  });
+}
+
+/** Busca ao vivo na Steam pelo equivalente deste jogo e gera o resumo por IA
+ * na hora (busca + coleta + resumo, encadeados) - o caminho pesado, alguns
+ * segundos, só quando o `useResumoSteamXbox` acima não achou nada pronto. */
+export function useBuscarResumoSteamXbox() {
+  const cliente = useQueryClient();
+
+  return useMutation({
+    mutationFn: (productId: string) =>
+      enviar<ResumoReviewsXbox>(`/api/xbox/jogos/${productId}/resumo-steam`, {}),
+    onSuccess: (dados, productId) => {
+      cliente.setQueryData(["xbox", "resumo-steam", productId], dados);
     },
   });
 }

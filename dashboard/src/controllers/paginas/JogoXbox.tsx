@@ -11,9 +11,13 @@
 import { useMemo } from "react";
 import { Link, useParams } from "react-router-dom";
 
-import { useJogoXbox } from "@models/api/consultas";
+import {
+  useBuscarResumoSteamXbox,
+  useJogoXbox,
+  useResumoSteamXbox,
+} from "@models/api/consultas";
 import type { DetalheJogoXbox, PontoSerieXbox } from "@models/api/tipos";
-import { Consulta, Icone } from "@views/componentes/base";
+import { Aviso, Consulta, Icone, MensagemErro, Selo } from "@views/componentes/base";
 import { CapaXbox } from "@views/componentes/CapaXbox";
 import { CarrosselMidia } from "@views/componentes/CarrosselMidia";
 import { AreaNeon } from "@views/componentes/graficos/AreaNeon";
@@ -25,6 +29,7 @@ import {
   fmtDecimal,
   fmtMoeda,
   fmtNumero,
+  fmtRelativo,
   paraNumero,
 } from "@util/formatos";
 
@@ -33,6 +38,128 @@ function corDaNota(nota: number): string {
   if (nota >= 4) return PALETA_POLOS.positivo;
   if (nota >= 3) return TOKENS.secundaria;
   return TOKENS.textoSuave;
+}
+
+/**
+ * Resumo por IA cruzado da versão Steam — a Xbox Store não publica texto de
+ * avaliação (só a estrela agregada, já mostrada nos KPIs), então quando o
+ * mesmo jogo também está no nosso catálogo Steam, mostramos o resumo de lá,
+ * com a procedência bem explícita: quem lê precisa saber que é a opinião de
+ * quem jogou a versão Steam, não a Xbox.
+ */
+function ResumoPorIAXbox({ productId }: { productId: string }) {
+  const resumo = useResumoSteamXbox(productId);
+  const buscar = useBuscarResumoSteamXbox();
+
+  if (resumo.isLoading) {
+    return (
+      <Painel icone="auto_awesome" titulo="Resumo por IA">
+        <div className="h-16 animate-pulse rounded-lg bg-surface-container-high/60" />
+      </Painel>
+    );
+  }
+
+  const dados = buscar.data ?? resumo.data;
+
+  if (!dados) {
+    return (
+      <Painel
+        icone="auto_awesome"
+        titulo="Resumo por IA"
+        descricao="A Xbox Store não publica texto de avaliação — só a nota agregada, já mostrada acima."
+      >
+        <Aviso>
+          Ainda sem cruzamento pronto com o catálogo Steam. Se este jogo
+          também existir lá, dá pra buscar agora.
+        </Aviso>
+
+        {buscar.isError && <MensagemErro erro={buscar.error} />}
+
+        <button
+          type="button"
+          onClick={() => buscar.mutate(productId)}
+          disabled={buscar.isPending}
+          className="mt-space-sm inline-flex items-center gap-space-xs rounded bg-primary-container px-space-base py-space-xs font-title-code text-title-code text-on-primary transition-[filter] hover:brightness-110 disabled:opacity-60"
+        >
+          <Icone
+            nome={buscar.isPending ? "progress_activity" : "travel_explore"}
+            className={`text-[16px] ${buscar.isPending ? "animate-spin" : ""}`}
+          />
+          {buscar.isPending ? "Buscando na Steam…" : "Buscar avaliações na Steam"}
+        </button>
+      </Painel>
+    );
+  }
+
+  const { resumo: r, steam_nome: steamNome } = dados;
+
+  return (
+    <Painel
+      icone="auto_awesome"
+      titulo="Resumo por IA"
+      descricao="A Xbox Store não publica texto de avaliação — este resumo é da comunidade da versão Steam do mesmo jogo."
+      meta={
+        <div className="flex flex-wrap items-center gap-space-xs">
+          <Selo cor="neutro">via Steam · {steamNome}</Selo>
+          <span
+            className="font-label-caps text-label-caps uppercase tracking-widest text-outline"
+            title={r.modelo}
+          >
+            gerado {fmtRelativo(r.gerado_em)} · {fmtNumero(r.avaliacoes_usadas)} avaliações
+            na amostra
+          </span>
+        </div>
+      }
+    >
+      <p className="font-body-md text-[15px] leading-[1.65] text-on-surface">{r.texto}</p>
+
+      {(r.positivos.length > 0 || r.negativos.length > 0) && (
+        <div className="mt-space-base grid grid-cols-1 gap-space-base sm:grid-cols-2">
+          {r.positivos.length > 0 && (
+            <div className="rounded-xl border border-outline-variant/15 bg-surface-container-low/50 p-space-base">
+              <div
+                className="flex items-center gap-space-xxs font-badge-status text-badge-status uppercase tracking-wide"
+                style={{ color: PALETA_POLOS.positivo }}
+              >
+                <Icone nome="thumb_up" className="text-[13px]" />O que agradou
+              </div>
+              <ul className="mt-space-sm flex flex-col gap-space-xs">
+                {r.positivos.map((ponto, i) => (
+                  <li
+                    key={i}
+                    className="font-body-sm text-body-sm leading-snug text-on-surface-variant"
+                  >
+                    {ponto}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {r.negativos.length > 0 && (
+            <div className="rounded-xl border border-outline-variant/15 bg-surface-container-low/50 p-space-base">
+              <div
+                className="flex items-center gap-space-xxs font-badge-status text-badge-status uppercase tracking-wide"
+                style={{ color: PALETA_POLOS.negativo }}
+              >
+                <Icone nome="thumb_down" className="text-[13px]" />O que incomodou
+              </div>
+              <ul className="mt-space-sm flex flex-col gap-space-xs">
+                {r.negativos.map((ponto, i) => (
+                  <li
+                    key={i}
+                    className="font-body-sm text-body-sm leading-snug text-on-surface-variant"
+                  >
+                    {ponto}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
+    </Painel>
+  );
 }
 
 export function JogoXboxPagina() {
@@ -233,6 +360,8 @@ export function JogoXboxPagina() {
                 </p>
               </Painel>
             )}
+
+            <ResumoPorIAXbox productId={jogo.product_id} />
 
             {/* ==================== RECURSOS E CLASSIFICAÇÃO ==================== */}
             {(temFicha || temClassificacao) && (

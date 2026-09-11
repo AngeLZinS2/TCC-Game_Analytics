@@ -25,9 +25,12 @@ from views.schemas import (
     JogoXbox,
     PontoSerieXbox,
     ResumoColetaXbox,
+    ResumoReviews,
+    ResumoReviewsXbox,
 )
 from config import get_settings
-from models.models import DimJogoXbox, FatoSnapshotJogoXbox
+from services.etl.casamento_jogos import normalizar_titulo
+from models.models import DimJogoSteam, DimJogoXbox, FatoSnapshotJogoXbox
 from models.session import get_db, session_scope
 
 logger = logging.getLogger(__name__)
@@ -332,3 +335,193 @@ def coletar(entrada: EntradaColetaXbox) -> ResumoColetaXbox:
         registros_brutos=execucao.registros_coletados,
         segundos=round(execucao.duracao_segundos, 2),
     )
+
+
+def _jogo_steam_por_nome(sessao: Session, nome: str) -> DimJogoSteam | None:
+    """Acha em `dim_jogo_steam` o jogo cujo nome normalizado bate com `nome`.
+
+    So compara IGUAL apos normalizar (ver `casamento_jogos.py`) - nunca por
+    substring, pra nao colar o resumo de um jogo errado. O catalogo Steam
+    local e pequeno (algumas centenas de linhas no maximo): varrer em Python
+    e mais simples que replicar a normalizacao em SQL, e nao pesa.
+    """
+    alvo = normalizar_titulo(nome)
+    if not alvo:
+        return None
+    for jogo in sessao.scalars(select(DimJogoSteam)):
+        if normalizar_titulo(jogo.nome) == alvo:
+            return jogo
+    return None
+
+
+def _resposta_resumo_steam(jogo_steam: DimJogoSteam) -> ResumoReviewsXbox | None:
+    if not jogo_steam.resumo_reviews_texto:
+        return None
+    return ResumoReviewsXbox(
+        steam_app_id=jogo_steam.app_id,
+        steam_nome=jogo_steam.nome,
+        resumo=ResumoReviews(
+            app_id=jogo_steam.app_id,
+            texto=jogo_steam.resumo_reviews_texto,
+            positivos=jogo_steam.resumo_reviews_positivos or [],
+            negativos=jogo_steam.resumo_reviews_negativos or [],
+            gerado_em=jogo_steam.resumo_reviews_em,
+            modelo=jogo_steam.resumo_reviews_modelo or "",
+            avaliacoes_usadas=jogo_steam.resumo_reviews_avaliacoes or 0,
+        ),
+    )
+
+
+@router.get("/jogos/{product_id}/resumo-steam", response_model=ResumoReviewsXbox)
+def resumo_steam(
+    product_id: str, sessao: Session = Depends(get_db)
+) -> ResumoReviewsXbox:
+    """O resumo por IA da versao Steam do MESMO jogo, se ja estiver pronto.
+
+    So le o que ja existe - rapido, sem chamar nada externo. A Xbox Store nao
+    publica texto de avaliacao (so nota agregada), entao o resumo por IA so
+    existe pro lado Steam; aqui e so achar o cruzamento certo pelo nome. Sem
+    match, ou match sem resumo ainda, devolve 404 - o botao "buscar na
+    Steam" (`POST` abaixo) e quem faz a busca/coleta de verdade.
+    """
+    jogo = sessao.get(DimJogoXbox, product_id)
+    if jogo is None:
+        raise HTTPException(
+            status_code=404, detail=f"product_id {product_id} nao monitorado"
+        )
+
+    equivalente = _jogo_steam_por_nome(sessao, jogo.nome)
+    if equivalente is None:
+        raise HTTPException(
+            status_code=404,
+            detail="nenhum jogo com esse nome no nosso catalogo Steam ainda",
+        )
+
+    resposta = _resposta_resumo_steam(equivalente)
+    if resposta is None:
+        raise HTTPException(
+            status_code=404,
+            detail=(
+                f"achamos {equivalente.nome} no catalogo Steam, mas ainda sem "
+                "resumo por IA gerado"
+            ),
+        )
+    return resposta
+
+
+@router.post("/jogos/{product_id}/resumo-steam", response_model=ResumoReviewsXbox)
+def buscar_resumo_steam(
+    product_id: str, sessao: Session = Depends(get_db)
+) -> ResumoReviewsXbox:
+    """Busca ao vivo na Steam pelo equivalente deste jogo e gera o resumo por
+    IA na hora - o caminho pesado, so quando o `GET` acima nao achou nada
+    pronto. Mesma logica do `/api/steam/coletar`: sincrono, poucos segundos,
+    quem clicou esta esperando.
+
+    Encadeia ate 3 passos, cada um so se o anterior nao resolveu: (1) busca
+    na loja da Steam pelo nome; (2) coleta o jogo (ficha + avaliacoes) se
+    ainda nao estiver no catalogo; (3) gera o resumo por IA se ainda nao
+    tiver um.
+    """
+    from services.collectors import steam_loja
+    from services.collectors.resumo_reviews import ResumoReviewsCollector
+    from services.collectors.steam_collector import SteamCollector
+    from services.etl.raw_storage import RawStorage
+    from controllers.routers.catalogo import PAGINAS_SOB_DEMANDA
+
+    jogo = sessao.get(DimJogoXbox, product_id)
+    if jogo is None:
+        raise HTTPException(
+            status_code=404, detail=f"product_id {product_id} nao monitorado"
+        )
+
+    # Ja resolvido? Sem chamar nada externo de novo.
+    equivalente = _jogo_steam_por_nome(sessao, jogo.nome)
+    if equivalente is not None:
+        pronto = _resposta_resumo_steam(equivalente)
+        if pronto is not None:
+            return pronto
+
+    settings = get_settings()
+    app_id = equivalente.app_id if equivalente is not None else None
+
+    if app_id is None:
+        # Passo 1: busca na loja da Steam pelo nome. Com o nome NORMALIZADO,
+        # nao o cru: a busca da Steam devolve ZERO resultados pra uma query
+        # com sufixo de plataforma entre parenteses ("Dead Island 2
+        # (Windows)" -> 0 resultados; "Dead Island 2" -> acha na hora).
+        alvo = normalizar_titulo(jogo.nome)
+        candidatos = steam_loja.buscar(alvo, limite=5)
+        achado = next(
+            (
+                c
+                for c in candidatos
+                if isinstance(c.get("id"), int)
+                and normalizar_titulo(str(c.get("name") or "")) == alvo
+            ),
+            None,
+        )
+        if achado is None:
+            raise HTTPException(
+                status_code=404,
+                detail=f'nenhum jogo chamado "{jogo.nome}" encontrado na Steam',
+            )
+        app_id = int(achado["id"])
+
+    # Passo 2: coleta (ficha + avaliacoes) se ainda nao estiver no catalogo.
+    if equivalente is None:
+        storage = RawStorage(settings.raw_data_path, registrar_no_banco=True)
+        settings_coleta = settings.model_copy(
+            update={"steam_reviews_paginas": PAGINAS_SOB_DEMANDA}
+        )
+        coletor = SteamCollector(
+            raw_storage=storage, app_ids=[app_id], settings=settings_coleta
+        )
+        try:
+            execucao = coletor.run(carregar=True)
+        except Exception as exc:  # noqa: BLE001 - a tela precisa da mensagem
+            raise HTTPException(
+                status_code=502, detail=f"a coleta na Steam falhou: {type(exc).__name__}"
+            ) from exc
+        finally:
+            coletor.close()
+        if not execucao.sucesso:
+            raise HTTPException(
+                status_code=502, detail=execucao.erro or "a coleta na Steam nao foi concluida"
+            )
+
+    # Passo 3: resumo por IA, se ainda nao tiver um.
+    if not settings.groq_api_key:
+        raise HTTPException(
+            status_code=404,
+            detail="jogo encontrado e coletado na Steam, mas o resumo por IA nao esta configurado (GROQ_API_KEY)",
+        )
+    storage = RawStorage(settings.raw_data_path, registrar_no_banco=True)
+    coletor_resumo = ResumoReviewsCollector(
+        raw_storage=storage, settings=settings, app_ids=[app_id]
+    )
+    try:
+        coletor_resumo.run(carregar=True)
+    except Exception as exc:  # noqa: BLE001 - segue pra devolver o que der
+        logger.warning(
+            "resumo por IA sob demanda (via Xbox) falhou",
+            extra={"app_id": app_id, "erro": f"{type(exc).__name__}: {exc}"},
+        )
+    finally:
+        coletor_resumo.close()
+
+    # O coletor grava numa sessao propria (`session_scope`); sem isto a
+    # sessao desta requisicao devolveria o objeto que ja tinha em memoria,
+    # de ANTES do resumo ser gravado (identity map).
+    sessao.expire_all()
+    jogo_steam = sessao.get(DimJogoSteam, app_id)
+    resposta = _resposta_resumo_steam(jogo_steam) if jogo_steam else None
+    if resposta is None:
+        raise HTTPException(
+            status_code=404,
+            detail=(
+                f"achamos {jogo.nome} na Steam e coletamos as avaliacoes, mas "
+                "nao houve avaliacoes de sobra pra gerar um resumo por IA"
+            ),
+        )
+    return resposta

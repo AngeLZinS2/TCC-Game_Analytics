@@ -755,6 +755,20 @@ class ResumoReviews(BaseModel):
     avaliacoes_usadas: int
 
 
+class ResumoReviewsXbox(BaseModel):
+    """O resumo por IA acima, cruzado da versao Steam do MESMO jogo.
+
+    A Xbox Store nao publica texto de avaliacao (so nota agregada) - quando o
+    jogo tambem existe no nosso catalogo Steam, mostramos o resumo de la, com
+    a procedencia explicita (`steam_nome`/`steam_app_id`): quem le precisa
+    saber que esse texto fala da versao Steam, nao da Xbox.
+    """
+
+    steam_app_id: int
+    steam_nome: str
+    resumo: ResumoReviews
+
+
 class ConjuntoSentimento(BaseModel):
     avaliacoes: int
     total_no_banco: int
