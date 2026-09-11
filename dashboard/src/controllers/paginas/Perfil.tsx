@@ -1,19 +1,28 @@
 /**
  * Perfil: dados da conta + a atividade pessoal que ela acumula - por
  * enquanto so o historico de perguntas ao Assistente de IA, a unica
- * atividade que o site liga a uma conta ate aqui (Fase 31).
+ * atividade que o site liga a uma conta ate aqui (Fase 31/32).
+ *
+ * O "nivel" e o "PlayDB agora" nao inventam dado nenhum: o nivel e so uma
+ * leitura de `total_perguntas_assistente` (que ja existe) em faixas, e o
+ * pulso do site vem do mesmo `/api/visao-geral` que a Visao Geral usa - nada
+ * aqui e exclusivo da conta, so reaproveitado num contexto pessoal (o "olha
+ * o que rolou desde a ultima vez" que sites como Steam/OP.GG mostram no
+ * perfil).
  *
  * Exige conta - a tela so renderiza dentro de `RotaProtegida` (`App.tsx`).
  */
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 
-import { usePerfilUsuario } from "@models/api/consultas";
+import { useMaisJogadosSteam, usePerfilUsuario, useVisaoGeral } from "@models/api/consultas";
 import { sairDaConta } from "@models/conta/acoes";
 import { useUsuario } from "@models/conta/contexto";
-import { Botao, Icone, MensagemErro } from "@views/componentes/base";
+import { Botao, Icone, MensagemErro, Selo } from "@views/componentes/base";
 import { KpiHud, Painel } from "@views/componentes/hud";
+import { CapaJogo } from "@views/componentes/CapaJogo";
+import { MarcaGithub, MarcaGoogle } from "@views/componentes/MarcasOAuth";
 import { fmtData, fmtNumero } from "@util/formatos";
 import { agruparPorDia, useHistoricoAssistente } from "./assistente/historico";
 
@@ -21,10 +30,63 @@ function hora(iso: string): string {
   return new Date(iso).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
 }
 
+/** Faixas de nivel a partir de perguntas feitas - o unico numero que a conta
+ * realmente acumula hoje. Sem pontuacao escondida, so o total em faixas. */
+function nivelDoUsuario(totalPerguntas: number): { rotulo: string; icone: string } {
+  if (totalPerguntas >= 20) return { rotulo: "Analista de Dados", icone: "workspace_premium" };
+  if (totalPerguntas >= 5) return { rotulo: "Investigador", icone: "travel_explore" };
+  if (totalPerguntas >= 1) return { rotulo: "Curioso", icone: "psychology" };
+  return { rotulo: "Novo por aqui", icone: "waving_hand" };
+}
+
+function diasComoMembro(iso: string): number {
+  const inicio = new Date(iso).getTime();
+  return Math.max(0, Math.floor((Date.now() - inicio) / 86_400_000));
+}
+
+/** Metodo de login em uso, pelo `providerData` do Firebase - a mesma conta
+ * pode ter mais de um vinculado, mas o primeiro e o que autenticou agora. */
+function useProvedorLogin() {
+  const { usuario } = useUsuario();
+  const providerId = usuario?.providerData[0]?.providerId;
+
+  if (providerId === "google.com") {
+    return { rotulo: "Google", icone: <MarcaGoogle /> };
+  }
+  if (providerId === "github.com") {
+    return { rotulo: "GitHub", icone: <MarcaGithub /> };
+  }
+  return { rotulo: "E-mail e senha", icone: <Icone nome="mail" className="text-[15px] text-primary" /> };
+}
+
+const ATALHOS = [
+  {
+    rota: "/catalogo",
+    rotulo: "Catálogo de Jogos",
+    descricao: "Steam, Xbox e preços em ~33 lojas",
+    icone: "sports_esports",
+  },
+  {
+    rota: "/esports",
+    rotulo: "E-Sports",
+    descricao: "Partidas, ranking e previsão de confronto",
+    icone: "emoji_events",
+  },
+  {
+    rota: "/recomendacoes",
+    rotulo: "Recomendações por Reviews",
+    descricao: "O que a comunidade está gostando agora",
+    icone: "sentiment_satisfied",
+  },
+] as const;
+
 export function PerfilPagina() {
   const { usuario } = useUsuario();
   const perfil = usePerfilUsuario();
   const historico = useHistoricoAssistente();
+  const visaoGeral = useVisaoGeral();
+  const maisJogado = useMaisJogadosSteam(1);
+  const provedor = useProvedorLogin();
   const [saindo, setSaindo] = useState(false);
 
   async function sair() {
@@ -37,6 +99,12 @@ export function PerfilPagina() {
   }
 
   const grupos = agruparPorDia(historico.entradas);
+  const nivel = useMemo(
+    () => nivelDoUsuario(perfil.data?.total_perguntas_assistente ?? 0),
+    [perfil.data?.total_perguntas_assistente],
+  );
+  const dias = perfil.data ? diasComoMembro(perfil.data.membro_desde) : null;
+  const primeiroJogo = maisJogado.data?.[0];
 
   return (
     <>
@@ -49,6 +117,36 @@ export function PerfilPagina() {
           Sair
         </Botao>
       </header>
+
+      {/* ==================== RESUMO ==================== */}
+      <div className="flex flex-col gap-space-base overflow-hidden rounded-xl bg-surface-container-low/90 p-space-lg shadow-2xl sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-space-base">
+          <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-primary-container/20 font-headline-lg text-headline-lg text-primary">
+            {(usuario?.email ?? "?").charAt(0).toUpperCase()}
+          </div>
+          <div className="flex flex-col gap-space-xxs">
+            <span className="font-headline-sm text-headline-sm text-on-surface">
+              Olá, {usuario?.email?.split("@")[0] ?? "visitante"}
+            </span>
+            <div className="flex flex-wrap items-center gap-space-xs">
+              <Selo cor="primario">
+                <Icone nome={nivel.icone} className="text-[13px]" />
+                {nivel.rotulo}
+              </Selo>
+              {dias !== null && (
+                <Selo cor="neutro">
+                  <Icone nome="calendar_today" className="text-[12px]" />
+                  {dias === 0 ? "Membro desde hoje" : `Membro há ${fmtNumero(dias)} dia${dias === 1 ? "" : "s"}`}
+                </Selo>
+              )}
+              <Selo cor="neutro">
+                {provedor.icone}
+                {provedor.rotulo}
+              </Selo>
+            </div>
+          </div>
+        </div>
+      </div>
 
       <Painel icone="badge" titulo="Sua conta">
         {perfil.isError ? (
@@ -72,6 +170,74 @@ export function PerfilPagina() {
               </span>
             </div>
           </div>
+        )}
+      </Painel>
+
+      {/* ==================== O PLAYDB AGORA ==================== */}
+      <Painel
+        icone="bolt"
+        titulo="O PlayDB agora"
+        descricao="O que o site coletou até agora — os mesmos números da Visão Geral, num resumo rápido."
+      >
+        {visaoGeral.isError ? (
+          <MensagemErro erro={visaoGeral.error} />
+        ) : (
+          <div className="grid grid-cols-2 gap-space-base lg:grid-cols-4">
+            <KpiHud
+              etiqueta="Catálogo"
+              valor={visaoGeral.data ? fmtNumero(visaoGeral.data.jogos_steam + visaoGeral.data.jogos_xbox) : "—"}
+              valorNumerico={visaoGeral.data ? visaoGeral.data.jogos_steam + visaoGeral.data.jogos_xbox : null}
+              formatarValor={fmtNumero}
+              rotulo="jogos monitorados"
+              acento="primaria"
+            />
+            <KpiHud
+              etiqueta="Star schema"
+              valor={visaoGeral.data ? fmtNumero(visaoGeral.data.partidas) : "—"}
+              valorNumerico={visaoGeral.data?.partidas ?? null}
+              formatarValor={fmtNumero}
+              rotulo="partidas coletadas"
+              acento="terciaria"
+            />
+            <KpiHud
+              etiqueta="Valve"
+              valor={visaoGeral.data?.steam_usuarios_online != null ? fmtNumero(visaoGeral.data.steam_usuarios_online) : "—"}
+              valorNumerico={visaoGeral.data?.steam_usuarios_online ?? null}
+              formatarValor={fmtNumero}
+              rotulo="conectados à Steam agora"
+              acento="secundaria"
+            />
+            <KpiHud
+              etiqueta="Dimensão"
+              valor={visaoGeral.data ? fmtNumero(visaoGeral.data.jogadores) : "—"}
+              valorNumerico={visaoGeral.data?.jogadores ?? null}
+              formatarValor={fmtNumero}
+              rotulo="jogadores identificados"
+              acento="primaria"
+            />
+          </div>
+        )}
+
+        {primeiroJogo && (
+          <a
+            href={`https://store.steampowered.com/app/${primeiroJogo.app_id}/`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-space-base flex items-center gap-space-sm rounded-lg bg-surface-container-lowest p-space-sm transition-colors hover:bg-surface-container"
+          >
+            <CapaJogo appId={primeiroJogo.app_id} nome={primeiroJogo.nome ?? "Jogo"} className="h-12 w-12 shrink-0" />
+            <div className="min-w-0 flex-1">
+              <span className="font-label-caps text-label-caps uppercase tracking-widest text-outline">
+                Mais jogado na Steam agora
+              </span>
+              <p className="truncate font-body-md text-body-md font-bold text-on-surface">
+                {primeiroJogo.nome ?? `App ${primeiroJogo.app_id}`}
+              </p>
+            </div>
+            <span className="shrink-0 font-title-code text-title-code text-primary">
+              {fmtNumero(primeiroJogo.jogadores_agora)} jogando
+            </span>
+          </a>
         )}
       </Painel>
 
@@ -153,6 +319,26 @@ export function PerfilPagina() {
             </button>
           </div>
         )}
+      </Painel>
+
+      {/* ==================== EXPLORE MAIS ==================== */}
+      <Painel icone="explore" titulo="Explore mais" descricao="Outras partes do PlayDB que você talvez ainda não tenha visto.">
+        <div className="grid grid-cols-1 gap-space-sm sm:grid-cols-3">
+          {ATALHOS.map((atalho) => (
+            <Link
+              key={atalho.rota}
+              to={atalho.rota}
+              className="flex items-start gap-space-sm rounded-lg bg-surface-container-lowest p-space-base transition-colors hover:bg-surface-container-high"
+            >
+              <Icone nome={atalho.icone} className="mt-[2px] shrink-0 text-[20px] text-primary" />
+              <div className="min-w-0 flex-1">
+                <span className="font-title-code text-title-code text-on-surface">{atalho.rotulo}</span>
+                <p className="font-body-sm text-body-sm text-outline">{atalho.descricao}</p>
+              </div>
+              <Icone nome="arrow_forward" className="mt-[2px] shrink-0 text-[16px] text-outline" />
+            </Link>
+          ))}
+        </div>
       </Painel>
     </>
   );
