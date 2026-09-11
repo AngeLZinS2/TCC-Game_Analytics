@@ -64,6 +64,7 @@ import type {
   EntradaHistoricoAssistente,
   JogoFavorito,
   EquipeFavorita,
+  ProvedorIA,
 } from "./tipos";
 
 export interface FiltrosJogos {
@@ -606,8 +607,8 @@ export function useDesfavoritarEquipe() {
 export function useSalvarChaveIA() {
   const cliente = useQueryClient();
   return useMutation({
-    mutationFn: async (chave: string) =>
-      chamar("/api/usuario/chave-ia", "PUT", { chave }, await cabecalhoAuthUsuario()),
+    mutationFn: async (entrada: { provedor: ProvedorIA; chave: string; modelo?: string }) =>
+      chamar("/api/usuario/chave-ia", "PUT", entrada, await cabecalhoAuthUsuario()),
     onSuccess: () => cliente.invalidateQueries({ queryKey: ["usuario", "perfil"] }),
   });
 }

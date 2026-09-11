@@ -924,9 +924,12 @@ class RespostaAssistente(BaseModel):
     series: list[SerieAssistente] = []
     tokens_entrada: int | None
     tokens_saida: int | None
-    #: `True` quando esta resposta usou a chave do OpenRouter da propria
-    #: conta (Fase 33), em vez da chave compartilhada do site.
+    #: `True` quando esta resposta usou uma chave de IA propria da conta
+    #: (Fase 33/34), em vez da chave compartilhada do site.
     usando_chave_propria: bool = False
+    #: "openrouter" | "anthropic" | "google" - so preenchido junto com
+    #: `usando_chave_propria`.
+    provedor_ia: str | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -1425,11 +1428,13 @@ class PerfilUsuario(BaseModel):
     nome_exibicao: str | None = None
     membro_desde: datetime
     total_perguntas_assistente: int
-    #: `True` quando a conta tem chave propria do OpenRouter cadastrada - o
+    #: `True` quando a conta tem chave de IA propria cadastrada - o
     #: Assistente de IA passa a usar ELA em vez da chave compartilhada do
     #: site. A chave em si nunca sai numa resposta de API, so a mascara.
     tem_chave_ia_propria: bool = False
     chave_ia_mascarada: str | None = None
+    chave_ia_provedor: str | None = None
+    chave_ia_modelo: str | None = None
 
 
 class EntradaHistoricoAssistente(BaseModel):
@@ -1497,9 +1502,13 @@ class EquipeFavorita(BaseModel):
 
 
 # ---------------------------------------------------------------------------
-# Chave de IA pessoal (Fase 33)
+# Chave de IA pessoal (Fase 33/34)
 # ---------------------------------------------------------------------------
 
 
 class EntradaChaveIA(BaseModel):
+    provedor: Literal["openrouter", "anthropic", "google"] = "openrouter"
     chave: str = Field(min_length=10, max_length=300)
+    #: Modelo escolhido nesse provedor. Vazio usa o padrao (o do site, no
+    #: OpenRouter; um modelo atual e balanceado, na Anthropic/Google).
+    modelo: str | None = Field(default=None, max_length=120)

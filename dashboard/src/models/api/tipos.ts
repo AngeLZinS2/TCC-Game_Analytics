@@ -792,8 +792,9 @@ export interface RespostaAssistente {
   series: SerieAssistente[];
   tokens_entrada: number | null;
   tokens_saida: number | null;
-  /** `true` quando esta resposta usou a chave do OpenRouter da propria conta. */
+  /** `true` quando esta resposta usou uma chave de IA da propria conta. */
   usando_chave_propria: boolean;
+  provedor_ia: ProvedorIA | null;
 }
 
 // --- Previsao de confronto entre equipes (Fase 9) ---
@@ -1228,7 +1229,11 @@ export interface PerfilUsuario {
   total_perguntas_assistente: number;
   tem_chave_ia_propria: boolean;
   chave_ia_mascarada: string | null;
+  chave_ia_provedor: ProvedorIA | null;
+  chave_ia_modelo: string | null;
 }
+
+export type ProvedorIA = "openrouter" | "anthropic" | "google";
 
 export interface EntradaHistoricoAssistente {
   id: number;

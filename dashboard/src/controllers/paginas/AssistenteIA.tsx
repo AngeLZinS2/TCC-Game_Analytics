@@ -45,6 +45,7 @@ import { CartaoConfianca, PainelFontes } from "./assistente/PainelContexto";
 import { PainelHistorico } from "./assistente/PainelHistorico";
 import { Processando } from "./assistente/Processando";
 import { StatusApiAssistente } from "./assistente/StatusApi";
+import { ROTULO_PROVEDOR } from "./conta/PainelChaveIA";
 import { fmtNumero, fmtRelativo } from "@util/formatos";
 
 export function AssistenteIAPagina() {
@@ -255,7 +256,7 @@ export function AssistenteIAPagina() {
                     {resposta.usando_chave_propria && (
                       <Selo cor="positivo">
                         <Icone nome="vpn_key" className="text-[12px]" />
-                        Sua chave
+                        Sua chave{resposta.provedor_ia ? ` · ${ROTULO_PROVEDOR[resposta.provedor_ia]}` : ""}
                       </Selo>
                     )}
                     <span className="font-badge-status text-badge-status uppercase tracking-wider text-outline">

@@ -276,9 +276,12 @@ class Resposta:
     fontes_web: list[dict[str, str]] = field(default_factory=list)
     tokens_entrada: int | None = None
     tokens_saida: int | None = None
-    #: `True` quando `perguntar()` recebeu `chave_pessoal` - a resposta usou a
-    #: chave do OpenRouter da propria conta, nao a compartilhada do site.
+    #: `True` quando `perguntar()` recebeu `chave_pessoal` - a resposta usou
+    #: uma chave de IA da propria conta, nao a compartilhada do site.
     usando_chave_propria: bool = False
+    #: "openrouter" | "anthropic" | "google" - so preenchido junto com
+    #: `usando_chave_propria`.
+    provedor_ia: str | None = None
 
 
 class AssistenteIndisponivel(RuntimeError):
@@ -2167,26 +2170,163 @@ def _chamar_modelo(corpo: dict[str, Any], settings) -> dict[str, Any]:
     }
 
 
+#: Modelo usado quando a conta escolheu Anthropic/Google mas nao disse qual -
+#: um atual e equilibrado (nem o mais caro, nem o mais fraco), ja que quem
+#: paga a conta e a propria pessoa. No OpenRouter o padrao continua sendo o
+#: `settings.openrouter_model` do site (ele ja da acesso a Claude/Gemini por
+#: tras da mesma chave - so nao escolhia o modelo antes da Fase 34).
+_MODELO_PADRAO_DIRETO = {
+    "anthropic": "claude-sonnet-5",
+    "google": "gemini-3.8-flash",
+}
+
+
+def _chamar_anthropic(
+    texto_usuario: str, sistema: str, modelo: str, api_key: str
+) -> dict[str, Any]:
+    """Chave direta da Anthropic (Fase 34) - via SDK oficial (`pip install
+    anthropic`), nao REST cru: o SDK ja tipa os erros (chave invalida, rate
+    limit, conexao) em vez de forcar reparsear corpo de erro feito a mao.
+
+    Sem telemetria (`telemetria_assistente`) aqui de proposito: aquele painel
+    e sobre a SAUDE DA CHAVE COMPARTILHADA do site, nao da chave pessoal de
+    quem esta perguntando - misturar os dois faria uma chave de terceiro
+    falhando aparecer como se fosse a nossa.
+    """
+    import anthropic
+
+    cliente = anthropic.Anthropic(api_key=api_key)
+    try:
+        resposta = cliente.messages.create(
+            model=modelo,
+            max_tokens=700,
+            temperature=0.2,
+            system=sistema,
+            messages=[{"role": "user", "content": texto_usuario}],
+        )
+    except anthropic.AuthenticationError as exc:
+        raise AssistenteIndisponivel(
+            "a Anthropic recusou a chave (invalida ou sem credito)"
+        ) from exc
+    except anthropic.APIStatusError as exc:
+        raise AssistenteIndisponivel(
+            f"Anthropic respondeu {exc.status_code}: {str(exc)[:200]}"
+        ) from exc
+    except anthropic.APIConnectionError as exc:
+        raise AssistenteIndisponivel(
+            f"nao foi possivel falar com a Anthropic: {type(exc).__name__}"
+        ) from exc
+
+    texto = "".join(
+        bloco.text for bloco in resposta.content if getattr(bloco, "type", None) == "text"
+    ).strip()
+
+    return {
+        "texto": texto,
+        "annotations": None,
+        "modelo": resposta.model,
+        "uso": {
+            "prompt_tokens": resposta.usage.input_tokens,
+            "completion_tokens": resposta.usage.output_tokens,
+        },
+    }
+
+
+def _chamar_google(
+    texto_usuario: str, sistema: str, modelo: str, api_key: str, timeout_segundos: float
+) -> dict[str, Any]:
+    """Chave direta do Google AI Studio (Fase 34) - REST cru, no mesmo estilo
+    do resto do projeto (`_chamar_modelo` acima). A chave vai na query
+    string (`?key=`) - e assim que a API do Gemini pede, nao num header."""
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{modelo}:generateContent"
+    try:
+        resposta = requests.post(
+            url,
+            params={"key": api_key},
+            json={
+                "contents": [{"role": "user", "parts": [{"text": texto_usuario}]}],
+                "systemInstruction": {"parts": [{"text": sistema}]},
+                "generationConfig": {"maxOutputTokens": 700, "temperature": 0.2},
+            },
+            timeout=timeout_segundos,
+        )
+    except requests.RequestException as exc:
+        raise AssistenteIndisponivel(
+            f"nao foi possivel falar com o Google: {type(exc).__name__}"
+        ) from exc
+
+    if resposta.status_code != 200:
+        raise AssistenteIndisponivel(
+            f"Google respondeu {resposta.status_code}: {resposta.text[:200]}"
+        )
+    dados = resposta.json()
+    if "error" in dados:
+        raise AssistenteIndisponivel(str(dados["error"])[:200])
+
+    candidatos = dados.get("candidates") or []
+    partes = ((candidatos[0].get("content") or {}).get("parts") if candidatos else None) or []
+    texto = "".join(p.get("text", "") for p in partes).strip()
+    uso_bruto = dados.get("usageMetadata") or {}
+
+    return {
+        "texto": texto,
+        "annotations": None,
+        "modelo": modelo,
+        "uso": {
+            "prompt_tokens": uso_bruto.get("promptTokenCount"),
+            "completion_tokens": uso_bruto.get("candidatesTokenCount"),
+        },
+    }
+
+
 # ---------------------------------------------------------------------------
 # Chamada ao provedor
 # ---------------------------------------------------------------------------
 
 
-def perguntar(pergunta: str, chave_pessoal: str | None = None) -> Resposta:
+def perguntar(
+    pergunta: str,
+    chave_pessoal: str | None = None,
+    provedor_pessoal: str | None = None,
+    modelo_pessoal: str | None = None,
+) -> Resposta:
     """Monta o contexto, chama o modelo e devolve resposta + contexto usado.
 
-    `chave_pessoal`: chave do OpenRouter da propria conta (Fase 33), ja
-    decifrada por quem chamou. Quando presente, substitui a chave
-    compartilhada do site so nesta chamada - `settings` vira uma copia local,
-    o `.env`/processo nunca muda.
+    `chave_pessoal`: chave de IA da propria conta (Fase 33/34), ja decifrada
+    por quem chamou. `provedor_pessoal` diz qual API ela abre
+    ("openrouter"/"anthropic"/"google" - "openrouter" se omitido, por
+    compatibilidade). No OpenRouter, a chave (e o `modelo_pessoal`, se
+    dado) substituem os do site so nesta chamada, via copia de `settings` -
+    o `.env`/processo nunca muda. Anthropic e Google sao chamados direto
+    (`_chamar_anthropic`/`_chamar_google`), sem passar pelo OpenRouter.
+
+    O modo web (busca ao vivo, `PRECISA_WEB`) so existe no caminho OpenRouter
+    - e um plugin dele, sem equivalente pronto nos outros dois. Perguntando
+    com chave da Anthropic/Google, uma pergunta que precisaria da web cai na
+    mesma mensagem de "nao consegui completar" que o site ja mostra com o
+    modo web desligado.
     """
     settings = get_settings()
-    if chave_pessoal:
-        settings = settings.model_copy(update={"openrouter_api_key": chave_pessoal})
-    if not settings.openrouter_api_key:
+    provedor = (provedor_pessoal or "openrouter") if chave_pessoal else "openrouter"
+    usando_direto = chave_pessoal is not None and provedor != "openrouter"
+
+    if chave_pessoal and provedor == "openrouter":
+        settings = settings.model_copy(
+            update={
+                "openrouter_api_key": chave_pessoal,
+                **({"openrouter_model": modelo_pessoal} if modelo_pessoal else {}),
+            }
+        )
+    if provedor == "openrouter" and not settings.openrouter_api_key:
         raise AssistenteIndisponivel(
             "OPENROUTER_API_KEY nao configurada. Defina no .env para usar o assistente."
         )
+
+    modelo_efetivo = (
+        settings.openrouter_model
+        if provedor == "openrouter"
+        else (modelo_pessoal or _MODELO_PADRAO_DIRETO[provedor])
+    )
 
     contexto_montado = montar_contexto(pergunta)
     blocos = contexto_montado.blocos
@@ -2198,9 +2338,10 @@ def perguntar(pergunta: str, chave_pessoal: str | None = None) -> Resposta:
                 "Só respondo sobre o mundo dos jogos e esports - essa pergunta "
                 "está fora do que o PlayDB cobre."
             ),
-            modelo=settings.openrouter_model,
+            modelo=modelo_efetivo,
             blocos=[b for b in blocos if b.chave == "geral"],
             usando_chave_propria=bool(chave_pessoal),
+            provedor_ia=provedor if chave_pessoal else None,
         )
 
     contexto = "\n\n".join(
@@ -2258,10 +2399,33 @@ def perguntar(pergunta: str, chave_pessoal: str | None = None) -> Resposta:
             ],
         }
 
+    def _chamar(corpo_openrouter: dict[str, Any]) -> dict[str, Any]:
+        """Despacha pro provedor certo. `corpo_openrouter` sempre existe (o
+        caminho OpenRouter usa ele direto); Anthropic/Google so aproveitam o
+        `system`/`user` ja montados dentro dele - nao repetem a formatacao
+        do CONTEXTO."""
+        if provedor == "openrouter":
+            return _chamar_modelo(corpo_openrouter, settings)
+        mensagens = corpo_openrouter["messages"]
+        sistema = mensagens[0]["content"]
+        texto_usuario = mensagens[1]["content"]
+        if provedor == "anthropic":
+            return _chamar_anthropic(texto_usuario, sistema, modelo_efetivo, chave_pessoal)
+        if provedor == "google":
+            return _chamar_google(
+                texto_usuario,
+                sistema,
+                modelo_efetivo,
+                chave_pessoal,
+                settings.openrouter_timeout_seconds,
+            )
+        raise AssistenteIndisponivel(f"provedor de IA desconhecido: {provedor}")  # pragma: no cover
+
     # A busca ja na primeira chamada so quando a pergunta pede na cara ("pesquisa
     # na web ...") E o filtro de palavras nao a marcou como claramente fora do
-    # mundo dos jogos.
-    web_ligada = settings.assistente_web_habilitada
+    # mundo dos jogos. So existe no OpenRouter (ver docstring) - `usando_direto`
+    # desliga o modo web inteiro pras chamadas diretas.
+    web_ligada = settings.assistente_web_habilitada and not usando_direto
     web_na_primeira = (
         web_ligada
         and contexto_montado.web_sugerida
@@ -2270,7 +2434,7 @@ def perguntar(pergunta: str, chave_pessoal: str | None = None) -> Resposta:
     )
 
     usou_web = web_na_primeira
-    saida = _chamar_modelo(_corpo_web() if web_na_primeira else _corpo(), settings)
+    saida = _chamar(_corpo_web() if web_na_primeira else _corpo())
 
     # Escopo: o modelo (regra 0) responde `FORA_ESCOPO` quando a pergunta nao e
     # do mundo dos jogos. E ele o juiz - o filtro de palavras erra ("Legue of
@@ -2287,7 +2451,7 @@ def perguntar(pergunta: str, chave_pessoal: str | None = None) -> Resposta:
         and not web_na_primeira
         and _parece_sem_resposta(saida["texto"])
     ):
-        segunda = _chamar_modelo(_corpo_web(), settings)
+        segunda = _chamar(_corpo_web())
         if segunda["texto"] and not _fora_escopo(segunda["texto"]):
             saida = segunda
             usou_web = True
@@ -2335,6 +2499,7 @@ def perguntar(pergunta: str, chave_pessoal: str | None = None) -> Resposta:
         tokens_entrada=uso.get("prompt_tokens"),
         tokens_saida=uso.get("completion_tokens"),
         usando_chave_propria=bool(chave_pessoal),
+        provedor_ia=provedor if chave_pessoal else None,
     )
 
 

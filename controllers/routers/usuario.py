@@ -103,10 +103,13 @@ def perfil(
     usuario: UsuarioAtual = Depends(exigir_usuario),
     sessao: Session = Depends(get_db),
 ) -> PerfilUsuario:
-    criado_em, chave_cifrada = sessao.execute(
-        select(DimUsuario.criado_em, DimUsuario.openrouter_api_key_cifrada).where(
-            DimUsuario.id_usuario == usuario.id_usuario
-        )
+    criado_em, chave_cifrada, provedor, modelo = sessao.execute(
+        select(
+            DimUsuario.criado_em,
+            DimUsuario.chave_ia_cifrada,
+            DimUsuario.chave_ia_provedor,
+            DimUsuario.chave_ia_modelo,
+        ).where(DimUsuario.id_usuario == usuario.id_usuario)
     ).one()
 
     total = sessao.execute(
@@ -128,6 +131,8 @@ def perfil(
         total_perguntas_assistente=total,
         tem_chave_ia_propria=bool(chave_cifrada),
         chave_ia_mascarada=chave_mascarada,
+        chave_ia_provedor=provedor if chave_cifrada else None,
+        chave_ia_modelo=modelo if chave_cifrada else None,
     )
 
 
@@ -137,7 +142,8 @@ def salvar_chave_ia(
     usuario: UsuarioAtual = Depends(exigir_usuario),
     sessao: Session = Depends(get_db),
 ) -> None:
-    """Cadastra/troca a chave do OpenRouter da propria conta.
+    """Cadastra/troca a chave de IA da propria conta (OpenRouter, Anthropic
+    ou Google).
 
     Nao testa a chave contra o provedor aqui - so guarda cifrada. Uma chave
     invalida so aparece na proxima pergunta ao assistente, com o mesmo erro
@@ -151,7 +157,11 @@ def salvar_chave_ia(
     sessao.execute(
         update(DimUsuario)
         .where(DimUsuario.id_usuario == usuario.id_usuario)
-        .values(openrouter_api_key_cifrada=cifrada)
+        .values(
+            chave_ia_cifrada=cifrada,
+            chave_ia_provedor=entrada.provedor,
+            chave_ia_modelo=(entrada.modelo.strip() if entrada.modelo else None) or None,
+        )
     )
     sessao.commit()
 
@@ -164,7 +174,7 @@ def remover_chave_ia(
     sessao.execute(
         update(DimUsuario)
         .where(DimUsuario.id_usuario == usuario.id_usuario)
-        .values(openrouter_api_key_cifrada=None)
+        .values(chave_ia_cifrada=None, chave_ia_provedor=None, chave_ia_modelo=None)
     )
     sessao.commit()
 

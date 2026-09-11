@@ -788,3 +788,71 @@ def test_perguntar_usa_chave_compartilhada_sem_chave_pessoal(monkeypatch: pytest
     resposta = modulo.perguntar("quantos jogos vocês monitoram no total?")
 
     assert resposta.usando_chave_propria is False
+
+
+def test_perguntar_com_chave_anthropic_chama_provedor_certo(monkeypatch: pytest.MonkeyPatch):
+    """Fase 34: `provedor_pessoal="anthropic"` tem que desviar do OpenRouter
+    por completo - `_chamar_modelo` nem pode ser chamado."""
+    from services.ml import assistente as modulo
+
+    chamadas: list[tuple] = []
+
+    def _chamar_modelo_bomba(corpo, settings):
+        raise AssertionError("nao deveria chamar o OpenRouter com chave da Anthropic")
+
+    def _chamar_anthropic_falso(texto_usuario, sistema, modelo, api_key):
+        chamadas.append((texto_usuario, sistema, modelo, api_key))
+        return {
+            "texto": "resposta da Anthropic",
+            "annotations": None,
+            "modelo": modelo,
+            "uso": {"prompt_tokens": 10, "completion_tokens": 5},
+        }
+
+    monkeypatch.setattr(modulo, "_chamar_modelo", _chamar_modelo_bomba)
+    monkeypatch.setattr(modulo, "_chamar_anthropic", _chamar_anthropic_falso)
+
+    resposta = modulo.perguntar(
+        "quantos jogos vocês monitoram no total?",
+        chave_pessoal="chave-anthropic-de-teste",
+        provedor_pessoal="anthropic",
+        modelo_pessoal="claude-sonnet-5",
+    )
+
+    assert resposta.resposta == "resposta da Anthropic"
+    assert resposta.usando_chave_propria is True
+    assert resposta.provedor_ia == "anthropic"
+    assert len(chamadas) == 1
+    _texto_usuario, _sistema, modelo, api_key = chamadas[0]
+    assert modelo == "claude-sonnet-5"
+    assert api_key == "chave-anthropic-de-teste"
+
+
+def test_perguntar_com_chave_google_usa_modelo_padrao_sem_escolha(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    """Sem `modelo_pessoal`, cai no padrao do provedor - nunca fica sem
+    modelo nenhum."""
+    from services.ml import assistente as modulo
+
+    chamadas: list[tuple] = []
+
+    def _chamar_google_falso(texto_usuario, sistema, modelo, api_key, timeout_segundos):
+        chamadas.append(modelo)
+        return {
+            "texto": "resposta do Google",
+            "annotations": None,
+            "modelo": modelo,
+            "uso": {"prompt_tokens": 1, "completion_tokens": 1},
+        }
+
+    monkeypatch.setattr(modulo, "_chamar_google", _chamar_google_falso)
+
+    resposta = modulo.perguntar(
+        "quantos jogos vocês monitoram no total?",
+        chave_pessoal="chave-google-de-teste",
+        provedor_pessoal="google",
+    )
+
+    assert resposta.provedor_ia == "google"
+    assert chamadas == [modulo._MODELO_PADRAO_DIRETO["google"]]

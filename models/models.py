@@ -1099,10 +1099,16 @@ class DimUsuario(Base):
     nome_exibicao: Mapped[str | None] = mapped_column(String(200))
     criado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     ultimo_acesso: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
-    #: Chave do OpenRouter da propria conta, cifrada (Fernet) - `None` usa a
-    #: chave compartilhada do site. Nunca fica em texto puro no banco nem sai
-    #: numa resposta de API (ver `services/cifra.py`).
-    openrouter_api_key_cifrada: Mapped[str | None] = mapped_column(Text)
+    #: Chave de IA da propria conta, cifrada (Fernet) - `None` usa a chave
+    #: compartilhada do site (OpenRouter). Nunca fica em texto puro no banco
+    #: nem sai numa resposta de API (ver `services/cifra.py`).
+    chave_ia_cifrada: Mapped[str | None] = mapped_column(Text)
+    #: "openrouter" | "anthropic" | "google" - qual API a chave acima abre.
+    chave_ia_provedor: Mapped[str | None] = mapped_column(String(20))
+    #: Modelo escolhido nesse provedor (ex. "anthropic/claude-sonnet-4.5" no
+    #: OpenRouter, "claude-sonnet-5" na Anthropic direta). `None` usa o
+    #: padrao do provedor.
+    chave_ia_modelo: Mapped[str | None] = mapped_column(String(120))
 
     __table_args__ = (UniqueConstraint("firebase_uid", name="uq_usuario_firebase_uid"),)
 

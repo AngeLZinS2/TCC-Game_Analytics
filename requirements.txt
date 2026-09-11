@@ -35,6 +35,10 @@ psutil>=6.0
 # Contas de usuario (Fase 31): verifica o ID token do Firebase (RS256) contra
 # o JWKS publico do Google - sem o pacote firebase-admin, sem service account.
 pyjwt[crypto]>=2.9
+# Chave de IA pessoal com Anthropic direta (Fase 34): SDK oficial, nao REST
+# cru - ja tipa erro de chave invalida/rate limit. O caminho Google usa
+# requests (ja uma dependencia) direto, sem SDK novo.
+anthropic>=0.40
 
 # --- Machine learning (Fase 6) ---
 # O modelo de previsao le do star schema e roda dentro da propria API; nao ha

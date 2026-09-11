@@ -103,20 +103,28 @@ def responder(
     """Responde uma pergunta sobre os dados coletados.
 
     Exige conta (Fase 31) - a pergunta entra no historico pessoal, visivel em
-    "Perfil". Quem cadastrou chave propria do OpenRouter (Fase 33) usa ELA
-    aqui, em vez da compartilhada do site. 503 quando falta chave (nem a
-    compartilhada, nem a propria) ou o provedor recusa - sao estados
-    esperados, e a tela mostra a instrucao em vez de um erro generico.
+    "Perfil". Quem cadastrou chave propria (Fase 33/34 - OpenRouter,
+    Anthropic ou Google) usa ELA aqui, em vez da compartilhada do site. 503
+    quando falta chave (nem a compartilhada, nem a propria) ou o provedor
+    recusa - sao estados esperados, e a tela mostra a instrucao em vez de um
+    erro generico.
     """
-    chave_cifrada = sessao.execute(
-        select(DimUsuario.openrouter_api_key_cifrada).where(
-            DimUsuario.id_usuario == usuario.id_usuario
-        )
-    ).scalar_one_or_none()
+    chave_cifrada, provedor_pessoal, modelo_pessoal = sessao.execute(
+        select(
+            DimUsuario.chave_ia_cifrada,
+            DimUsuario.chave_ia_provedor,
+            DimUsuario.chave_ia_modelo,
+        ).where(DimUsuario.id_usuario == usuario.id_usuario)
+    ).one()
     chave_pessoal = decifrar(chave_cifrada) if chave_cifrada else None
 
     try:
-        resposta = perguntar(entrada.pergunta, chave_pessoal=chave_pessoal)
+        resposta = perguntar(
+            entrada.pergunta,
+            chave_pessoal=chave_pessoal,
+            provedor_pessoal=provedor_pessoal,
+            modelo_pessoal=modelo_pessoal,
+        )
     except AssistenteIndisponivel as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
@@ -209,4 +217,5 @@ def responder(
         tokens_entrada=resposta.tokens_entrada,
         tokens_saida=resposta.tokens_saida,
         usando_chave_propria=resposta.usando_chave_propria,
+        provedor_ia=resposta.provedor_ia,
     )
