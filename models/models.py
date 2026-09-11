@@ -1074,3 +1074,46 @@ class FatoBusca(Base):
     criado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
     __table_args__ = (Index("ix_busca_criado_em", "criado_em"),)
+
+
+# ---------------------------------------------------------------------------
+# Contas de usuario (Fase 31) - Firebase Auth
+# ---------------------------------------------------------------------------
+
+
+class DimUsuario(Base):
+    """Perfil local minimo de uma conta Firebase.
+
+    O Firebase e quem cria a conta e verifica a senha - esta linha so guarda o
+    suficiente pra ligar o `firebase_uid` (o `sub` do ID token) a dados
+    proprios do PlayDB, como o historico de perguntas ao assistente. Criada
+    sob demanda (upsert) na primeira requisicao autenticada, nao num fluxo de
+    cadastro separado.
+    """
+
+    __tablename__ = "dim_usuario"
+
+    id_usuario: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    firebase_uid: Mapped[str] = mapped_column(String(128), nullable=False)
+    email: Mapped[str | None] = mapped_column(String(320))
+    nome_exibicao: Mapped[str | None] = mapped_column(String(200))
+    criado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    ultimo_acesso: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+    __table_args__ = (UniqueConstraint("firebase_uid", name="uq_usuario_firebase_uid"),)
+
+
+class FatoPerguntaAssistente(Base):
+    """Uma pergunta feita ao Assistente de IA, ligada a conta de quem perguntou."""
+
+    __tablename__ = "fato_pergunta_assistente"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    id_usuario: Mapped[int] = mapped_column(
+        Integer, ForeignKey("dim_usuario.id_usuario", ondelete="CASCADE"), nullable=False
+    )
+    pergunta: Mapped[str] = mapped_column(Text, nullable=False)
+    util: Mapped[bool | None] = mapped_column(Boolean)
+    criado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+    __table_args__ = (Index("ix_pergunta_assistente_usuario", "id_usuario", "criado_em"),)

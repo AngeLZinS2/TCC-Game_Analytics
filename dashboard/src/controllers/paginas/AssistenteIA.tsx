@@ -19,8 +19,12 @@
  * - "Ver consulta" com SQL: as consultas vivem no Python e nunca sobem na
  *   resposta. O botao exigiria inventar o SQL, entao nao existe - "Ver dados"
  *   abre o contexto real.
- * - Historico com perguntas de exemplo: nao ha persistencia no servidor, e a
- *   lista comeca vazia de verdade (`assistente/historico.ts`).
+ * - Historico com perguntas de exemplo: a lista comeca vazia de verdade -
+ *   guardada por conta desde a Fase 31 (`assistente/historico.ts`), mas
+ *   nunca com uma pergunta que a pessoa nao fez.
+ *
+ * Exige conta (Fase 31): a tela so renderiza dentro de `RotaProtegida`
+ * (`App.tsx`), entao aqui dentro sempre ha um usuario logado.
  */
 
 import { useMemo, useState } from "react";
@@ -81,8 +85,9 @@ export function AssistenteIAPagina() {
     const limpo = texto.trim();
     if (limpo.length < 3) return;
     setPergunta(limpo);
-    historico.registrar(limpo);
     setGavetaHistorico(false);
+    // O historico entra no ar do lado do backend (Fase 31), junto da
+    // resposta - `usePerguntarAssistente` ja invalida o cache no sucesso.
     assistente.mutate(limpo);
   }
 

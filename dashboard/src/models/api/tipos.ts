@@ -1218,3 +1218,17 @@ export interface SaudeBanco {
   tamanho_texto: string;
   tabelas: TabelaBanco[];
 }
+
+export interface PerfilUsuario {
+  email: string | null;
+  nome_exibicao: string | null;
+  membro_desde: string;
+  total_perguntas_assistente: number;
+}
+
+export interface EntradaHistoricoAssistente {
+  id: number;
+  pergunta: string;
+  em: string;
+  util: boolean | null;
+}

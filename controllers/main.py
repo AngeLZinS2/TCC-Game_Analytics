@@ -29,6 +29,7 @@ from controllers.routers import (
     sentimento,
     steam,
     telemetria,
+    usuario,
     xbox,
 )
 from config import get_settings
@@ -69,6 +70,7 @@ app.include_router(sentimento.router)
 app.include_router(confronto.router)
 app.include_router(ranking_oficial.router)
 app.include_router(home.router)
+app.include_router(usuario.router)
 app.include_router(assistente.router)
 app.include_router(telemetria.router)
 app.include_router(admin.router)

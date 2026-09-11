@@ -32,6 +32,9 @@ uvicorn[standard]>=0.34.0
 # Painel admin (Fase 30): CPU/RAM/disco quando nao ha Netdata pra consultar
 # (dev local, sem VPS) - fallback do que roda no proprio container.
 psutil>=6.0
+# Contas de usuario (Fase 31): verifica o ID token do Firebase (RS256) contra
+# o JWKS publico do Google - sem o pacote firebase-admin, sem service account.
+pyjwt[crypto]>=2.9
 
 # --- Machine learning (Fase 6) ---
 # O modelo de previsao le do star schema e roda dentro da propria API; nao ha

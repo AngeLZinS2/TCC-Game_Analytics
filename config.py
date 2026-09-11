@@ -373,6 +373,14 @@ class Settings(BaseSettings):
     netdata_url: str = "http://host.docker.internal:19999"
     netdata_timeout_segundos: float = Field(default=2.0, gt=0)
 
+    # --- Contas de usuario (Fase 31) - Firebase Auth ---
+    #: ID do projeto Firebase. Nao e segredo (aparece no SDK do navegador) -
+    #: e o valor que valida o `aud`/`iss` do ID token contra o JWKS publico do
+    #: Google, sem precisar de service account no backend.
+    firebase_project_id: str = "playdb-d9b04"
+    #: Cache do JWKS do Google em memoria, pra nao buscar a cada requisicao.
+    firebase_jwks_cache_segundos: int = Field(default=3600, ge=60)
+
     #: Quantos jogos do ranking oficial de MAIS JOGADOS entram no catalogo a
     #: cada rodada da Steam (o mesmo "Most Played" que o SteamDB espelha).
     #:

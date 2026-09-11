@@ -109,3 +109,46 @@ export async function enviar<T>(
 
   return (await resposta.json()) as T;
 }
+
+/**
+ * PATCH/DELETE com corpo opcional - o historico de perguntas do Assistente
+ * (Fase 31) e o primeiro caso que precisa de um metodo alem de GET/POST.
+ * Separado de `enviar` (que sempre serializa `corpo`, mesmo `undefined`, e
+ * sempre espera um corpo JSON de volta) porque um DELETE devolve 204 sem
+ * corpo nenhum.
+ */
+export async function chamar<T = void>(
+  caminho: string,
+  metodo: "PATCH" | "DELETE",
+  corpo?: unknown,
+  cabecalhos?: Record<string, string>,
+): Promise<T> {
+  let resposta: Response;
+  try {
+    resposta = await fetch(urlApi(caminho), {
+      method: metodo,
+      headers: {
+        Accept: "application/json",
+        ...(corpo !== undefined ? { "Content-Type": "application/json" } : {}),
+        ...cabecalhos,
+      },
+      body: corpo !== undefined ? JSON.stringify(corpo) : undefined,
+    });
+  } catch {
+    throw new ErroApi(0, "Nao foi possivel falar com a API. Ela esta rodando?");
+  }
+
+  if (!resposta.ok) {
+    let detalhe = `${resposta.status} ${resposta.statusText}`;
+    try {
+      const json = await resposta.json();
+      if (typeof json?.detail === "string") detalhe = json.detail;
+    } catch {
+      /* resposta sem corpo JSON: fica a mensagem padrao */
+    }
+    throw new ErroApi(resposta.status, detalhe);
+  }
+
+  if (resposta.status === 204) return undefined as T;
+  return (await resposta.json()) as T;
+}

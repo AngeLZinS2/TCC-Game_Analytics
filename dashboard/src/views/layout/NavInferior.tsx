@@ -6,10 +6,9 @@
  * cinco destinos, rótulo curto, alvo alto o suficiente para o polegar. No
  * desktop (`md:` para cima) este componente não renderiza.
  *
- * "Perfil" fica de fora: depende de autenticação, que o projeto não tem, e um
- * item sem destino só rouba espaço dos que funcionam. O "APK" no fim TEM
- * destino (a landing estática `/mobile.html`), por isso entra — como `<a>` de
- * verdade, fora da SPA.
+ * "Perfil" ganhou conta de verdade na Fase 31 e entra na lista. O "APK" no
+ * fim TEM destino (a landing estática `/mobile.html`), por isso também
+ * entra — como `<a>` de verdade, fora da SPA.
  *
  * `pb-[env(safe-area-inset-bottom)]` reserva a faixa do gesto de home nos
  * aparelhos sem botão físico — sem isso o último item fica embaixo da barra do
@@ -34,6 +33,7 @@ const ITENS: ItemInferior[] = [
   { rota: "/esports", rotulo: "E-Sports", icone: "emoji_events", prefixo: true },
   { rota: "/recomendacoes", rotulo: "Reviews", icone: "sentiment_satisfied" },
   { rota: "/assistente", rotulo: "IA", icone: "smart_toy" },
+  { rota: "/perfil", rotulo: "Perfil", icone: "account_circle" },
 ];
 
 export function NavInferior() {

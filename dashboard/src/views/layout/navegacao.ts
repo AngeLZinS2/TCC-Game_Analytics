@@ -2,9 +2,9 @@
  * As entradas da barra superior, na ordem do desenho do Stitch.
  *
  * O campo `rota` e o que separa uma tela pronta de uma tela so desenhada.
- * "Perfil" existe no Stitch mas depende de autenticacao, que o projeto nao
- * tem - aparece na navegacao, porque faz parte do desenho do produto, mas nao
- * leva a lugar nenhum e diz isso na propria linha.
+ * "Perfil" ganhou conta de verdade na Fase 31 (Firebase Auth) - clicar leva
+ * pra `/perfil`, que pede login/cadastro se ninguem estiver logado
+ * (`RotaProtegida`).
  *
  * **E-Sports nao e uma tela, e uma area.** Partidas, Resultados, Previsao,
  * Ranking, Herois e Jogadores eram seis icones na barra, todos dependentes do
@@ -56,5 +56,5 @@ export const NAVEGACAO: ItemNavegacao[] = [
     icone: "smart_toy",
     selo: "LLM",
   },
-  { rota: null, rotulo: "Perfil", icone: "account_circle" },
+  { rota: "/perfil", rotulo: "Perfil", icone: "account_circle" },
 ];

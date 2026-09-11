@@ -9,9 +9,13 @@ contra a fonte sem sair da pagina.
 from __future__ import annotations
 
 import logging
+from datetime import datetime, timezone
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
+from controllers.routers.usuario import UsuarioAtual, exigir_usuario
+from models.models import FatoPerguntaAssistente
+from models.session import session_scope
 from views.schemas import (
     BlocoContexto,
     FonteWeb,
@@ -30,6 +34,26 @@ from services.ml.assistente import AssistenteIndisponivel, perguntar
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/assistente", tags=["assistente"])
+
+
+def _registrar_pergunta(id_usuario: int, pergunta: str) -> None:
+    """Grava a pergunta no historico da conta - melhor esforco, como
+    `registrar_busca` em `telemetria.py`: falhar aqui nao pode derrubar uma
+    resposta que ja chegou pro usuario."""
+    try:
+        with session_scope() as sessao:
+            sessao.add(
+                FatoPerguntaAssistente(
+                    id_usuario=id_usuario,
+                    pergunta=pergunta,
+                    criado_em=datetime.now(timezone.utc),
+                )
+            )
+    except Exception as exc:  # noqa: BLE001
+        logger.warning(
+            "gravar pergunta no historico falhou",
+            extra={"erro": f"{type(exc).__name__}: {exc}"},
+        )
 
 
 @router.get("/status")
@@ -68,16 +92,21 @@ def saude() -> dict[str, object]:
 
 
 @router.post("/perguntar", response_model=RespostaAssistente)
-def responder(entrada: EntradaPergunta) -> RespostaAssistente:
+def responder(
+    entrada: EntradaPergunta, usuario: UsuarioAtual = Depends(exigir_usuario)
+) -> RespostaAssistente:
     """Responde uma pergunta sobre os dados coletados.
 
-    503 quando falta chave ou o provedor recusa - sao estados esperados, e a
-    tela mostra a instrucao em vez de um erro generico.
+    Exige conta (Fase 31) - a pergunta entra no historico pessoal, visivel em
+    "Perfil". 503 quando falta chave ou o provedor recusa - sao estados
+    esperados, e a tela mostra a instrucao em vez de um erro generico.
     """
     try:
         resposta = perguntar(entrada.pergunta)
     except AssistenteIndisponivel as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+    _registrar_pergunta(usuario.id_usuario, resposta.pergunta)
 
     jogo_ao_vivo = None
     if resposta.jogo_ao_vivo is not None:

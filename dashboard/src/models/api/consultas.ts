@@ -7,8 +7,10 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { buscar, enviar } from "./cliente";
+import { buscar, chamar, enviar } from "./cliente";
 import { cabecalhoAuthAdmin, salvarTokenAdmin, tokenAdmin } from "@models/admin/sessao";
+import { cabecalhoAuthUsuario } from "@models/conta/cliente";
+import { useUsuario } from "@models/conta/contexto";
 import type {
   AgregadoGenero,
   DetalheJogoSteam,
@@ -58,6 +60,8 @@ import type {
   ResumoPersonagem,
   Saude,
   VisaoGeral,
+  PerfilUsuario,
+  EntradaHistoricoAssistente,
 } from "./tipos";
 
 export interface FiltrosJogos {
@@ -434,9 +438,81 @@ export function useSaudeAssistente() {
  * entao ela tem que acontecer quando a pessoa manda, e nao a cada tecla.
  */
 export function usePerguntarAssistente() {
+  const cliente = useQueryClient();
   return useMutation({
-    mutationFn: (pergunta: string) =>
-      enviar<RespostaAssistente>("/api/assistente/perguntar", { pergunta }),
+    mutationFn: async (pergunta: string) =>
+      enviar<RespostaAssistente>(
+        "/api/assistente/perguntar",
+        { pergunta },
+        undefined,
+        await cabecalhoAuthUsuario(),
+      ),
+    // A pergunta ja entra no historico do lado do backend (Fase 31) - aqui so
+    // invalida o cache pra "Perfil" e a lateral do assistente mostrarem ela.
+    onSuccess: () => {
+      cliente.invalidateQueries({ queryKey: ["usuario", "historico-assistente"] });
+      cliente.invalidateQueries({ queryKey: ["usuario", "perfil"] });
+    },
+  });
+}
+
+// --- Conta de usuario (Fase 31) ---
+
+export function usePerfilUsuario() {
+  const { usuario } = useUsuario();
+  return useQuery({
+    queryKey: ["usuario", "perfil"],
+    queryFn: async () =>
+      buscar<PerfilUsuario>("/api/usuario/perfil", undefined, await cabecalhoAuthUsuario()),
+    enabled: !!usuario,
+    retry: false,
+  });
+}
+
+/** Historico de perguntas ao Assistente, guardado por conta (troca o antigo
+ * `localStorage` de `assistente/historico.ts`). */
+export function useHistoricoAssistenteServidor() {
+  const { usuario } = useUsuario();
+  return useQuery({
+    queryKey: ["usuario", "historico-assistente"],
+    queryFn: async () =>
+      buscar<EntradaHistoricoAssistente[]>(
+        "/api/usuario/historico-assistente",
+        undefined,
+        await cabecalhoAuthUsuario(),
+      ),
+    enabled: !!usuario,
+    retry: false,
+  });
+}
+
+export function useAvaliarPerguntaAssistente() {
+  const cliente = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, util }: { id: number; util: boolean | null }) =>
+      chamar(
+        `/api/usuario/historico-assistente/${id}`,
+        "PATCH",
+        { util },
+        await cabecalhoAuthUsuario(),
+      ),
+    onSuccess: () =>
+      cliente.invalidateQueries({ queryKey: ["usuario", "historico-assistente"] }),
+  });
+}
+
+export function useLimparHistoricoAssistente() {
+  const cliente = useQueryClient();
+  return useMutation({
+    mutationFn: async () =>
+      chamar(
+        "/api/usuario/historico-assistente",
+        "DELETE",
+        undefined,
+        await cabecalhoAuthUsuario(),
+      ),
+    onSuccess: () =>
+      cliente.invalidateQueries({ queryKey: ["usuario", "historico-assistente"] }),
   });
 }
 

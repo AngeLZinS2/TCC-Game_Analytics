@@ -1410,3 +1410,29 @@ class EntradaLoginAdmin(BaseModel):
 class TokenAdmin(BaseModel):
     token: str
     expira_em: datetime
+
+
+# ---------------------------------------------------------------------------
+# Contas de usuario (Fase 31) - Firebase Auth
+# ---------------------------------------------------------------------------
+
+
+class PerfilUsuario(BaseModel):
+    email: str | None = None
+    nome_exibicao: str | None = None
+    membro_desde: datetime
+    total_perguntas_assistente: int
+
+
+class EntradaHistoricoAssistente(BaseModel):
+    """Mesma forma que `EntradaHistorico` no frontend - a troca de local
+    storage pra backend nao muda a tela, so a fonte do dado."""
+
+    id: int
+    pergunta: str
+    em: datetime
+    util: bool | None = None
+
+
+class EntradaAvaliarPergunta(BaseModel):
+    util: bool | None = None

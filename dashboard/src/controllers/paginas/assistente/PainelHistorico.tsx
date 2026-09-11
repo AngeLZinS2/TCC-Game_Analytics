@@ -1,9 +1,8 @@
 /**
- * A lateral esquerda: as perguntas que ESTA pessoa fez, neste navegador.
- *
- * Nao ha historico no servidor (ver `historico.ts`), e a lista comeca vazia de
- * verdade - com um estado vazio que explica por que, em vez de cinco perguntas
- * de exemplo que dariam a impressao de um uso que nunca houve.
+ * A lateral esquerda: as perguntas que ESTA pessoa fez, guardadas na conta
+ * (Fase 31 - ver `historico.ts`). A lista comeca vazia de verdade - com um
+ * estado vazio que explica isso, em vez de cinco perguntas de exemplo que
+ * dariam a impressao de um uso que nunca houve.
  */
 
 import { useMemo, useState } from "react";
@@ -79,7 +78,7 @@ export function PainelHistorico({
           <p className="py-space-base font-body-sm text-body-sm text-outline">
             {busca
               ? "Nenhuma pergunta com esse termo."
-              : "Suas perguntas aparecem aqui. Ficam só neste navegador — o assistente não guarda conversa no servidor."}
+              : "Suas perguntas aparecem aqui, ligadas à sua conta — só a pergunta em si, não a conversa inteira."}
           </p>
         ) : (
           grupos.map((grupo) => (

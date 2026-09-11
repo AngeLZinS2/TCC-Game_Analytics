@@ -1,113 +1,58 @@
 /**
- * Historico de perguntas do assistente.
+ * Historico de perguntas do assistente - por conta (Fase 31), nao mais por
+ * navegador.
  *
- * O backend NAO persiste conversa: `/api/assistente/perguntar` e sem estado -
- * recebe uma pergunta, monta o contexto, devolve a resposta e esquece. Entao o
- * historico mora no navegador, e isso e uma escolha declarada, nao um
- * disfarce: nada aqui inventa pergunta que a pessoa nao fez, e a lista comeca
- * vazia de verdade em vez de nascer com exemplos plausiveis.
+ * Ate aqui isto vivia so no `localStorage` (ver o comentario antigo, ainda
+ * valido sobre o resto: o backend responde uma pergunta e esquece, o texto
+ * puro da resposta nunca foi guardado, so a pergunta). Com conta de verdade,
+ * a pessoa pediu pra isso passar a acompanhar ela entre navegadores -
+ * `usePerguntarAssistente` grava a pergunta no servidor assim que a resposta
+ * chega, e este hook so le/avalia/limpa contra `/api/usuario/historico-assistente`.
  *
- * A forma de `EntradaHistorico` ja e a que um endpoint de historico devolveria
- * (id, pergunta, momento, feedback). No dia em que o backend guardar isso,
- * troca-se a implementacao do hook e a tela nao muda.
+ * A forma devolvida e a mesma de antes (`entradas`, `carregando`, `avaliar`,
+ * `limpar`) pra `PainelHistorico`/`AssistenteIA` nao precisarem mudar.
  */
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback } from "react";
 
-/** Uma pergunta que a pessoa realmente enviou, com o retorno que ela deu. */
-export interface EntradaHistorico {
-  id: string;
-  pergunta: string;
-  /** ISO 8601, em hora local do navegador. */
-  em: string;
-  /** `null` enquanto ninguem avaliou a resposta. */
-  util: boolean | null;
-}
+import {
+  useAvaliarPerguntaAssistente,
+  useHistoricoAssistenteServidor,
+  useLimparHistoricoAssistente,
+} from "@models/api/consultas";
+import type { EntradaHistoricoAssistente } from "@models/api/tipos";
 
-const CHAVE = "playdb.assistente.historico";
-
-/**
- * Teto de itens guardados.
- *
- * Nao e por espaco (sao poucos bytes), e por leitura: uma lateral com 500
- * perguntas deixa de ser historico e vira arquivo morto. 50 cobre semanas de
- * uso e ainda cabe na tela com rolagem curta.
- */
-const MAXIMO = 50;
-
-function ler(): EntradaHistorico[] {
-  try {
-    const bruto = window.localStorage.getItem(CHAVE);
-    if (!bruto) return [];
-    const dados: unknown = JSON.parse(bruto);
-    if (!Array.isArray(dados)) return [];
-    // Filtra em vez de confiar: o conteudo do localStorage pode ter sido
-    // escrito por uma versao anterior desta tela, com outro formato.
-    return dados.filter(
-      (item): item is EntradaHistorico =>
-        typeof item === "object" &&
-        item !== null &&
-        typeof (item as EntradaHistorico).id === "string" &&
-        typeof (item as EntradaHistorico).pergunta === "string" &&
-        typeof (item as EntradaHistorico).em === "string",
-    );
-  } catch {
-    // Modo anonimo, cota estourada, JSON corrompido: sem historico e um
-    // estado valido da tela, nao um erro que valha interromper a pessoa.
-    return [];
-  }
-}
-
-function gravar(entradas: EntradaHistorico[]) {
-  try {
-    window.localStorage.setItem(CHAVE, JSON.stringify(entradas));
-  } catch {
-    // Idem: perder o historico e aceitavel, quebrar a pergunta nao.
-  }
-}
+/** Alias mantido pelo nome antigo - so os consumidores desta tela usam. */
+export type EntradaHistorico = EntradaHistoricoAssistente;
 
 export function useHistoricoAssistente() {
-  const [entradas, setEntradas] = useState<EntradaHistorico[]>([]);
-  // Existe para a lateral distinguir "ainda nao li o armazenamento" de
-  // "li e esta vazio" - sao dois estados visuais diferentes.
-  const [carregando, setCarregando] = useState(true);
+  const consulta = useHistoricoAssistenteServidor();
+  const avaliarMutacao = useAvaliarPerguntaAssistente();
+  const limparMutacao = useLimparHistoricoAssistente();
 
-  useEffect(() => {
-    setEntradas(ler());
-    setCarregando(false);
-  }, []);
+  const entradas = consulta.data ?? [];
 
-  const registrar = useCallback((pergunta: string) => {
-    setEntradas((atuais) => {
-      // Repetir a mesma pergunta nao cria linha nova - sobe a existente, que
-      // e o que a pessoa espera de uma lista "recentes".
-      const semRepetida = atuais.filter(
-        (e) => e.pergunta.toLowerCase() !== pergunta.toLowerCase(),
-      );
-      const proximas = [
-        { id: crypto.randomUUID(), pergunta, em: new Date().toISOString(), util: null },
-        ...semRepetida,
-      ].slice(0, MAXIMO);
-      gravar(proximas);
-      return proximas;
-    });
-  }, []);
-
-  /** Guarda o polegar da resposta na pergunta correspondente. */
-  const avaliar = useCallback((pergunta: string, util: boolean | null) => {
-    setEntradas((atuais) => {
-      const proximas = atuais.map((e) => (e.pergunta === pergunta ? { ...e, util } : e));
-      gravar(proximas);
-      return proximas;
-    });
-  }, []);
+  /** Casa por texto (nao por id): e como a tela ja identificava "a pergunta
+   * atual" antes de existir id nenhum, e continua funcionando porque o
+   * backend nao deduplica pergunta repetida no historico. */
+  const avaliar = useCallback(
+    (pergunta: string, util: boolean | null) => {
+      const entrada = entradas.find((e) => e.pergunta === pergunta);
+      if (entrada) avaliarMutacao.mutate({ id: entrada.id, util });
+    },
+    [entradas, avaliarMutacao],
+  );
 
   const limpar = useCallback(() => {
-    gravar([]);
-    setEntradas([]);
-  }, []);
+    limparMutacao.mutate();
+  }, [limparMutacao]);
 
-  return { entradas, carregando, registrar, avaliar, limpar };
+  return {
+    entradas,
+    carregando: consulta.isPending,
+    avaliar,
+    limpar,
+  };
 }
 
 /** O rotulo do grupo de uma entrada: "Hoje", "Ontem" ou a data. */
