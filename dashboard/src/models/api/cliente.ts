@@ -107,6 +107,12 @@ export async function enviar<T>(
     throw new ErroApi(resposta.status, detalhe);
   }
 
+  // Alguns POSTs (ex.: favoritar) respondem 204 sem corpo - `.json()` num
+  // corpo vazio lanca SyntaxError, o que fazia a mutacao "falhar" pro
+  // TanStack Query mesmo com a escrita bem-sucedida no servidor (o
+  // `onSuccess` que invalida o cache nunca rodava, e a estrela de favorito
+  // so atualizava depois de um F5).
+  if (resposta.status === 204) return undefined as T;
   return (await resposta.json()) as T;
 }
 

@@ -36,6 +36,7 @@ import type {
   ConfrontoAgendado,
   ContribuicaoConfronto,
   EquipeConfronto,
+  EquipeRankingOficial,
   FatorConfronto,
   LigaConfronto,
   PrevisaoConfronto as TipoPrevisao,
@@ -141,6 +142,64 @@ function AvisoValidacao({ validacao }: { validacao: ValidacaoConfronto }) {
         )}
       </div>
     </div>
+  );
+}
+
+/**
+ * Uma linha do ranking oficial: posição, escudo, nome e V-D/rating.
+ *
+ * `id_equipe` é `null` quando a fonte ainda não foi reconciliada com
+ * `dim_equipe` (mesmo caso de `AgendaPartida.id_equipe_a/b`) - sem id não há
+ * o que favoritar, então a estrela some em vez de favoritar o nome errado.
+ */
+function LinhaRankingOficial({
+  equipe,
+  indice,
+}: {
+  equipe: EquipeRankingOficial;
+  indice: number;
+}) {
+  const favoritosEquipes = useFavoritosEquipes();
+  const favoritar = useFavoritarEquipe();
+  const desfavoritar = useDesfavoritarEquipe();
+  const favoritado = favoritosEquipes.data?.some((e) => e.id_equipe === equipe.id_equipe);
+
+  return (
+    <tr className={indice % 2 ? "bg-[#131824]" : "bg-[#10141D]"}>
+      <td className="px-space-md py-space-sm font-label-caps text-label-caps text-outline">
+        #{String(equipe.posicao).padStart(2, "0")}
+      </td>
+      <td className="px-space-md py-space-sm">
+        <span className="flex items-center gap-space-xs">
+          {equipe.logo_url && (
+            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded bg-neutral-200 p-[2px]">
+              <img src={equipe.logo_url} alt="" className="max-h-full max-w-full object-contain" />
+            </span>
+          )}
+          <span className="font-headline-sm text-headline-sm text-on-surface">
+            {equipe.equipe_nome}
+          </span>
+          {equipe.tag && (
+            <span className="font-title-code text-title-code text-outline">{equipe.tag}</span>
+          )}
+          {equipe.id_equipe !== null && (
+            <BotaoFavoritar
+              favoritado={Boolean(favoritado)}
+              ocupado={favoritar.isPending || desfavoritar.isPending}
+              rotulo="Favoritar time"
+              tamanho="sm"
+              aoAlternar={() => {
+                const id = equipe.id_equipe as number;
+                favoritado ? desfavoritar.mutate(id) : favoritar.mutate(id);
+              }}
+            />
+          )}
+        </span>
+      </td>
+      <td className="px-space-md py-space-sm text-right font-title-code text-title-code tabular-nums text-primary">
+        {equipe.vitorias !== null ? `${equipe.vitorias}-${equipe.derrotas ?? 0}` : equipe.pontos ?? "—"}
+      </td>
+    </tr>
   );
 }
 
@@ -1208,40 +1267,7 @@ export function PrevisaoConfrontoPagina({
                 </thead>
                 <tbody className="font-body-md text-body-sm">
                   {regiaoRanking.equipes.map((equipe, indice) => (
-                    <tr
-                      key={`${equipe.posicao}-${equipe.equipe_nome}`}
-                      className={indice % 2 ? "bg-[#131824]" : "bg-[#10141D]"}
-                    >
-                      <td className="px-space-md py-space-sm font-label-caps text-label-caps text-outline">
-                        #{String(equipe.posicao).padStart(2, "0")}
-                      </td>
-                      <td className="px-space-md py-space-sm">
-                        <span className="flex items-center gap-space-xs">
-                          {equipe.logo_url && (
-                            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded bg-neutral-200 p-[2px]">
-                              <img
-                                src={equipe.logo_url}
-                                alt=""
-                                className="max-h-full max-w-full object-contain"
-                              />
-                            </span>
-                          )}
-                          <span className="font-headline-sm text-headline-sm text-on-surface">
-                            {equipe.equipe_nome}
-                          </span>
-                          {equipe.tag && (
-                            <span className="font-title-code text-title-code text-outline">
-                              {equipe.tag}
-                            </span>
-                          )}
-                        </span>
-                      </td>
-                      <td className="px-space-md py-space-sm text-right font-title-code text-title-code tabular-nums text-primary">
-                        {equipe.vitorias !== null
-                          ? `${equipe.vitorias}-${equipe.derrotas ?? 0}`
-                          : equipe.pontos ?? "—"}
-                      </td>
-                    </tr>
+                    <LinhaRankingOficial key={`${equipe.posicao}-${equipe.equipe_nome}`} equipe={equipe} indice={indice} />
                   ))}
                 </tbody>
               </table>
