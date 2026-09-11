@@ -157,6 +157,7 @@ avisa. O que está confirmado é que cada um tem modo online.
 15. Quando houver um bloco "Modelo de confronto", ele diz para quais jogos existe modelo de previsão ajustado. Se a pergunta pedir previsão de um confronto de um jogo SEM modelo na lista, diga que ainda não há modelo para esse jogo. Se o bloco disser que a acurácia não supera a taxa base, a resposta precisa dizer isso - não venda a previsão como confiável.
 16. BUSCA NA WEB. Antes de responder, decida nesta ordem: (a) a pergunta é do mundo dos jogos/esports? Se NÃO -> só "FORA_ESCOPO" (regra 0). (b) O CONTEXTO responde? Se responde, responda normalmente. (c) Se é de jogos mas o CONTEXTO não tem (resultado/campeão de torneio, quem é um jogador, notícia, data de lançamento, patch atual, comparação entre jogos que não temos) -> sua resposta inteira deve ser SÓ esta linha: PRECISA_WEB
 17. Numa resposta em MODO WEB (o sistema avisa), os resultados da busca já vêm no contexto. Use-os, inclusive números, MAS: (a) atribua cada afirmação à fonte - "segundo <site/página>", nunca como medição nossa; (b) se os resultados forem rasos, velhos ou se contradisserem, diga que a web não deu resposta firme; (c) não vá além do que os resultados dizem. Sem nada útil na web, aí sim a regra 3.
+18. O CONTEXTO pode trazer um bloco que a pergunta não pediu (ex.: o catálogo da Steam ordenado por jogadores simultâneos). Cite um bloco SÓ se ele responde a pergunta feita. Em especial, não mencione "jogos mais jogados agora"/ranking de jogadores simultâneos a menos que a pergunta seja sobre isso - citar esse número por conta própria, numa pergunta sobre outro assunto ou outro jogo, é o erro que a regra 0 e as regras acima existem para evitar.
 """
 
 
@@ -1836,8 +1837,16 @@ def _bloco_steam_ao_vivo(
 
 
 GATILHOS: dict[str, tuple[str, ...]] = {
-    "steam": ("steam", "jogo", "jogos", "preco", "preço", "catalogo", "catálogo",
-              "jogadores simultaneos", "ccu", "genero", "gênero", "desconto"),
+    # "jogo"/"jogos" NAO entram aqui de proposito: sao palavras genericas
+    # demais (quase toda pergunta do dominio tem uma delas), e casar com elas
+    # fazia o catalogo INTEIRO da Steam - ordenado por jogadores simultaneos -
+    # entrar em quase toda resposta, mesmo perguntas sobre um jogo especifico
+    # que nao esta no nosso catalogo (ex.: "me fala sobre o jogo Diablo IV").
+    # O gatilho real tem que ser sobre O CATALOGO em si (preco, genero,
+    # desconto, "quais jogos vocês tem") - nao qualquer mencao a "jogo".
+    "steam": ("steam", "preco", "preço", "catalogo", "catálogo",
+              "jogadores simultaneos", "ccu", "genero", "gênero", "desconto",
+              "quais jogos", "que jogos"),
     "partidas": ("partida", "partidas", "dota", "torneio", "liga", "duracao",
                  "duração", "radiant", "dire", "esport"),
     "herois": ("heroi", "herói", "herois", "heróis", "winrate", "personagem", "meta",
@@ -1895,16 +1904,23 @@ def montar_contexto(pergunta: str) -> ContextoMontado:
         "sentimento": _bloco_sentimento,
     }
 
-    # Os gatilhos que a pergunta casou DE VERDADE. Quando nada casa, todos os
+    # Os gatilhos que a pergunta casou DE VERDADE. Quando nada casa, os outros
     # blocos entram (para o modelo ter o que ler), mas o GRAFICO de um bloco so
     # sobe se o gatilho dele foi explicito - senao "como buildar a Kaisa"
     # mostraria o grafico de jogadores da Steam ao lado da resposta.
+    #
+    # "steam" fica DE FORA desse fallback: e o catalogo inteiro ordenado por
+    # jogadores simultaneos, e "nada casou" e exatamente o caso de uma
+    # pergunta sobre um jogo que nao esta nesse catalogo (ex.: Diablo IV) -
+    # entrar ai so faz o modelo narrar "os mais jogados agora" por ter esse
+    # numero disponivel, nunca porque a pergunta pediu. O bloco "geral" ja
+    # cobre as perguntas de contagem/cobertura que motivavam o fallback.
     gatilhos_explicitos = {
         chave
         for chave, termos in GATILHOS.items()
         if any(_normalizar(termo) in normalizada for termo in termos)
     }
-    escolhidos = gatilhos_explicitos or set(GATILHOS)
+    escolhidos = gatilhos_explicitos or (set(GATILHOS) - {"steam"})
 
     with session_scope() as sessao:
         blocos = [_bloco_geral(sessao)]

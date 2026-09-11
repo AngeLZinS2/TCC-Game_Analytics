@@ -103,6 +103,60 @@ def test_todo_gatilho_tem_termos():
         assert all(termo.strip() for termo in termos)
 
 
+@pytest.mark.parametrize(
+    "pergunta",
+    [
+        # O bug relatado: perguntar de um jogo especifico (mesmo fora do
+        # nosso catalogo) trazia o catalogo INTEIRO da Steam ordenado por
+        # jogadores simultaneos em toda resposta - so por causa da palavra
+        # "jogo". "steam" nao pode acionar aqui: nem a palavra bate, nem ha
+        # pedido de catalogo/preco/genero/ranking.
+        "me fala sobre o jogo Diablo IV",
+        "o que voce sabe sobre o jogo Hollow Knight?",
+        "esse jogo e bom?",
+    ],
+)
+def test_mencao_generica_a_jogo_nao_aciona_o_catalogo_da_steam(pergunta: str):
+    normalizada = _normalizar(pergunta)
+    acionados = {
+        chave
+        for chave, termos in GATILHOS.items()
+        if any(_normalizar(termo) in normalizada for termo in termos)
+    }
+    assert "steam" not in acionados
+
+
+def test_pergunta_sem_gatilho_nenhum_nao_traz_o_catalogo_da_steam():
+    """Fallback de "nada casou" ainda entra com os outros blocos (para o
+    modelo ter o que ler), mas NAO com o catalogo da Steam - e exatamente o
+    caso de uma pergunta sobre um jogo fora do nosso catalogo, e o catalogo
+    e ordenado por jogadores simultaneos: entrar ai vira a narrativa "os mais
+    jogados agora" que a pergunta nunca pediu."""
+    contexto = montar_contexto("me fala sobre o jogo Diablo IV")
+    assert not any(bloco.chave == "steam" for bloco in contexto.blocos)
+
+
+@pytest.mark.parametrize(
+    "pergunta",
+    [
+        "qual o preco do Hollow Knight no nosso catalogo?",
+        "quais jogos voces tem no catalogo?",
+        "quantos jogadores simultaneos tem o catalogo agora?",
+    ],
+)
+def test_pergunta_de_catalogo_ainda_aciona_o_bloco_da_steam(pergunta: str):
+    """A remocao de "jogo"/"jogos" do gatilho nao pode quebrar a pergunta que
+    de fato pede o catalogo - so a mencao generica a "jogo" que nao pedia
+    nada dele."""
+    normalizada = _normalizar(pergunta)
+    acionados = {
+        chave
+        for chave, termos in GATILHOS.items()
+        if any(_normalizar(termo) in normalizada for termo in termos)
+    }
+    assert "steam" in acionados
+
+
 def test_instrucao_prende_todo_numero_ao_contexto():
     """O prompt e parte do contrato, e este e o item que nao pode cair.
 
