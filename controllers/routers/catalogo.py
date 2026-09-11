@@ -16,10 +16,12 @@ das avaliacoes com TEXTO, e essas so existem depois de coletadas. Sem a coleta
 sob demanda, buscar um jogo novo mostraria a ficha e mais nada: nem tendencia,
 nem aspectos, nem avaliacao classificada. Por isso `/coletar`.
 
-**Preco nas outras lojas.** O `/coletar` tambem dispara, na mesma chamada, a
-coleta do ITAD para esse app - senao o painel "Onde comprar" ficaria vazio ate
-a rodada em lote (horas depois). E best-effort: se o ITAD falhar ou nao tiver
-chave, a coleta da Steam ja esta feita e a resposta volta mesmo assim.
+**Preco nas outras lojas e resumo por IA.** O `/coletar` tambem dispara, na
+mesma chamada, a coleta do ITAD e o resumo por IA (Groq) para esse app -
+senao o painel "Onde comprar" e o "Resumo por IA" ficariam vazios ate a
+rodada em lote (horas depois, e so quando o jogo entrasse na fila). Os dois
+sao best-effort: se ITAD/Groq falharem ou nao tiverem chave, a coleta da
+Steam ja esta feita e a resposta volta mesmo assim.
 """
 
 from __future__ import annotations
@@ -73,6 +75,44 @@ def _coletar_preco_sob_demanda(app_id: int) -> None:
     except Exception as exc:  # noqa: BLE001 - preco e acessorio, nao derruba a coleta
         logger.warning(
             "coleta de preco sob demanda falhou",
+            extra={"app_id": app_id, "erro": f"{type(exc).__name__}: {exc}"},
+        )
+    finally:
+        coletor.close()
+
+
+def _gerar_resumo_sob_demanda(app_id: int) -> None:
+    """Gera o resumo por IA (Groq) para um app recem-coletado. Best-effort.
+
+    Roda na mesma requisicao do `/coletar`: as ~300 avaliacoes que acabaram de
+    entrar (`PAGINAS_SOB_DEMANDA`) ja bastam pro minimo do resumo
+    (`resumo_reviews_minimo_avaliacoes`, padrao 15) - sem isto o "Resumo por
+    IA" so apareceria quando o jogo entrasse na fila do agendador (a cada 2h,
+    6 por rodada), o que pode levar dias pra um catalogo grande.
+
+    `app_ids=[app_id]` restringe a UM jogo: mesmo que o coletor normalmente
+    processe varios por rodada, aqui e so essa chamada ao Groq (poucos
+    segundos), nao um lote.
+
+    Nunca levanta: sem `GROQ_API_KEY`, avaliacoes de menos, ou Groq fora do
+    ar, a coleta da Steam ja aconteceu e a resposta do `/coletar` nao muda.
+    """
+    from services.collectors.resumo_reviews import ResumoReviewsCollector
+    from services.etl.raw_storage import RawStorage
+
+    settings = get_settings()
+    if not settings.groq_api_key:
+        return
+
+    storage = RawStorage(settings.raw_data_path, registrar_no_banco=True)
+    coletor = ResumoReviewsCollector(
+        raw_storage=storage, settings=settings, app_ids=[app_id]
+    )
+    try:
+        coletor.run(carregar=True)
+    except Exception as exc:  # noqa: BLE001 - resumo e acessorio, nao derruba a coleta
+        logger.warning(
+            "resumo por IA sob demanda falhou",
             extra={"app_id": app_id, "erro": f"{type(exc).__name__}: {exc}"},
         )
     finally:
@@ -142,7 +182,8 @@ def coletar(entrada: EntradaColeta) -> ResumoColeta:
 
     E o unico endpoint do projeto que ESCREVE chamando uma API externa. Roda de
     forma sincrona, e nao em fila, porque quem clicou esta esperando o resultado
-    na tela - e sao ~6 segundos, nao minutos.
+    na tela - a Steam sao ~6 segundos, + preco/resumo por IA best-effort no
+    fim (mais uns segundos cada, nunca minutos: so este app, nao um lote).
     """
     # Import tardio: o coletor arrasta requests, o ETL e o storage, e os outros
     # endpoints deste router nao precisam de nada disso.
@@ -200,8 +241,10 @@ def coletar(entrada: EntradaColeta) -> ResumoColeta:
             ),
         )
 
-    # O jogo entrou no banco: agora o preco nas outras lojas, best-effort.
+    # O jogo entrou no banco: agora preco nas outras lojas + resumo por IA,
+    # best-effort os dois.
     _coletar_preco_sob_demanda(entrada.app_id)
+    _gerar_resumo_sob_demanda(entrada.app_id)
 
     return ResumoColeta(
         app_id=entrada.app_id,
