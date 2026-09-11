@@ -1,7 +1,7 @@
 """Resumo de avaliacoes por IA - "o que a comunidade esta dizendo desse jogo?"
 
 Amostra avaliacoes de texto de `fato_avaliacao_steam` (metade recomendadas,
-metade nao) e pede pro Groq (`llama-3.3-70b-versatile`, gratis) um resumo em
+metade nao) e pede pro Groq (`openai/gpt-oss-120b`, gratis) um resumo em
 portugues + pontos positivos/negativos. Cacheia em `dim_jogo_steam`, igual ao
 `itad_id`/`menor_preco_historico` de outras fontes externas.
 
@@ -193,12 +193,15 @@ class ResumoReviewsCollector(BaseCollector[ResultadoResumoReviews]):
 
         registros: list[RawRecord] = []
         with session_scope() as sessao:
+            # `.all()` antes do `dict()`: o `Result` do execute tem `.keys()`
+            # (nomes de coluna) - sem o `.all()`, `dict()` acha que e um
+            # mapping e tenta subscrever o proprio Result em vez de iterar.
             nomes = dict(
                 sessao.execute(
                     select(DimJogoSteam.app_id, DimJogoSteam.nome).where(
                         DimJogoSteam.app_id.in_(alvos)
                     )
-                )
+                ).all()
             )
             for app_id in alvos:
                 amostra = _amostra_avaliacoes(
@@ -217,15 +220,26 @@ class ResumoReviewsCollector(BaseCollector[ResultadoResumoReviews]):
                         ),
                     },
                 ]
+                corpo: dict[str, Any] = {
+                    "model": self.settings.groq_model,
+                    "messages": mensagens,
+                    "max_tokens": 600,
+                    "temperature": 0.3,
+                }
+                if self.settings.groq_model.startswith("openai/gpt-oss"):
+                    # Os gpt-oss "pensam" antes de responder e cobram isso do
+                    # `max_tokens` - sem isto, `content` pode voltar vazio
+                    # (viu-se na integracao: 60 tokens de raciocinio e 0 de
+                    # resposta). "low" chega a resposta com poucos tokens de
+                    # raciocinio; `include_reasoning=False` tira o raciocinio
+                    # do payload (so a resposta interessa aqui).
+                    corpo["reasoning_effort"] = "low"
+                    corpo["include_reasoning"] = False
+
                 try:
                     resposta = self.client.post_json(
                         f"{self._base}/chat/completions",
-                        json={
-                            "model": self.settings.groq_model,
-                            "messages": mensagens,
-                            "max_tokens": 600,
-                            "temperature": 0.3,
-                        },
+                        json=corpo,
                         headers={
                             "Authorization": f"Bearer {self.settings.groq_api_key}"
                         },

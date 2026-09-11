@@ -345,7 +345,7 @@ class Settings(BaseSettings):
     #: projeto que depende de chave de terceiro.
     groq_api_key: str | None = None
     groq_base_url: str = "https://api.groq.com/openai/v1"
-    groq_model: str = "llama-3.3-70b-versatile"
+    groq_model: str = "openai/gpt-oss-120b"
     groq_timeout_seconds: float = Field(default=60.0, gt=0)
     #: So vale resumir jogo com avaliacoes de sobra pra ter o que sintetizar.
     resumo_reviews_minimo_avaliacoes: int = Field(default=15, ge=1)

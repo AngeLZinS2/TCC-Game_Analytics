@@ -7,7 +7,7 @@ Create Date: 2026-09-11
 A aba "Recepcao por jogo" (Recomendacoes por Reviews) mostrava as avaliacoes
 individuais classificadas, mas ninguem sintetizava "o que a comunidade esta
 dizendo" em texto corrido. `resumo_reviews.py` amostra avaliacoes de
-`fato_avaliacao_steam`, pede pro Groq (Llama 3.3 70B, free) um resumo em
+`fato_avaliacao_steam`, pede pro Groq (GPT-OSS 120B, free) um resumo em
 portugues + pontos positivos/negativos, e cacheia aqui - igual ao `itad_id`/
 `menor_preco_historico` ja cacheados em `dim_jogo_steam` pra outras fontes
 externas.

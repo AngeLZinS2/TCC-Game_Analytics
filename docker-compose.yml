@@ -41,6 +41,10 @@ services:
       # Idem: sem ITAD_API_KEY o painel "Onde comprar" nao aparece.
       ITAD_API_KEY: ${ITAD_API_KEY:-}
       ITAD_COUNTRY: ${ITAD_COUNTRY:-BR}
+      # Idem: sem GROQ_API_KEY o painel "Resumo por IA" nao aparece. Conta
+      # separada da do OPENROUTER_API_KEY acima (ver services/collectors/resumo_reviews.py).
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      GROQ_MODEL: ${GROQ_MODEL:-openai/gpt-oss-120b}
     ports:
       - "8000:8000"
     volumes:
@@ -94,9 +98,12 @@ services:
       AGENDADOR_BRACKETS_POR_RODADA: ${AGENDADOR_BRACKETS_POR_RODADA:-10}
       AGENDADOR_RANKING_MINUTOS: ${AGENDADOR_RANKING_MINUTOS:-10080}
       AGENDADOR_PRECOS_MINUTOS: ${AGENDADOR_PRECOS_MINUTOS:-720}
+      AGENDADOR_RESUMO_REVIEWS_MINUTOS: ${AGENDADOR_RESUMO_REVIEWS_MINUTOS:-120}
       OPENDOTA_API_KEY: ${OPENDOTA_API_KEY:-}
       ITAD_API_KEY: ${ITAD_API_KEY:-}
       ITAD_COUNTRY: ${ITAD_COUNTRY:-BR}
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      GROQ_MODEL: ${GROQ_MODEL:-openai/gpt-oss-120b}
     volumes:
       - ./data:/app/data
     # `restart: unless-stopped` e nao `always`: se alguem parar o agendador de
