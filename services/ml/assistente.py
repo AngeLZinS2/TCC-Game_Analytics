@@ -1172,6 +1172,40 @@ def _extremo_avaliacao_pedido(pergunta: str) -> str | None:
     return None
 
 
+def _extremo_recepcao_pedido(pergunta: str) -> str | None:
+    """`"pior"`/`"melhor"` para ordenar a LISTA/GRAFICO do bloco de sentimento
+    (o NOSSO catalogo - poucos jogos, cabe todo na resposta).
+
+    Mais solto que `_extremo_avaliacao_pedido` (que exige "pior avaliacao"/
+    "pior nota" etc por extenso, porque aquele bloco fala de TODA a Steam via
+    SteamSpy e "pior" sozinho la seria perigoso demais). Aqui e seguro: esta
+    funcao so e chamada de dentro de `_bloco_sentimento`, que so se monta
+    quando a pergunta ja tem gatilho de avaliacao/review/sentimento - "pior"/
+    "melhor" soltos aqui sempre se referem a recepcao, nunca a outra coisa.
+
+    Existe porque "qual jogo tem a pior recepcao nas avaliacoes" nao bate
+    nenhum termo de `GATILHOS_EXTREMO_AVALIACAO` (fala "recepcao", nao
+    "avaliacao"/"nota") - sem isto, o bloco monta a lista/grafico padrao
+    (por VOLUME de avaliacoes, nao por nota), e o texto (que le a lista
+    inteira) cita um jogo enquanto o grafico mostra outro.
+    """
+    normalizada = _normalizar(pergunta)
+    if (
+        re.search(r"\bpior(es)?\b", normalizada)
+        or "menos aprovado" in normalizada
+        or "mais reprovado" in normalizada
+        or "mais mal" in normalizada
+    ):
+        return "pior"
+    if (
+        re.search(r"\bmelhor(es)?\b", normalizada)
+        or "mais aprovado" in normalizada
+        or "mais bem" in normalizada
+    ):
+        return "melhor"
+    return None
+
+
 def _bloco_extremo_avaliacao(pergunta: str) -> Bloco | None:
     """O melhor/pior avaliado de um genero, em TODA a Steam - nao so o nosso banco.
 
@@ -1508,7 +1542,12 @@ def _bloco_guia(pergunta: str, sessao) -> Bloco | None:
     return Bloco("guia", f"Guia de build - {nome_p}", "\n".join(linhas), fonte="opgg")
 
 
-def _bloco_sentimento(sessao) -> tuple[Bloco, SerieAssistente]:
+#: Abaixo disso o percentual de um jogo e ruido (1 avaliacao negativa vira
+#: "0% positivas" e dispara o extremo por um caso isolado).
+RECEPCAO_MIN_AVALIACOES = 5
+
+
+def _bloco_sentimento(pergunta: str, sessao) -> tuple[Bloco, SerieAssistente]:
     relatorio = metricas_sentimento()
     linhas: list[str] = []
 
@@ -1549,9 +1588,28 @@ def _bloco_sentimento(sessao) -> tuple[Bloco, SerieAssistente]:
         "Sentimento das avaliacoes",
         "\n".join(linhas) or "Nenhuma avaliacao coletada.",
     )
+
+    # A lista/grafico por padrao mostra os MAIS avaliados (por volume) - uma
+    # visao geral razoavel. Mas quando a pergunta pede o PIOR/MELHOR do nosso
+    # catalogo, o grafico tem que mostrar essa ponta (ordenado por
+    # percentual), senao ele mostra "os mais avaliados" enquanto o texto (que
+    # le a lista inteira) responde o jogo com a nota mais baixa/alta de fato -
+    # o grafico contradizendo a resposta.
+    extremo = _extremo_recepcao_pedido(pergunta)
+    elegiveis = [linha for linha in por_jogo if linha[1] >= RECEPCAO_MIN_AVALIACOES] or list(por_jogo)
+    if extremo == "pior":
+        ordenado = sorted(elegiveis, key=lambda linha: float(linha[2] or 0) / linha[1])
+        titulo_serie = "Pior recepção (coletada)"
+    elif extremo == "melhor":
+        ordenado = sorted(elegiveis, key=lambda linha: float(linha[2] or 0) / linha[1], reverse=True)
+        titulo_serie = "Melhor recepção (coletada)"
+    else:
+        ordenado = por_jogo
+        titulo_serie = "Avaliações positivas por jogo (coletadas)"
+
     serie = SerieAssistente(
         chave="sentimento",
-        titulo="Avaliações positivas por jogo (coletadas)",
+        titulo=titulo_serie,
         unidade="%",
         itens=[
             PontoSerie(
@@ -1559,7 +1617,7 @@ def _bloco_sentimento(sessao) -> tuple[Bloco, SerieAssistente]:
                 valor=round(100 * float(pos or 0) / total, 1),
                 detalhe=f"{total} avaliações",
             )
-            for nome, total, pos in por_jogo[:8]
+            for nome, total, pos in ordenado[:8]
         ],
     )
     return bloco, serie
@@ -1901,7 +1959,6 @@ def montar_contexto(pergunta: str) -> ContextoMontado:
         "steam": _bloco_steam,
         "partidas": _bloco_partidas,
         "herois": _bloco_herois,
-        "sentimento": _bloco_sentimento,
     }
 
     # Os gatilhos que a pergunta casou DE VERDADE. Quando nada casa, os outros
@@ -1927,7 +1984,10 @@ def montar_contexto(pergunta: str) -> ContextoMontado:
         series: list[SerieAssistente] = []
         for chave in ("steam", "partidas", "herois", "sentimento"):
             if chave in escolhidos:
-                bloco, serie = construtores[chave](sessao)
+                if chave == "sentimento":
+                    bloco, serie = _bloco_sentimento(pergunta, sessao)
+                else:
+                    bloco, serie = construtores[chave](sessao)
                 blocos.append(bloco)
                 if (
                     serie is not None

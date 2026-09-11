@@ -41,6 +41,7 @@ from services.ml.assistente import (
     _elenco_sem_desempenho,
     _confirma_nome,
     _extremo_avaliacao_pedido,
+    _extremo_recepcao_pedido,
     _genero_pedido,
     _modo_multijogador,
     _normalizar,
@@ -400,6 +401,76 @@ def test_bloco_extremo_sem_genero_pede_o_genero_em_vez_de_usar_o_catalogo():
     assert bloco.fonte == "banco"
 
 
+@pytest.mark.parametrize(
+    "pergunta,esperado",
+    [
+        # O bug relatado: nao bate nenhum termo de GATILHOS_EXTREMO_AVALIACAO
+        # (fala "recepcao", nao "avaliacao"/"nota") - por isso precisa de um
+        # detector proprio, mais solto, dentro do bloco de sentimento.
+        ("qual jogo tem a pior recepção nas avaliações?", "pior"),
+        ("qual foi o jogo melhor recebido?", "melhor"),
+        ("como estao as avaliacoes dos jogos?", None),
+    ],
+)
+def test_extremo_recepcao_pedido(pergunta: str, esperado: str | None):
+    assert _extremo_recepcao_pedido(pergunta) == esperado
+
+
+def test_bloco_sentimento_ordena_pelo_extremo_pedido():
+    """O bug relatado: o grafico do bloco de sentimento sempre mostrava os
+    MAIS avaliados (por volume) mesmo quando a pergunta pedia o PIOR - o
+    texto (que le a lista inteira) respondia um jogo, e o grafico mostrava
+    outro em primeiro, contradizendo a resposta.
+
+    Pedido "pior", a serie tem que vir ordenada por percentual (o pior
+    primeiro) - nao por volume de avaliacoes.
+    """
+    with session_scope() as sessao:
+        _, serie_padrao = _bloco_sentimento("como estao as avaliacoes?", sessao)
+        _, serie_pior = _bloco_sentimento(
+            "qual jogo tem a pior recepção nas avaliações?", sessao
+        )
+        _, serie_melhor = _bloco_sentimento(
+            "qual jogo tem a melhor recepção nas avaliações?", sessao
+        )
+
+    if not serie_padrao.itens:
+        pytest.skip("nenhuma avaliacao coletada neste banco")
+
+    valores_pior = [item.valor for item in serie_pior.itens]
+    valores_melhor = [item.valor for item in serie_melhor.itens]
+    assert valores_pior == sorted(valores_pior)
+    assert valores_melhor == sorted(valores_melhor, reverse=True)
+    assert "pior" in serie_pior.titulo.lower()
+    assert "melhor" in serie_melhor.titulo.lower()
+
+    # O primeiro item da serie "pior" e exatamente o jogo com a MENOR
+    # recomendacao entre os que tem avaliacao suficiente - o mesmo dado que
+    # o texto do bloco (que lista todo mundo) usaria para responder.
+    linhas_com_dado = [
+        linha for linha in bloco_linhas_por_jogo(sessao) if linha[1] >= 5
+    ] or bloco_linhas_por_jogo(sessao)
+    if linhas_com_dado:
+        pior_esperado = min(
+            linhas_com_dado, key=lambda linha: float(linha[2] or 0) / linha[1]
+        )
+        assert serie_pior.itens[0].rotulo == pior_esperado[0]
+
+
+def bloco_linhas_por_jogo(sessao):
+    """Repete a mesma consulta de `_bloco_sentimento` para o teste verificar
+    o extremo esperado sem duplicar a logica de ordenacao em si."""
+    from models.models import DimJogoSteam, FatoAvaliacaoSteam
+    from sqlalchemy import cast, func, select, Integer
+
+    positivas = func.sum(cast(FatoAvaliacaoSteam.recomendado, Integer))
+    return sessao.execute(
+        select(DimJogoSteam.nome, func.count(), positivas)
+        .join(FatoAvaliacaoSteam, FatoAvaliacaoSteam.app_id == DimJogoSteam.app_id)
+        .group_by(DimJogoSteam.nome)
+    ).all()
+
+
 def test_bloco_do_banco_e_bloco_da_loja_se_declaram():
     """A procedencia e campo, nao convencao de titulo.
 
@@ -420,11 +491,19 @@ def test_todo_construtor_de_bloco_devolve_par_bloco_serie():
     primeira pergunta que citava "partidas". Nenhum teste passava pelo laco,
     entao a suite inteira ficou verde com a rota quebrada.
     """
-    construtores = (_bloco_steam, _bloco_partidas, _bloco_herois, _bloco_sentimento)
+    # `_bloco_sentimento` tem assinatura diferente dos outros tres (recebe a
+    # pergunta tambem - ver `test_bloco_sentimento_ordena_pelo_extremo_pedido`)
+    # - por isso o chamado dele entra separado, ja com a pergunta certa.
+    construtores = (
+        (_bloco_steam, ()),
+        (_bloco_partidas, ()),
+        (_bloco_herois, ()),
+        (_bloco_sentimento, ("como estao as avaliacoes?",)),
+    )
 
     with session_scope() as sessao:
-        for construtor in construtores:
-            resultado = construtor(sessao)
+        for construtor, args_extras in construtores:
+            resultado = construtor(*args_extras, sessao)
 
             assert isinstance(resultado, tuple), f"{construtor.__name__} nao devolveu tupla"
             bloco, serie = resultado
