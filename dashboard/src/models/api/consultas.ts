@@ -31,10 +31,12 @@ import type {
   DetalheConfronto,
   DetalheJogoXbox,
   DetalhePersonagem,
+  CandidatoJogoXbox,
   FiltrosJogosXbox,
   JogoXbox,
   PerfilEsporte,
   ResumoConfrontos,
+  ResumoColetaXbox,
   EquipeConfronto,
   LigaConfronto,
   PanoramaSentimento,
@@ -592,5 +594,33 @@ export function useJogoXbox(productId?: string) {
     queryKey: ["xbox", "jogo", productId],
     queryFn: () => buscar<DetalheJogoXbox>(`/api/xbox/jogos/${productId}`),
     enabled: !!productId,
+  });
+}
+
+/** Busca ao vivo na Microsoft Store — o que fecha o buraco de um jogo à
+ * venda mas fora do Game Pass e da semente fixa (ex.: um jogo que saiu do
+ * Game Pass). Mesmo desenho do `useBuscaCatalogo` da Steam. */
+export function useBuscaCatalogoXbox(termo: string) {
+  return useQuery({
+    queryKey: ["xbox", "catalogo", termo],
+    queryFn: () => buscar<CandidatoJogoXbox[]>("/api/xbox/catalogo", { termo }),
+    enabled: termo.trim().length >= 2,
+    placeholderData: (anterior) => anterior,
+    retry: false,
+  });
+}
+
+/** Coleta um jogo da Microsoft Store agora, achado pelo `/catalogo` acima. */
+export function useColetarJogoXbox() {
+  const cliente = useQueryClient();
+
+  return useMutation({
+    mutationFn: (productId: string) =>
+      enviar<ResumoColetaXbox>("/api/xbox/coletar", { product_id: productId }),
+    onSuccess: () => {
+      for (const chave of [["xbox"], ["visao-geral"]]) {
+        cliente.invalidateQueries({ queryKey: chave });
+      }
+    },
   });
 }

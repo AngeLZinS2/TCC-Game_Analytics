@@ -15,9 +15,15 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { usePaginacaoLocal } from "@models/hooks/paginacao";
-import { useGenerosXbox, useJogosXbox, useVisaoGeral } from "@models/api/consultas";
-import type { AgregadoGenero, JogoXbox } from "@models/api/tipos";
-import { Consulta, Icone, TabelaRolavel } from "@views/componentes/base";
+import {
+  useBuscaCatalogoXbox,
+  useColetarJogoXbox,
+  useGenerosXbox,
+  useJogosXbox,
+  useVisaoGeral,
+} from "@models/api/consultas";
+import type { AgregadoGenero, CandidatoJogoXbox, JogoXbox } from "@models/api/tipos";
+import { Consulta, Icone, MensagemErro, TabelaRolavel } from "@views/componentes/base";
 import { CapaXbox } from "@views/componentes/CapaXbox";
 import { CartaoJogoXbox } from "@views/componentes/CartaoJogoXbox";
 import {
@@ -90,6 +96,92 @@ function Nota({ jogo }: { jogo: JogoXbox }) {
         </span>
       )}
     </span>
+  );
+}
+
+/**
+ * "Não achou? Busque na loja" — o catálogo Xbox só acompanha quem está no
+ * Game Pass agora ou numa semente fixa (ver `xbox_collector.py`). Um jogo à
+ * venda mas fora dos dois (ex.: "Grand Theft Auto V", que saiu do Game Pass)
+ * nunca aparece na tabela principal por mais que exista na Xbox Store de
+ * verdade — este painel busca ao vivo na Microsoft Store e deixa adicionar
+ * ao catálogo com um clique. Mesmo desenho da `BuscaDeJogo` da Steam.
+ */
+function BuscaNaLojaXbox({ termo }: { termo: string }) {
+  const navegar = useNavigate();
+  const catalogo = useBuscaCatalogoXbox(termo);
+  const coletar = useColetarJogoXbox();
+
+  if (termo.trim().length < 2) return null;
+
+  const resultados = catalogo.data ?? [];
+
+  function adicionar(candidato: CandidatoJogoXbox) {
+    if (candidato.coletado) {
+      navegar(`/xbox/${candidato.product_id}`);
+      return;
+    }
+    coletar.mutate(candidato.product_id, {
+      onSuccess: (resumo) => navegar(`/xbox/${resumo.product_id}`),
+    });
+  }
+
+  return (
+    <div className="space-y-space-sm rounded-xl bg-surface-container-low/60 p-space-base">
+      <div className="flex items-center gap-space-xs font-label-caps text-label-caps uppercase tracking-widest text-outline">
+        <Icone nome="travel_explore" className="text-[16px] text-primary" />
+        Não achou no catálogo coletado? Resultados da Microsoft Store
+      </div>
+
+      {coletar.isError && <MensagemErro erro={coletar.error} />}
+
+      {catalogo.isFetching && resultados.length === 0 ? (
+        <div className="h-16 animate-pulse rounded-lg bg-surface-container-high/60" />
+      ) : resultados.length === 0 ? (
+        <p className="font-body-sm text-body-sm text-on-surface-variant">
+          Nenhum jogo da Xbox Store bate com essa busca.
+        </p>
+      ) : (
+        <div className="rolagem-discreta flex gap-space-sm overflow-x-auto pb-space-xs">
+          {resultados.map((candidato) => (
+            <button
+              key={candidato.product_id}
+              type="button"
+              onClick={() => adicionar(candidato)}
+              disabled={coletar.isPending && coletar.variables === candidato.product_id}
+              className="flex w-48 shrink-0 flex-col gap-space-xs rounded-lg bg-surface-container-lowest p-space-sm text-left transition-colors hover:bg-surface-container disabled:opacity-60"
+            >
+              <div className="aspect-[3/4] w-full overflow-hidden rounded bg-surface-container-high">
+                {candidato.imagem && (
+                  <img
+                    src={candidato.imagem}
+                    alt=""
+                    className="h-full w-full object-cover"
+                    loading="lazy"
+                  />
+                )}
+              </div>
+              <span className="truncate font-title-code text-title-code font-bold text-on-surface">
+                {candidato.nome}
+              </span>
+              <span className="truncate font-body-sm text-body-sm text-on-surface-variant">
+                {candidato.publicadora ?? "—"}
+              </span>
+              <span className="flex items-center justify-between font-badge-status text-badge-status uppercase">
+                <span className="text-primary">{candidato.preco_texto ?? "—"}</span>
+                {candidato.coletado ? (
+                  <span className="text-tertiary">já no catálogo</span>
+                ) : coletar.isPending && coletar.variables === candidato.product_id ? (
+                  <span className="text-outline">adicionando…</span>
+                ) : (
+                  <span className="text-outline">+ adicionar</span>
+                )}
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -192,6 +284,8 @@ export function XboxCatalogo() {
           ))}
         </div>
       </section>
+
+      <BuscaNaLojaXbox termo={termoBuscado} />
 
       {/* ---------- KPIs (sobre a lista inteira, nunca a página) ---------- */}
       <Consulta estado={jogos} altura={160} vazio="Catálogo do Xbox ainda não coletado.">

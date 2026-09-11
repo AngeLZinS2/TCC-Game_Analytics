@@ -19,12 +19,16 @@ from sqlalchemy.orm import Session, aliased
 
 from views.schemas import (
     AgregadoGenero,
+    CandidatoJogoXbox,
     DetalheJogoXbox,
+    EntradaColetaXbox,
     JogoXbox,
     PontoSerieXbox,
+    ResumoColetaXbox,
 )
+from config import get_settings
 from models.models import DimJogoXbox, FatoSnapshotJogoXbox
-from models.session import get_db
+from models.session import get_db, session_scope
 
 logger = logging.getLogger(__name__)
 
@@ -230,4 +234,101 @@ def detalhar_jogo(
             for s in snapshots
         ],
         midias=jogo.midias or [],
+    )
+
+
+@router.get("/catalogo", response_model=list[CandidatoJogoXbox])
+def buscar_catalogo(
+    termo: str = Query(..., min_length=2, max_length=100),
+    sessao: Session = Depends(get_db),
+) -> list[CandidatoJogoXbox]:
+    """Busca na Microsoft Store, marcando o que ja esta em `dim_jogo_xbox`.
+
+    O catalogo Xbox so acompanha quem passou pelo Game Pass ou pela semente
+    fixa (`xbox_collector.py`) - um jogo a venda mas fora dos dois (ex.:
+    "Grand Theft Auto V", que saiu do Game Pass) nunca aparecia na aba. Este
+    endpoint e o `/coletar` abaixo fecham o buraco, no mesmo desenho do
+    `/api/steam/catalogo` + `/api/steam/coletar`.
+    """
+    from services.collectors import xbox_loja
+
+    itens = xbox_loja.buscar(termo, limite=15)
+    if not itens:
+        return []
+
+    ids = [item["product_id"] for item in itens]
+    coletados = set(
+        sessao.scalars(
+            select(DimJogoXbox.product_id).where(DimJogoXbox.product_id.in_(ids))
+        )
+    )
+
+    return [
+        CandidatoJogoXbox(
+            product_id=item["product_id"],
+            nome=item["titulo"],
+            publicadora=item.get("publicadora"),
+            preco_texto=item.get("preco_texto"),
+            coletado=item["product_id"] in coletados,
+            imagem=item.get("imagem"),
+        )
+        for item in itens
+    ]
+
+
+@router.post("/coletar", response_model=ResumoColetaXbox)
+def coletar(entrada: EntradaColetaXbox) -> ResumoColetaXbox:
+    """Coleta um jogo da Microsoft Store agora - achado pelo `/catalogo` acima,
+    fora do Game Pass e da semente fixa. Sincrono, mesma logica do
+    `/api/steam/coletar`: quem clicou esta esperando na tela, e e so uma ficha
+    (uma chamada ao `displaycatalog`), nao um lote - questao de segundos.
+    """
+    from services.collectors.xbox_collector import XboxCollector
+    from services.etl.raw_storage import RawStorage
+
+    settings = get_settings()
+    storage = RawStorage(settings.raw_data_path, registrar_no_banco=True)
+    coletor = XboxCollector(
+        raw_storage=storage, settings=settings, product_ids=[entrada.product_id]
+    )
+
+    try:
+        execucao = coletor.run(carregar=True)
+    except Exception as exc:  # noqa: BLE001 - a tela precisa da mensagem
+        logger.warning(
+            "coleta Xbox sob demanda falhou",
+            extra={"product_id": entrada.product_id, "erro": f"{type(exc).__name__}: {exc}"},
+        )
+        raise HTTPException(
+            status_code=502, detail=f"a coleta falhou: {type(exc).__name__}"
+        ) from exc
+    finally:
+        coletor.close()
+
+    if not execucao.sucesso:
+        raise HTTPException(
+            status_code=502, detail=execucao.erro or "a coleta nao foi concluida"
+        )
+
+    with session_scope() as sessao_local:
+        nome = sessao_local.scalar(
+            select(DimJogoXbox.nome).where(
+                DimJogoXbox.product_id == entrada.product_id
+            )
+        )
+
+    if nome is None:
+        raise HTTPException(
+            status_code=404,
+            detail=(
+                f"o product_id {entrada.product_id} nao devolveu ficha da Store. "
+                "Pode ser regionalmente indisponivel ou o id estar errado."
+            ),
+        )
+
+    return ResumoColetaXbox(
+        product_id=entrada.product_id,
+        nome=nome,
+        registros_brutos=execucao.registros_coletados,
+        segundos=round(execucao.duracao_segundos, 2),
     )

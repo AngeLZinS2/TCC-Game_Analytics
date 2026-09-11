@@ -268,6 +268,24 @@ export interface FiltrosJogosXbox {
   limite?: number;
 }
 
+/** Um resultado da busca na Microsoft Store — o catálogo Xbox só tem quem
+ * passou pelo Game Pass ou pela semente fixa; isto acha o resto. */
+export interface CandidatoJogoXbox {
+  product_id: string;
+  nome: string;
+  publicadora: string | null;
+  preco_texto: string | null;
+  coletado: boolean;
+  imagem: string | null;
+}
+
+export interface ResumoColetaXbox {
+  product_id: string;
+  nome: string;
+  registros_brutos: number;
+  segundos: number;
+}
+
 export interface JogoDisponivel {
   codigo: string;
   nome: string;

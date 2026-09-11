@@ -1199,6 +1199,37 @@ class ResumoColeta(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# Busca na Microsoft Store e coleta sob demanda (Fase 29)
+# ---------------------------------------------------------------------------
+
+
+class CandidatoJogoXbox(BaseModel):
+    """Um resultado da busca na Microsoft Store - o catalogo Xbox so tem quem
+    passou pelo Game Pass ou pela semente fixa; a busca acha o resto."""
+
+    product_id: str
+    nome: str
+    publicadora: str | None
+    #: Ja formatado pela Store ("R$ 74,95") - sem o preco em centavos porque
+    #: a busca nao devolve moeda separada, so o texto localizado pro mercado.
+    preco_texto: str | None
+    #: Se ja existe em `dim_jogo_xbox` - decide entre mostrar ou coletar.
+    coletado: bool
+    imagem: str | None = None
+
+
+class EntradaColetaXbox(BaseModel):
+    product_id: str = Field(min_length=1, max_length=32)
+
+
+class ResumoColetaXbox(BaseModel):
+    product_id: str
+    nome: str
+    registros_brutos: int
+    segundos: float
+
+
+# ---------------------------------------------------------------------------
 # Ranking oficial (por esporte / regiao) - /api/esports/ranking-oficial
 # ---------------------------------------------------------------------------
 class EquipeRankingOficial(BaseModel):
