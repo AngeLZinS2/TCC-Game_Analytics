@@ -23,6 +23,9 @@ import { useEffect, useMemo, useState } from "react";
 import { useEntrarNaTela } from "@models/hooks/animacao";
 import {
   useAgendaConfronto,
+  useDesfavoritarEquipe,
+  useFavoritarEquipe,
+  useFavoritosEquipes,
   useLigasConfronto,
   usePrevisaoConfronto,
   useRankingConfronto,
@@ -41,6 +44,7 @@ import type {
   ValidacaoConfronto,
 } from "@models/api/tipos";
 import { Consulta, Esqueleto, Icone, MensagemErro, Selo } from "@views/componentes/base";
+import { BotaoFavoritar } from "@views/componentes/BotaoFavoritar";
 import { BarraSegmentada, CAMPO, LABEL_CAMPO, Painel, Pilula } from "@views/componentes/hud";
 import { Modal } from "@views/componentes/Modal";
 import { useJogoAtual } from "@views/layout/JogoAtual";
@@ -155,6 +159,11 @@ function LadoDoConfronto({
   jogo: string;
 }) {
   const fonte = fonteExterna(jogo);
+  const favoritosEquipes = useFavoritosEquipes();
+  const favoritar = useFavoritarEquipe();
+  const desfavoritar = useDesfavoritarEquipe();
+  const favoritado = favoritosEquipes.data?.some((e) => e.id_equipe === equipe.id_equipe);
+
   return (
     <div className="flex flex-1 flex-col items-center gap-space-sm text-center">
       <span className="font-label-caps text-label-caps uppercase tracking-widest text-outline">
@@ -177,8 +186,19 @@ function LadoDoConfronto({
       )}
 
       <div className="min-w-0">
-        <div className="truncate font-headline-md text-headline-md text-on-surface">
-          {equipe.nome}
+        <div className="flex items-center justify-center gap-space-xs">
+          <div className="truncate font-headline-md text-headline-md text-on-surface">
+            {equipe.nome}
+          </div>
+          <BotaoFavoritar
+            favoritado={Boolean(favoritado)}
+            ocupado={favoritar.isPending || desfavoritar.isPending}
+            rotulo="Favoritar time"
+            tamanho="sm"
+            aoAlternar={() =>
+              favoritado ? desfavoritar.mutate(equipe.id_equipe) : favoritar.mutate(equipe.id_equipe)
+            }
+          />
         </div>
         <div className="font-title-code text-title-code text-outline">
           {equipe.vitorias}/{equipe.partidas} · {fmtPercentual(equipe.winrate)}

@@ -23,6 +23,7 @@ from controllers.routers import (
     catalogo,
     confronto,
     dota,
+    favoritos,
     home,
     meta,
     ranking_oficial,
@@ -71,6 +72,7 @@ app.include_router(confronto.router)
 app.include_router(ranking_oficial.router)
 app.include_router(home.router)
 app.include_router(usuario.router)
+app.include_router(favoritos.router)
 app.include_router(assistente.router)
 app.include_router(telemetria.router)
 app.include_router(admin.router)

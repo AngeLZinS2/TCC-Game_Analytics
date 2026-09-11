@@ -13,11 +13,15 @@ import { Link, useParams } from "react-router-dom";
 
 import {
   useBuscarResumoSteamXbox,
+  useDesfavoritarJogo,
+  useFavoritarJogo,
+  useFavoritosJogos,
   useJogoXbox,
   useResumoSteamXbox,
 } from "@models/api/consultas";
 import type { DetalheJogoXbox, PontoSerieXbox } from "@models/api/tipos";
 import { Aviso, Consulta, Icone, MensagemErro, Selo } from "@views/componentes/base";
+import { BotaoFavoritar } from "@views/componentes/BotaoFavoritar";
 import { CapaXbox } from "@views/componentes/CapaXbox";
 import { CarrosselMidia } from "@views/componentes/CarrosselMidia";
 import { AreaNeon } from "@views/componentes/graficos/AreaNeon";
@@ -165,6 +169,12 @@ function ResumoPorIAXbox({ productId }: { productId: string }) {
 export function JogoXboxPagina() {
   const { productId } = useParams();
   const detalhe = useJogoXbox(productId);
+  const favoritosJogos = useFavoritosJogos();
+  const favoritar = useFavoritarJogo();
+  const desfavoritar = useDesfavoritarJogo();
+  const favoritado = favoritosJogos.data?.some(
+    (f) => f.fonte === "xbox" && f.jogo_id === productId,
+  );
 
   const precosSerie = useMemo(() => {
     const serie = detalhe.data?.serie ?? [];
@@ -235,9 +245,21 @@ export function JogoXboxPagina() {
                   />
 
                   <div className="min-w-0">
-                  <h1 className="font-display-hero text-display-hero uppercase leading-none tracking-tight text-on-surface">
-                    {jogo.nome}
-                  </h1>
+                  <div className="flex items-center gap-space-sm">
+                    <h1 className="font-display-hero text-display-hero uppercase leading-none tracking-tight text-on-surface">
+                      {jogo.nome}
+                    </h1>
+                    <BotaoFavoritar
+                      favoritado={Boolean(favoritado)}
+                      ocupado={favoritar.isPending || desfavoritar.isPending}
+                      rotulo="Favoritar jogo"
+                      aoAlternar={() =>
+                        favoritado
+                          ? desfavoritar.mutate({ fonte: "xbox", jogo_id: jogo.product_id })
+                          : favoritar.mutate({ fonte: "xbox", jogo_id: jogo.product_id })
+                      }
+                    />
+                  </div>
 
                   <p className="mt-space-xs font-title-code text-title-code uppercase text-outline">
                     DEV:{" "}

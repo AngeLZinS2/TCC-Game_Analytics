@@ -1117,3 +1117,57 @@ class FatoPerguntaAssistente(Base):
     criado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
     __table_args__ = (Index("ix_pergunta_assistente_usuario", "id_usuario", "criado_em"),)
+
+
+# ---------------------------------------------------------------------------
+# Favoritos (Fase 32)
+# ---------------------------------------------------------------------------
+
+
+class UsuarioJogoFavorito(Base):
+    """Um jogo (Steam ou Xbox) que a conta quer acompanhar.
+
+    `jogo_id` e sempre texto (mesmo pra Steam, cujo `app_id` e inteiro) pra
+    nao precisar de duas colunas nullable por fonte. Sem FK pro catalogo: um
+    favorito sobrevive ao jogo sair do catalogo coletado.
+    """
+
+    __tablename__ = "usuario_jogo_favorito"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    id_usuario: Mapped[int] = mapped_column(
+        Integer, ForeignKey("dim_usuario.id_usuario", ondelete="CASCADE"), nullable=False
+    )
+    fonte: Mapped[str] = mapped_column(String(10), nullable=False)
+    jogo_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    criado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("id_usuario", "fonte", "jogo_id", name="uq_usuario_jogo_favorito"),
+        Index("ix_jogo_favorito_usuario", "id_usuario"),
+    )
+
+
+class UsuarioEquipeFavorita(Base):
+    """Um time (`dim_equipe`) que a conta quer acompanhar.
+
+    A dimensao de equipe ja e por jogo (o mesmo time em CS e Valorant sao
+    linhas diferentes), entao favoritar aqui e implicitamente "esse time
+    NESSE jogo".
+    """
+
+    __tablename__ = "usuario_equipe_favorita"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    id_usuario: Mapped[int] = mapped_column(
+        Integer, ForeignKey("dim_usuario.id_usuario", ondelete="CASCADE"), nullable=False
+    )
+    id_equipe: Mapped[int] = mapped_column(
+        Integer, ForeignKey("dim_equipe.id_equipe", ondelete="CASCADE"), nullable=False
+    )
+    criado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("id_usuario", "id_equipe", name="uq_usuario_equipe_favorita"),
+        Index("ix_equipe_favorita_usuario", "id_usuario"),
+    )

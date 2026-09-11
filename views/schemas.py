@@ -7,7 +7,7 @@ seguem o dominio (portugues, como o banco) em vez de espelhar o SQL bruto.
 from __future__ import annotations
 
 from datetime import date, datetime
-from typing import Any
+from typing import Any, Literal
 from decimal import Decimal
 
 from pydantic import BaseModel, Field
@@ -1436,3 +1436,53 @@ class EntradaHistoricoAssistente(BaseModel):
 
 class EntradaAvaliarPergunta(BaseModel):
     util: bool | None = None
+
+
+# ---------------------------------------------------------------------------
+# Favoritos (Fase 32)
+# ---------------------------------------------------------------------------
+
+
+class EntradaFavoritarJogo(BaseModel):
+    fonte: Literal["steam", "xbox"]
+    jogo_id: str = Field(min_length=1, max_length=64)
+
+
+class JogoFavorito(BaseModel):
+    fonte: str
+    jogo_id: str
+    nome: str
+    imagem: str | None = None
+    preco_atual: Decimal | None = None
+    preco_normal: Decimal | None = None
+    desconto_percentual: int | None = None
+    moeda: str | None = None
+    gratuito: bool | None = None
+    #: `True` quando ha desconto ativo agora - o que faz o favorito valer a
+    #: pena olhar de novo no Perfil.
+    promocao_ativa: bool
+    ultima_noticia_titulo: str | None = None
+    ultima_noticia_url: str | None = None
+    ultima_noticia_em: datetime | None = None
+
+
+class EntradaFavoritarEquipe(BaseModel):
+    id_equipe: int
+
+
+class ProximaPartidaFavorita(BaseModel):
+    id_externo: str
+    adversario_nome: str
+    inicio_previsto: datetime
+    torneio: str | None = None
+
+
+class EquipeFavorita(BaseModel):
+    id_equipe: int
+    nome: str
+    tag: str | None = None
+    logo_url: str | None = None
+    #: `codigo` de `dim_jogo` (ex. "dota2", "counterstrike") - a mesma conta
+    #: pode favoritar o mesmo nome de time em jogos diferentes.
+    jogo_codigo: str
+    proxima_partida: ProximaPartidaFavorita | None = None

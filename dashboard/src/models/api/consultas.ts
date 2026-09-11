@@ -62,6 +62,8 @@ import type {
   VisaoGeral,
   PerfilUsuario,
   EntradaHistoricoAssistente,
+  JogoFavorito,
+  EquipeFavorita,
 } from "./tipos";
 
 export interface FiltrosJogos {
@@ -513,6 +515,89 @@ export function useLimparHistoricoAssistente() {
       ),
     onSuccess: () =>
       cliente.invalidateQueries({ queryKey: ["usuario", "historico-assistente"] }),
+  });
+}
+
+// --- Favoritos: jogos e equipes (Fase 32) ---
+
+export function useFavoritosJogos() {
+  const { usuario } = useUsuario();
+  return useQuery({
+    queryKey: ["usuario", "favoritos", "jogos"],
+    queryFn: async () =>
+      buscar<JogoFavorito[]>(
+        "/api/usuario/favoritos/jogos",
+        undefined,
+        await cabecalhoAuthUsuario(),
+      ),
+    enabled: !!usuario,
+    retry: false,
+  });
+}
+
+export function useFavoritarJogo() {
+  const cliente = useQueryClient();
+  return useMutation({
+    mutationFn: async (entrada: { fonte: "steam" | "xbox"; jogo_id: string }) =>
+      enviar<void>("/api/usuario/favoritos/jogos", entrada, undefined, await cabecalhoAuthUsuario()),
+    onSuccess: () => cliente.invalidateQueries({ queryKey: ["usuario", "favoritos", "jogos"] }),
+  });
+}
+
+export function useDesfavoritarJogo() {
+  const cliente = useQueryClient();
+  return useMutation({
+    mutationFn: async (entrada: { fonte: "steam" | "xbox"; jogo_id: string }) =>
+      chamar(
+        `/api/usuario/favoritos/jogos/${entrada.fonte}/${entrada.jogo_id}`,
+        "DELETE",
+        undefined,
+        await cabecalhoAuthUsuario(),
+      ),
+    onSuccess: () => cliente.invalidateQueries({ queryKey: ["usuario", "favoritos", "jogos"] }),
+  });
+}
+
+export function useFavoritosEquipes() {
+  const { usuario } = useUsuario();
+  return useQuery({
+    queryKey: ["usuario", "favoritos", "equipes"],
+    queryFn: async () =>
+      buscar<EquipeFavorita[]>(
+        "/api/usuario/favoritos/equipes",
+        undefined,
+        await cabecalhoAuthUsuario(),
+      ),
+    enabled: !!usuario,
+    retry: false,
+  });
+}
+
+export function useFavoritarEquipe() {
+  const cliente = useQueryClient();
+  return useMutation({
+    mutationFn: async (id_equipe: number) =>
+      enviar<void>(
+        "/api/usuario/favoritos/equipes",
+        { id_equipe },
+        undefined,
+        await cabecalhoAuthUsuario(),
+      ),
+    onSuccess: () => cliente.invalidateQueries({ queryKey: ["usuario", "favoritos", "equipes"] }),
+  });
+}
+
+export function useDesfavoritarEquipe() {
+  const cliente = useQueryClient();
+  return useMutation({
+    mutationFn: async (id_equipe: number) =>
+      chamar(
+        `/api/usuario/favoritos/equipes/${id_equipe}`,
+        "DELETE",
+        undefined,
+        await cabecalhoAuthUsuario(),
+      ),
+    onSuccess: () => cliente.invalidateQueries({ queryKey: ["usuario", "favoritos", "equipes"] }),
   });
 }
 

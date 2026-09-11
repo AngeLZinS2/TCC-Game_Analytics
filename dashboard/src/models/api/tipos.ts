@@ -1232,3 +1232,35 @@ export interface EntradaHistoricoAssistente {
   em: string;
   util: boolean | null;
 }
+
+export interface JogoFavorito {
+  fonte: "steam" | "xbox";
+  jogo_id: string;
+  nome: string;
+  imagem: string | null;
+  preco_atual: number | null;
+  preco_normal: number | null;
+  desconto_percentual: number | null;
+  moeda: string | null;
+  gratuito: boolean | null;
+  promocao_ativa: boolean;
+  ultima_noticia_titulo: string | null;
+  ultima_noticia_url: string | null;
+  ultima_noticia_em: string | null;
+}
+
+export interface ProximaPartidaFavorita {
+  id_externo: string;
+  adversario_nome: string;
+  inicio_previsto: string;
+  torneio: string | null;
+}
+
+export interface EquipeFavorita {
+  id_equipe: number;
+  nome: string;
+  tag: string | null;
+  logo_url: string | null;
+  jogo_codigo: string;
+  proxima_partida: ProximaPartidaFavorita | null;
+}

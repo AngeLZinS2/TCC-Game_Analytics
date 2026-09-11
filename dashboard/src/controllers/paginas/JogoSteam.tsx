@@ -10,7 +10,7 @@
 import { useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 
-import { useJogoSteam } from "@models/api/consultas";
+import { useDesfavoritarJogo, useFavoritarJogo, useFavoritosJogos, useJogoSteam } from "@models/api/consultas";
 import type {
   DetalheJogoSteam,
   FichaJogoSteam,
@@ -20,6 +20,7 @@ import type {
   PontoSerie,
 } from "@models/api/tipos";
 import { Botao, Consulta, Icone, Selo } from "@views/componentes/base";
+import { BotaoFavoritar } from "@views/componentes/BotaoFavoritar";
 import { CapaJogo } from "@views/componentes/CapaJogo";
 import { CarrosselMidia } from "@views/componentes/CarrosselMidia";
 import { AreaNeon } from "@views/componentes/graficos/AreaNeon";
@@ -55,6 +56,12 @@ export function JogoSteamPagina() {
   const [periodo, setPeriodo] = useState<number | null>(null);
 
   const detalhe = useJogoSteam(Number(appId));
+  const favoritosJogos = useFavoritosJogos();
+  const favoritar = useFavoritarJogo();
+  const desfavoritar = useDesfavoritarJogo();
+  const favoritado = favoritosJogos.data?.some(
+    (f) => f.fonte === "steam" && f.jogo_id === appId,
+  );
 
   const serieRecortada = useMemo(() => {
     const serie = detalhe.data?.serie ?? [];
@@ -108,9 +115,21 @@ export function JogoSteamPagina() {
                   />
 
                   <div className="min-w-0">
-                    <h1 className="font-display-hero text-display-hero uppercase leading-none tracking-tight text-on-surface">
-                      {jogo.nome}
-                    </h1>
+                    <div className="flex items-center gap-space-sm">
+                      <h1 className="font-display-hero text-display-hero uppercase leading-none tracking-tight text-on-surface">
+                        {jogo.nome}
+                      </h1>
+                      <BotaoFavoritar
+                        favoritado={Boolean(favoritado)}
+                        ocupado={favoritar.isPending || desfavoritar.isPending}
+                        rotulo="Favoritar jogo"
+                        aoAlternar={() =>
+                          favoritado
+                            ? desfavoritar.mutate({ fonte: "steam", jogo_id: String(jogo.app_id) })
+                            : favoritar.mutate({ fonte: "steam", jogo_id: String(jogo.app_id) })
+                        }
+                      />
+                    </div>
 
                     <p className="mt-space-xs font-title-code text-title-code uppercase text-outline">
                       DEV: <span className="text-on-surface-variant">{jogo.desenvolvedora ?? "—"}</span>{" "}
