@@ -13,6 +13,8 @@ import { PartidaPagina } from "./paginas/Partida";
 import { RecomendacoesReviewsPagina } from "./paginas/RecomendacoesReviews";
 import { AssistenteIAPagina } from "./paginas/AssistenteIA";
 import { EsportsLayout } from "./paginas/esports/EsportsLayout";
+import { AdminPagina } from "./paginas/admin/AdminPagina";
+import { useTelemetriaAcesso } from "@models/hooks/telemetria";
 
 /**
  * Rotas antigas (`/partidas`, `/previsao`, `/herois`, `/jogadores`) viraram
@@ -32,6 +34,8 @@ function EsportsSemAba() {
 }
 
 export function App() {
+  useTelemetriaAcesso();
+
   return (
     <ProvedorJogo>
       {/* `overflow-x-clip`: rede de segurança contra um SVG decorativo ou um
@@ -78,6 +82,7 @@ export function App() {
 
             <Route path="/recomendacoes" element={<RecomendacoesReviewsPagina />} />
             <Route path="/assistente" element={<AssistenteIAPagina />} />
+            <Route path="/admin" element={<AdminPagina />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </main>

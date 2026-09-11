@@ -1164,3 +1164,57 @@ export interface RankingOficial {
   /** `true` = classificação V-D calculada dos confrontos (sem fonte externa). */
   derivado: boolean;
 }
+
+// --- Painel admin (Fase 30) ---
+
+export interface TokenAdmin {
+  token: string;
+  expira_em: string;
+}
+
+export interface PontoAcessoDia {
+  dia: string;
+  acessos: number;
+  visitantes_unicos: number;
+}
+
+export interface VisaoGeralAdmin {
+  online_agora: number;
+  acessos_hoje: number;
+  acessos_mes: number;
+  acessos_ano: number;
+  visitantes_unicos_hoje: number;
+  visitantes_unicos_mes: number;
+  visitantes_unicos_ano: number;
+  buscas_hoje: number;
+  buscas_mes: number;
+  buscas_ano: number;
+  serie_acessos: PontoAcessoDia[];
+  termos_mais_buscados: string[];
+}
+
+export interface MetricaSistema {
+  percentual: number;
+  detalhe: string;
+}
+
+/** `fonte`: "netdata" (VPS de produção) ou "local" (fallback via psutil, dev). */
+export interface SaudeSistema {
+  fonte: string;
+  cpu: MetricaSistema | null;
+  memoria: MetricaSistema | null;
+  disco: MetricaSistema | null;
+  carga_1min: number | null;
+  carga_5min: number | null;
+  carga_15min: number | null;
+}
+
+export interface TabelaBanco {
+  tabela: string;
+  linhas: number;
+}
+
+export interface SaudeBanco {
+  tamanho_texto: string;
+  tabelas: TabelaBanco[];
+}

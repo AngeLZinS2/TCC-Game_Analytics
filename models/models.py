@@ -1033,3 +1033,44 @@ class FatoMinutoPartida(Base):
         UniqueConstraint("id_partida", "minuto", name="uq_minuto_partida"),
         Index("ix_minuto_jogo", "id_jogo", "minuto"),
     )
+
+
+# ---------------------------------------------------------------------------
+# Telemetria do site (Fase 30) - painel admin
+# ---------------------------------------------------------------------------
+
+
+class FatoAcessoSite(Base):
+    """Uma linha por pageview/heartbeat do frontend (`POST /api/telemetria/acesso`).
+
+    `visitante_id` e um UUID gerado no navegador e guardado no localStorage -
+    identifica o MESMO visitante entre paginas/sessoes sem cookie nem dado
+    pessoal (nao e IP, nao e nome, nao e email). E o que permite contar
+    "visitantes unicos" alem de "acessos" simples.
+    """
+
+    __tablename__ = "fato_acesso_site"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    visitante_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    rota: Mapped[str | None] = mapped_column(String(200))
+    criado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+    __table_args__ = (
+        Index("ix_acesso_site_criado_em", "criado_em"),
+        Index("ix_acesso_site_visitante", "visitante_id"),
+    )
+
+
+class FatoBusca(Base):
+    """Uma linha por busca no catalogo (Steam ou Xbox) - `fonte` distingue qual."""
+
+    __tablename__ = "fato_busca"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    fonte: Mapped[str] = mapped_column(String(20), nullable=False)
+    termo: Mapped[str] = mapped_column(String(200), nullable=False)
+    resultados: Mapped[int | None] = mapped_column(Integer)
+    criado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+    __table_args__ = (Index("ix_busca_criado_em", "criado_em"),)

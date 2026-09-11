@@ -357,6 +357,22 @@ class Settings(BaseSettings):
     #: avaliacoes novas sem resumir tudo toda hora.
     resumo_reviews_revalidar_dias: int = Field(default=7, ge=1)
 
+    # --- Painel admin (Fase 30) ---
+    #: Senha do painel `/admin`. Sem ela configurada, o painel fica
+    #: inacessivel (todo login recusa) - estado esperado ate configurar, como
+    #: o assistente sem OPENROUTER_API_KEY. So a senha, sem usuario: o painel
+    #: e de operacao interna, nao um sistema de contas.
+    admin_senha: str | None = None
+    #: Validade do token emitido no login, em horas.
+    admin_token_horas: int = Field(default=12, ge=1)
+    #: Onde o Netdata da VPS escuta. De dentro do container, o host precisa
+    #: do mapeamento `extra_hosts: host.docker.internal:host-gateway` no
+    #: compose (Netdata roda no host, nao em container, bind so em
+    #: 127.0.0.1:19999). Sem alcancar isso (ex.: localhost sem VPS), o painel
+    #: cai pro fallback local (`psutil`) sozinho.
+    netdata_url: str = "http://host.docker.internal:19999"
+    netdata_timeout_segundos: float = Field(default=2.0, gt=0)
+
     #: Quantos jogos do ranking oficial de MAIS JOGADOS entram no catalogo a
     #: cada rodada da Steam (o mesmo "Most Played" que o SteamDB espelha).
     #:

@@ -1314,3 +1314,99 @@ class DestaquesHome(BaseModel):
     #: `None` quando nenhum confronto proximo tem os dois times num jogo com
     #: modelo ajustado.
     destaque: DestaqueConfronto | None = None
+
+
+# ---------------------------------------------------------------------------
+# Telemetria do site (Fase 30) - pageview/heartbeat + painel admin
+# ---------------------------------------------------------------------------
+
+
+class EntradaAcesso(BaseModel):
+    """Um pageview/heartbeat que o frontend manda ao vivo.
+
+    `visitante_id` e um UUID gerado no navegador (localStorage) - identifica
+    o mesmo visitante sem cookie nem dado pessoal.
+    """
+
+    visitante_id: str = Field(min_length=8, max_length=64)
+    rota: str | None = Field(default=None, max_length=200)
+
+
+class PontoAcessoDia(BaseModel):
+    dia: date
+    acessos: int
+    visitantes_unicos: int
+
+
+class VisaoGeralAdmin(BaseModel):
+    """KPIs do painel admin: acesso e busca, com o recorte dia/mes/ano que
+    o painel pede."""
+
+    online_agora: int
+
+    acessos_hoje: int
+    acessos_mes: int
+    acessos_ano: int
+    visitantes_unicos_hoje: int
+    visitantes_unicos_mes: int
+    visitantes_unicos_ano: int
+
+    buscas_hoje: int
+    buscas_mes: int
+    buscas_ano: int
+
+    #: Ultimos 30 dias, mais antigo primeiro - o grafico da tela.
+    serie_acessos: list[PontoAcessoDia] = Field(default_factory=list)
+
+    #: Termos mais buscados nos ultimos 30 dias (bonus - mostra o que o
+    #: publico esta procurando e nao acha, se aparecer "coletado=false" junto).
+    termos_mais_buscados: list[str] = Field(default_factory=list)
+
+
+class MetricaSistema(BaseModel):
+    """Uma metrica de recurso (CPU/RAM/disco) em percentual, ja pronta pra
+    barra de progresso da tela."""
+
+    percentual: float
+    #: Texto pronto pra exibir ("1,1 GiB de 7,0 GiB") - varia a unidade
+    #: conforme a fonte (Netdata em MiB/GiB, psutil em bytes), entao o
+    #: backend formata em vez do front adivinhar a unidade certa.
+    detalhe: str
+
+
+class SaudeSistema(BaseModel):
+    """Uso de CPU/RAM/disco da maquina onde a API roda.
+
+    `fonte` diz de onde veio: "netdata" (a VPS de producao, via Netdata que
+    ja monitora o host) ou "local" (fallback via `psutil` do proprio
+    container - o que se ve rodando local, sem VPS pra consultar).
+    """
+
+    fonte: str
+    cpu: MetricaSistema | None = None
+    memoria: MetricaSistema | None = None
+    disco: MetricaSistema | None = None
+    #: 1/5/15 min - so quando a fonte e "netdata" (psutil nao tem load
+    #: agregado comparavel de forma simples multiplataforma).
+    carga_1min: float | None = None
+    carga_5min: float | None = None
+    carga_15min: float | None = None
+
+
+class TabelaBanco(BaseModel):
+    tabela: str
+    linhas: int
+
+
+class SaudeBanco(BaseModel):
+    tamanho_texto: str
+    tabelas: list[TabelaBanco] = Field(default_factory=list)
+
+
+class EntradaLoginAdmin(BaseModel):
+    senha: str = Field(min_length=1, max_length=200)
+
+
+class TokenAdmin(BaseModel):
+    token: str
+    expira_em: datetime

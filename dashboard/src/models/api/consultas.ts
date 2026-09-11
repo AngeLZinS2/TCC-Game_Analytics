@@ -8,6 +8,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { buscar, enviar } from "./cliente";
+import { cabecalhoAuthAdmin, salvarTokenAdmin, tokenAdmin } from "@models/admin/sessao";
 import type {
   AgregadoGenero,
   DetalheJogoSteam,
@@ -42,6 +43,10 @@ import type {
   PanoramaSentimento,
   ResumoReviews,
   ResumoReviewsXbox,
+  TokenAdmin,
+  VisaoGeralAdmin,
+  SaudeSistema,
+  SaudeBanco,
   PrevisaoConfronto,
   RankingOficial,
   RelatorioConfronto,
@@ -651,5 +656,50 @@ export function useBuscarResumoSteamXbox() {
     onSuccess: (dados, productId) => {
       cliente.setQueryData(["xbox", "resumo-steam", productId], dados);
     },
+  });
+}
+
+// --- Painel admin (Fase 30) ---
+//
+// Sem sistema de contas: uma senha só, token guardado no localStorage
+// (`@models/admin/sessao`). Todo hook daqui manda o header `Authorization` e
+// só habilita a consulta quando já existe um token salvo — sem isso a tela
+// de login nunca chamaria `/api/admin/*` à toa.
+
+export function useLoginAdmin() {
+  return useMutation({
+    mutationFn: (senha: string) => enviar<TokenAdmin>("/api/admin/login", { senha }),
+    onSuccess: (dados) => salvarTokenAdmin(dados.token),
+  });
+}
+
+export function useVisaoGeralAdmin() {
+  return useQuery({
+    queryKey: ["admin", "visao-geral"],
+    queryFn: () =>
+      buscar<VisaoGeralAdmin>("/api/admin/visao-geral", undefined, cabecalhoAuthAdmin()),
+    enabled: !!tokenAdmin(),
+    retry: false,
+  });
+}
+
+/** CPU/RAM/disco — reconsulta a cada 10s pra parecer um painel de monitoramento
+ * de verdade, não uma foto parada. */
+export function useSistemaAdmin() {
+  return useQuery({
+    queryKey: ["admin", "sistema"],
+    queryFn: () => buscar<SaudeSistema>("/api/admin/sistema", undefined, cabecalhoAuthAdmin()),
+    enabled: !!tokenAdmin(),
+    refetchInterval: 10000,
+    retry: false,
+  });
+}
+
+export function useBancoAdmin() {
+  return useQuery({
+    queryKey: ["admin", "banco"],
+    queryFn: () => buscar<SaudeBanco>("/api/admin/banco", undefined, cabecalhoAuthAdmin()),
+    enabled: !!tokenAdmin(),
+    retry: false,
   });
 }

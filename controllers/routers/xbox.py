@@ -30,6 +30,7 @@ from views.schemas import (
 )
 from config import get_settings
 from services.etl.casamento_jogos import normalizar_titulo
+from controllers.routers.telemetria import registrar_busca
 from models.models import DimJogoSteam, DimJogoXbox, FatoSnapshotJogoXbox
 from models.session import get_db, session_scope
 
@@ -257,6 +258,7 @@ def buscar_catalogo(
 
     itens = xbox_loja.buscar(termo, limite=15)
     if not itens:
+        registrar_busca("xbox", termo, 0)
         return []
 
     ids = [item["product_id"] for item in itens]
@@ -266,7 +268,7 @@ def buscar_catalogo(
         )
     )
 
-    return [
+    candidatos = [
         CandidatoJogoXbox(
             product_id=item["product_id"],
             nome=item["titulo"],
@@ -277,6 +279,8 @@ def buscar_catalogo(
         )
         for item in itens
     ]
+    registrar_busca("xbox", termo, len(candidatos))
+    return candidatos
 
 
 @router.post("/coletar", response_model=ResumoColetaXbox)

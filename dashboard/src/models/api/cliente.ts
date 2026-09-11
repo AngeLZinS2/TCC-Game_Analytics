@@ -19,6 +19,13 @@ export class ErroApi extends Error {
 
 type Parametros = Record<string, string | number | boolean | undefined | null>;
 
+/** Caminho -> URL completa, respeitando `VITE_API_URL` — pra quem precisa
+ * montar a chamada na mão (ex.: `navigator.sendBeacon`, que não passa por
+ * `buscar`/`enviar`). */
+export function urlApi(caminho: string): string {
+  return `${BASE}${caminho}`;
+}
+
 function montarUrl(caminho: string, parametros?: Parametros): string {
   const url = `${BASE}${caminho}`;
   if (!parametros) return url;
@@ -32,11 +39,15 @@ function montarUrl(caminho: string, parametros?: Parametros): string {
   return consulta ? `${url}?${consulta}` : url;
 }
 
-export async function buscar<T>(caminho: string, parametros?: Parametros): Promise<T> {
+export async function buscar<T>(
+  caminho: string,
+  parametros?: Parametros,
+  cabecalhos?: Record<string, string>,
+): Promise<T> {
   let resposta: Response;
   try {
     resposta = await fetch(montarUrl(caminho, parametros), {
-      headers: { Accept: "application/json" },
+      headers: { Accept: "application/json", ...cabecalhos },
     });
   } catch {
     // Rede fora / API no ar? A distincao importa para a mensagem na tela.
@@ -68,12 +79,17 @@ export async function enviar<T>(
   caminho: string,
   corpo: unknown,
   parametros?: Parametros,
+  cabecalhos?: Record<string, string>,
 ): Promise<T> {
   let resposta: Response;
   try {
     resposta = await fetch(montarUrl(caminho, parametros), {
       method: "POST",
-      headers: { Accept: "application/json", "Content-Type": "application/json" },
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        ...cabecalhos,
+      },
       body: JSON.stringify(corpo),
     });
   } catch {

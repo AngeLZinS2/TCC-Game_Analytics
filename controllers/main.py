@@ -18,6 +18,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 
 from controllers.routers import (
+    admin,
     assistente,
     catalogo,
     confronto,
@@ -27,6 +28,7 @@ from controllers.routers import (
     ranking_oficial,
     sentimento,
     steam,
+    telemetria,
     xbox,
 )
 from config import get_settings
@@ -68,6 +70,8 @@ app.include_router(confronto.router)
 app.include_router(ranking_oficial.router)
 app.include_router(home.router)
 app.include_router(assistente.router)
+app.include_router(telemetria.router)
+app.include_router(admin.router)
 
 
 @app.get("/", tags=["meta"])

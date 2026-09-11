@@ -29,6 +29,9 @@ alembic>=1.14.0
 # --- API (Fase 5) ---
 fastapi>=0.118.0
 uvicorn[standard]>=0.34.0
+# Painel admin (Fase 30): CPU/RAM/disco quando nao ha Netdata pra consultar
+# (dev local, sem VPS) - fallback do que roda no proprio container.
+psutil>=6.0
 
 # --- Machine learning (Fase 6) ---
 # O modelo de previsao le do star schema e roda dentro da propria API; nao ha

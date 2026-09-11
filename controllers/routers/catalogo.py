@@ -33,6 +33,7 @@ from sqlalchemy.orm import Session
 
 from views.schemas import CandidatoJogo, EntradaColeta, ResumoColeta
 from services.collectors import steam_loja
+from controllers.routers.telemetria import registrar_busca
 from config import get_settings
 from models.models import DimJogoSteam, FatoAvaliacaoSteam
 from models.session import get_db, session_scope
@@ -134,6 +135,7 @@ def buscar_catalogo(
     # resultado - entao nao vale distinguir com um 502.
     itens = steam_loja.buscar(termo, limite=20)
     if not itens:
+        registrar_busca("steam", termo, 0)
         return []
 
     app_ids = [int(item["id"]) for item in itens]
@@ -173,6 +175,7 @@ def buscar_catalogo(
             )
         )
 
+    registrar_busca("steam", termo, len(candidatos))
     return candidatos
 
 
