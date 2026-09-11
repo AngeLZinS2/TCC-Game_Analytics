@@ -39,7 +39,14 @@ from services.ml.assistente import (
     _bloco_sentimento,
     _bloco_steam,
     _elenco_sem_desempenho,
+    _bloco_agenda,
+    _bloco_plataforma,
+    _bloco_previsao,
+    _bloco_ranking,
+    _bloco_steam_online,
+    _bloco_xbox,
     _confirma_nome,
+    _equipe_citada,
     _extremo_avaliacao_pedido,
     _extremo_recepcao_pedido,
     _genero_pedido,
@@ -102,6 +109,141 @@ def test_todo_gatilho_tem_termos():
     for chave, termos in GATILHOS.items():
         assert termos, f"{chave} sem termos"
         assert all(termo.strip() for termo in termos)
+
+
+# --- O site dentro do contexto: plataforma, agenda, ranking, Xbox ----------
+
+
+def test_bloco_da_plataforma_lista_as_telas_de_verdade():
+    """O assistente precisa saber o que o proprio site oferece.
+
+    Sem este bloco ele mandava a pessoa para telas que nao existem e dizia
+    "nao temos isso" sobre coisa que a plataforma faz. As rotas aqui sao as
+    do `App.tsx` - se alguem renomear uma rota e esquecer deste bloco, o
+    assistente volta a indicar caminho quebrado.
+    """
+    with session_scope() as sessao:
+        bloco = _bloco_plataforma(sessao)
+
+    assert bloco.chave == "plataforma"
+    for rota in ("/catalogo/steam", "/catalogo/xbox", "/recomendacoes", "/perfil"):
+        assert rota in bloco.conteudo, f"{rota} sumiu do mapa do site"
+    # O que NAO existe precisa estar dito, senao o modelo promete.
+    assert "PlayStation" in bloco.conteudo
+    assert "NÃO EXISTE" in bloco.conteudo or "NÃO FAZ" in bloco.conteudo
+
+
+def test_plataforma_e_geral_entram_em_qualquer_pergunta():
+    contexto = montar_contexto("o que esse site faz?")
+    chaves = [bloco.chave for bloco in contexto.blocos]
+
+    assert chaves[:2] == ["plataforma", "geral"]
+    # E o resto NAO entra: sem gatilho, winrate de heroi de Dota nao tem o que
+    # fazer numa pergunta sobre o site (era o antigo fallback "entra tudo").
+    assert "herois" not in chaves
+    assert "sentimento" not in chaves
+
+
+def test_pergunta_sobre_o_proprio_site_e_do_dominio():
+    """"o que esse site faz?" caia em FORA_ESCOPO - a pior resposta possivel
+    para a pergunta que o bloco da plataforma existe para responder."""
+    assert montar_contexto("o que esse site faz?").no_dominio is True
+    assert montar_contexto("quais telas tem no site de voces?").no_dominio is True
+
+
+def test_agenda_responde_quando_o_time_joga():
+    with session_scope() as sessao:
+        bloco = _bloco_agenda("quando joga a FURIA?", sessao)
+
+    if bloco is None:
+        pytest.skip("nenhum confronto da FURIA na janela coletada agora")
+    assert bloco.chave == "agenda"
+    assert "FURIA" in bloco.conteudo
+    # O horario tem que sair convertido - o banco guarda UTC e a pergunta e
+    # "que horas". Sem isso a resposta sai 3 horas adiantada.
+    assert "horario de Brasilia" in bloco.conteudo
+
+
+def test_agenda_nao_entra_em_pergunta_que_nao_e_de_agenda():
+    with session_scope() as sessao:
+        assert _bloco_agenda("quantas partidas coletamos?", sessao) is None
+        # "Evil West" e um jogo do Xbox; "evil" casava com "Evil Geniuses" e
+        # trazia o calendario de esports para dentro de uma pergunta de loja.
+        assert _bloco_agenda("tem no game pass o evil west?", sessao) is None
+
+
+def test_equipe_citada_ignora_nome_curto_demais():
+    """Existe uma equipe chamada "X" no banco - sem piso de tamanho, ela
+    casava com o "x" de "FURIA x MIBR" e virava um lado do confronto."""
+    assert _equipe_citada("quem ganha furia x mibr?", {"X", "FURIA", "MIBR"}) == {
+        "FURIA",
+        "MIBR",
+    }
+
+
+def test_ranking_oficial_responde_melhor_time_com_a_fonte():
+    with session_scope() as sessao:
+        bloco = _bloco_ranking("qual o melhor time de cs?", sessao)
+        assert _bloco_ranking("quantos jogos tem no catalogo?", sessao) is None
+
+    if bloco is None:
+        pytest.skip("nenhum ranking oficial coletado neste banco")
+    assert bloco.chave == "ranking"
+    # Ranking de terceiro: sem a fonte e a data, a resposta vira medicao nossa.
+    assert "#1" in bloco.conteudo
+    assert "fonte" in bloco.conteudo.lower()
+
+
+def test_xbox_responde_game_pass_e_ignora_pergunta_de_steam():
+    with session_scope() as sessao:
+        bloco = _bloco_xbox("o que tem de bom no game pass?", sessao)
+        assert _bloco_xbox("qual o preco de hollow knight na steam?", sessao) is None
+
+    if bloco is None:
+        pytest.skip("catalogo do Xbox vazio neste banco")
+    assert bloco.chave == "xbox"
+    assert "Game Pass" in bloco.conteudo
+
+
+def test_steam_online_so_com_gatilho():
+    """O bloco faz rede (Valve). Sem gatilho ele nao pode nem tentar."""
+    with session_scope() as sessao:
+        bloco, _ = _bloco_steam_online("quantas partidas coletamos?", sessao)
+    assert bloco is None
+
+
+def test_previsao_roda_o_modelo_para_dois_times_citados():
+    with session_scope() as sessao:
+        vago = _bloco_previsao("quem ganha o classico?", sessao)
+        bloco = _bloco_previsao("quem ganha FURIA x MIBR no cs?", sessao)
+
+    # Pergunta sem dois times nomeados nao pode virar previsao de par nenhum.
+    assert vago is None
+    if bloco is None:
+        pytest.skip("modelo de confronto de CS nao ajustado neste ambiente")
+    assert bloco.chave == "previsao"
+    assert "FURIA" in bloco.titulo and "MIBR" in bloco.titulo
+    # A previsao nunca vai sozinha: ou tem validacao, ou diz que falta amostra.
+    assert "validacao" in bloco.conteudo.lower() or "amostra" in bloco.conteudo.lower()
+
+
+@pytest.mark.parametrize(
+    "trecho",
+    [
+        "O QUE É O PLAYDB",  # identidade do produto
+        "use a rota EXATA",  # regra 19 - encaminhamento de tela
+        "AGENDA",  # regra 20
+        "RANKING OFICIAL",  # regra 21
+        "PREVISÃO DE CONFRONTO",  # regra 22
+        "XBOX E GAME PASS",  # regra 23
+        "STEAM INTEIRA x NOSSO CATÁLOGO",  # regra 24
+    ],
+)
+def test_instrucao_cobre_o_site_inteiro(trecho: str):
+    """A instrucao e o contrato do assistente com o produto: cada bloco novo
+    tem uma regra de como usa-lo. Removida a regra, o bloco continua chegando
+    e o modelo volta a improvisar em cima dele."""
+    assert trecho in INSTRUCAO
 
 
 @pytest.mark.parametrize(

@@ -45,6 +45,7 @@ import re
 import time
 import unicodedata
 from dataclasses import dataclass, field
+from datetime import datetime, timedelta, timezone
 from typing import Any, Callable
 
 import requests
@@ -54,22 +55,28 @@ from models import vocabulario_esports
 from services.collectors import itad_loja, opgg_mcp, steam_descoberta, steam_loja
 from config import get_settings
 from services.ml import telemetria_assistente
+from services.collectors.steam_online import URL_MAIS_JOGADOS as URL_MAIS_JOGADOS_STEAM
 from models.models import (
     AgendaPartida,
+    DimAppSteamNome,
     DimEquipe,
     DimJogo,
     DimJogoSteam,
+    DimJogoXbox,
     DimPartida,
     DimPersonagem,
     FatoAvaliacaoSteam,
     FatoEstatisticaPersonagem,
     FatoPartidaJogador,
     FatoSnapshotJogoSteam,
+    FatoSteamOnline,
+    RankingExterno,
 )
 from models.session import session_scope
 from services.etl.transform_itad import MenorHistorico, OfertaItad
 from services.ml.confronto import carregar_relatorio as relatorio_confronto
 from services.ml.confronto import jogos_com_modelo as _jogos_com_modelo_confronto
+from services.ml.confronto import prever as prever_confronto
 from services.ml.sentimento import carregar_metricas as metricas_sentimento
 
 logger = logging.getLogger(__name__)
@@ -77,6 +84,18 @@ logger = logging.getLogger(__name__)
 INSTRUCAO = """\
 Você é o assistente de dados do PlayDB, uma plataforma de coleta e análise de \
 dados de jogos e esports.
+
+O QUE É O PLAYDB, e o que você é dentro dele. A plataforma coleta por conta \
+própria: as lojas (Steam e Xbox/Game Pass), o calendário e os resultados do \
+cenário profissional de vários jogos, os rankings oficiais que cada esporte \
+publica, as avaliações da Steam, e treina aqui os modelos (sentimento das \
+reviews e previsão de confronto). A proposta dela é uma só: **todo número \
+mostrado tem origem conferível**. Você é o atalho para esse acervo - quem \
+pergunta aqui está pedindo o que as telas mostram, sem precisar navegar. \
+Então duas obrigações andam juntas: nunca inventar número, e nunca dizer \
+"não temos isso" sobre algo que a plataforma tem. O bloco "O que o PlayDB \
+faz e onde fica cada coisa" lista as telas e as rotas - é ele que diz o que \
+existe, não o seu conhecimento geral sobre sites parecidos.
 
 REGRA 0, acima de todas - ESCOPO. Você SÓ trata do mundo dos jogos e esports: \
 jogos de qualquer plataforma, lojas e preços, partidas, torneios, times, \
@@ -101,6 +120,13 @@ números dele são estimativas, não medição oficial.
 jogos que não são da Steam e cujas partidas nós não coletamos. São partidas \
 públicas com classificação, do público geral, NÃO do cenário profissional. \
 Diga "segundo o OP.GG" e diga que é do público geral.
+- RANKING: o ranking que a fonte OFICIAL de cada esporte publica (Valve em \
+Counter-Strike, vlr.gg em VALORANT, Ubisoft em Rainbow Six, LoL Esports, \
+RLCS, DLTV). É de terceiro, tem data de snapshot, e NÃO é a mesma coisa que \
+a força estimada pelo nosso modelo.
+- XBOX: o catálogo da Microsoft Store que coletamos, focado no Game Pass - \
+preço em BRL, desconto, se está no Game Pass agora e a nota da Store (0 a 5, \
+escala diferente do percentual da Steam).
 
 REGRAS, em ordem de prioridade:
 
@@ -158,6 +184,12 @@ avisa. O que está confirmado é que cada um tem modo online.
 16. BUSCA NA WEB. Antes de responder, decida nesta ordem: (a) a pergunta é do mundo dos jogos/esports? Se NÃO -> só "FORA_ESCOPO" (regra 0). (b) O CONTEXTO responde? Se responde, responda normalmente. (c) Se é de jogos mas o CONTEXTO não tem (resultado/campeão de torneio, quem é um jogador, notícia, data de lançamento, patch atual, comparação entre jogos que não temos) -> sua resposta inteira deve ser SÓ esta linha: PRECISA_WEB
 17. Numa resposta em MODO WEB (o sistema avisa), os resultados da busca já vêm no contexto. Use-os, inclusive números, MAS: (a) atribua cada afirmação à fonte - "segundo <site/página>", nunca como medição nossa; (b) se os resultados forem rasos, velhos ou se contradisserem, diga que a web não deu resposta firme; (c) não vá além do que os resultados dizem. Sem nada útil na web, aí sim a regra 3.
 18. O CONTEXTO pode trazer um bloco que a pergunta não pediu (ex.: o catálogo da Steam ordenado por jogadores simultâneos). Cite um bloco SÓ se ele responde a pergunta feita. Em especial, não mencione "jogos mais jogados agora"/ranking de jogadores simultâneos a menos que a pergunta seja sobre isso - citar esse número por conta própria, numa pergunta sobre outro assunto ou outro jogo, é o erro que a regra 0 e as regras acima existem para evitar.
+19. ONDE VER. Ao indicar uma tela, use a rota EXATA do bloco "O que o PlayDB faz e onde fica cada coisa" (ex.: /catalogo/xbox, /esports/counterstrike/ranking). Rota com placeholder (/esports/<jogo>/partidas, /steam/<app_id>, /xbox/<product_id>) NUNCA vai assim para a resposta: troque pelo valor real - o código do jogo está no mesmo bloco, e o app_id/product_id aparece no bloco do jogo. Se você não tem o valor, escreva o nome da tela ("a aba Partidas de E-Sports") em vez de um link quebrado. Nunca invente rota, nome de menu ou botão, e nunca prometa recurso que esse bloco não lista - se a pessoa pedir algo que a plataforma não faz (PlayStation, comprar o jogo, ver a conta dela da Steam), diga o que existe no lugar. Indicar a tela é um COMPLEMENTO da resposta, não a resposta: primeiro responda com o dado do contexto.
+20. AGENDA. Quando houver um bloco de agenda, ele responde "quando joga", "tem jogo hoje" e "o que está rolando". Use os horários COMO ESTÃO lá (já vêm em horário de Brasília) e diga o torneio. Se o bloco disser que não há confronto futuro na janela, diga isso - não ofereça a partida de outro time nem invente data. Confronto listado como "deve estar em andamento" é inferência pelo horário, não confirmação de que está ao vivo: diga assim.
+21. RANKING OFICIAL. Com um bloco de ranking, responda "qual o melhor time" por ELE, citando a fonte e a data do snapshot ("#1 no ranking da Valve, snapshot de ..."). O bloco diz a REGIÃO de cada lista: quando o ranking é regional (VALORANT, LoL, Rocket League), diga de qual região está falando - "o #1 da Europa" e "o #1 do mundo" são respostas diferentes, e dar uma pela outra é erro de fato. Não misture com a força do nosso modelo nem com winrate das nossas partidas - são medidas diferentes, e trocá-las é responder outra pergunta.
+22. PREVISÃO DE CONFRONTO. Com um bloco de previsão, a resposta é a probabilidade DELE, com os dois nomes e os fatores que pesaram. Se o bloco avisar que a acurácia não supera a taxa base ou que a amostra é pequena, a resposta PRECISA dizer isso na mesma frase da porcentagem. Se o bloco disser que falta histórico do par, diga que não há previsão para esse confronto - nunca estime a chance por conta própria.
+23. XBOX E GAME PASS. Com um bloco do Xbox, responda por ele, não pelo seu conhecimento geral - entra e sai jogo do Game Pass toda semana, e o bloco é a coleta mais recente. A nota da Store é de 0 a 5 e não se compara com o percentual de positivas da Steam: não converta uma na outra. Jogo ausente do bloco significa "não está na nossa coleta", nunca "não existe no Xbox".
+24. STEAM INTEIRA x NOSSO CATÁLOGO. São duas perguntas diferentes e cada uma tem o seu bloco. "Qual o jogo mais jogado agora" (o mundo) se responde pelo bloco da Valve ao vivo; "qual o mais jogado do catálogo de vocês" se responde pelo bloco do catálogo. Diga sempre de qual recorte está falando, e não apresente o catálogo de 60 jogos como se fosse a Steam inteira.
 """
 
 
@@ -451,6 +483,127 @@ def _linhas_cobertura(sessao) -> list[str]:
         "a tela de detalhe do personagem (/herois) mostra a ficha completa."
     )
     return linhas
+
+
+#: As telas do site, na ordem da navegacao. Rota exata + o que ela responde.
+#: E texto fixo de proposito: rota de tela nao esta em tabela nenhuma, e a
+#: alternativa (deixar o modelo deduzir) produz link inventado - o defeito que
+#: este bloco existe para fechar.
+TELAS_PLAYDB = (
+    ("/", "Visão Geral",
+     "o dia de hoje: usuários simultâneos da Steam inteira (número da Valve), "
+     "Top mais jogados agora, próximas partidas e destaques"),
+    ("/catalogo/steam", "Catálogo de Jogos > Steam",
+     "os jogos da Steam que monitoramos: preço, jogadores simultâneos, nota, "
+     "gênero. A ficha de um jogo fica em /steam/<app_id>"),
+    ("/catalogo/xbox", "Catálogo de Jogos > Xbox",
+     "jogos da Microsoft Store: preço, desconto, Game Pass, nota da loja. "
+     "A ficha fica em /xbox/<product_id>"),
+    ("/catalogo/playstation", "Catálogo de Jogos > PlayStation",
+     "AINDA NÃO EXISTE - a aba mostra 'em breve'. Não há nenhum dado de "
+     "PlayStation nesta plataforma"),
+    ("/recomendacoes", "Recomendações por Reviews",
+     "recomendação a partir das avaliações da Steam, com resumo por IA e o "
+     "modelo de sentimento"),
+    ("/esports/<jogo>/partidas", "E-Sports > Partidas",
+     "a agenda: os próximos confrontos daquele jogo, com torneio e horário"),
+    ("/esports/<jogo>/resultados", "E-Sports > Resultados",
+     "confrontos já decididos, com placar e (onde a fonte publica) o detalhe "
+     "por mapa e por jogador"),
+    ("/esports/<jogo>/previsao", "E-Sports > Previsão",
+     "o simulador: escolhe dois times e mostra a probabilidade de cada um "
+     "vencer, com os fatores por trás"),
+    ("/esports/<jogo>/ranking", "E-Sports > Ranking",
+     "as equipes ordenadas - por força ajustada pelos nossos confrontos e, "
+     "onde existe, pelo ranking oficial publicado"),
+    ("/esports/<jogo>/herois", "E-Sports > Heróis",
+     "personagens/agentes/campeões: winrate, taxa de escolha e a ficha "
+     "completa (habilidades e, onde há, guia de build)"),
+    ("/esports/<jogo>/jogadores", "E-Sports > Jogadores",
+     "os jogadores com desempenho agregado das partidas coletadas"),
+    ("/assistente", "Assistente de IA",
+     "esta tela - responde sobre os dados da plataforma"),
+    ("/perfil", "Perfil",
+     "a conta: favoritar jogos (acompanha preço, promoção e notícia) e times "
+     "(acompanha a próxima partida), e cadastrar uma chave de IA própria. "
+     "Exige login"),
+    ("/mobile.html", "APK Mobile", "o aplicativo Android da plataforma"),
+)
+
+
+def _bloco_plataforma(sessao) -> Bloco:
+    """O que o PlayDB é e onde cada resposta mora no site.
+
+    Entra em TODA pergunta, junto do bloco geral. Existe por duas falhas que
+    apareceram juntas: o assistente mandava a pessoa para telas que não
+    existem (inventava rota e nome de menu), e respondia "não temos isso"
+    sobre coisa que a plataforma faz - porque nenhum bloco falava das TELAS,
+    só dos números. Um assistente que não sabe o que o próprio site oferece
+    não consegue ser o atalho para ele.
+
+    O texto das telas é fixo (`TELAS_PLAYDB`); o que vem do banco é só quais
+    jogos têm área de esports de fato, que muda com a coleta.
+    """
+    # Mesmo criterio e mesma ordem do trilho lateral e do menu de E-Sports
+    # (`temEsports` no front): jogo com partida, agenda OU equipe coletada.
+    # Ordenar igual importa - a pessoa ve os 8 primeiros na lateral, e o
+    # assistente falando de outra ordem parece falar de outro site.
+    partidas_de = (
+        select(func.count())
+        .select_from(DimPartida)
+        .where(DimPartida.id_jogo == DimJogo.id_jogo)
+        .scalar_subquery()
+    )
+    agenda_de = (
+        select(func.count())
+        .select_from(AgendaPartida)
+        .where(AgendaPartida.id_jogo == DimJogo.id_jogo)
+        .scalar_subquery()
+    )
+    equipes_de = (
+        select(func.count())
+        .select_from(DimEquipe)
+        .where(DimEquipe.id_jogo == DimJogo.id_jogo)
+        .scalar_subquery()
+    )
+    com_area = sessao.execute(
+        select(DimJogo.codigo, DimJogo.nome)
+        .where((partidas_de > 0) | (agenda_de > 0) | (equipes_de > 0))
+        .order_by(desc(partidas_de), desc(agenda_de), desc(equipes_de), DimJogo.nome)
+    ).all()
+
+    linhas = [
+        "O PlayDB é uma plataforma de coleta e análise de dados de jogos e "
+        "esports (projeto de TCC). Tudo que ele mostra vem de coleta própria: "
+        "lojas (Steam e Xbox), fontes de esports e modelos treinados aqui - "
+        "não é agregador de notícia nem loja.",
+        "",
+        "TELAS DO SITE (ao indicar onde ver, use a rota exata desta lista e "
+        "nunca invente outra):",
+    ]
+    linhas += [f"- {rotulo} ({rota}): {descricao}." for rota, rotulo, descricao in TELAS_PLAYDB]
+
+    if com_area:
+        linhas += [
+            "",
+            "Jogos com área de E-Sports própria (troque <jogo> pelo código; os "
+            "8 primeiros são os que aparecem no menu lateral, os demais ficam "
+            "no menu de E-Sports): "
+            + ", ".join(f"{nome} = {codigo}" for codigo, nome in com_area)
+            + ".",
+        ]
+
+    linhas += [
+        "",
+        "O QUE A PLATAFORMA NÃO FAZ: não vende, não instala e não roda jogo; "
+        "não acessa a conta de Steam/Xbox de ninguém; não tem dado de "
+        "PlayStation, Nintendo nem de loja fora Steam/Xbox (o preço de outras "
+        "lojas só aparece na ficha de um jogo da Steam, via IsThereAnyDeal); "
+        "não cobre partida ranqueada pessoal de quem pergunta - o cenário "
+        "coberto é o profissional, e o público geral só aparece via OP.GG.",
+    ]
+
+    return Bloco("plataforma", "O que o PlayDB faz e onde fica cada coisa", "\n".join(linhas))
 
 
 def _bloco_steam(sessao) -> tuple[Bloco, SerieAssistente]:
@@ -1267,6 +1420,889 @@ def _bloco_extremo_avaliacao(pergunta: str) -> Bloco | None:
     )
 
 
+GATILHOS_PREVISAO = (
+    "quem ganha", "quem vence", "quem leva", "quem e favorito", "favorito",
+    "chance de vencer", "chances de", "probabilidade", "previsao", "prever",
+    "quem e melhor", "quem ganharia", "contra", " vs ", " x ",
+    "confronto entre", "simular", "simulacao",
+)
+
+
+def _pede_previsao(pergunta: str) -> bool:
+    normalizada = f" {_normalizar(pergunta)} "
+    return any(_normalizar(termo) in normalizada for termo in GATILHOS_PREVISAO)
+
+
+def _bloco_previsao(pergunta: str, sessao) -> Bloco | None:
+    """A previsao REAL do nosso modelo para dois times citados na pergunta.
+
+    A tela /esports/<jogo>/previsao responde "quem ganha X contra Y" com
+    probabilidade e fatores; o assistente so tinha as METRICAS do modelo
+    (acuracia, ROC-AUC) - entao "quem ganha FURIA x MIBR?" virava uma aula
+    sobre validacao, ou pior, um palpite do conhecimento geral. Agora roda o
+    mesmo motor da tela.
+
+    O aviso de validacao vem junto, sempre: com a amostra atual a acuracia
+    nem sempre supera a taxa base, e vender a porcentagem sem esse contexto e
+    exatamente o que esta plataforma existe para nao fazer.
+    """
+    if not _pede_previsao(pergunta):
+        return None
+
+    com_modelo = _jogos_com_modelo_confronto()
+    if not com_modelo:
+        return None
+
+    # `confrontos` separa o time de verdade do homonimo de academia: "Team
+    # Spirit" e "Team Spirit Academy" casam os dois com "spirit", e sem um
+    # criterio de proeminencia a previsao sai do time errado com cara de
+    # certa. Quem tem mais confronto coletado e quem a pergunta quer dizer.
+    confrontos_de = (
+        select(func.count())
+        .select_from(AgendaPartida)
+        .where(
+            (AgendaPartida.id_equipe_a == DimEquipe.id_equipe)
+            | (AgendaPartida.id_equipe_b == DimEquipe.id_equipe)
+        )
+        .scalar_subquery()
+    )
+    candidatos = sessao.execute(
+        select(
+            DimEquipe.id_equipe,
+            DimEquipe.nome,
+            DimJogo.codigo,
+            DimJogo.nome,
+            confrontos_de,
+        )
+        .join(DimJogo, DimJogo.id_jogo == DimEquipe.id_jogo)
+        .where(DimJogo.codigo.in_(com_modelo))
+    ).all()
+    if not candidatos:
+        return None
+
+    citados = _equipe_citada(pergunta, {linha[1] for linha in candidatos})
+    if len(citados) < 2:
+        return None
+
+    normalizada = _normalizar(pergunta)
+    tokens = re.findall(r"[a-z0-9]+", normalizada)
+    trechos = {
+        " ".join(tokens[i:j])
+        for i in range(len(tokens))
+        for j in range(i + 1, min(i + 4, len(tokens)) + 1)
+    }
+    codigos = _codigos_citados(pergunta)
+
+    def _intervalo(nome: str) -> tuple[int, int]:
+        """O trecho da pergunta onde este time foi citado.
+
+        Intervalo, nao posicao: "Team Spirit" e "Spirit" sao duas linhas do
+        banco para a MESMA mencao no texto, e agrupa-las por posicao exata as
+        tratava como dois lados de um confronto ("Team Spirit x Spirit").
+        """
+        alvo = _normalizar(nome)
+        indice = normalizada.find(alvo)
+        if indice >= 0:
+            return (indice, indice + len(alvo))
+        for palavra in re.findall(r"[a-z0-9]+", alvo):
+            if len(palavra) >= 4:
+                achado = normalizada.find(palavra)
+                if achado >= 0:
+                    return (achado, achado + len(palavra))
+        return (10_000, 10_000)
+
+    #: Um "grupo" e o time que a pergunta quis dizer: entre os homonimos, o de
+    #: nome exato e, empatando, o de mais confrontos coletados.
+    def _melhor(linhas: list) -> tuple:
+        return sorted(
+            linhas,
+            key=lambda linha: (
+                0 if _normalizar(linha[1]) in trechos else 1,
+                -(linha[4] or 0),
+                len(linha[1]),
+            ),
+        )[0]
+
+    por_jogo: dict[str, list[tuple[tuple[int, int], Any]]] = {}
+    for linha in candidatos:
+        if linha[1] not in citados:
+            continue
+        por_jogo.setdefault(linha[2], []).append((_intervalo(linha[1]), linha))
+
+    def _mencoes(marcados: list[tuple[tuple[int, int], Any]]) -> list[list]:
+        """Uma lista por MENÇÃO do texto - trechos que se sobrepõem viram uma."""
+        grupos: list[tuple[list[int], list]] = []
+        for (inicio, fim), linha in sorted(marcados, key=lambda item: item[0]):
+            if grupos and inicio < grupos[-1][0][1]:
+                grupos[-1][0][1] = max(grupos[-1][0][1], fim)
+                grupos[-1][1].append(linha)
+            else:
+                grupos.append(([inicio, fim], [linha]))
+        return [linhas for _, linhas in grupos]
+
+    escolha = None
+    for codigo, marcados in por_jogo.items():
+        if codigos and codigo not in codigos:
+            continue
+        grupos = _mencoes(marcados)
+        if len(grupos) < 2:
+            continue
+        lados = [_melhor(linhas) for linhas in grupos[:2]]
+        if lados[0][0] == lados[1][0]:
+            continue
+        escolha = (codigo, lados)
+        break
+    if escolha is None:
+        return None
+
+    codigo_jogo, lados = escolha
+    id_a, nome_a, _, nome_jogo, _ = lados[0]
+    id_b, nome_b, _, _, _ = lados[1]
+
+    try:
+        previsao = prever_confronto(id_a, id_b, codigo_jogo)
+    except KeyError:
+        return Bloco(
+            "previsao",
+            f"Previsao de {nome_a} x {nome_b} ({nome_jogo})",
+            f"O modelo de {nome_jogo} nao tem confronto coletado de "
+            f"{nome_a} e/ou {nome_b}, entao NAO ha previsao para este par. "
+            "Diga isso - nao estime a chance por conta propria - e indique a "
+            f"aba Previsao em /esports/{codigo_jogo}/previsao, que lista os "
+            "times com histórico suficiente.",
+        )
+    except ValueError:
+        return None
+
+    relatorio = relatorio_confronto(codigo_jogo) or {}
+    validacao = relatorio.get("validacao") or {}
+
+    a, b = previsao.equipe_a, previsao.equipe_b
+    linhas = [
+        f"Previsao do NOSSO modelo (Bradley-Terry + regressao logistica sobre "
+        f"os confrontos de {nome_jogo} que coletamos) - a mesma da aba "
+        f"Previsao em /esports/{codigo_jogo}/previsao.",
+        f"{a.nome} vence: {round(previsao.probabilidade_a * 100, 1)}%",
+        f"{b.nome} vence: {round(previsao.probabilidade_b * 100, 1)}%",
+        f"{a.nome}: {a.vitorias} vitorias em {a.partidas} confrontos coletados "
+        f"(winrate {round(a.winrate, 1)}%, forca {round(a.forca, 3)})"
+        + (f", #{a.posicao_ranking} no ranking oficial" if a.posicao_ranking else ""),
+        f"{b.nome}: {b.vitorias} vitorias em {b.partidas} confrontos coletados "
+        f"(winrate {round(b.winrate, 1)}%, forca {round(b.forca, 3)})"
+        + (f", #{b.posicao_ranking} no ranking oficial" if b.posicao_ranking else ""),
+        f"Confrontos diretos coletados: {previsao.confrontos_diretos} "
+        f"({previsao.vitorias_diretas_a} vitorias de {a.nome}).",
+    ]
+
+    if previsao.fatores:
+        linhas.append("Fatores que o modelo pesa:")
+        for fator in previsao.fatores[:5]:
+            linhas.append(
+                f"  {fator.rotulo}: {a.nome} {fator.valor_a}, {b.nome} "
+                f"{fator.valor_b} ({fator.unidade or 'sem unidade'})"
+            )
+
+    if validacao.get("suficiente"):
+        acuracia = round(validacao["acuracia"] * 100, 1)
+        base = round(validacao["taxa_base"] * 100, 1)
+        linhas.append(
+            f"Validacao temporal deste modelo: acuracia {acuracia}% contra "
+            f"taxa base de {base}% em {validacao['avaliadas']} partidas."
+        )
+        if validacao["acuracia"] <= validacao["taxa_base"]:
+            linhas.append(
+                "ATENCAO: a acuracia NAO supera a taxa base. A resposta "
+                "precisa dizer que esta previsao e descritiva e nao demonstrou "
+                "prever melhor que o chute."
+            )
+    else:
+        linhas.append(
+            "Amostra pequena demais para validar este modelo: trate a "
+            "probabilidade como descritiva, nao como acerto comprovado."
+        )
+
+    return Bloco(
+        "previsao",
+        f"Previsao de {a.nome} x {b.nome} ({nome_jogo})",
+        "\n".join(linhas),
+    )
+
+
+GATILHOS_STEAM_ONLINE = (
+    "mais jogado", "mais jogados", "top da steam", "top steam",
+    "ranking da steam", "quem lidera a steam", "jogo mais jogado",
+    "usuarios online", "usuarios simultaneos da steam", "pessoas jogando",
+    "quantas pessoas estao jogando", "online agora", "steam agora",
+    "pico de jogadores", "top 10 da steam", "mais populares",
+)
+
+#: Cache de processo do Top da Valve. Mesmo TTL do endpoint `/api/steam/
+#: mais-jogados`: a Valve mexe no numero a cada poucos minutos, e segurar 90s
+#: evita uma chamada de rede por pergunta sem a lista ficar velha.
+_CACHE_TOP_STEAM: dict[str, Any] = {"em": 0.0, "itens": []}
+_TTL_TOP_STEAM_S = 90
+
+
+def _pede_steam_online(pergunta: str) -> bool:
+    normalizada = _normalizar(pergunta)
+    return any(_normalizar(termo) in normalizada for termo in GATILHOS_STEAM_ONLINE)
+
+
+def _top_steam_ao_vivo() -> list[dict[str, Any]]:
+    """Os mais jogados da Steam INTEIRA agora, direto da Valve.
+
+    Rede, como `_bloco_extremo_avaliacao`. Falha em silencio (lista vazia):
+    ficar sem este bloco e melhor que a pergunta inteira falhar por causa de
+    uma indisponibilidade da Valve.
+    """
+    agora = time.monotonic()
+    if agora - float(_CACHE_TOP_STEAM["em"]) < _TTL_TOP_STEAM_S and _CACHE_TOP_STEAM["itens"]:
+        return _CACHE_TOP_STEAM["itens"]
+
+    try:
+        resposta = requests.get(URL_MAIS_JOGADOS_STEAM, timeout=8)
+        resposta.raise_for_status()
+        ranks = ((resposta.json() or {}).get("response") or {}).get("ranks") or []
+    except (requests.RequestException, ValueError) as exc:
+        logger.warning("Top da Steam indisponivel para o assistente: %s", exc)
+        return _CACHE_TOP_STEAM["itens"]
+
+    itens = [
+        {
+            "posicao": linha["rank"],
+            "app_id": linha["appid"],
+            "jogadores": linha.get("concurrent_in_game") or 0,
+            "pico_24h": linha.get("peak_in_game"),
+        }
+        for linha in ranks
+        if isinstance(linha.get("appid"), int)
+    ]
+    if itens:
+        _CACHE_TOP_STEAM["em"] = agora
+        _CACHE_TOP_STEAM["itens"] = itens
+    return itens
+
+
+def _bloco_steam_online(pergunta: str, sessao) -> tuple[Bloco | None, SerieAssistente | None]:
+    """Os mais jogados da STEAM INTEIRA agora + quanta gente esta na Steam.
+
+    Este bloco e o que separa duas perguntas que o assistente confundia:
+    "qual o jogo mais jogado agora" (a Steam inteira - Counter-Strike, Dota,
+    PUBG, o que a Valve publica neste instante) e "qual o mais jogado do
+    catalogo de voces" (os 60 jogos que monitoramos). O segundo ja tinha
+    bloco; o primeiro caia no catalogo e respondia errado com numero certo.
+    """
+    if not _pede_steam_online(pergunta):
+        return None, None
+
+    itens = _top_steam_ao_vivo()
+    plataforma = sessao.execute(
+        select(
+            FatoSteamOnline.usuarios_online,
+            FatoSteamOnline.usuarios_em_jogo,
+            FatoSteamOnline.coletado_em,
+        ).order_by(desc(FatoSteamOnline.coletado_em)).limit(1)
+    ).first()
+
+    if not itens and plataforma is None:
+        return None, None
+
+    linhas = [
+        "FONTE: Valve, consultada agora - vale para a Steam INTEIRA, nao so "
+        "para os jogos do nosso catalogo. Se a pergunta for sobre o NOSSO "
+        "catalogo, o bloco certo e o do catalogo, nao este.",
+    ]
+
+    if plataforma is not None:
+        online, em_jogo, coletado = plataforma
+        linhas.append(
+            f"Pessoas conectadas a Steam: {online} agora, sendo {em_jogo} "
+            f"dentro de algum jogo (coleta de {_quando_texto(coletado, datetime.now(timezone.utc))})."
+        )
+
+    pontos: list[PontoSerie] = []
+    if itens:
+        ids = [item["app_id"] for item in itens[:20]]
+        nomes = dict(
+            sessao.execute(
+                select(DimJogoSteam.app_id, DimJogoSteam.nome).where(
+                    DimJogoSteam.app_id.in_(ids)
+                )
+            ).all()
+        )
+        for app_id, nome in sessao.execute(
+            select(DimAppSteamNome.app_id, DimAppSteamNome.nome).where(
+                DimAppSteamNome.app_id.in_(ids)
+            )
+        ).all():
+            nomes.setdefault(app_id, nome)
+
+        linhas.append("")
+        linhas.append("Mais jogados da Steam neste instante (ranking da Valve):")
+        for item in itens[:15]:
+            nome = nomes.get(item["app_id"]) or f"app {item['app_id']}"
+            pico = f", pico de {item['pico_24h']} em 24h" if item["pico_24h"] else ""
+            linhas.append(
+                f"  #{item['posicao']} {nome}: {item['jogadores']} jogando agora{pico}"
+            )
+            if item["jogadores"]:
+                pontos.append(
+                    PontoSerie(rotulo=nome, valor=float(item["jogadores"]))
+                )
+
+    serie = (
+        SerieAssistente(
+            chave="steam_online",
+            titulo="Mais jogados da Steam agora (Valve)",
+            unidade="jogadores",
+            itens=pontos[:8],
+        )
+        if pontos
+        else None
+    )
+    return (
+        Bloco(
+            "steam_online",
+            "Steam inteira, ao vivo (Valve)",
+            "\n".join(linhas),
+            fonte="steam",
+        ),
+        serie,
+    )
+
+
+GATILHOS_XBOX = (
+    "xbox", "game pass", "gamepass", "microsoft store", "series x", "series s",
+    "console da microsoft",
+)
+
+
+def _pede_xbox(pergunta: str) -> bool:
+    normalizada = _normalizar(pergunta)
+    return any(_normalizar(termo) in normalizada for termo in GATILHOS_XBOX)
+
+
+def _bloco_xbox(pergunta: str, sessao) -> Bloco | None:
+    """O catalogo do Xbox: preco, desconto, Game Pass e nota da Store.
+
+    A aba /catalogo/xbox existe desde a Fase 29 e nenhum bloco falava dela -
+    perguntado "tem no Game Pass?", o assistente respondia pelo conhecimento
+    geral (que envelhece: entra e sai jogo do Game Pass toda semana) ou dizia
+    que a plataforma so cobre Steam. Cobre as duas.
+
+    Com um jogo citado, responde por ELE. Sem jogo, faz o panorama - que e a
+    resposta certa para "o que tem de bom no Game Pass?".
+    """
+    if not _pede_xbox(pergunta):
+        return None
+
+    catalogo = sessao.execute(
+        select(
+            DimJogoXbox.nome,
+            DimJogoXbox.preco_atual,
+            DimJogoXbox.preco_normal,
+            DimJogoXbox.moeda,
+            DimJogoXbox.desconto_percentual,
+            DimJogoXbox.no_game_pass,
+            DimJogoXbox.nota,
+            DimJogoXbox.numero_avaliacoes,
+            DimJogoXbox.generos,
+            DimJogoXbox.gratuito,
+        )
+    ).all()
+    if not catalogo:
+        return None
+
+    normalizada = _normalizar(pergunta)
+
+    def _citado(nome: str) -> bool:
+        alvo = _normalizar(nome)
+        if len(alvo) >= 4 and alvo in normalizada:
+            return True
+        # "Avatar: Frontiers of Pandora" quando a pessoa escreve so "Avatar".
+        raiz = _normalizar(nome.split(":")[0]).strip()
+        return len(raiz) >= 5 and raiz in normalizada
+
+    def _preco(linha) -> str:
+        nome, preco, normal, moeda, desconto, game_pass, nota, avaliacoes, generos, gratuito = linha
+        if gratuito:
+            return "gratuito"
+        if preco is None:
+            return "preco nao publicado"
+        texto = f"{moeda or 'BRL'} {preco}"
+        if desconto:
+            texto += f" ({desconto}% de desconto, de {moeda or 'BRL'} {normal})"
+        return texto
+
+    def _linha(linha) -> str:
+        nome, preco, normal, moeda, desconto, game_pass, nota, avaliacoes, generos, gratuito = linha
+        partes = [_preco(linha)]
+        partes.append("NO Game Pass" if game_pass else "fora do Game Pass")
+        if nota is not None:
+            partes.append(f"nota {nota}/5 na Store em {avaliacoes or 0} avaliacoes")
+        if generos:
+            partes.append(", ".join(generos[:3]))
+        return f"  {nome}: " + "; ".join(partes)
+
+    citados = [linha for linha in catalogo if _citado(linha[0])]
+
+    total = len(catalogo)
+    no_gp = sum(1 for linha in catalogo if linha[5])
+    cabecalho = (
+        f"Catalogo do Xbox que coletamos: {total} jogos da Microsoft Store, "
+        f"{no_gp} deles no Game Pass agora. A coleta e focada no Game Pass - "
+        "um jogo de Xbox que nao esta nesta lista pode existir na loja sem "
+        "estar aqui, entao nao afirme que ele 'nao existe no Xbox'. Preco em "
+        "BRL, da ultima coleta. A nota e a da Microsoft Store (0 a 5), que NAO "
+        "e a mesma escala do percentual de avaliacoes positivas da Steam."
+    )
+
+    if citados:
+        corpo = ["Jogos do Xbox que a pergunta cita:"] + [
+            _linha(linha) for linha in citados[:6]
+        ]
+        titulo = "Xbox - o jogo citado"
+    else:
+        promocoes = sorted(
+            (linha for linha in catalogo if linha[4]),
+            key=lambda linha: linha[4],
+            reverse=True,
+        )[:8]
+        bem_avaliados = sorted(
+            (
+                linha
+                for linha in catalogo
+                if linha[6] is not None and (linha[7] or 0) >= 500
+            ),
+            key=lambda linha: (linha[6], linha[7] or 0),
+            reverse=True,
+        )[:8]
+        corpo = []
+        if promocoes:
+            corpo.append("Maiores descontos agora no Xbox:")
+            corpo += [_linha(linha) for linha in promocoes]
+        if bem_avaliados:
+            corpo.append("Melhores notas da Store (com 500+ avaliacoes):")
+            corpo += [_linha(linha) for linha in bem_avaliados]
+        titulo = "Xbox - panorama do catalogo"
+
+    if not corpo:
+        return None
+
+    # `fonte` diz de ONDE LEMOS, nao quem publicou: isto sai do nosso banco
+    # (a coleta do Xbox), e a tela pinta bloco de banco e bloco de loja ao
+    # vivo de formas diferentes. A procedencia real esta no texto do bloco.
+    return Bloco("xbox", titulo, cabecalho + "\n" + "\n".join(corpo))
+
+
+GATILHOS_RANKING = (
+    "ranking", "rankeado", "rankeada", "classificacao", "standings",
+    "melhor time", "melhores times", "melhor equipe", "melhores equipes",
+    "maior time", "maiores times", "top times", "top 10", "top 5",
+    "numero 1", "primeiro lugar", "lider", "colocacao", "posicao",
+    "melhor do mundo", "melhor da regiao",
+)
+
+#: Como cada fonte de ranking se chama para o leitor. Mesmo mapa do
+#: `controllers/routers/ranking_oficial.py` - o nome que a tela mostra e o
+#: nome que a resposta precisa citar, senao a pessoa nao consegue conferir.
+FONTES_RANKING = {
+    "vlr": "vlr.gg",
+    "valve": "Valve Regional Standings",
+    "ubi_r6": "R6 Esports Global Standings (Ubisoft)",
+    "owcs": "OWCS (Liquipedia)",
+    "rlcs": "RLCS (blast.tv)",
+    "dltv": "DLTV World Ranking",
+    "lolesports": "LoL Esports (oficial)",
+}
+
+#: Slug da regiao -> como se escreve na pergunta. Serve para "quem lidera o
+#: ranking da Europa" achar `europe` sem o modelo ter que adivinhar.
+APELIDOS_REGIAO = {
+    "north-america": ("america do norte", "north america", "na", "eua"),
+    "south-america": ("america do sul", "south america", "sul-americano"),
+    "europe": ("europa", "europe", "europeu", "eu"),
+    "brazil": ("brasil", "brazil", "brasileiro", "br"),
+    "korea": ("coreia", "korea", "coreano"),
+    "japan": ("japao", "japan", "japones"),
+    "china": ("china", "chines"),
+    "pacific": ("pacifico", "pacific"),
+    "asia-pacific": ("asia", "asia-pacifico", "apac"),
+    "mena": ("mena", "oriente medio"),
+    "oceania": ("oceania", "oceanico"),
+    "sub-saharan-africa": ("africa", "africano"),
+    "la-s": ("latam sul", "la-s"),
+    "la-n": ("latam norte", "la-n"),
+    "lck": ("lck",),
+    "lpl": ("lpl",),
+    "lec": ("lec",),
+    "lta-north": ("lta norte", "lta-north"),
+    "lta-south": ("lta sul", "lta-south"),
+    "cblol": ("cblol",),
+    "ljl": ("ljl",),
+    "lcp": ("lcp",),
+    "nacl": ("nacl",),
+    "lfl": ("lfl",),
+    "vcs": ("vcs",),
+    "global": ("global", "mundial", "do mundo"),
+}
+
+
+def _pede_ranking(pergunta: str) -> bool:
+    normalizada = _normalizar(pergunta)
+    return any(_normalizar(termo) in normalizada for termo in GATILHOS_RANKING)
+
+
+def _regioes_citadas(pergunta: str) -> set[str]:
+    normalizada = _normalizar(pergunta)
+    tokens = set(re.findall(r"[a-z0-9-]+", normalizada))
+    achadas: set[str] = set()
+    for slug, apelidos in APELIDOS_REGIAO.items():
+        for apelido in apelidos:
+            if " " in apelido:
+                if apelido in normalizada:
+                    achadas.add(slug)
+            elif apelido in tokens:
+                achadas.add(slug)
+    return achadas
+
+
+def _bloco_ranking(pergunta: str, sessao) -> Bloco | None:
+    """O ranking OFICIAL publicado da fonte de cada jogo (a aba Ranking).
+
+    Nasce de "qual o melhor time de CS?", que antes caia no bloco de modelos
+    (metricas de validacao, nao ranking) ou na web - com a Valve, o vlr.gg, a
+    Ubisoft e a LoL Esports ja coletados no banco. E ranking de TERCEIRO, nao
+    medicao nossa, e o bloco diz isso em cada linha para a resposta poder
+    atribuir.
+
+    Tres recortes, do mais especifico ao mais geral: a posicao de um time
+    citado; o ranking do jogo (e da regiao) citado; ou o topo de cada jogo,
+    quando a pergunta e generica - melhor que escolher um jogo no chute.
+    """
+    if not _pede_ranking(pergunta):
+        return None
+
+    ultima_por_jogo = (
+        select(
+            RankingExterno.id_jogo.label("id_jogo"),
+            func.max(RankingExterno.data_referencia).label("data"),
+        )
+        .group_by(RankingExterno.id_jogo)
+        .subquery()
+    )
+    linhas = sessao.execute(
+        select(
+            DimJogo.codigo,
+            DimJogo.nome,
+            RankingExterno.fonte,
+            RankingExterno.regiao,
+            RankingExterno.posicao,
+            RankingExterno.equipe_nome,
+            RankingExterno.pontos,
+            RankingExterno.vitorias,
+            RankingExterno.derrotas,
+            RankingExterno.data_referencia,
+        )
+        .join(DimJogo, DimJogo.id_jogo == RankingExterno.id_jogo)
+        .join(
+            ultima_por_jogo,
+            (ultima_por_jogo.c.id_jogo == RankingExterno.id_jogo)
+            & (ultima_por_jogo.c.data == RankingExterno.data_referencia),
+        )
+        .where(RankingExterno.posicao <= 40)
+        .order_by(DimJogo.codigo, RankingExterno.regiao, RankingExterno.posicao)
+    ).all()
+
+    if not linhas:
+        return None
+
+    codigos = _codigos_citados(pergunta)
+    regioes = _regioes_citadas(pergunta)
+    times = _equipe_citada(pergunta, {linha[5] for linha in linhas})
+
+    def _descrever(linha) -> str:
+        (_, _, fonte, regiao, posicao, equipe, pontos, vitorias, derrotas, _) = linha
+        marca = (
+            f"{pontos} pontos"
+            if pontos is not None
+            else f"{vitorias}V-{derrotas}D"
+            if vitorias is not None
+            else "sem pontuacao publicada"
+        )
+        return f"  #{posicao} {equipe} ({marca})"
+
+    partes: list[str] = []
+
+    if times:
+        partes.append(
+            "Onde os times citados aparecem nos rankings oficiais coletados:"
+        )
+        for linha in linhas:
+            if linha[5] in times:
+                fonte = FONTES_RANKING.get(linha[2], linha[2])
+                partes.append(
+                    f"  {linha[5]} - {linha[1]}, regiao {linha[3] or 'global'}: "
+                    f"#{linha[4]} (fonte {fonte}, snapshot de {linha[9]})"
+                )
+        titulo = "Posicao no ranking oficial"
+    else:
+        alvo = [linha for linha in linhas if not codigos or linha[0] in codigos]
+        if regioes:
+            alvo = [linha for linha in alvo if (linha[3] or "global") in regioes] or alvo
+        if not alvo:
+            return None
+
+        # Sem jogo citado a pergunta e generica ("qual o melhor time?"): o topo
+        # de cada um, curto, em vez de escolher um jogo no chute.
+        por_bloco = 10 if codigos else 3
+        agrupado: dict[tuple[str, str | None], list] = {}
+        for linha in alvo:
+            agrupado.setdefault((linha[1], linha[3]), []).append(linha)
+
+        for (nome_jogo, regiao), grupo in agrupado.items():
+            fonte = FONTES_RANKING.get(grupo[0][2], grupo[0][2])
+            partes.append(
+                f"{nome_jogo} - ranking {regiao or 'global'} (fonte: {fonte}, "
+                f"snapshot de {grupo[0][9]}):"
+            )
+            partes += [_descrever(linha) for linha in grupo[:por_bloco]]
+        titulo = (
+            "Ranking oficial do jogo citado" if codigos else "Ranking oficial por jogo"
+        )
+
+    if not partes:
+        return None
+
+    cabecalho = (
+        "Ranking PUBLICADO pela fonte oficial de cada jogo - nao e medicao "
+        "nossa, e nao e a mesma coisa que a forca estimada pelo nosso modelo "
+        "(essa fica na aba Previsao). Diga a fonte e a data do snapshot."
+    )
+    return Bloco("ranking", titulo, cabecalho + "\n" + "\n".join(partes))
+
+
+#: Brasil nao tem horario de verao desde 2019 - offset fixo, sem depender do
+#: `tzdata` estar instalado na imagem do container.
+FUSO_BRASILIA = timezone(timedelta(hours=-3))
+
+GATILHOS_AGENDA = (
+    "quando joga", "quando jogam", "quando vai jogar", "que horas joga",
+    "proxima partida", "proximas partidas", "proximo jogo", "proximos jogos",
+    "proximo confronto", "proximos confrontos", "agenda", "calendario",
+    "tem jogo", "tem partida", "joga hoje", "jogam hoje", "vai jogar",
+    "vao jogar", "joga quando", "jogam quando", "hoje", "amanha",
+    "essa semana", "nesta semana",
+    "ao vivo", "acontecendo agora", "rolando agora", "esta jogando",
+)
+
+#: Quanto tempo depois do horario marcado um confronto sem resultado ainda
+#: conta como "deve estar rolando" (serie longa de MD5 passa de 3h).
+JANELA_AO_VIVO = timedelta(hours=4)
+
+
+def _quando_texto(momento: datetime, agora: datetime) -> str:
+    """"hoje 16:00", "amanha 09:30" ou "sab 13/09 16:00" - sempre em Brasilia.
+
+    O horario e o que a pessoa pergunta ("que horas joga?"), e o banco guarda
+    em UTC. Sem a conversao aqui, a resposta sai 3 horas adiantada - errado de
+    um jeito que parece certo, que e o pior tipo de erro para esta tela.
+    """
+    local = momento.astimezone(FUSO_BRASILIA)
+    hoje = agora.astimezone(FUSO_BRASILIA).date()
+    dias = (local.date() - hoje).days
+    if dias == 0:
+        prefixo = "hoje"
+    elif dias == 1:
+        prefixo = "amanha"
+    elif dias == -1:
+        prefixo = "ontem"
+    else:
+        prefixo = local.strftime("%d/%m")
+    return f"{prefixo} {local:%H:%M} (horario de Brasilia)"
+
+
+def _pede_agenda(pergunta: str) -> bool:
+    normalizada = _normalizar(pergunta)
+    return any(_normalizar(termo) in normalizada for termo in GATILHOS_AGENDA)
+
+
+def _equipe_citada(pergunta: str, nomes: set[str], exato: bool = False) -> set[str]:
+    """Quais dos nomes de equipe dados a pergunta cita.
+
+    Casa o nome inteiro ("furia esports") ou uma palavra inteira dele com 4+
+    letras ("furia" -> "FURIA Esports", "vitality" -> "Team Vitality"). O piso
+    de 4 letras e o que evita "team", "the" e tag de 2 letras casarem com meia
+    tabela - um falso positivo aqui nao e cosmetico: traz a agenda do time
+    errado com cara de resposta.
+
+    `exato=True` desliga o casamento por palavra e exige o nome inteiro. E o
+    modo de quem NAO tem outro sinal na pergunta: "tem no game pass o Evil
+    West?" casava "evil" com "Evil Geniuses" e trazia a agenda do time - uma
+    pergunta de loja respondida com calendario de esports.
+    """
+    normalizada = _normalizar(pergunta)
+    tokens = re.findall(r"[a-z0-9]+", normalizada)
+    trechos = {
+        " ".join(tokens[i:j])
+        for i in range(len(tokens))
+        for j in range(i + 1, min(i + 4, len(tokens)) + 1)
+    }
+
+    achados: set[str] = set()
+    for nome in nomes:
+        alvo = _normalizar(nome).strip()
+        # Piso de 3 letras no NOME tambem, nao so na palavra: existe uma
+        # equipe chamada "X" no banco, e sem isso ela casava com o "x" de
+        # "FURIA x MIBR" - o separador virando um dos lados do confronto.
+        if len(alvo) < 3:
+            continue
+        if alvo in trechos:
+            achados.add(nome)
+            continue
+        if exato:
+            continue
+        palavras = [p for p in re.findall(r"[a-z0-9]+", alvo) if len(p) >= 4]
+        if palavras and any(p in tokens for p in palavras):
+            achados.add(nome)
+    return achados
+
+
+def _bloco_agenda(pergunta: str, sessao) -> Bloco | None:
+    """Os proximos confrontos - do time citado, do jogo citado, ou de todos.
+
+    E a pergunta mais comum de quem acompanha esports ("quando joga a
+    FURIA?", "tem jogo hoje?") e a plataforma coleta exatamente isso na tela
+    de Partidas - mas nenhum bloco trazia a agenda, entao o assistente
+    respondia pela busca na web ou dizia que nao tinha. Tinha.
+
+    Sem gatilho de tempo E sem time citado, devolve `None`: "quem venceu o
+    mundial de 2023" nao e pergunta de agenda.
+    """
+    agora = datetime.now(timezone.utc)
+    janela_passado = agora - timedelta(days=3)
+    janela_futuro = agora + timedelta(days=14)
+
+    linhas_agenda = sessao.execute(
+        select(
+            AgendaPartida.equipe_a_nome,
+            AgendaPartida.equipe_b_nome,
+            AgendaPartida.inicio_previsto,
+            AgendaPartida.torneio,
+            AgendaPartida.formato,
+            AgendaPartida.vitoria_a,
+            AgendaPartida.placar_a,
+            AgendaPartida.placar_b,
+            DimJogo.nome,
+            DimJogo.codigo,
+        )
+        .join(DimJogo, DimJogo.id_jogo == AgendaPartida.id_jogo)
+        .where(AgendaPartida.inicio_previsto.between(janela_passado, janela_futuro))
+        .order_by(AgendaPartida.inicio_previsto)
+    ).all()
+
+    if not linhas_agenda:
+        return None
+
+    # O MESMO confronto chega por duas fontes (PandaScore e Liquipedia, por
+    # exemplo) com o torneio escrito diferente. Listar os dois faz a resposta
+    # dizer que o time joga duas vezes no mesmo horario - fica o de descricao
+    # mais rica, que e o que tem o nome completo da fase.
+    unicos: dict[tuple, Any] = {}
+    for linha in linhas_agenda:
+        chave = (
+            linha[9],
+            _normalizar(linha[0]),
+            _normalizar(linha[1]),
+            linha[2].replace(minute=0, second=0, microsecond=0),
+        )
+        atual = unicos.get(chave)
+        if atual is None or len(linha[3] or "") > len(atual[3] or ""):
+            unicos[chave] = linha
+    linhas_agenda = sorted(unicos.values(), key=lambda linha: linha[2])
+
+    nomes_em_jogo = {linha[0] for linha in linhas_agenda} | {
+        linha[1] for linha in linhas_agenda
+    }
+    pede = _pede_agenda(pergunta)
+    codigos_citados = _codigos_citados(pergunta)
+    # Sem nenhuma palavra de agenda na pergunta, so o nome INTEIRO do time
+    # conta - senao qualquer palavra de 4 letras que exista num nome de
+    # equipe puxa o calendario para dentro de uma pergunta de loja.
+    times_citados = _equipe_citada(pergunta, nomes_em_jogo, exato=not pede)
+
+    if times_citados:
+        alvo = [
+            linha
+            for linha in linhas_agenda
+            if linha[0] in times_citados or linha[1] in times_citados
+        ]
+        titulo = f"Agenda de {', '.join(sorted(times_citados))}"
+    elif codigos_citados and pede:
+        alvo = [linha for linha in linhas_agenda if linha[9] in codigos_citados]
+        titulo = "Agenda dos confrontos do jogo citado"
+    elif pede:
+        alvo = list(linhas_agenda)
+        titulo = "Agenda de confrontos (todos os jogos)"
+    else:
+        return None
+
+    if not alvo:
+        return None
+
+    futuros = [linha for linha in alvo if linha[2] > agora][:12]
+    ao_vivo = [
+        linha
+        for linha in alvo
+        if linha[5] is None and agora - JANELA_AO_VIVO <= linha[2] <= agora
+    ][:6]
+    decididos = [linha for linha in alvo if linha[5] is not None][-6:]
+
+    linhas = [
+        f"Agora sao {_quando_texto(agora, agora)}. A agenda vem da coleta "
+        "(Liquipedia, PandaScore, vlr.gg e afins) - o horario pode mudar pela "
+        "organizacao do torneio.",
+    ]
+
+    def _descrever(linha, com_placar: bool) -> str:
+        a, b, inicio, torneio, formato, vitoria_a, placar_a, placar_b, jogo, _ = linha
+        cabeca = f"{a} x {b} - {jogo}, {torneio or 'torneio nao informado'}"
+        if formato:
+            cabeca += f", {formato}"
+        if com_placar and vitoria_a is not None:
+            vencedor = a if vitoria_a else b
+            placar = (
+                f" {placar_a}-{placar_b}"
+                if placar_a is not None and placar_b is not None
+                else ""
+            )
+            return f"{cabeca}: venceu {vencedor}{placar} ({_quando_texto(inicio, agora)})"
+        return f"{cabeca}: {_quando_texto(inicio, agora)}"
+
+    if ao_vivo:
+        linhas.append("")
+        linhas.append("Deve estar em andamento agora (horario ja passou, sem resultado publicado):")
+        linhas += [f"  {_descrever(linha, False)}" for linha in ao_vivo]
+
+    if futuros:
+        linhas.append("")
+        linhas.append(f"Proximos confrontos ({len(futuros)} listados):")
+        linhas += [f"  {_descrever(linha, False)}" for linha in futuros]
+    else:
+        linhas.append("")
+        linhas.append(
+            "Nenhum confronto FUTURO nesta janela de 14 dias para o que a "
+            "pergunta pediu - diga isso, nao ofereca um confronto de outro time."
+        )
+
+    if decididos:
+        linhas.append("")
+        linhas.append("Resultados recentes (ultimos 3 dias):")
+        linhas += [f"  {_descrever(linha, True)}" for linha in decididos]
+
+    return Bloco("agenda", titulo, "\n".join(linhas))
+
+
 def _bloco_partidas(sessao) -> tuple[Bloco, None]:
     total = sessao.scalar(select(func.count()).select_from(DimPartida)) or 0
     duracao = sessao.scalar(select(func.avg(DimPartida.duracao_segundos)))
@@ -1961,26 +2997,26 @@ def montar_contexto(pergunta: str) -> ContextoMontado:
         "herois": _bloco_herois,
     }
 
-    # Os gatilhos que a pergunta casou DE VERDADE. Quando nada casa, os outros
-    # blocos entram (para o modelo ter o que ler), mas o GRAFICO de um bloco so
-    # sobe se o gatilho dele foi explicito - senao "como buildar a Kaisa"
-    # mostraria o grafico de jogadores da Steam ao lado da resposta.
+    # Os gatilhos que a pergunta casou DE VERDADE, e so eles. O GRAFICO de um
+    # bloco tambem so sobe com gatilho explicito - senao "como buildar a
+    # Kaisa" mostraria o grafico de jogadores da Steam ao lado da resposta.
     #
-    # "steam" fica DE FORA desse fallback: e o catalogo inteiro ordenado por
-    # jogadores simultaneos, e "nada casou" e exatamente o caso de uma
-    # pergunta sobre um jogo que nao esta nesse catalogo (ex.: Diablo IV) -
-    # entrar ai so faz o modelo narrar "os mais jogados agora" por ter esse
-    # numero disponivel, nunca porque a pergunta pediu. O bloco "geral" ja
-    # cobre as perguntas de contagem/cobertura que motivavam o fallback.
+    # Existia aqui um fallback de "nada casou -> entram todos os blocos, para
+    # o modelo ter o que ler". Ele saiu: hoje `plataforma` e `geral` entram
+    # SEMPRE (o que a plataforma faz, e os volumes de cada base), e os blocos
+    # que respondem sozinhos - agenda, ranking, xbox, Steam ao vivo, loja,
+    # elenco, guia, previsao - tem gatilho proprio, independente deste mapa.
+    # O que o fallback fazia, na pratica, era despejar winrate de heroi de
+    # Dota em pergunta que nao pedia nada disso.
     gatilhos_explicitos = {
         chave
         for chave, termos in GATILHOS.items()
         if any(_normalizar(termo) in normalizada for termo in termos)
     }
-    escolhidos = gatilhos_explicitos or (set(GATILHOS) - {"steam"})
+    escolhidos = gatilhos_explicitos
 
     with session_scope() as sessao:
-        blocos = [_bloco_geral(sessao)]
+        blocos = [_bloco_plataforma(sessao), _bloco_geral(sessao)]
         series: list[SerieAssistente] = []
         for chave in ("steam", "partidas", "herois", "sentimento"):
             if chave in escolhidos:
@@ -1995,6 +3031,30 @@ def montar_contexto(pergunta: str) -> ContextoMontado:
                     and chave in gatilhos_explicitos
                 ):
                     series.append(serie)
+
+        # Independe de gatilho de categoria: citar o nome de um time ja basta
+        # ("quando joga a FURIA?" nao tem palavra de agenda nenhuma se a
+        # pessoa escrever so "FURIA joga quando").
+        agenda = _bloco_agenda(pergunta, sessao)
+        if agenda is not None:
+            blocos.append(agenda)
+
+        ranking = _bloco_ranking(pergunta, sessao)
+        if ranking is not None:
+            blocos.append(ranking)
+
+        xbox = _bloco_xbox(pergunta, sessao)
+        if xbox is not None:
+            blocos.append(xbox)
+
+        online, serie_online = _bloco_steam_online(pergunta, sessao)
+        if online is not None:
+            blocos.append(online)
+            if serie_online is not None and serie_online.itens:
+                # Na FRENTE: quem pergunta "qual o mais jogado agora" quer o
+                # grafico da Steam inteira. O do nosso catalogo ao lado dessa
+                # resposta mostraria outros numeros para a mesma pergunta.
+                series.insert(0, serie_online)
 
         elenco, serie_elenco = _bloco_elenco(pergunta, sessao)
         if elenco is not None:
@@ -2013,6 +3073,13 @@ def montar_contexto(pergunta: str) -> ContextoMontado:
             # pergunta), ela some - melhor sem grafico do que com um alheio.
             if series and series[0].chave not in gatilhos_explicitos | {"elenco"}:
                 series = []
+
+        # Antes do bloco de modelos de proposito: quando a pergunta nomeia dois
+        # times, a resposta e a previsao DELES; as metricas do modelo entram
+        # como contexto de quanto confiar, nao como a resposta.
+        previsao = _bloco_previsao(pergunta, sessao)
+        if previsao is not None:
+            blocos.append(previsao)
 
         if "modelos" in escolhidos:
             blocos.append(_bloco_modelos(pergunta, sessao))
@@ -2114,12 +3181,24 @@ TERMOS_DOMINIO = (
     "lancamento", "gameplay", "campanha", "modo online", "multiplayer",
     "co-op", "coop", "pvp", "pve", "raid", "boss", "loot", "grind",
     "plataforma", "nosso sistema", "nosso site", "nosso banco", "dashboard",
+    # Perguntar sobre o PROPRIO site e do escopo - "o que esse site faz?"
+    # caia em FORA_ESCOPO, que e a pior resposta possivel para a pergunta
+    # que o bloco da plataforma existe para responder.
+    "site", "playdb", "sistema", "app", "aplicativo", "tela", "telas", "aba",
+    "menu", "pagina", "rota",
     "coleta", "modelo de previsao", "winrate", "pick rate", "kda",
     "jogador", "jogadora", "pro player", "proplayer", "pro-player", "atleta",
     "roster", "escalacao", "midlane", "toplane", "jungle", "jungler", "adc",
     "carry", "igl", "draft", "clutch", "headshot", "legends", "worlds",
     "lck", "lpl", "lcs", "lec", "cblol", "esl", "iem", "blast", "invitational",
     "the international",
+    # O que o site faz e como se pergunta por isso - sem estes termos, "tem
+    # jogo hoje?" e "tem no game pass?" eram julgadas fora do escopo.
+    "game pass", "gamepass", "microsoft store", "series x", "series s",
+    "agenda", "calendario", "proxima partida", "proximo jogo", "quando joga",
+    "ao vivo", "ranking", "classificacao", "standings", "favorito",
+    "promocao", "desconto", "favoritar", "favoritos", "assistente",
+    "catalogo", "loja", "perfil", "conta", "apk",
 )
 
 
