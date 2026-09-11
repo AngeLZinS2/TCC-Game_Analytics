@@ -685,11 +685,29 @@ export function RecomendacoesReviewsPagina() {
     chaveReset: String(listaPorJogo.length),
   });
 
-  // Abre no jogo com mais avaliacoes coletadas: e o que tem mais o que mostrar.
+  // Abre num jogo em rotação, não sempre o mesmo: dentre os N mais jogados
+  // agora (`catalogo`, já ordenado por jogadores) que também têm avaliação
+  // coletada (senão a tela abriria vazia), sorteia um a cada visita.
+  //
+  // Espera o `catalogo` resolver (sucesso OU erro) antes de sortear: ele
+  // carrega mais devagar que o `panoramaGeral` (ficha inteira de ~200 jogos)
+  // - sortear cedo demais cairia sempre no fallback (todo mundo, não só os
+  // mais jogados) e travaria nisso, porque uma vez que `appId` é setado o
+  // efeito não roda de novo.
   useEffect(() => {
-    if (appId !== null || !panoramaGeral.data?.por_jogo.length) return;
-    setAppId(panoramaGeral.data.por_jogo[0].app_id);
-  }, [appId, panoramaGeral.data]);
+    if (appId !== null) return;
+    if (!panoramaGeral.data?.por_jogo.length) return;
+    if (!catalogo.data && !catalogo.isError) return;
+
+    const comAvaliacoes = new Set(panoramaGeral.data.por_jogo.map((j) => j.app_id));
+    const maisJogados = (catalogo.data ?? [])
+      .filter((jogo) => comAvaliacoes.has(jogo.app_id))
+      .slice(0, 8);
+
+    const pool = maisJogados.length > 0 ? maisJogados : panoramaGeral.data.por_jogo;
+    const sorteado = pool[Math.floor(Math.random() * pool.length)];
+    setAppId(sorteado.app_id);
+  }, [appId, panoramaGeral.data, catalogo.data, catalogo.isError]);
 
   const jogoSelecionado = useMemo(
     () => (catalogo.data ?? []).find((jogo) => jogo.app_id === appId),
