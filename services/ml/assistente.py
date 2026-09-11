@@ -42,6 +42,7 @@ from __future__ import annotations
 
 import logging
 import re
+import time
 import unicodedata
 from dataclasses import dataclass, field
 from typing import Any, Callable
@@ -52,6 +53,7 @@ from sqlalchemy import Integer, cast, desc, func, select
 from models import vocabulario_esports
 from services.collectors import itad_loja, opgg_mcp, steam_descoberta, steam_loja
 from config import get_settings
+from services.ml import telemetria_assistente
 from models.models import (
     AgendaPartida,
     DimEquipe,
@@ -2096,7 +2098,14 @@ def _parece_sem_resposta(texto: str) -> bool:
 
 
 def _chamar_modelo(corpo: dict[str, Any], settings) -> dict[str, Any]:
-    """Um POST ao OpenRouter. Devolve `{texto, annotations, modelo, uso}`."""
+    """Um POST ao OpenRouter. Devolve `{texto, annotations, modelo, uso}`.
+
+    Toda saida (sucesso ou falha) passa por `telemetria_assistente.registrar` -
+    e o que alimenta o painel "Status da API" da tela do assistente, pra um
+    429 do provedor aparecer como "modelo gratis limitado agora" em vez de
+    parecer bug nosso.
+    """
+    inicio = time.monotonic()
     try:
         resposta = requests.post(
             f"{settings.openrouter_base_url}/chat/completions",
@@ -2108,18 +2117,44 @@ def _chamar_modelo(corpo: dict[str, Any], settings) -> dict[str, Any]:
             timeout=settings.openrouter_timeout_seconds,
         )
     except requests.RequestException as exc:
+        telemetria_assistente.registrar(
+            sucesso=False,
+            status_http=None,
+            erro=f"{type(exc).__name__}: {exc}",
+            duracao_ms=round((time.monotonic() - inicio) * 1000),
+        )
         raise AssistenteIndisponivel(
             f"nao foi possivel falar com o OpenRouter: {type(exc).__name__}"
         ) from exc
 
+    duracao_ms = round((time.monotonic() - inicio) * 1000)
+
     if resposta.status_code != 200:
+        telemetria_assistente.registrar(
+            sucesso=False,
+            status_http=resposta.status_code,
+            erro=resposta.text[:200],
+            duracao_ms=duracao_ms,
+        )
         raise AssistenteIndisponivel(
             f"OpenRouter respondeu {resposta.status_code}: {resposta.text[:200]}"
         )
     dados = resposta.json()
     if "error" in dados:
+        telemetria_assistente.registrar(
+            sucesso=False,
+            status_http=resposta.status_code,
+            erro=str(dados["error"])[:200],
+            duracao_ms=duracao_ms,
+        )
         raise AssistenteIndisponivel(str(dados["error"])[:200])
 
+    telemetria_assistente.registrar(
+        sucesso=True,
+        status_http=resposta.status_code,
+        erro=None,
+        duracao_ms=duracao_ms,
+    )
     mensagem = ((dados.get("choices") or [{}])[0].get("message")) or {}
     return {
         "texto": (mensagem.get("content") or "").strip(),

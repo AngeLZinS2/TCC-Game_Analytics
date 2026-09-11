@@ -642,6 +642,31 @@ export interface StatusAssistente {
   provedor: string;
 }
 
+export interface ChamadaAssistente {
+  quando: string;
+  sucesso: boolean;
+  status_http: number | null;
+  rate_limited: boolean;
+  erro: string | null;
+  duracao_ms: number;
+}
+
+/** Telemetria em tempo real das chamadas ao OpenRouter — o painel "Status da
+ * API" usa isto pra explicar um 429 do provedor na hora, em vez de parecer
+ * bug nosso. `chamadas` vem mais recente primeiro. */
+export interface SaudeAssistente {
+  configurado: boolean;
+  modelo: string;
+  total_recente: number;
+  sucessos_recente: number;
+  taxa_sucesso: number | null;
+  rate_limited_recente: boolean;
+  ultima_chamada_em: string | null;
+  ultima_chamada_sucesso: boolean | null;
+  ultima_chamada_erro: string | null;
+  chamadas: ChamadaAssistente[];
+}
+
 export interface BlocoContexto {
   chave: string;
   titulo: string;

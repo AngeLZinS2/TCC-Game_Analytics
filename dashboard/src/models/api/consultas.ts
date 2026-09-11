@@ -46,6 +46,7 @@ import type {
   ResumoColeta,
   RespostaAssistente,
   StatusAssistente,
+  SaudeAssistente,
   ResumoPersonagem,
   Saude,
   VisaoGeral,
@@ -402,6 +403,18 @@ export function useStatusAssistente() {
   return useQuery({
     queryKey: ["assistente", "status"],
     queryFn: () => buscar<StatusAssistente>("/api/assistente/status"),
+    retry: false,
+  });
+}
+
+/** Telemetria em tempo real das chamadas ao OpenRouter (rate limit, erro,
+ * taxa de sucesso). Reconsulta sozinho a cada 15s - é o que faz o painel de
+ * "Status da API" parecer vivo sem a pessoa precisar recarregar a tela. */
+export function useSaudeAssistente() {
+  return useQuery({
+    queryKey: ["assistente", "saude"],
+    queryFn: () => buscar<SaudeAssistente>("/api/assistente/saude"),
+    refetchInterval: 15000,
     retry: false,
   });
 }

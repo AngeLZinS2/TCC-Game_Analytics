@@ -47,6 +47,26 @@ def status() -> dict[str, object]:
     }
 
 
+@router.get("/saude")
+def saude() -> dict[str, object]:
+    """Telemetria em tempo real das chamadas ao OpenRouter.
+
+    O `/auth/key` do provedor nao devolve quanto falta da cota gratis (so
+    custo em dolar, que fica 0 pra modelo `:free`), entao o unico jeito de
+    saber "esta rate-limited agora" e observar as nossas proprias chamadas -
+    `telemetria_assistente` guarda as ultimas em memoria. A tela usa isto pra
+    explicar um 429 na hora em vez de parecer bug nosso.
+    """
+    from services.ml import telemetria_assistente
+
+    settings = get_settings()
+    return {
+        "configurado": bool(settings.openrouter_api_key),
+        "modelo": settings.openrouter_model,
+        **telemetria_assistente.resumo(),
+    }
+
+
 @router.post("/perguntar", response_model=RespostaAssistente)
 def responder(entrada: EntradaPergunta) -> RespostaAssistente:
     """Responde uma pergunta sobre os dados coletados.

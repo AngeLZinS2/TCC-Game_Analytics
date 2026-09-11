@@ -40,6 +40,7 @@ import { useHistoricoAssistente } from "./assistente/historico";
 import { CartaoConfianca, PainelFontes } from "./assistente/PainelContexto";
 import { PainelHistorico } from "./assistente/PainelHistorico";
 import { Processando } from "./assistente/Processando";
+import { StatusApiAssistente } from "./assistente/StatusApi";
 import { fmtNumero, fmtRelativo } from "@util/formatos";
 
 export function AssistenteIAPagina() {
@@ -143,6 +144,8 @@ export function AssistenteIAPagina() {
           </div>
         )}
       </header>
+
+      <StatusApiAssistente />
 
       {/* ==================== TRES AREAS ==================== */}
       <div className="grid grid-cols-1 items-start gap-space-base lg:grid-cols-[240px_minmax(0,1fr)] xl:grid-cols-[240px_minmax(0,1fr)_290px]">
