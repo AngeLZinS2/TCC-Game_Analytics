@@ -28,7 +28,7 @@ export interface ItemNavegacao {
 }
 
 export const NAVEGACAO: ItemNavegacao[] = [
-  { rota: "/", rotulo: "Visão Geral", icone: "space_dashboard", selo: "LIVE" },
+  { rota: "/painel", rotulo: "Visão Geral", icone: "space_dashboard", selo: "LIVE" },
 
   // Catalogo de Jogos: Steam, PlayStation e Xbox em abas de `/catalogo/:loja`.
   // `rota` e `/catalogo` (nao `/catalogo/steam`) para o `<NavLink>` casar por

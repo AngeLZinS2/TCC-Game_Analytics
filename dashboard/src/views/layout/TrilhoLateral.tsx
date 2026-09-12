@@ -45,7 +45,7 @@ export function TrilhoLateral() {
 
   return (
     <aside className="fixed left-0 top-0 z-40 hidden h-screen w-60 flex-col border-r border-outline-variant/25 bg-surface-container-lowest px-space-sm py-space-base lg:flex">
-      <NavLink to="/" className="mb-space-lg flex items-center gap-space-sm px-space-sm">
+      <NavLink to="/painel" className="mb-space-lg flex items-center gap-space-sm px-space-sm">
         <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-secondary-fixed-dim font-title-code text-title-code font-semibold text-on-secondary">
           P
         </span>
@@ -122,7 +122,7 @@ export function TrilhoLateral() {
             <NavLink
               key={item.rotulo}
               to={item.rota}
-              end={item.rota === "/"}
+              end={item.rota === "/painel"}
               className={({ isActive }) => `${ITEM} ${isActive ? ATIVO : INATIVO}`}
             >
               {({ isActive }) => (

@@ -19,7 +19,7 @@
  * sempre, independente da preferencia de acessibilidade do sistema.
  */
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type RefObject } from "react";
 
 /**
  * `false` no primeiro paint, `true` a partir do paint seguinte - a janela que
@@ -96,4 +96,38 @@ export function useContagem(
   }, [valorFinal, duracaoMs]);
 
   return valorFinal === null || valorFinal === undefined ? null : exibido;
+}
+
+/**
+ * `true` na primeira vez que o elemento entra na viewport - pra seção que só
+ * a Home usa (o cartão de pilar, a parede de capas), que ninguém vê sem
+ * rolar até lá. Diferente de `useEntrarNaTela`: aquela dispara sempre, no
+ * mount, porque serve número/barra que já nasce visível; esta só dispara
+ * quando o elemento REALMENTE aparece na tela, e só uma vez (desconecta o
+ * observer depois - a seção não "desanima" ao rolar pra longe e voltar).
+ */
+export function useVisivel<T extends HTMLElement>(): [RefObject<T | null>, boolean] {
+  const raiz = useRef<T>(null);
+  const [visivel, setVisivel] = useState(false);
+
+  useEffect(() => {
+    const alvo = raiz.current;
+    if (!alvo) return;
+
+    const observador = new IntersectionObserver(
+      ([entrada]) => {
+        if (entrada.isIntersecting) {
+          setVisivel(true);
+          observador.disconnect();
+        }
+      },
+      // -10% na base: a seção anima um pouco antes de bater no rodapé da
+      // tela, não só quando já está totalmente à vista.
+      { threshold: 0.15, rootMargin: "0px 0px -10% 0px" },
+    );
+    observador.observe(alvo);
+    return () => observador.disconnect();
+  }, []);
+
+  return [raiz, visivel];
 }

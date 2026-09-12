@@ -96,4 +96,36 @@
       animation: none;
     }
   }
+
+  /* Home: a parede de capas da Steam boiando - cada tile usa esta mesma
+     animação com um `animation-delay` próprio (inline, por índice), pra não
+     ficarem todas subindo e descendo em uníssono feito soldado. */
+  .capa-flutuante {
+    animation: flutuar 6s ease-in-out infinite;
+  }
+  @keyframes flutuar {
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-10px);
+    }
+  }
+
+  /* Home: o chevron de "role pra baixo" no rodapé do herói. */
+  .dica-rolar {
+    animation: sobe-desce 1.8s ease-in-out infinite;
+  }
+  @keyframes sobe-desce {
+    0%,
+    100% {
+      transform: translateY(0);
+      opacity: 0.5;
+    }
+    50% {
+      transform: translateY(6px);
+      opacity: 1;
+    }
+  }
 }

@@ -26,12 +26,18 @@ export function CapaJogo({
   nome,
   imagemUrl,
   className = "h-12 w-12",
+  aoFalhar,
 }: {
   appId: number;
   nome: string;
   /** URL real da ficha (Steam API), quando ja disponivel. Vence o palpite de CDN. */
   imagemUrl?: string | null;
   className?: string;
+  /** Chamado quando NEM o palpite de CDN nem `imagemUrl` carregam - a linha de
+   * tabela ainda mostra a inicial (não pode sumir, desalinharia a linha),
+   * mas uma tela tipo "parede de capas" (Home) pode preferir trocar o jogo
+   * inteiro por outro candidato em vez de exibir um quadrado de letra. */
+  aoFalhar?: () => void;
 }) {
   const [falhou, setFalhou] = useState(false);
 
@@ -51,7 +57,10 @@ export function CapaJogo({
       src={imagemUrl || `${CDN}/${appId}/capsule_231x87.jpg`}
       alt=""
       loading="lazy"
-      onError={() => setFalhou(true)}
+      onError={() => {
+        setFalhou(true);
+        aoFalhar?.();
+      }}
       className={`shrink-0 rounded bg-surface-container object-cover shadow-md ${className}`}
     />
   );

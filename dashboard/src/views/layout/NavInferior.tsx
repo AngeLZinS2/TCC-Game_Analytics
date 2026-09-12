@@ -28,7 +28,7 @@ interface ItemInferior {
 }
 
 const ITENS: ItemInferior[] = [
-  { rota: "/", rotulo: "Geral", icone: "space_dashboard" },
+  { rota: "/painel", rotulo: "Geral", icone: "space_dashboard" },
   { rota: "/catalogo", rotulo: "Catálogo", icone: "sports_esports", prefixo: true },
   { rota: "/esports", rotulo: "E-Sports", icone: "emoji_events", prefixo: true },
   { rota: "/recomendacoes", rotulo: "Reviews", icone: "sentiment_satisfied" },

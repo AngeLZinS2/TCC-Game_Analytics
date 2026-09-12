@@ -118,7 +118,7 @@ function ItemNav({ item }: { item: ItemNavegacao }) {
   return (
     <NavLink
       to={item.rota}
-      end={item.rota === "/"}
+      end={item.rota === "/painel"}
       className={({ isActive }) =>
         isActive
           ? `${BOTAO_NAV} bg-surface-container-high text-primary shadow-[inset_0_-2px_0_0_#5a8cff]`
@@ -174,7 +174,7 @@ export function BarraSuperior() {
   return (
     <header className="fixed left-0 right-0 top-0 z-50 flex h-16 items-center gap-space-base border-b border-outline-variant/30 bg-surface-container-lowest/95 px-space-base backdrop-blur-md md:px-space-lg lg:left-60">
       {/* Marca e fileira de ícones: só até `lg` (no desktop, o trilho lateral). */}
-      <Link to="/" className="flex shrink-0 items-center gap-space-sm lg:hidden">
+      <Link to="/painel" className="flex shrink-0 items-center gap-space-sm lg:hidden">
         <Icone nome="stadia_controller" className="text-[24px] text-primary-container" />
         <span className="font-title-code text-title-code uppercase tracking-wider text-primary">
           PlayDB
