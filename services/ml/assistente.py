@@ -606,7 +606,22 @@ def _bloco_plataforma(sessao) -> Bloco:
     return Bloco("plataforma", "O que o PlayDB faz e onde fica cada coisa", "\n".join(linhas))
 
 
-def _bloco_steam(sessao) -> tuple[Bloco, SerieAssistente]:
+#: A pergunta e sobre CONTAGEM DE JOGADORES - o unico caso em que o grafico
+#: do catalogo ("Jogadores simultaneos agora") responde o que foi perguntado.
+GATILHOS_JOGADORES = (
+    "jogadores simultaneos", "jogadores agora", "ccu", "mais jogado",
+    "mais jogados", "jogando agora", "online agora", "pico de jogadores",
+    "quantos jogadores", "quantas pessoas jogam", "quantas pessoas estao",
+    "populacao", "movimento",
+)
+
+
+def _pede_contagem_de_jogadores(pergunta: str) -> bool:
+    normalizada = _normalizar(pergunta)
+    return any(_normalizar(termo) in normalizada for termo in GATILHOS_JOGADORES)
+
+
+def _bloco_steam(pergunta: str, sessao) -> tuple[Bloco, SerieAssistente | None]:
     recentes = (
         select(FatoSnapshotJogoSteam)
         .distinct(FatoSnapshotJogoSteam.app_id)
@@ -654,11 +669,21 @@ def _bloco_steam(sessao) -> tuple[Bloco, SerieAssistente]:
         "Catalogo da Steam (ultimo snapshot de cada jogo)",
         "\n".join(linhas) or "Nenhum jogo coletado.",
     )
-    serie = SerieAssistente(
-        chave="steam",
-        titulo="Jogadores simultâneos agora",
-        unidade="jogadores",
-        itens=pontos[:8],
+
+    # O grafico deste bloco e "quem tem mais gente jogando" - ele so responde
+    # pergunta de CONTAGEM DE JOGADORES. Antes subia por qualquer palavra da
+    # categoria "steam" (preco, catalogo, genero, ate a palavra "steam"), e
+    # "me informa bons jogos de terror na steam" vinha com um ranking de
+    # jogadores simultaneos ao lado - grafico respondendo outra pergunta.
+    serie = (
+        SerieAssistente(
+            chave="steam",
+            titulo="Jogadores simultâneos agora",
+            unidade="jogadores",
+            itens=pontos[:8],
+        )
+        if _pede_contagem_de_jogadores(pergunta)
+        else None
     )
     return bloco, serie
 
@@ -696,6 +721,16 @@ GATILHOS_RECOMENDACAO = (
     "recomenda", "recomendo", "recomendacao",
     "sugere", "sugestao", "indica", "indicacao",
     "vale a pena jogar", "devo jogar",
+    # "me informa bons jogos de terror" nao casava nenhum termo acima e caia
+    # no bloco do catalogo, que o modelo apresentou como se fossem jogos de
+    # terror. Pedir jogo BOM de alguma coisa e pedir recomendacao, com ou sem
+    # o verbo "recomendar" - mas so no PLURAL/generico ("bons jogos",
+    # "melhores jogos"): "qual o MELHOR jogo de fps" no singular e pergunta de
+    # nota (um so vencedor), nao de lista, e quem responde essa e outro bloco.
+    "bons jogos", "bom jogo", "melhores jogos",
+    "jogos bons", "jogo bom", "quais jogos de", "que jogos de",
+    "o que jogar", "que jogo jogar", "dica de jogo", "dicas de jogo",
+    "me informa jogos", "me fala jogos", "lista de jogos",
 )
 
 
@@ -1197,7 +1232,11 @@ def _bloco_descoberta(
     squads de 5" com cara de dado.
     """
     modo = _modo_multijogador(pergunta)
-    if modo is None:
+    # Sem falar de jogar acompanhado o bloco ainda entra, desde que a pergunta
+    # PECA jogos de uma tag ("bons jogos de terror"). Antes exigia os dois, e
+    # essa pergunta caia no bloco do nosso catalogo - 60 jogos, nenhum filtro
+    # de tag - que o modelo entao apresentava como "destaques de terror".
+    if modo is None and not _pede_recomendacao(pergunta):
         return None, [], None
 
     tag = steam_descoberta.resolver_tag(pergunta)
@@ -1205,25 +1244,31 @@ def _bloco_descoberta(
         return None, [], None
 
     tag_id, tag_nome = tag
-    cooperativo, competitivo = modo
-    achados = steam_descoberta.multijogador_por_tag(
-        tag_id, cooperativo=cooperativo, competitivo=competitivo
-    )
 
-    filtro = (
-        "cooperativo online" if cooperativo and not competitivo
-        else "PvP online" if competitivo and not cooperativo
-        else "PvP ou cooperativo online"
-    )
-    rotulo = f"{tag_nome}, {filtro}"
+    if modo is None:
+        achados = steam_descoberta.por_tag(tag_id)
+        filtro = None
+        rotulo = tag_nome
+    else:
+        cooperativo, competitivo = modo
+        achados = steam_descoberta.multijogador_por_tag(
+            tag_id, cooperativo=cooperativo, competitivo=competitivo
+        )
+        filtro = (
+            "cooperativo online" if cooperativo and not competitivo
+            else "PvP online" if competitivo and not cooperativo
+            else "PvP ou cooperativo online"
+        )
+        rotulo = f"{tag_nome}, {filtro}"
 
     if not achados:
         return (
             Bloco(
                 "descoberta",
                 f"Recomendação ({rotulo})",
-                f"A busca na loja da Steam por '{tag_nome}' com {filtro} não "
-                "devolveu nenhum jogo agora. Diga que a busca não trouxe "
+                f"A busca na loja da Steam por '{tag_nome}'"
+                + (f" com {filtro}" if filtro else "")
+                + " não devolveu nenhum jogo agora. Diga que a busca não trouxe "
                 "resultado - não substitua por jogos de memória.",
                 fonte="steam",
             ),
@@ -1232,9 +1277,10 @@ def _bloco_descoberta(
         )
 
     linhas = [
-        f"Jogos da loja da Steam com a tag '{tag_nome}' e {filtro}, consultados "
-        "AGORA (não são do nosso banco). Ordem: quem tem mais gente jogando "
-        "neste instante. Recomende só entre estes:",
+        f"Jogos da loja da Steam com a tag '{tag_nome}'"
+        + (f" e {filtro}" if filtro else "")
+        + ", consultados AGORA (não são do nosso banco). Ordem: quem tem mais "
+        "gente jogando neste instante. Recomende só entre estes:",
     ]
     recomendados: list[JogoRecomendado] = []
     pontos: list[PontoSerie] = []
@@ -1277,18 +1323,37 @@ def _bloco_descoberta(
                 )
             )
 
-    linhas.append(
-        "A loja NÃO informa tamanho de grupo nem quantos jogadores cabem numa "
-        "partida. O que está confirmado é que cada um destes tem modo online "
-        "(PvP ou cooperativo) na categoria da própria Steam. Não afirme que "
-        "algum suporta exatamente 5 jogadores - isso não está nos dados."
-    )
+    if filtro:
+        linhas.append(
+            "A loja NÃO informa tamanho de grupo nem quantos jogadores cabem numa "
+            "partida. O que está confirmado é que cada um destes tem modo online "
+            "(PvP ou cooperativo) na categoria da própria Steam. Não afirme que "
+            "algum suporta exatamente 5 jogadores - isso não está nos dados."
+        )
+    else:
+        linhas.append(
+            "A busca foi só pela TAG - não há filtro de modo aqui, então não "
+            "afirme que algum destes é single-player ou multijogador a menos "
+            "que a linha do jogo diga. A tag é atribuída pela comunidade da "
+            "Steam, não é uma classificação oficial de gênero. E a ordem é por "
+            "QUANTA GENTE ESTÁ JOGANDO agora, não por qualidade: são os mais "
+            "populares da tag, não 'os melhores' - diga isso em vez de "
+            "apresentar a ordem como um ranking de qualidade."
+        )
 
-    serie = SerieAssistente(
-        chave="descoberta",
-        titulo=f"Jogando agora — {tag_nome}",
-        unidade="jogadores",
-        itens=pontos[:8],
+    # Grafico so no caminho de JOGAR ACOMPANHADO, onde "tem gente jogando
+    # agora" e a propria pergunta. Em "bons jogos de terror" ele nao responde
+    # nada que foi perguntado - e a tela ja desenha os cartoes dos jogos
+    # recomendados, com capa, que e a visualizacao certa para essa pergunta.
+    serie = (
+        SerieAssistente(
+            chave="descoberta",
+            titulo=f"Jogando agora — {tag_nome}",
+            unidade="jogadores",
+            itens=pontos[:8],
+        )
+        if filtro
+        else None
     )
 
     return (
@@ -2992,7 +3057,6 @@ def montar_contexto(pergunta: str) -> ContextoMontado:
     normalizada = _normalizar(pergunta)
 
     construtores: dict[str, Callable[[Any], tuple[Bloco, SerieAssistente | None]]] = {
-        "steam": _bloco_steam,
         "partidas": _bloco_partidas,
         "herois": _bloco_herois,
     }
@@ -3020,7 +3084,11 @@ def montar_contexto(pergunta: str) -> ContextoMontado:
         series: list[SerieAssistente] = []
         for chave in ("steam", "partidas", "herois", "sentimento"):
             if chave in escolhidos:
-                if chave == "sentimento":
+                # `steam` e `sentimento` recebem a pergunta: os graficos deles
+                # so entram quando ela e sobre o que o grafico mede.
+                if chave == "steam":
+                    bloco, serie = _bloco_steam(pergunta, sessao)
+                elif chave == "sentimento":
                     bloco, serie = _bloco_sentimento(pergunta, sessao)
                 else:
                     bloco, serie = construtores[chave](sessao)

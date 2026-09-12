@@ -613,6 +613,46 @@ def bloco_linhas_por_jogo(sessao):
     ).all()
 
 
+@pytest.mark.parametrize(
+    "pergunta,tem_grafico",
+    [
+        # O grafico do catalogo mede JOGADORES. So sobe quando a pergunta e
+        # sobre isso - antes subia por qualquer palavra da categoria "steam".
+        ("qual jogo tem mais jogadores simultaneos?", True),
+        ("quais os jogos mais jogados do catalogo?", True),
+        # O bug relatado: pergunta de recomendacao vinha com um ranking de
+        # jogadores simultaneos ao lado, respondendo outra coisa.
+        ("me informa bons jogos de Terror na steam", False),
+        ("quantos jogos da steam voces monitoram?", False),
+        ("qual o preco de hollow knight no catalogo?", False),
+    ],
+)
+def test_grafico_do_catalogo_so_em_pergunta_de_jogadores(pergunta: str, tem_grafico: bool):
+    with session_scope() as sessao:
+        _, serie = _bloco_steam(pergunta, sessao)
+
+    assert (serie is not None) is tem_grafico
+
+
+@pytest.mark.parametrize(
+    "pergunta,esperado",
+    [
+        # "me informa bons jogos de terror" nao casava nenhum gatilho e caia
+        # no bloco do catalogo, que o modelo apresentou como se fossem jogos
+        # de terror - a alucinacao relatada.
+        ("me informa bons jogos de Terror na steam", True),
+        ("quais jogos de estrategia valem a pena?", True),
+        ("o que jogar hoje?", True),
+        ("me recomenda um fps", True),
+        # Continua nao sendo pedido de recomendacao.
+        ("quantas partidas coletamos?", False),
+        ("qual jogo tem a pior avaliacao?", False),
+    ],
+)
+def test_pedido_de_recomendacao_sem_o_verbo_recomendar(pergunta: str, esperado: bool):
+    assert _pede_recomendacao(pergunta) is esperado
+
+
 def test_bloco_do_banco_e_bloco_da_loja_se_declaram():
     """A procedencia e campo, nao convencao de titulo.
 
@@ -633,11 +673,10 @@ def test_todo_construtor_de_bloco_devolve_par_bloco_serie():
     primeira pergunta que citava "partidas". Nenhum teste passava pelo laco,
     entao a suite inteira ficou verde com a rota quebrada.
     """
-    # `_bloco_sentimento` tem assinatura diferente dos outros tres (recebe a
-    # pergunta tambem - ver `test_bloco_sentimento_ordena_pelo_extremo_pedido`)
-    # - por isso o chamado dele entra separado, ja com a pergunta certa.
+    # `_bloco_steam` e `_bloco_sentimento` recebem a pergunta tambem: o
+    # grafico de cada um so entra quando ela e sobre o que o grafico mede.
     construtores = (
-        (_bloco_steam, ()),
+        (_bloco_steam, ("qual jogo tem mais jogadores simultaneos?",)),
         (_bloco_partidas, ()),
         (_bloco_herois, ()),
         (_bloco_sentimento, ("como estao as avaliacoes?",)),

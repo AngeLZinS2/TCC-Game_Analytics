@@ -146,28 +146,31 @@ def resolver_tag(pergunta: str) -> tuple[int, str] | None:
     return tag_id, nome
 
 
-def _candidatos(tag_id: int, categoria: int, quantidade: int) -> list[int]:
-    """App ids da busca da loja para uma tag + categoria.
+def _candidatos(tag_id: int, categoria: int | None, quantidade: int) -> list[int]:
+    """App ids da busca da loja para uma tag (e, se dada, uma categoria).
 
     Ordem de RELEVANCIA (o padrao da loja), nao por nota. Ordenar por avaliacao
     aqui traz o topo de um ranking de nicho - mods de uma pessoa so com 40
     avaliacoes perfeitas - em vez dos jogos que a pergunta quer.
+
+    `categoria=None` busca so pela tag: e o caso de "bons jogos de terror",
+    onde exigir modo online deixaria de fora justamente os jogos de terror
+    single-player, que sao a maioria do genero.
     """
     settings = get_settings()
-    dados = pegar(
-        URL_BUSCA_FILTRADA,
-        {
-            "json": 1,
-            "term": "",
-            "tags": tag_id,
-            "category2": categoria,
-            "cc": settings.steam_country,
-            "l": settings.steam_language,
-            "infinite": 1,
-            "start": 0,
-            "count": quantidade,
-        },
-    )
+    parametros: dict[str, Any] = {
+        "json": 1,
+        "term": "",
+        "tags": tag_id,
+        "cc": settings.steam_country,
+        "l": settings.steam_language,
+        "infinite": 1,
+        "start": 0,
+        "count": quantidade,
+    }
+    if categoria is not None:
+        parametros["category2"] = categoria
+    dados = pegar(URL_BUSCA_FILTRADA, parametros)
     if not isinstance(dados, dict):
         return []
 
@@ -266,6 +269,61 @@ def multijogador_por_tag(
                 "gratuito": bool(dados.get("is_free")),
                 # Em centavos na API; quem exibe divide. `None` quando a loja
                 # nao vende na regiao (pre-venda, removido do catalogo).
+                "preco": (preco.get("final") / 100) if preco.get("final") else None,
+                "moeda": preco.get("currency"),
+                "imagem_header": dados.get("header_image"),
+                "jogadores_agora": jogadores_agora(app_id),
+            }
+        )
+
+    confirmados.sort(key=lambda j: j["jogadores_agora"] or 0, reverse=True)
+    return confirmados
+
+
+def por_tag(
+    tag_id: int,
+    *,
+    desejados: int = 8,
+    teto_candidatos: int = 14,
+) -> list[dict[str, Any]]:
+    """Jogos de uma tag na loja, sem filtro de modo, ordenados por jogadores.
+
+    Irma de `multijogador_por_tag` para a pergunta que NAO fala de jogar
+    acompanhado: "bons jogos de terror". Exigir modo online ali era o que
+    fazia a pergunta cair no bloco do nosso catalogo - e o catalogo, que tem
+    60 jogos e nenhum filtro de tag, respondia com "destaques" que o modelo
+    entao apresentava como se fossem jogos de terror.
+
+    Mesma disciplina da irma: so `type == "game"` (DLC e trilha sonora
+    aparecem na busca por tag), e o custo limitado por `teto_candidatos`.
+    """
+    confirmados: list[dict[str, Any]] = []
+    for app_id in _candidatos(tag_id, None, teto_candidatos):
+        if len(confirmados) >= desejados:
+            break
+
+        dados = ficha(app_id)
+        if not dados or dados.get("type") != "game":
+            continue
+
+        preco = dados.get("price_overview") or {}
+        confirmados.append(
+            {
+                "app_id": app_id,
+                "nome": dados.get("name"),
+                "generos": [
+                    g.get("description")
+                    for g in (dados.get("genres") or [])
+                    if isinstance(g, dict) and g.get("description")
+                ],
+                "categorias": sorted(
+                    c.get("description")
+                    for c in (dados.get("categories") or [])
+                    if isinstance(c, dict)
+                    and c.get("id") in CATEGORIAS_MULTIJOGADOR
+                    and c.get("description")
+                ),
+                "gratuito": bool(dados.get("is_free")),
                 "preco": (preco.get("final") / 100) if preco.get("final") else None,
                 "moeda": preco.get("currency"),
                 "imagem_header": dados.get("header_image"),
