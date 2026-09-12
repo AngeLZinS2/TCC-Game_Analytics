@@ -50,12 +50,11 @@ import { CartaoJogoSteam } from "@views/componentes/CartaoJogoSteam";
 import {
   BarraFina,
   BarraRanking,
-  CAMPO,
   KpiHud,
-  LABEL_CAMPO,
   Paginacao,
   Pilula,
   Segmentos,
+  SeletorFiltro,
   SeletorModo,
   Sparkline,
   useModoPersistente,
@@ -247,44 +246,33 @@ export function SteamPagina() {
 
           {/* Gênero (Ação, Terror, Aventura...) e categoria (`recursos`:
               Single-player, Co-op, Conquistas...) são os dois filtros de
-              característica do catálogo - dropdown nos dois, pelo mesmo
-              motivo: gênero tem ~15 valores e categoria 50+, e uma fileira de
-              chips com esse volume vira parede em vez de filtro. */}
-          <label className={LABEL_CAMPO}>
-            <span className="font-label-caps text-label-caps uppercase tracking-widest text-outline">
-              Gênero
-            </span>
-            <select
-              value={genero}
-              onChange={(evento) => setGenero(evento.target.value)}
-              className={CAMPO}
-            >
-              <option value="">Todos ({totalCatalogo || 0})</option>
-              {generos.data?.map((item: AgregadoGenero) => (
-                <option key={item.genero} value={item.genero}>
-                  {item.genero} ({item.jogos})
-                </option>
-              ))}
-            </select>
-          </label>
+              característica do catálogo. `SeletorFiltro` em vez de `<select>`
+              nativo: a lista aberta de um `<select>` é o navegador quem
+              desenha (painel branco do sistema, sem nada do tema escuro) -
+              com as 50+ categorias da Steam isso ficava feio o bastante para
+              destoar da tela inteira. */}
+          <SeletorFiltro
+            rotulo="Gênero"
+            valor={genero}
+            aoEscolher={setGenero}
+            rotuloTudo={`Todos (${totalCatalogo || 0})`}
+            opcoes={(generos.data ?? []).map((item: AgregadoGenero) => ({
+              valor: item.genero,
+              rotulo: `${item.genero} (${item.jogos})`,
+            }))}
+          />
 
-          <label className={LABEL_CAMPO}>
-            <span className="font-label-caps text-label-caps uppercase tracking-widest text-outline">
-              Categoria
-            </span>
-            <select
-              value={categoria}
-              onChange={(evento) => setCategoria(evento.target.value)}
-              className={CAMPO}
-            >
-              <option value="">Todas</option>
-              {categorias.data?.map((item) => (
-                <option key={item.categoria} value={item.categoria}>
-                  {item.categoria} ({item.jogos})
-                </option>
-              ))}
-            </select>
-          </label>
+          <SeletorFiltro
+            rotulo="Categoria"
+            valor={categoria}
+            aoEscolher={setCategoria}
+            rotuloTudo="Todas"
+            buscavel
+            opcoes={(categorias.data ?? []).map((item) => ({
+              valor: item.categoria,
+              rotulo: `${item.categoria} (${item.jogos})`,
+            }))}
+          />
 
           <div className="flex flex-wrap items-center gap-space-xs">
             <span className="mr-space-xs hidden font-label-caps text-label-caps uppercase text-outline sm:inline">

@@ -7,7 +7,7 @@
  * gerado - as classes sao as mesmas.
  */
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import { useContagem, useEntrarNaTela } from "@models/hooks/animacao";
 import { Icone } from "./base";
@@ -863,3 +863,178 @@ export const CAMPO =
  */
 export const LABEL_CAMPO =
   "flex w-full flex-col items-start gap-space-xxs sm:w-auto sm:flex-row sm:items-center sm:gap-space-xs";
+
+export interface OpcaoFiltro {
+  valor: string;
+  /** Já formatado como a linha deve aparecer - ex. "Ação (47)". */
+  rotulo: string;
+}
+
+/**
+ * Dropdown de filtro no visual do próprio site, não o `<select>` nativo.
+ *
+ * Nasceu porque um `<select>` estiliza o BOTÃO fechado (é o que `CAMPO` faz),
+ * mas a lista aberta é o navegador quem desenha - painel branco do sistema
+ * operacional, fonte do sistema, sem nada do tema escuro daqui. Com uma
+ * dúzia de opções passa despercebido; com as 50+ categorias da Steam vira a
+ * única coisa clara na tela inteira. Mesmo padrão hover/clique-fora/Escape do
+ * `SeletorDeJogo`, generalizado para qualquer lista de opções.
+ *
+ * `buscavel` liga o campo de busca no topo do painel - vale a pena a partir
+ * de ~20 opções (rolar uma lista desse tamanho procurando um nome é pior que
+ * digitar as 3 primeiras letras dele).
+ */
+export function SeletorFiltro({
+  rotulo,
+  valor,
+  opcoes,
+  aoEscolher,
+  rotuloTudo,
+  buscavel = false,
+}: {
+  rotulo: string;
+  /** `""` é "sem filtro" - a opção "Tudo" do topo. */
+  valor: string;
+  opcoes: OpcaoFiltro[];
+  aoEscolher: (valor: string) => void;
+  /** O rótulo da opção "sem filtro" - já formatado, ex. "Todos (61)". */
+  rotuloTudo: string;
+  buscavel?: boolean;
+}) {
+  const [aberto, setAberto] = useState(false);
+  const [busca, setBusca] = useState("");
+  const raiz = useRef<HTMLDivElement>(null);
+  const campoBusca = useRef<HTMLInputElement>(null);
+
+  // Mesmo par de listeners do `SeletorDeJogo`: clique fora fecha (o gesto
+  // esperado de quem abriu clicando, não passando o mouse), Escape idem.
+  useEffect(() => {
+    if (!aberto) return;
+
+    function aoClicarFora(evento: MouseEvent) {
+      if (!raiz.current?.contains(evento.target as Node)) setAberto(false);
+    }
+    function aoTeclarEscape(evento: KeyboardEvent) {
+      if (evento.key === "Escape") setAberto(false);
+    }
+
+    document.addEventListener("mousedown", aoClicarFora);
+    document.addEventListener("keydown", aoTeclarEscape);
+    return () => {
+      document.removeEventListener("mousedown", aoClicarFora);
+      document.removeEventListener("keydown", aoTeclarEscape);
+    };
+  }, [aberto]);
+
+  useEffect(() => {
+    if (aberto && buscavel) campoBusca.current?.focus();
+  }, [aberto, buscavel]);
+
+  function escolher(novoValor: string) {
+    aoEscolher(novoValor);
+    setAberto(false);
+    setBusca("");
+  }
+
+  const termo = busca.trim().toLowerCase();
+  const filtradas = termo
+    ? opcoes.filter((opcao) => opcao.rotulo.toLowerCase().includes(termo))
+    : opcoes;
+  const atual = opcoes.find((opcao) => opcao.valor === valor);
+
+  return (
+    <div className={LABEL_CAMPO}>
+      <span className="font-label-caps text-label-caps uppercase tracking-widest text-outline">
+        {rotulo}
+      </span>
+
+      {/* O ancoramento do painel (`relative` + `ref`) precisa ficar SÓ em
+          volta do botão, não do rótulo também - senão "left-0" do painel
+          aberto alinharia com o texto do rótulo, não com o botão. */}
+      <div ref={raiz} className="relative w-full sm:w-auto">
+        <button
+          type="button"
+          aria-haspopup="listbox"
+          aria-expanded={aberto}
+          onClick={() => setAberto((estava) => !estava)}
+          className={`${CAMPO} flex items-center justify-between gap-space-xs text-left`}
+        >
+          <span className="truncate">{atual ? atual.rotulo : rotuloTudo}</span>
+          <Icone
+            nome="expand_more"
+            className={`shrink-0 text-[18px] text-outline transition-transform ${
+              aberto ? "rotate-180" : ""
+            }`}
+          />
+        </button>
+
+        {aberto && (
+          // Mesmo "vão preenchido" do `SeletorDeJogo`: `top-full` sem margem,
+          // o respiro é padding de dentro do próprio painel hoverável/clicável.
+          <div className="absolute left-0 top-full z-30 w-[min(22rem,calc(100vw-4rem))] pt-space-xxs sm:w-72">
+            <div
+              role="listbox"
+              aria-label={rotulo}
+              // `shrink-0` em CADA filha é obrigatório, não estético: com
+              // dezenas de opções a lista já passa de `max-h-80`, e um botão
+              // com `truncate` (`overflow: hidden`) faz o Chrome zerar a
+              // altura mínima automática dele em flexbox - sem `shrink-0` o
+              // `flex-shrink` padrão esmagava as linhas a ~8px de altura em
+              // vez de a lista simplesmente rolar, e o texto virava um borrão
+              // ilegível de poucos pixels (bug real, não só "feio").
+              className="rolagem-discreta flex max-h-80 w-full flex-col gap-space-xxs overflow-y-auto rounded-lg border border-outline-variant/30 bg-surface-container-low p-space-xs shadow-2xl"
+            >
+              {buscavel && (
+                <input
+                  ref={campoBusca}
+                  type="search"
+                  value={busca}
+                  onChange={(evento) => setBusca(evento.target.value)}
+                  placeholder={`Buscar em ${opcoes.length}…`}
+                  className="mb-space-xxs shrink-0 rounded bg-surface-container px-space-sm py-space-xs font-title-code text-title-code text-on-surface outline-none placeholder:text-outline focus:bg-surface-container-high"
+                />
+              )}
+
+              <button
+                type="button"
+                role="option"
+                aria-selected={valor === ""}
+                onClick={() => escolher("")}
+                className={`w-full shrink-0 rounded px-space-sm py-space-xs text-left font-title-code text-title-code transition-colors ${
+                  valor === ""
+                    ? "bg-surface-container-high text-on-surface"
+                    : "text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface"
+                }`}
+              >
+                {rotuloTudo}
+              </button>
+
+              {filtradas.map((opcao) => (
+                <button
+                  key={opcao.valor}
+                  type="button"
+                  role="option"
+                  aria-selected={opcao.valor === valor}
+                  onClick={() => escolher(opcao.valor)}
+                  className={`w-full shrink-0 truncate rounded px-space-sm py-space-xs text-left font-title-code text-title-code transition-colors ${
+                    opcao.valor === valor
+                      ? "bg-surface-container-high text-on-surface"
+                      : "text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface"
+                  }`}
+                >
+                  {opcao.rotulo}
+                </button>
+              ))}
+
+              {buscavel && filtradas.length === 0 && (
+                <p className="shrink-0 px-space-sm py-space-xs font-body-sm text-body-sm text-outline">
+                  Nada encontrado.
+                </p>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
