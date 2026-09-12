@@ -175,7 +175,7 @@ export function BarraSuperior() {
     <header className="fixed left-0 right-0 top-0 z-50 flex h-16 items-center gap-space-base border-b border-outline-variant/30 bg-surface-container-lowest/95 px-space-base backdrop-blur-md md:px-space-lg lg:left-60">
       {/* Marca e fileira de ícones: só até `lg` (no desktop, o trilho lateral). */}
       <Link to="/painel" className="flex shrink-0 items-center gap-space-sm lg:hidden">
-        <Icone nome="stadia_controller" className="text-[24px] text-primary-container" />
+        <img src="/logo-icone.png" alt="" className="h-6 w-6 object-contain" />
         <span className="font-title-code text-title-code uppercase tracking-wider text-primary">
           PlayDB
         </span>

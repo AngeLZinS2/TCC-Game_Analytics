@@ -46,9 +46,7 @@ export function TrilhoLateral() {
   return (
     <aside className="fixed left-0 top-0 z-40 hidden h-screen w-60 flex-col border-r border-outline-variant/25 bg-surface-container-lowest px-space-sm py-space-base lg:flex">
       <NavLink to="/painel" className="mb-space-lg flex items-center gap-space-sm px-space-sm">
-        <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-secondary-fixed-dim font-title-code text-title-code font-semibold text-on-secondary">
-          P
-        </span>
+        <img src="/logo-icone.png" alt="" className="h-7 w-7 shrink-0 object-contain" />
         <span className="font-headline-sm text-headline-sm font-bold tracking-tight text-on-surface">
           PlayDB
         </span>

@@ -206,9 +206,15 @@ export function HomePagina() {
                 "translate3d(calc(var(--mx, 0) * 14px), calc(var(--my, 0) * 10px), 0)",
             }}
           >
+            <img
+              src="/logo-completo.png"
+              alt="PlayDB"
+              className="h-20 w-auto drop-shadow-[0_0_44px_rgba(90,140,255,0.35)] sm:h-24"
+            />
+
             <span className="inline-flex items-center gap-space-xs rounded-full border border-outline-variant/40 bg-surface-container-lowest/80 px-space-md py-space-xs font-title-code text-title-code uppercase tracking-widest text-on-surface-variant backdrop-blur-sm">
               <span className="h-2 w-2 animate-pulse rounded-full bg-tertiary" aria-hidden />
-              PlayDB · instrumento de dados de jogos
+              instrumento de dados de jogos
             </span>
 
             <h1 className="text-balance font-display-hero text-[clamp(2.5rem,1.5rem+5vw,4.75rem)] font-bold leading-[1.05] tracking-tight text-on-surface">
