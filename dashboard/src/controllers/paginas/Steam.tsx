@@ -2,9 +2,14 @@
  * Catalogo Steam.
  *
  * Porte da tela "Jogos da Steam" do Stitch. A estrutura segue o desenho:
- * cabecalho com identificador de pipeline, busca + pilulas de ordenacao, chips
- * de genero com contagem, tres KPIs, o ranking em barras de gradiente e a
- * tabela de telemetria.
+ * cabecalho com identificador de pipeline, busca + pilulas de ordenacao,
+ * dropdowns de genero e categoria, tres KPIs, o ranking em barras de
+ * gradiente e a tabela de telemetria.
+ *
+ * Genero (Acao, Terror, Aventura...) e categoria (Single-player, Co-op,
+ * Conquistas...) eram uma fileira de chips - virou dropdown pelo mesmo
+ * motivo dos dois: o catalogo tem ~15 generos e 50+ categorias, e esse
+ * volume em chip virava parede de scroll horizontal em vez de filtro.
  *
  * O que o desenho mostra e o projeto ainda nao tem ficou de fora, nao virou
  * numero fixo: "Trending 24h" depende de variacao entre coletas e so acende
@@ -18,6 +23,7 @@ import { useNavigate } from "react-router-dom";
 import { usePaginacaoLocal } from "@models/hooks/paginacao";
 import {
   useBuscaCatalogo,
+  useCategoriasSteam,
   useColetarJogo,
   useGenerosSteam,
   useJogosSteam,
@@ -44,8 +50,9 @@ import { CartaoJogoSteam } from "@views/componentes/CartaoJogoSteam";
 import {
   BarraFina,
   BarraRanking,
-  ChipContagem,
+  CAMPO,
   KpiHud,
+  LABEL_CAMPO,
   Paginacao,
   Pilula,
   Segmentos,
@@ -94,6 +101,7 @@ export function SteamPagina() {
 
   const [busca, setBusca] = useState("");
   const [genero, setGenero] = useState("");
+  const [categoria, setCategoria] = useState("");
   const [ordenacao, setOrdenacao] = useState<Ordenacao>("jogadores");
 
   // "Trending" nao existe no backend: ele ordena pela variacao, que e calculada
@@ -102,6 +110,7 @@ export function SteamPagina() {
   const jogos = useJogosSteam({
     busca: busca.trim() || undefined,
     genero: genero || undefined,
+    categoria: categoria || undefined,
     ordenar_por: ordenacao === "trending" ? "jogadores" : ordenacao,
     limite: 500,
   });
@@ -111,6 +120,7 @@ export function SteamPagina() {
     "tabela",
   );
   const generos = useGenerosSteam();
+  const categorias = useCategoriasSteam();
   // O total do catalogo vem da contagem real da dimensao. Antes saia de
   // `Math.max` das contagens por genero - e um jogo conta em TODOS os
   // generos dele, entao o maior genero nunca foi o catalogo. Com 45 jogos
@@ -171,7 +181,7 @@ export function SteamPagina() {
 
   const paginacao = usePaginacaoLocal(linhas, {
     porPaginaInicial: { mobile: 5, desktop: 25 },
-    chaveReset: `${termoBuscado}|${genero}|${ordenacao}`,
+    chaveReset: `${termoBuscado}|${genero}|${categoria}|${ordenacao}`,
   });
 
   //: O vazio dos paineis de telemetria.
@@ -235,6 +245,47 @@ export function SteamPagina() {
             </kbd>
           </div>
 
+          {/* Gênero (Ação, Terror, Aventura...) e categoria (`recursos`:
+              Single-player, Co-op, Conquistas...) são os dois filtros de
+              característica do catálogo - dropdown nos dois, pelo mesmo
+              motivo: gênero tem ~15 valores e categoria 50+, e uma fileira de
+              chips com esse volume vira parede em vez de filtro. */}
+          <label className={LABEL_CAMPO}>
+            <span className="font-label-caps text-label-caps uppercase tracking-widest text-outline">
+              Gênero
+            </span>
+            <select
+              value={genero}
+              onChange={(evento) => setGenero(evento.target.value)}
+              className={CAMPO}
+            >
+              <option value="">Todos ({totalCatalogo || 0})</option>
+              {generos.data?.map((item: AgregadoGenero) => (
+                <option key={item.genero} value={item.genero}>
+                  {item.genero} ({item.jogos})
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className={LABEL_CAMPO}>
+            <span className="font-label-caps text-label-caps uppercase tracking-widest text-outline">
+              Categoria
+            </span>
+            <select
+              value={categoria}
+              onChange={(evento) => setCategoria(evento.target.value)}
+              className={CAMPO}
+            >
+              <option value="">Todas</option>
+              {categorias.data?.map((item) => (
+                <option key={item.categoria} value={item.categoria}>
+                  {item.categoria} ({item.jogos})
+                </option>
+              ))}
+            </select>
+          </label>
+
           <div className="flex flex-wrap items-center gap-space-xs">
             <span className="mr-space-xs hidden font-label-caps text-label-caps uppercase text-outline sm:inline">
               Ordenar:
@@ -260,29 +311,6 @@ export function SteamPagina() {
               );
             })}
           </div>
-        </div>
-
-        {/* ---------- Chips de genero ---------- */}
-        <div className="rolagem-discreta flex items-center gap-space-xs overflow-x-auto pb-space-xs">
-          <ChipContagem
-            ativo={genero === ""}
-            contagem={totalCatalogo || undefined}
-            aoClicar={() => setGenero("")}
-          >
-            TODOS
-          </ChipContagem>
-
-          {generos.data?.map((item: AgregadoGenero) => (
-            <ChipContagem
-              key={item.genero}
-              ativo={genero === item.genero}
-              contagem={item.jogos}
-              cor={corDoGenero(item.genero)}
-              aoClicar={() => setGenero(genero === item.genero ? "" : item.genero)}
-            >
-              {item.genero}
-            </ChipContagem>
-          ))}
         </div>
       </section>
 
@@ -310,7 +338,11 @@ export function SteamPagina() {
             <section className="grid grid-cols-1 gap-space-base md:grid-cols-3">
               <KpiHud
                 etiqueta="VALVE_CONCURRENT_USERS // AGORA"
-                canto={genero ? `FILTRO: ${genero.toUpperCase()}` : "CATÁLOGO INTEIRO"}
+                canto={
+                  genero || categoria
+                    ? `FILTRO: ${[genero, categoria].filter(Boolean).join(" + ").toUpperCase()}`
+                    : "CATÁLOGO INTEIRO"
+                }
                 valor={fmtNumero(somaJogadores)}
                 valorNumerico={somaJogadores}
                 formatarValor={fmtNumero}

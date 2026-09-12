@@ -197,6 +197,11 @@ export interface AgregadoGenero {
   nota_avaliacoes_media: Decimal | null;
 }
 
+export interface AgregadoCategoria {
+  categoria: string;
+  jogos: number;
+}
+
 // ---------------------------------------------------------------------------
 // Catalogo Xbox (Fase 26) — vitrine de loja, sem CCU nem ML
 // ---------------------------------------------------------------------------

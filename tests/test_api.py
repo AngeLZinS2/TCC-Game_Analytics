@@ -71,6 +71,40 @@ def test_jogo_inexistente_da_404(cliente: TestClient) -> None:
     assert cliente.get("/api/steam/jogos/1").status_code == 404
 
 
+def test_agrega_por_categoria(cliente: TestClient) -> None:
+    corpo = cliente.get("/api/steam/categorias").json()
+    assert isinstance(corpo, list)
+    if not corpo:
+        pytest.skip("catalogo Steam sem categoria coletada")
+
+    for item in corpo:
+        assert item["categoria"]
+        assert item["jogos"] > 0
+        # Chave de traducao sem resolver da Steam - lixo de exibicao, nunca
+        # deveria chegar ao dropdown do front.
+        assert not item["categoria"].startswith("#")
+
+    # Maior contagem primeiro - e o que o dropdown mostra no topo.
+    contagens = [item["jogos"] for item in corpo]
+    assert contagens == sorted(contagens, reverse=True)
+
+
+def test_filtro_por_categoria_so_traz_quem_tem_a_categoria(cliente: TestClient) -> None:
+    categorias = cliente.get("/api/steam/categorias").json()
+    if not categorias:
+        pytest.skip("catalogo Steam sem categoria coletada")
+
+    alvo = categorias[0]["categoria"]
+    corpo = cliente.get(
+        "/api/steam/jogos", params={"categoria": alvo, "limite": 500}
+    ).json()
+
+    assert len(corpo) == categorias[0]["jogos"]
+    # A tabela nao devolve `recursos` (so `generos`) - conferir a contagem
+    # contra o agregado e o teste de que o filtro bateu no campo certo.
+    assert corpo
+
+
 # --- Catalogo Xbox --------------------------------------------------------
 
 

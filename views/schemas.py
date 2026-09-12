@@ -268,6 +268,14 @@ class AgregadoGenero(BaseModel):
     nota_avaliacoes_media: Decimal | None = None
 
 
+class AgregadoCategoria(BaseModel):
+    """Uma categoria da Steam (`recursos`: Single-player, Co-op, Conquistas...)
+    e quantos jogos do catalogo a tem - o que preenche o dropdown de filtro."""
+
+    categoria: str
+    jogos: int
+
+
 # ---------------------------------------------------------------------------
 # Catalogo Xbox (Game Pass + Microsoft Store) - vitrine de loja
 # ---------------------------------------------------------------------------

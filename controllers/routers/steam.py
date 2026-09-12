@@ -17,6 +17,7 @@ from sqlalchemy import case, desc, func, nulls_last, or_, select
 from sqlalchemy.orm import Session, aliased
 
 from views.schemas import (
+    AgregadoCategoria,
     AgregadoGenero,
     DetalheJogoSteam,
     FichaJogoSteam,
@@ -302,6 +303,13 @@ def listar_jogos(
     sessao: Session = Depends(get_db),
     busca: str | None = Query(None, description="filtra por nome ou desenvolvedora"),
     genero: str | None = Query(None, description="filtra por um genero exato"),
+    categoria: str | None = Query(
+        None,
+        description=(
+            "filtra por uma categoria exata da Steam (recursos: Single-player, "
+            "Multi-player, Co-op, Conquistas da Steam...) - diferente de genero"
+        ),
+    ),
     ordenar_por: OrdenarPor = "jogadores",
     ordem: Literal["asc", "desc"] = "desc",
     limite: int = Query(100, ge=1, le=500),
@@ -336,6 +344,8 @@ def listar_jogos(
         )
     if genero:
         consulta = consulta.where(DimJogoSteam.generos.any(genero))
+    if categoria:
+        consulta = consulta.where(DimJogoSteam.recursos.any(categoria))
 
     coluna = ordenacoes[ordenar_por]
     alvo = desc(coluna) if ordem == "desc" else coluna.asc()
@@ -375,6 +385,44 @@ def agregar_por_genero(sessao: Session = Depends(get_db)) -> list[AgregadoGenero
             jogadores_simultaneos=linha.jogadores,
             nota_avaliacoes_media=linha.nota,
         )
+        for linha in sessao.execute(consulta)
+    ]
+
+
+@router.get("/categorias", response_model=list[AgregadoCategoria])
+def agregar_por_categoria(sessao: Session = Depends(get_db)) -> list[AgregadoCategoria]:
+    """As categorias da Steam (`recursos`: Single-player, Co-op, Conquistas...)
+    presentes no catalogo, com quantos jogos tem cada uma - o dropdown de
+    filtro pede essa lista pronta, em vez de descobrir os valores existentes
+    varrendo a tabela toda no navegador.
+
+    Diferente de genero (um punhado de generos grossos, cabe em chip): a
+    Steam tem 50+ categorias, e o volume e o motivo do filtro ser um
+    `<select>` e nao uma fileira de chips.
+    """
+    # `unnest()` nao pode ir direto no WHERE/HAVING (o Postgres recusa
+    # set-returning function nos dois) - por isso o unnest mora numa
+    # subconsulta, e o filtro entra na consulta de fora, sobre a coluna ja
+    # expandida.
+    expandido = select(
+        DimJogoSteam.app_id, func.unnest(DimJogoSteam.recursos).label("categoria")
+    ).subquery()
+
+    consulta = (
+        select(
+            expandido.c.categoria,
+            func.count(func.distinct(expandido.c.app_id)).label("jogos"),
+        )
+        # A Steam as vezes deixa uma chave de traducao sem resolver
+        # ("#category_playable_at_your_own_pace") escapar do payload - lixo de
+        # exibicao, nao categoria de verdade.
+        .where(~expandido.c.categoria.like("#%"))
+        .group_by(expandido.c.categoria)
+        .order_by(desc("jogos"))
+    )
+
+    return [
+        AgregadoCategoria(categoria=linha.categoria, jogos=linha.jogos)
         for linha in sessao.execute(consulta)
     ]
 

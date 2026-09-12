@@ -12,6 +12,7 @@ import { cabecalhoAuthAdmin, salvarTokenAdmin, tokenAdmin } from "@models/admin/
 import { cabecalhoAuthUsuario } from "@models/conta/cliente";
 import { useUsuario } from "@models/conta/contexto";
 import type {
+  AgregadoCategoria,
   AgregadoGenero,
   DetalheJogoSteam,
   DetalhePartida,
@@ -71,6 +72,7 @@ import type {
 export interface FiltrosJogos {
   busca?: string;
   genero?: string;
+  categoria?: string;
   ordenar_por?: string;
   ordem?: "asc" | "desc";
   limite?: number;
@@ -111,6 +113,15 @@ export function useGenerosSteam() {
   return useQuery({
     queryKey: ["steam", "generos"],
     queryFn: () => buscar<AgregadoGenero[]>("/api/steam/generos"),
+  });
+}
+
+/** As categorias da Steam (Single-player, Co-op, Conquistas...) presentes no
+ * catálogo, com contagem - popula o dropdown de filtro por categoria. */
+export function useCategoriasSteam() {
+  return useQuery({
+    queryKey: ["steam", "categorias"],
+    queryFn: () => buscar<AgregadoCategoria[]>("/api/steam/categorias"),
   });
 }
 
