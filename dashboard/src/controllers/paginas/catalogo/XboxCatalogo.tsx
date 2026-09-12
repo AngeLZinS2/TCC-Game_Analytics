@@ -3,8 +3,9 @@
  *
  * Rasa de proposito: a Microsoft nao publica CCU nem texto de avaliacao em API
  * gratuita, entao aqui e ficha + preco + selo do Game Pass. A estrutura segue a
- * aba Steam (busca, pilulas de ordenacao, chips de genero, KPIs, tabela), sem o
- * ranking de jogadores nem o grafico de telemetria, que nao tem fonte.
+ * aba Steam (busca, dropdowns de genero e categoria, pilulas de ordenacao,
+ * KPIs, tabela), sem o ranking de jogadores nem o grafico de telemetria, que
+ * nao tem fonte.
  *
  * O catalogo tem ~800 jogos: a lista inteira vem da API (capada em 500) e a
  * tela mostra 25/50 por vez (`usePaginacaoLocal`). O leitor escolhe entre
@@ -17,6 +18,7 @@ import { useNavigate } from "react-router-dom";
 import { usePaginacaoLocal } from "@models/hooks/paginacao";
 import {
   useBuscaCatalogoXbox,
+  useCategoriasXbox,
   useColetarJogoXbox,
   useGenerosXbox,
   useJogosXbox,
@@ -27,10 +29,10 @@ import { Consulta, Icone, MensagemErro, TabelaRolavel } from "@views/componentes
 import { CapaXbox } from "@views/componentes/CapaXbox";
 import { CartaoJogoXbox } from "@views/componentes/CartaoJogoXbox";
 import {
-  ChipContagem,
   KpiHud,
   Paginacao,
   Pilula,
+  SeletorFiltro,
   SeletorModo,
   useModoPersistente,
 } from "@views/componentes/hud";
@@ -192,6 +194,7 @@ export function XboxCatalogo() {
   const [busca, setBusca] = useState("");
   const [termoBuscado, setTermoBuscado] = useState("");
   const [genero, setGenero] = useState("");
+  const [categoria, setCategoria] = useState("");
   const [ordenacao, setOrdenacao] = useState<Ordenacao>("game_pass");
   const [modo, setModo] = useModoPersistente<ModoCatalogo>(
     "playdb:xbox-modo",
@@ -207,12 +210,14 @@ export function XboxCatalogo() {
   const jogos = useJogosXbox({
     busca: termoBuscado || undefined,
     genero: genero || undefined,
+    categoria: categoria || undefined,
     ordenar_por: ordenacao,
     // O catálogo inteiro de uma vez — a paginação é no cliente. O Game Pass no
     // BR tem ~800–1000 jogos; 1500 dá folga pro catálogo crescer.
     limite: 1500,
   });
   const generos = useGenerosXbox();
+  const categorias = useCategoriasXbox();
   const visaoGeral = useVisaoGeral();
 
   const totalCatalogo = visaoGeral.data?.jogos_xbox ?? 0;
@@ -220,7 +225,7 @@ export function XboxCatalogo() {
   const lista = useMemo<JogoXbox[]>(() => jogos.data ?? [], [jogos.data]);
   const paginacao = usePaginacaoLocal(lista, {
     porPaginaInicial: { mobile: 5, desktop: 25 },
-    chaveReset: `${termoBuscado}|${genero}|${ordenacao}`,
+    chaveReset: `${termoBuscado}|${genero}|${categoria}|${ordenacao}`,
   });
 
   return (
@@ -244,6 +249,33 @@ export function XboxCatalogo() {
             />
           </div>
 
+          {/* Gênero (Ação e aventura, RPG, Tiro...) e categoria (recursos:
+              Co-op online, 4K, Otimizado p/ Series X|S...) no mesmo dropdown
+              que o catálogo Steam usa - a lista aberta de um `<select>`
+              nativo é o navegador quem desenha, sem nada do tema escuro. */}
+          <SeletorFiltro
+            rotulo="Gênero"
+            valor={genero}
+            aoEscolher={setGenero}
+            rotuloTudo={`Todos (${totalCatalogo || 0})`}
+            opcoes={(generos.data ?? []).map((item: AgregadoGenero) => ({
+              valor: item.genero,
+              rotulo: `${item.genero} (${item.jogos})`,
+            }))}
+          />
+
+          <SeletorFiltro
+            rotulo="Categoria"
+            valor={categoria}
+            aoEscolher={setCategoria}
+            rotuloTudo="Todas"
+            buscavel
+            opcoes={(categorias.data ?? []).map((item) => ({
+              valor: item.categoria,
+              rotulo: `${item.categoria} (${item.jogos})`,
+            }))}
+          />
+
           <div className="flex flex-wrap items-center gap-space-xs">
             <span className="mr-space-xs hidden font-label-caps text-label-caps uppercase text-outline sm:inline">
               Ordenar:
@@ -259,29 +291,6 @@ export function XboxCatalogo() {
               </Pilula>
             ))}
           </div>
-        </div>
-
-        {/* ---------- chips de genero ---------- */}
-        <div className="rolagem-discreta flex items-center gap-space-xs overflow-x-auto pb-space-xs">
-          <ChipContagem
-            ativo={genero === ""}
-            contagem={totalCatalogo || undefined}
-            aoClicar={() => setGenero("")}
-          >
-            TODOS
-          </ChipContagem>
-
-          {generos.data?.map((item: AgregadoGenero) => (
-            <ChipContagem
-              key={item.genero}
-              ativo={genero === item.genero}
-              contagem={item.jogos}
-              cor={corDoGenero(item.genero)}
-              aoClicar={() => setGenero(genero === item.genero ? "" : item.genero)}
-            >
-              {item.genero}
-            </ChipContagem>
-          ))}
         </div>
       </section>
 
@@ -308,7 +317,11 @@ export function XboxCatalogo() {
             <section className="grid grid-cols-1 gap-space-base md:grid-cols-3">
               <KpiHud
                 etiqueta="XBOX_STORE // CATÁLOGO"
-                canto={genero ? `FILTRO: ${genero.toUpperCase()}` : "MERCADO BR"}
+                canto={
+                  genero || categoria
+                    ? `FILTRO: ${[genero, categoria].filter(Boolean).join(" + ").toUpperCase()}`
+                    : "MERCADO BR"
+                }
                 valor={fmtNumero(totalCatalogo || todos.length)}
                 valorNumerico={totalCatalogo || todos.length}
                 formatarValor={fmtNumero}

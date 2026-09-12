@@ -124,6 +124,31 @@ def test_xbox_lista_de_jogos_tem_a_forma_da_vitrine(cliente: TestClient) -> None
     assert isinstance(jogo["recursos"], list)
 
 
+def test_xbox_agrega_por_categoria(cliente: TestClient) -> None:
+    corpo = cliente.get("/api/xbox/categorias").json()
+    assert isinstance(corpo, list)
+    if not corpo:
+        pytest.skip("catalogo Xbox sem categoria coletada")
+
+    for item in corpo:
+        assert item["categoria"]
+        assert item["jogos"] > 0
+    contagens = [item["jogos"] for item in corpo]
+    assert contagens == sorted(contagens, reverse=True)
+
+
+def test_xbox_filtro_por_categoria_so_traz_quem_tem_a_categoria(cliente: TestClient) -> None:
+    categorias = cliente.get("/api/xbox/categorias").json()
+    if not categorias:
+        pytest.skip("catalogo Xbox sem categoria coletada")
+
+    alvo = categorias[0]["categoria"]
+    corpo = cliente.get(
+        "/api/xbox/jogos", params={"categoria": alvo, "limite": 2000}
+    ).json()
+    assert len(corpo) == categorias[0]["jogos"]
+
+
 def test_xbox_detalhe_traz_serie_e_midias(cliente: TestClient) -> None:
     lista = cliente.get("/api/xbox/jogos", params={"limite": 1}).json()
     if not lista:

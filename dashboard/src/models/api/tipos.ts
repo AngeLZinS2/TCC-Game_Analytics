@@ -268,6 +268,7 @@ export interface DetalheJogoXbox {
 export interface FiltrosJogosXbox {
   busca?: string;
   genero?: string;
+  categoria?: string;
   ordenar_por?: "game_pass" | "nome" | "preco" | "nota";
   ordem?: "asc" | "desc";
   limite?: number;

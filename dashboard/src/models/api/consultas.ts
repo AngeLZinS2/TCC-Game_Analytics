@@ -803,6 +803,15 @@ export function useGenerosXbox() {
   });
 }
 
+/** Os recursos do jogo (Co-op online, 4K, Otimizado p/ Series X|S...) -
+ * popula o dropdown de categoria da aba Xbox. */
+export function useCategoriasXbox() {
+  return useQuery({
+    queryKey: ["xbox", "categorias"],
+    queryFn: () => buscar<AgregadoCategoria[]>("/api/xbox/categorias"),
+  });
+}
+
 export function useJogoXbox(productId?: string) {
   return useQuery({
     queryKey: ["xbox", "jogo", productId],

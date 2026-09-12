@@ -18,6 +18,7 @@ from sqlalchemy import case, desc, func, nulls_last, or_, select
 from sqlalchemy.orm import Session, aliased
 
 from views.schemas import (
+    AgregadoCategoria,
     AgregadoGenero,
     CandidatoJogoXbox,
     DetalheJogoXbox,
@@ -125,6 +126,13 @@ def listar_jogos(
     sessao: Session = Depends(get_db),
     busca: str | None = Query(None, description="filtra por nome ou publicadora"),
     genero: str | None = Query(None, description="filtra por um genero exato"),
+    categoria: str | None = Query(
+        None,
+        description=(
+            "filtra por um recurso exato do jogo (Co-op online, Multi-jogador "
+            "local, 4K, Otimizado p/ Series X|S...) - diferente de genero"
+        ),
+    ),
     ordenar_por: OrdenarPor = "game_pass",
     ordem: Literal["asc", "desc"] = "desc",
     # `le` alto de proposito: a aba pagina no cliente, entao ela busca o
@@ -148,6 +156,8 @@ def listar_jogos(
         )
     if genero:
         consulta = consulta.where(DimJogoXbox.generos.any(genero))
+    if categoria:
+        consulta = consulta.where(DimJogoXbox.recursos.any(categoria))
 
     if ordenar_por == "game_pass":
         # No Game Pass primeiro, depois alfabetico. `ordem` nao mexe aqui - o
@@ -201,6 +211,36 @@ def agregar_por_genero(sessao: Session = Depends(get_db)) -> list[AgregadoGenero
     )
     return [
         AgregadoGenero(genero=linha.genero, jogos=linha.jogos)
+        for linha in sessao.execute(consulta)
+    ]
+
+
+@router.get("/categorias", response_model=list[AgregadoCategoria])
+def agregar_por_categoria(sessao: Session = Depends(get_db)) -> list[AgregadoCategoria]:
+    """Contagem de jogos por recurso (`recursos`: Co-op online, 4K,
+    Otimizado p/ Series X|S...) - o mesmo desenho de `/api/steam/categorias`,
+    para o dropdown de categoria da aba Xbox.
+
+    `unnest()` nao roda direto em WHERE/GROUP BY seguido de filtro no mesmo
+    nivel (o Postgres recusa set-returning function fora do SELECT/FROM) -
+    por isso o unnest mora numa subconsulta e a agregacao acontece na de fora,
+    igual ao endpoint da Steam.
+    """
+    expandido = select(
+        DimJogoXbox.product_id, func.unnest(DimJogoXbox.recursos).label("categoria")
+    ).subquery()
+
+    consulta = (
+        select(
+            expandido.c.categoria,
+            func.count(func.distinct(expandido.c.product_id)).label("jogos"),
+        )
+        .group_by(expandido.c.categoria)
+        .order_by(desc("jogos"))
+    )
+
+    return [
+        AgregadoCategoria(categoria=linha.categoria, jogos=linha.jogos)
         for linha in sessao.execute(consulta)
     ]
 
