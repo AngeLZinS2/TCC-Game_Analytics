@@ -1235,6 +1235,20 @@ export interface PerfilUsuario {
 
 export type ProvedorIA = "openrouter" | "anthropic" | "google";
 
+/** Uma opção do seletor de modelo do Perfil. `grupo` vira o `<optgroup>`. */
+export interface ModeloIA {
+  id: string;
+  nome: string;
+  grupo: string;
+  gratuito: boolean;
+}
+
+export interface CatalogoModelosIA {
+  openrouter: ModeloIA[];
+  anthropic: ModeloIA[];
+  google: ModeloIA[];
+}
+
 export interface EntradaHistoricoAssistente {
   id: number;
   pergunta: string;

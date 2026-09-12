@@ -12,12 +12,19 @@
  * A chave nunca volta do backend em texto puro - so a mascara
  * (`chave_ia_mascarada`, os ultimos 4 caracteres). Trocar significa cadastrar
  * uma nova por cima, nao "editar" a antiga.
+ *
+ * O modelo e um `<select>`, nao texto livre: o id exato muda de provedor pra
+ * provedor (`anthropic/claude-sonnet-5` no OpenRouter, `claude-sonnet-5` na
+ * API direta) e um typo ali nao falha no cadastro - falha depois, na
+ * pergunta, parecendo chave invalida. A lista vem de
+ * `/api/assistente/modelos` (viva, no caso do OpenRouter), e "Outro" mantem o
+ * texto livre pra quem quer um modelo recem-lancado.
  */
 
-import { useState, type FormEvent } from "react";
+import { useMemo, useState, type FormEvent } from "react";
 
-import { useRemoverChaveIA, useSalvarChaveIA } from "@models/api/consultas";
-import type { PerfilUsuario, ProvedorIA } from "@models/api/tipos";
+import { useModelosIA, useRemoverChaveIA, useSalvarChaveIA } from "@models/api/consultas";
+import type { ModeloIA, PerfilUsuario, ProvedorIA } from "@models/api/tipos";
 import { Icone, MensagemErro } from "@views/componentes/base";
 import { CAMPO, Painel, Pilula } from "@views/componentes/hud";
 
@@ -28,22 +35,29 @@ const PROVEDORES: Record<
   openrouter: {
     rotulo: "OpenRouter",
     linkChave: "https://openrouter.ai/keys",
-    placeholderModelo: "opcional — ex.: anthropic/claude-sonnet-4.5 (vazio usa o modelo do site)",
+    placeholderModelo: "ex.: anthropic/claude-sonnet-5",
     icone: "hub",
   },
   anthropic: {
     rotulo: "Anthropic (Claude)",
     linkChave: "https://console.anthropic.com/settings/keys",
-    placeholderModelo: "opcional — ex.: claude-sonnet-5",
+    placeholderModelo: "ex.: claude-sonnet-5",
     icone: "smart_toy",
   },
   google: {
     rotulo: "Google (Gemini)",
     linkChave: "https://aistudio.google.com/apikey",
-    placeholderModelo: "opcional — ex.: gemini-3.8-flash",
+    placeholderModelo: "ex.: gemini-3.8-flash",
     icone: "smart_toy",
   },
 };
+
+/** Valor do `<option>` que revela o campo de texto livre.
+ *
+ * A lista vem do catálogo do provedor (viva, no caso do OpenRouter), mas
+ * modelo novo aparece toda semana — sem esta saída, quem quisesse um
+ * lançamento ficaria esperando a gente atualizar a lista. */
+const OUTRO = "__outro__";
 
 export const ROTULO_PROVEDOR: Record<ProvedorIA, string> = {
   openrouter: "OpenRouter",
@@ -54,13 +68,39 @@ export const ROTULO_PROVEDOR: Record<ProvedorIA, string> = {
 export function PainelChaveIA({ perfil }: { perfil: PerfilUsuario | undefined }) {
   const salvar = useSalvarChaveIA();
   const remover = useRemoverChaveIA();
+  const catalogo = useModelosIA();
   const [provedor, setProvedor] = useState<ProvedorIA>("openrouter");
   const [chave, setChave] = useState("");
-  const [modelo, setModelo] = useState("");
+  const [escolha, setEscolha] = useState("");
+  const [modeloLivre, setModeloLivre] = useState("");
   const [editando, setEditando] = useState(false);
 
   const temChave = perfil?.tem_chave_ia_propria ?? false;
   const mostrarForm = !temChave || editando;
+  const modelos = catalogo.data?.[provedor] ?? [];
+
+  // Um `<optgroup>` por grupo, na ordem em que o backend mandou - ele já
+  // ordena por relevância (gratuitos primeiro, depois as famílias).
+  const grupos = useMemo(() => {
+    const porGrupo = new Map<string, ModeloIA[]>();
+    for (const modelo of modelos) {
+      const lista = porGrupo.get(modelo.grupo) ?? [];
+      lista.push(modelo);
+      porGrupo.set(modelo.grupo, lista);
+    }
+    return [...porGrupo.entries()];
+  }, [modelos]);
+
+  const modelo = escolha === OUTRO ? modeloLivre.trim() : escolha;
+
+  function trocarProvedor(novo: ProvedorIA) {
+    setProvedor(novo);
+    // O id é de outro provedor - "claude-sonnet-5" não existe no OpenRouter,
+    // lá é "anthropic/claude-sonnet-5". Manter a escolha ao trocar de aba
+    // salvaria um modelo que a chave nova não aceita.
+    setEscolha("");
+    setModeloLivre("");
+  }
 
   async function enviar(evento: FormEvent) {
     evento.preventDefault();
@@ -68,10 +108,11 @@ export function PainelChaveIA({ perfil }: { perfil: PerfilUsuario | undefined })
     await salvar.mutateAsync({
       provedor,
       chave: chave.trim(),
-      modelo: modelo.trim() || undefined,
+      modelo: modelo || undefined,
     });
     setChave("");
-    setModelo("");
+    setEscolha("");
+    setModeloLivre("");
     setEditando(false);
   }
 
@@ -121,7 +162,12 @@ export function PainelChaveIA({ perfil }: { perfil: PerfilUsuario | undefined })
         <form onSubmit={enviar} className="flex flex-col gap-space-sm">
           <div className="flex flex-wrap items-center gap-space-xs">
             {(Object.keys(PROVEDORES) as ProvedorIA[]).map((p) => (
-              <Pilula key={p} ativa={provedor === p} aoClicar={() => setProvedor(p)} icone={PROVEDORES[p].icone}>
+              <Pilula
+                key={p}
+                ativa={provedor === p}
+                aoClicar={() => trocarProvedor(p)}
+                icone={PROVEDORES[p].icone}
+              >
                 {PROVEDORES[p].rotulo}
               </Pilula>
             ))}
@@ -154,7 +200,8 @@ export function PainelChaveIA({ perfil }: { perfil: PerfilUsuario | undefined })
                 onClick={() => {
                   setEditando(false);
                   setChave("");
-                  setModelo("");
+                  setEscolha("");
+                  setModeloLivre("");
                 }}
                 className="font-title-code text-title-code text-outline hover:text-on-surface"
               >
@@ -163,14 +210,53 @@ export function PainelChaveIA({ perfil }: { perfil: PerfilUsuario | undefined })
             )}
           </div>
 
-          <input
-            type="text"
-            value={modelo}
-            onChange={(evento) => setModelo(evento.target.value)}
-            placeholder={PROVEDORES[provedor].placeholderModelo}
-            className={CAMPO + " w-full"}
-            autoComplete="off"
-          />
+          <label className="flex flex-col gap-space-xs">
+            <span className="font-title-code text-title-code text-on-surface-variant">
+              Modelo
+            </span>
+            <select
+              value={escolha}
+              onChange={(evento) => setEscolha(evento.target.value)}
+              className={CAMPO + " w-full"}
+              disabled={catalogo.isLoading}
+            >
+              <option value="">
+                {provedor === "openrouter"
+                  ? "Padrão do site"
+                  : "Padrão do provedor (modelo atual e equilibrado)"}
+              </option>
+              {grupos.map(([grupo, itens]) => (
+                <optgroup key={grupo} label={grupo}>
+                  {itens.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.nome}
+                      {item.gratuito ? " — grátis" : ""}
+                    </option>
+                  ))}
+                </optgroup>
+              ))}
+              <option value={OUTRO}>Outro — digitar o ID…</option>
+            </select>
+          </label>
+
+          {escolha === OUTRO && (
+            <input
+              type="text"
+              value={modeloLivre}
+              onChange={(evento) => setModeloLivre(evento.target.value)}
+              placeholder={PROVEDORES[provedor].placeholderModelo}
+              className={CAMPO + " w-full"}
+              autoComplete="off"
+              autoFocus
+            />
+          )}
+
+          {catalogo.isError && (
+            <p className="font-body-sm text-body-sm text-outline">
+              Não deu para carregar a lista de modelos agora — escolha "Outro" e digite o
+              ID, ou deixe no padrão.
+            </p>
+          )}
 
           {salvar.isError && <MensagemErro erro={salvar.error} />}
 

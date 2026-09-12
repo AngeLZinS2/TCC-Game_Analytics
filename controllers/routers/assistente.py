@@ -21,6 +21,7 @@ from models.session import get_db, session_scope
 from services.cifra import decifrar
 from views.schemas import (
     BlocoContexto,
+    CatalogoModelosIA,
     FonteWeb,
     EntradaPergunta,
     JogoAoVivo,
@@ -92,6 +93,25 @@ def saude() -> dict[str, object]:
         "modelo": settings.openrouter_model,
         **telemetria_assistente.resumo(),
     }
+
+
+@router.get("/modelos", response_model=CatalogoModelosIA)
+def modelos() -> CatalogoModelosIA:
+    """Os modelos que o Perfil oferece no seletor, por provedor.
+
+    Sem login de proposito: e catalogo publico (a lista do OpenRouter vem da
+    API publica deles), nao dado de conta nenhuma. Deixar autenticado faria a
+    tela de cadastro da chave depender de uma sessao que ela ja tem, sem
+    proteger nada.
+    """
+    from services.ml import modelos_ia
+
+    return CatalogoModelosIA(
+        **{
+            provedor: [modelo.__dict__ for modelo in lista]
+            for provedor, lista in modelos_ia.catalogo().items()
+        }
+    )
 
 
 @router.post("/perguntar", response_model=RespostaAssistente)

@@ -1512,3 +1512,22 @@ class EntradaChaveIA(BaseModel):
     #: Modelo escolhido nesse provedor. Vazio usa o padrao (o do site, no
     #: OpenRouter; um modelo atual e balanceado, na Anthropic/Google).
     modelo: str | None = Field(default=None, max_length=120)
+
+
+class ModeloIA(BaseModel):
+    """Uma opcao do seletor de modelo do Perfil."""
+
+    id: str
+    nome: str
+    #: O `<optgroup>` da tela ("Gratuitos", "Anthropic (Claude)"...).
+    grupo: str
+    gratuito: bool = False
+
+
+class CatalogoModelosIA(BaseModel):
+    """Os modelos por provedor. A tela carrega uma vez e filtra pelo provedor
+    escolhido - sem ida ao servidor a cada clique na pilula."""
+
+    openrouter: list[ModeloIA] = []
+    anthropic: list[ModeloIA] = []
+    google: list[ModeloIA] = []

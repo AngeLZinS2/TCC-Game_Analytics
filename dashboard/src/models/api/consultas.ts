@@ -65,6 +65,7 @@ import type {
   JogoFavorito,
   EquipeFavorita,
   ProvedorIA,
+  CatalogoModelosIA,
 } from "./tipos";
 
 export interface FiltrosJogos {
@@ -603,6 +604,20 @@ export function useDesfavoritarEquipe() {
 }
 
 // --- Chave de IA pessoal (Fase 33) ---
+
+/** Os modelos oferecidos no seletor do Perfil, por provedor.
+ *
+ * A lista do OpenRouter é buscada ao vivo pelo backend (400+ modelos que
+ * mudam toda semana), então vale cache longo aqui: uma vez por sessão basta,
+ * e o backend já segura a dele por uma hora. */
+export function useModelosIA() {
+  return useQuery({
+    queryKey: ["assistente", "modelos"],
+    queryFn: () => buscar<CatalogoModelosIA>("/api/assistente/modelos"),
+    staleTime: 60 * 60 * 1000,
+    retry: false,
+  });
+}
 
 export function useSalvarChaveIA() {
   const cliente = useQueryClient();
