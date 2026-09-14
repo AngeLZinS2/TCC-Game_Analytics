@@ -72,10 +72,22 @@ class Settings(BaseSettings):
     steam_reviews_paginas: int = Field(default=1, ge=1, le=20)
 
     # --- Liquipedia (agenda de partidas) ---
-    #: A politica da Liquipedia pede 2s entre chamadas a `action=parse`.
-    #: O padrao aqui e 3 para dar folga - um bloqueio por excesso atinge o IP,
-    #: nao a chave, e derrubaria todo mundo na mesma rede.
+    #: A politica da Liquipedia (liquipedia.net/api-terms-of-use) pede no
+    #: MAXIMO 1 requisicao HTTP a cada 2s, para a API em geral. `action=query`
+    #: (indice de categoria, conteudo de pagina em lote) cai aqui - e o que
+    #: `liquipedia_wiki_collector.py` (equipes) usa. O padrao aqui e 3 para dar
+    #: folga - um bloqueio por excesso atinge o IP, nao a chave, e derrubaria
+    #: todo mundo na mesma rede.
     liquipedia_rate_limit_seconds: float = Field(default=3.0, gt=0)
+    #: `action=parse` tem uma regra PROPRIA e bem mais restrita nos mesmos
+    #: termos - "should not exceed 1 request per 30 seconds as these are more
+    #: resource intensive". E o que `liquipedia_collector.py` (agenda),
+    #: `liquipedia_bracket_collector.py` (brackets) e `owcs_standings.py`
+    #: (ranking do OWCS) usam - os tres renderizam pagina inteira, nao so
+    #: metadado. Ficou de fora ate 2026-09 por ler mal os termos (confundido
+    #: com o limite geral de 2s) - foi o motivo real do bloqueio de IP por
+    #: mais de uma hora que os comentarios deste projeto mencionam.
+    liquipedia_parse_rate_limit_seconds: float = Field(default=35.0, gt=0)
     #: A Liquipedia exige um User-Agent que identifique o projeto e um contato.
     #: UA generico e motivo declarado de bloqueio nos termos de uso deles.
     liquipedia_user_agent: str = (

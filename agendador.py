@@ -182,8 +182,11 @@ def _somar(parciais: list[CollectionResult], fonte: str) -> CollectionResult:
 def _coletar_liquipedia(settings: Settings, storage: RawStorage) -> CollectionResult:
     """A agenda de TODAS as wikis que tem `Liquipedia:Matches`.
 
-    Uma chamada por wiki - sao 66, cerca de tres minutos no intervalo padrao.
-    Barato o suficiente para varrer tudo a cada rodada.
+    Uma chamada `action=parse` por wiki - sao 66, ~35s de intervalo (o limite
+    PROPRIO de `action=parse` nos termos da Liquipedia, mais restrito que o
+    geral - ver `liquipedia_parse_rate_limit_seconds`), entao uma varredura
+    completa leva uns 35-40 minutos. Ainda cabe folgado no intervalo padrao de
+    12h da tarefa.
     """
     from services.collectors.liquipedia_collector import LiquipediaCollector
     from services.etl.wikis import com_agenda
@@ -210,9 +213,11 @@ def _coletar_liquipedia(settings: Settings, storage: RawStorage) -> CollectionRe
         # instancia, nunca ENTRE wikis deste laco. Sem este sleep, 66 wikis
         # saiam a ~1 chamada/segundo, e foi exatamente isso que aconteceu:
         # a Liquipedia bloqueou o IP com 429 por mais de uma hora depois de
-        # uma varredura sem pausa nenhuma entre wikis.
+        # uma varredura sem pausa nenhuma entre wikis - na epoca pensavamos
+        # que o limite de `action=parse` era o geral (2s); e o proprio de
+        # `action=parse` (30s), por isso o sleep agora e o mais longo.
         if posicao < len(wikis) - 1:
-            time.sleep(settings.liquipedia_rate_limit_seconds)
+            time.sleep(settings.liquipedia_parse_rate_limit_seconds)
 
     return _somar(parciais, "liquipedia")
 
@@ -288,7 +293,10 @@ def _coletar_brackets(settings: Settings, storage: RawStorage) -> CollectionResu
     historico sozinho do que semanas de ticker.
 
     Rodizio pelo mesmo motivo do de equipes: uma wiki pode ter dezenas de
-    torneios conhecidos, e cada um e uma chamada.
+    torneios conhecidos, e cada um e uma chamada `action=parse` (~35s de
+    intervalo - o limite proprio de `action=parse`, mais restrito que o
+    geral). Uma wiki com muitos torneios conhecidos pode levar dezenas de
+    minutos sozinha; ainda cabe no intervalo padrao de 24h da tarefa.
     """
     global _proxima_wiki_de_brackets
 
@@ -337,10 +345,12 @@ def _coletar_brackets(settings: Settings, storage: RawStorage) -> CollectionResu
             coletor.close()
 
         # O coletor ja pausa ENTRE torneios da mesma wiki (dentro do proprio
-        # `client`, que e reaproveitado ali). O que falta e a pausa ENTRE
-        # wikis deste laco - mesmo motivo dos outros dois sleeps deste arquivo.
+        # `client`, que e reaproveitado ali, no intervalo PROPRIO de
+        # `action=parse`). O que falta e a pausa ENTRE wikis deste laco -
+        # mesmo motivo dos outros dois sleeps deste arquivo, mesmo intervalo
+        # (e tambem `action=parse`).
         if posicao < len(lote) - 1:
-            time.sleep(settings.liquipedia_rate_limit_seconds)
+            time.sleep(settings.liquipedia_parse_rate_limit_seconds)
 
     return _somar(parciais, "liquipedia")
 

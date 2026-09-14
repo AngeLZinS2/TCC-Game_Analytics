@@ -9,8 +9,10 @@ curso; nenhuma das duas tem calendario.
 * `Accept-Encoding: gzip` - sem isso a API responde 406, nao 200 com dado ruim.
 * User-Agent que identifique o projeto e um contato. Um UA generico e motivo de
   bloqueio, e um bloqueio aqui derruba a coleta de todo mundo que usa o mesmo IP.
-* Intervalo entre chamadas. A politica pede 2s para `action=parse`; o padrao
-  aqui e 3s, com folga.
+* Intervalo entre chamadas. Este coletor usa `action=parse` (renderiza a pagina
+  inteira), que a politica trata a parte do limite geral de 2s: "should not
+  exceed 1 request per 30 seconds as these are more resource intensive". O
+  padrao aqui (`liquipedia_parse_rate_limit_seconds`) e 35s, com folga.
 
 Uma chamada por coleta traz a agenda inteira - a pagina `Liquipedia:Matches`
 agrega os confrontos futuros de todos os torneios ativos.
@@ -56,7 +58,8 @@ class LiquipediaCollector(BaseCollector[ResultadoAgenda]):
 
         self.client = RateLimitedClient(
             nome="liquipedia",
-            intervalo_minimo=self.settings.liquipedia_rate_limit_seconds,
+            # `action=parse` - o limite PROPRIO e mais restrito, nao o geral.
+            intervalo_minimo=self.settings.liquipedia_parse_rate_limit_seconds,
             max_retries=self.settings.http_max_retries,
             timeout=self.settings.http_timeout_seconds,
             user_agent=self.settings.liquipedia_user_agent,

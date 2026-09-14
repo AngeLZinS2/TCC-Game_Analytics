@@ -11,6 +11,12 @@ O efeito e cumulativo: quanto mais o ticker roda, mais torneios a lista
 conhece, e mais bracket ha para expandir. Um torneio que o ticker nunca
 mencionou tambem nao tem como aparecer aqui - nao existe fonte para "todos os
 torneios que existem", so para os que ja vimos de relance.
+
+**Termos de uso.** Cada torneio e uma chamada `action=parse` (a pagina do
+bracket inteira) - a Liquipedia trata isso a parte do limite geral de 2s:
+"should not exceed 1 request per 30 seconds as these are more resource
+intensive". O intervalo aqui (`liquipedia_parse_rate_limit_seconds`) e 35s,
+com folga.
 """
 
 from __future__ import annotations
@@ -70,7 +76,8 @@ class LiquipediaBracketCollector(BaseCollector[ResultadoAgenda]):
 
         self.client = RateLimitedClient(
             nome="liquipedia",
-            intervalo_minimo=self.settings.liquipedia_rate_limit_seconds,
+            # `action=parse` - o limite PROPRIO e mais restrito, nao o geral.
+            intervalo_minimo=self.settings.liquipedia_parse_rate_limit_seconds,
             max_retries=self.settings.http_max_retries,
             timeout=self.settings.http_timeout_seconds,
             user_agent=self.settings.liquipedia_user_agent,
