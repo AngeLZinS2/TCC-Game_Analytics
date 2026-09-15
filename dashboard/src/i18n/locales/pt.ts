@@ -1388,9 +1388,14 @@ const pt = {
     membroHaDia: "Membro há {{n}} dia",
     membroHaDias: "Membro há {{n}} dias",
     provedorEmailSenha: "E-mail e senha",
+    membroDesdeData: "Membro desde {{data}}",
+    emailVerificado: "E-mail verificado",
+    diaNoPlaydb: "dia no PlayDB",
+    diasNoPlaydb: "dias no PlayDB",
     suaConta: {
       titulo: "Sua conta",
       email: "E-mail",
+      identificador: "Identificador",
       membroDesde: "Membro desde",
     },
     playdbAgora: {
@@ -1405,7 +1410,11 @@ const pt = {
       dimensao: "Dimensão",
       jogadoresIdentificados: "jogadores identificados",
       maisJogadoAgora: "Mais jogado na Steam agora",
-      jogando: "jogando",
+      jogando: "jogadores conectados agora",
+      verJogo: "Ver jogo",
+      semMaisJogado: "Ainda não há coleta de jogadores simultâneos.",
+      emTempoReal: "Em tempo real",
+      vsColetaAnterior: "vs. coleta anterior",
     },
     perguntasAssistente: {
       titulo: "Perguntas ao Assistente de IA",
@@ -1415,6 +1424,7 @@ const pt = {
       vazioPrefixo: "Nenhuma pergunta ainda. Vá até o",
       vazioLink: "Assistente de IA",
       vazioSufixo: "e pergunte algo sobre os dados do PlayDB.",
+      abrirAssistente: "Abrir Assistente",
       limpar: "Limpar histórico",
     },
     jogosFavoritos: {

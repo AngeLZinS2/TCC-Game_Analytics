@@ -1382,9 +1382,14 @@ const es: Traducoes = {
     membroHaDia: "Miembro hace {{n}} día",
     membroHaDias: "Miembro hace {{n}} días",
     provedorEmailSenha: "Correo y contraseña",
+    membroDesdeData: "Miembro desde {{data}}",
+    emailVerificado: "Correo verificado",
+    diaNoPlaydb: "día en PlayDB",
+    diasNoPlaydb: "días en PlayDB",
     suaConta: {
       titulo: "Tu cuenta",
       email: "Correo electrónico",
+      identificador: "Identificador",
       membroDesde: "Miembro desde",
     },
     playdbAgora: {
@@ -1399,7 +1404,11 @@ const es: Traducoes = {
       dimensao: "Dimensión",
       jogadoresIdentificados: "jugadores identificados",
       maisJogadoAgora: "Más jugado en Steam ahora",
-      jogando: "jugando",
+      jogando: "jugadores conectados ahora",
+      verJogo: "Ver juego",
+      semMaisJogado: "Todavía no hay recolección de jugadores simultáneos.",
+      emTempoReal: "En tiempo real",
+      vsColetaAnterior: "vs. recolección anterior",
     },
     perguntasAssistente: {
       titulo: "Preguntas al Asistente de IA",
@@ -1409,6 +1418,7 @@ const es: Traducoes = {
       vazioPrefixo: "Todavía ninguna pregunta. Ve al",
       vazioLink: "Asistente de IA",
       vazioSufixo: "y pregunta algo sobre los datos de PlayDB.",
+      abrirAssistente: "Abrir Asistente",
       limpar: "Borrar historial",
     },
     jogosFavoritos: {
