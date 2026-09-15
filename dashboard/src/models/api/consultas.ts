@@ -68,7 +68,7 @@ import type {
   EquipeFavorita,
   ProvedorIA,
   CatalogoModelosIA,
-  OfertaSteam,
+  PaginaOfertasSteam,
 } from "./tipos";
 
 export interface FiltrosJogos {
@@ -151,19 +151,30 @@ export function useMaisJogadosSteam(limite = 100) {
 }
 
 export interface FiltrosOfertasSteam {
+  busca?: string;
   desconto_minimo?: number;
   preco_maximo?: number;
   pais?: string;
   moeda?: string;
   ordenar_por?: "desconto_desc" | "preco_asc";
   limite?: number;
+  offset?: number;
 }
 
-/** Promoções abertas AGORA na própria Steam (Fase 35) - primeiro-partido. */
+/**
+ * Promoções abertas AGORA na própria Steam (Fase 35) - primeiro-partido.
+ *
+ * Paginado no servidor (Fase 35.1): a varredura completa de ofertas
+ * (`/search/results/?specials=1`, o mesmo endpoint da própria página
+ * `/specials`) fez o catálogo crescer de dezenas pra ~20 mil linhas -
+ * grande demais pra buscar tudo de uma vez, ao contrário do catálogo Xbox
+ * (`usePaginacaoLocal`, ~800 jogos).
+ */
 export function useOfertasSteam(filtros: FiltrosOfertasSteam = {}) {
   return useQuery({
     queryKey: ["steam", "ofertas", filtros],
-    queryFn: () => buscar<OfertaSteam[]>("/api/steam/ofertas", { ...filtros }),
+    queryFn: () =>
+      buscar<PaginaOfertasSteam>("/api/steam/ofertas", { ...filtros }),
     placeholderData: (anterior) => anterior,
   });
 }

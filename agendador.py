@@ -190,6 +190,25 @@ def _coletar_steam_catalogo(settings: Settings, storage: RawStorage) -> Collecti
         coletor.close()
 
 
+def _coletar_steam_ofertas(settings: Settings, storage: RawStorage) -> CollectionResult:
+    """Varredura completa das ofertas ativas da Steam (Fase 35.1).
+
+    Distinto de `_coletar_steam_precos_alterados`: aquela so confirma o que o
+    `steam_catalogo` ja sinalizou como alterado (reage a mudanca futura);
+    esta varre `/search/results/?specials=1` - o mesmo endpoint que a pagina
+    `/specials` chama - e cobre TODA oferta ativa agora, incluindo as que ja
+    estavam no ar antes de qualquer baseline nosso. Nao depende de
+    `STEAM_API_KEY` (endpoint publico da loja), entao roda sem gate.
+    """
+    from services.collectors.steam_ofertas_collector import SteamOfertasCollector
+
+    coletor = SteamOfertasCollector(raw_storage=storage, settings=settings)
+    try:
+        return coletor.run(carregar=True)
+    finally:
+        coletor.close()
+
+
 def _coletar_steam_online(settings: Settings, storage: RawStorage) -> CollectionResult:
     """Usuarios simultaneos da plataforma Steam (numero da Valve, nao a soma)."""
     from services.collectors.steam_online import SteamOnlineCollector
@@ -808,6 +827,13 @@ def montar_tarefas(settings: Settings) -> list[Tarefa]:
             nome="steam_online",
             intervalo_segundos=settings.agendador_steam_online_minutos * 60,
             executar=_coletar_steam_online,
+        ),
+        # Sem gate de chave - `/search/results/` e endpoint publico da loja,
+        # ao contrario das outras tarefas Steam abaixo.
+        Tarefa(
+            nome="steam_ofertas",
+            intervalo_segundos=settings.agendador_steam_ofertas_minutos * 60,
+            executar=_coletar_steam_ofertas,
         ),
     ]
     if settings.steam_api_key:

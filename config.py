@@ -70,6 +70,13 @@ class Settings(BaseSettings):
     #: Atraso extra (ms) entre chamadas do `SteamStoreClient`, alem do rate
     #: limit acima - 0 desliga.
     steam_request_delay_ms: int = Field(default=0, ge=0)
+    #: Intervalo minimo (segundos) entre chamadas do `SteamOfertasCollector`
+    #: (`/search/results/?specials=1`). Separado de `steam_requests_per_second`
+    #: de proposito: testado ao vivo em 2026-09-15, este endpoint devolveu 429
+    #: na pagina 31 a 2 req/s (o ritmo que a API oficial tolera) - e busca da
+    #: LOJA, nao a `IStoreService` autenticada por chave, com limite proprio
+    #: mais apertado.
+    steam_ofertas_rate_limit_seconds: float = Field(default=2.0, gt=0)
     #: Quantas PAGINAS do `GetAppList` processar por execucao da tarefa
     #: `steam_catalogo` - nao quantidade de apps: cada pagina traz ate
     #: 50.000 resultados (`max_results`), entao o padrao (1) ja cobre ate
@@ -155,6 +162,14 @@ class Settings(BaseSettings):
     #: nao de todos os ~90 monitorados - e o novo real do lote costuma ser
     #: pequeno (23 apps numa rodada real de sync incremental).
     agendador_steam_precos_alterados_minutos: int = Field(default=10, ge=1)
+
+    #: Intervalo da varredura completa de ofertas (`/search/results/?specials=1`
+    #: - o MESMO endpoint que a pagina `/specials` chama, nao uma API
+    #: alternativa), em minutos. Nao depende de `STEAM_API_KEY` (endpoint
+    #: publico da loja). ~200 chamadas por rodada (19.774 ofertas medidas em
+    #: 2026-09-15, 100 por pagina) - barato o bastante pra rodar de hora em
+    #: hora sem estressar a Steam.
+    agendador_steam_ofertas_minutos: int = Field(default=60, ge=15)
 
     #: Intervalo do snapshot de usuarios simultaneos da PLATAFORMA Steam
     #: (`valvesoftware.com/about/stats`), em minutos. Numero unico, chamada

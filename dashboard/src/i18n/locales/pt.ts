@@ -667,6 +667,8 @@ const pt = {
     titulo: "Ofertas",
     descricao:
       "Promoções abertas AGORA na própria Steam — preço observado por nós, nunca inferido. Sem eventos oficiais da Valve: aqui só entra desconto de verdade, por jogo.",
+    buscarPlaceholder: "Buscar oferta por título…",
+    buscarAriaLabel: "Buscar oferta por título",
     descontoMinimo: "Desconto mínimo",
     todos: "Todos",
     ordenarPor: "Ordenar por",
@@ -674,6 +676,9 @@ const pt = {
     menorPreco: "Menor preço",
     nenhumaOferta: "Nenhuma promoção Steam ativa agora com esse filtro.",
     verJogo: "Ver jogo",
+    paginacao: {
+      exibindo: "Exibindo {{fatia}} de {{total}}",
+    },
   },
 
   catalogoXbox: {

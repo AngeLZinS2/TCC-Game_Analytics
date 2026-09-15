@@ -20,6 +20,7 @@ from logging_config import configurar_logging
 FONTES = (
     "steam",
     "steam-catalogo",
+    "steam-ofertas",
     "steam-online",
     "opendota",
     "liquipedia",
@@ -277,6 +278,11 @@ def _construir_coletor(args: argparse.Namespace, storage):
         # em `steam_sincronizacao` (carga inicial) ou rodando o passo
         # incremental (`if_modified_since`) quando ja concluida.
         return SteamCatalogoCollector(raw_storage=storage, settings=settings)
+
+    if args.fonte == "steam-ofertas":
+        from services.collectors.steam_ofertas_collector import SteamOfertasCollector
+
+        return SteamOfertasCollector(raw_storage=storage, settings=settings)
 
     if args.fonte == "steam-online":
         from services.collectors.steam_online import SteamOnlineCollector
@@ -579,6 +585,13 @@ def _cmd_collect(args: argparse.Namespace) -> int:
                 carregados = 0 if args.no_load else coletor.load(resultado)
                 normalizados = sum(r.total for r in resultado)
                 print(f"itens normalizados={normalizados} carregados={carregados}")
+                return 0
+            if args.fonte == "steam-ofertas":
+                # `carregar()` do loader pede `completa` alem do resultado -
+                # o proprio coletor ja sabe desempacotar `resultado.linhas`/
+                # `resultado.completa`, igual aos outros dois casos acima.
+                carregados = 0 if args.no_load else coletor.load(resultado)
+                print(f"itens normalizados={resultado.total} carregados={carregados}")
                 return 0
             if args.no_load:
                 carregados = 0

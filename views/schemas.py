@@ -285,6 +285,14 @@ class OfertaSteam(BaseModel):
     iniciada_em: datetime
 
 
+class PaginaOfertasSteam(BaseModel):
+    """Resposta paginada de `GET /api/steam/ofertas` (Fase 35.1 - varredura
+    completa fez o catalogo de ofertas crescer de dezenas pra ~20 mil)."""
+
+    itens: list[OfertaSteam]
+    total: int
+
+
 class DetalheJogoSteam(BaseModel):
     jogo: JogoSteam
     ficha: FichaJogoSteam

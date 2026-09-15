@@ -661,6 +661,8 @@ const en: Traducoes = {
     titulo: "Deals",
     descricao:
       "Promotions open RIGHT NOW on Steam itself — price observed by us, never inferred. No official Valve events: only real, per-game discounts show up here.",
+    buscarPlaceholder: "Search a deal by title…",
+    buscarAriaLabel: "Search a deal by title",
     descontoMinimo: "Minimum discount",
     todos: "All",
     ordenarPor: "Sort by",
@@ -668,6 +670,9 @@ const en: Traducoes = {
     menorPreco: "Lowest price",
     nenhumaOferta: "No active Steam promotion right now with this filter.",
     verJogo: "View game",
+    paginacao: {
+      exibindo: "Showing {{fatia}} of {{total}}",
+    },
   },
 
   catalogoXbox: {

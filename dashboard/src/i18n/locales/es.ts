@@ -661,6 +661,8 @@ const es: Traducoes = {
     titulo: "Ofertas",
     descricao:
       "Promociones abiertas AHORA en la propia Steam — precio observado por nosotros, nunca inferido. Sin eventos oficiales de Valve: aquí solo entra descuento real, por juego.",
+    buscarPlaceholder: "Buscar oferta por título…",
+    buscarAriaLabel: "Buscar oferta por título",
     descontoMinimo: "Descuento mínimo",
     todos: "Todos",
     ordenarPor: "Ordenar por",
@@ -668,6 +670,9 @@ const es: Traducoes = {
     menorPreco: "Menor precio",
     nenhumaOferta: "Ninguna promoción activa de Steam ahora con este filtro.",
     verJogo: "Ver juego",
+    paginacao: {
+      exibindo: "Mostrando {{fatia}} de {{total}}",
+    },
   },
 
   catalogoXbox: {

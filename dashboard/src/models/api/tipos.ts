@@ -229,6 +229,12 @@ export interface OfertaSteam {
   iniciada_em: string;
 }
 
+/** Resposta paginada de `GET /api/steam/ofertas` — Fase 35.1. */
+export interface PaginaOfertasSteam {
+  itens: OfertaSteam[];
+  total: number;
+}
+
 export interface AgregadoGenero {
   genero: string;
   jogos: number;
