@@ -48,6 +48,7 @@ import type {
   VisaoGeralAdmin,
   SaudeSistema,
   SaudeBanco,
+  SaudeCatalogoSteam,
   StatusAdmin,
   ListaContasAdmin,
   PrevisaoConfronto,
@@ -946,6 +947,23 @@ export function useBancoAdmin() {
     queryKey: ["admin", "banco"],
     queryFn: async () =>
       buscar<SaudeBanco>("/api/admin/banco", undefined, await cabecalhoAuthUsuario()),
+    enabled: !!usuario,
+    retry: false,
+  });
+}
+
+/** Progresso do catalogo completo da Steam (Fase 35) - checkpoint de
+ * verdade, nao a contagem crua de `useBancoAdmin`. */
+export function useCatalogoSteamAdmin() {
+  const { usuario } = useUsuario();
+  return useQuery({
+    queryKey: ["admin", "steam-catalogo"],
+    queryFn: async () =>
+      buscar<SaudeCatalogoSteam>(
+        "/api/admin/steam-catalogo",
+        undefined,
+        await cabecalhoAuthUsuario(),
+      ),
     enabled: !!usuario,
     retry: false,
   });

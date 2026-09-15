@@ -25,18 +25,25 @@ import type { TFunction } from "i18next";
 
 import {
   useBancoAdmin,
+  useCatalogoSteamAdmin,
   useContasAdmin,
   useSistemaAdmin,
   useVisaoGeralAdmin,
 } from "@models/api/consultas";
 import { ErroApi } from "@models/api/cliente";
 import { sairDaConta } from "@models/conta/acoes";
-import type { ListaContasAdmin, SaudeBanco, VisaoGeralAdmin } from "@models/api/tipos";
+import type {
+  ListaContasAdmin,
+  SaudeBanco,
+  SaudeCatalogoSteam,
+  SincronizacaoSteamStatus,
+  VisaoGeralAdmin,
+} from "@models/api/tipos";
 import { Botao, Consulta, Icone, Selo } from "@views/componentes/base";
 import { KpiHud, Painel, Segmentos } from "@views/componentes/hud";
 import { AreaNeon, type PontoArea } from "@views/componentes/graficos/AreaNeon";
 import { useEntrarNaTela } from "@models/hooks/animacao";
-import { fmtData, fmtNumero } from "@util/formatos";
+import { fmtData, fmtNumero, fmtRelativo } from "@util/formatos";
 import { MedidorRadial } from "./MedidorRadial";
 
 /** Quantos dos 6 segmentos acender: a fração do dia dentro do mês/ano, com piso de 1 se já houve algo hoje. */
@@ -53,10 +60,15 @@ export function AdminPagina() {
   const sistema = useSistemaAdmin();
   const banco = useBancoAdmin();
   const contas = useContasAdmin();
+  const catalogoSteam = useCatalogoSteamAdmin();
 
-  const semAcesso = [visaoGeral.error, sistema.error, banco.error, contas.error].some(
-    (erro) => erro instanceof ErroApi && erro.status === 403,
-  );
+  const semAcesso = [
+    visaoGeral.error,
+    sistema.error,
+    banco.error,
+    contas.error,
+    catalogoSteam.error,
+  ].some((erro) => erro instanceof ErroApi && erro.status === 403);
 
   async function sair() {
     setSaindo(true);
@@ -359,6 +371,11 @@ export function AdminPagina() {
       <Consulta estado={banco} altura={260}>
         {(dados: SaudeBanco) => <BancoDeDados dados={dados} t={t} />}
       </Consulta>
+
+      {/* ==================== CATALOGO STEAM (Fase 35) ==================== */}
+      <Consulta estado={catalogoSteam} altura={200}>
+        {(dados: SaudeCatalogoSteam) => <CatalogoSteam dados={dados} t={t} />}
+      </Consulta>
     </>
   );
 }
@@ -489,6 +506,67 @@ function BancoDeDados({ dados, t }: { dados: SaudeBanco; t: TFunction }) {
           ))}
         </div>
       </div>
+    </Painel>
+  );
+}
+
+/** Cor do `Selo` por status de uma fase do sync (`steam_sincronizacao`). */
+const COR_STATUS_SYNC: Record<string, "positivo" | "neutro" | "negativo"> = {
+  concluido: "positivo",
+  em_andamento: "neutro",
+  falhou: "negativo",
+};
+
+/**
+ * Progresso do catálogo Steam completo (Fase 35) — checkpoint de verdade
+ * (`steam_sincronizacao`), não a contagem crua de `BancoDeDados` acima.
+ * `dim_jogo_steam` (o catálogo MONITORADO) não muda com este crawl — só
+ * `apps_indexados` (`dim_app_steam_nome`, o índice completo) muda.
+ */
+function CatalogoSteam({ dados, t }: { dados: SaudeCatalogoSteam; t: TFunction }) {
+  return (
+    <Painel
+      icone="travel_explore"
+      titulo={t("admin.catalogoSteam.titulo")}
+      descricao={t("admin.catalogoSteam.descricao")}
+      meta={
+        <Selo cor="primario">
+          {t("admin.catalogoSteam.appsIndexados", { contagem: fmtNumero(dados.apps_indexados) })}
+        </Selo>
+      }
+    >
+      {dados.fases.length === 0 ? (
+        <p className="rounded bg-surface-container px-space-base py-space-md font-body-md text-body-md text-on-surface-variant">
+          {t("admin.catalogoSteam.semDado")}
+        </p>
+      ) : (
+        <div className="grid gap-space-xxs">
+          {dados.fases.map((fase: SincronizacaoSteamStatus) => (
+            <div
+              key={fase.fase}
+              className="flex flex-wrap items-center gap-space-sm rounded bg-surface-container px-space-sm py-space-xs"
+            >
+              <span className="min-w-0 flex-1 font-title-code text-title-code text-on-surface">
+                {t(`admin.catalogoSteam.fases.${fase.fase}`, fase.fase)}
+              </span>
+              <Selo cor={COR_STATUS_SYNC[fase.status] ?? "neutro"}>
+                {t(`admin.catalogoSteam.status.${fase.status}`, fase.status)}
+              </Selo>
+              {fase.last_appid != null && (
+                <span className="font-title-code text-title-code tabular-nums text-outline">
+                  appid {fmtNumero(fase.last_appid)}
+                </span>
+              )}
+              <span className="font-title-code text-title-code tabular-nums text-primary">
+                {t("admin.catalogoSteam.processados", { contagem: fmtNumero(fase.registros_processados) })}
+              </span>
+              <span className="font-body-sm text-body-sm text-outline">
+                {fmtRelativo(fase.atualizado_em)}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
     </Painel>
   );
 }

@@ -1454,6 +1454,22 @@ const es: Traducoes = {
     banco: {
       titulo: "Base de datos",
     },
+    catalogoSteam: {
+      titulo: "Catálogo Steam",
+      descricao: "Progreso del índice completo de Steam (GetAppList) — checkpoint persistido, no un conteo crudo.",
+      appsIndexados: "{{contagem}} apps indexados",
+      semDado: "La sincronización aún no se ejecutó.",
+      processados: "{{contagem}} procesados",
+      fases: {
+        catalogo_inicial: "Carga inicial",
+        catalogo_incremental: "Sincronización incremental",
+      },
+      status: {
+        concluido: "Completado",
+        em_andamento: "En curso",
+        falhou: "Falló",
+      },
+    },
   },
 
   recomendacoes: {

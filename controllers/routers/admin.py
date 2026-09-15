@@ -27,6 +27,7 @@ from config import Settings, get_settings
 from controllers.routers.usuario import UsuarioAtual, exigir_usuario
 from models.models import (
     AgendaPartida,
+    DimAppSteamNome,
     DimJogador,
     DimJogo,
     DimJogoSteam,
@@ -55,7 +56,9 @@ from views.schemas import (
     MetricaSistema,
     PontoAcessoDia,
     SaudeBanco,
+    SaudeCatalogoSteam,
     SaudeSistema,
+    SincronizacaoSteamStatus,
     StatusAdmin,
     TabelaBanco,
     VisaoGeralAdmin,
@@ -305,6 +308,7 @@ def sistema() -> SaudeSistema:
 _TABELAS_PRINCIPAIS: list[tuple[str, type]] = [
     ("raw_data", RawData),
     ("dim_jogo_steam", DimJogoSteam),
+    ("dim_app_steam_nome", DimAppSteamNome),
     ("fato_avaliacao_steam", FatoAvaliacaoSteam),
     ("fato_snapshot_jogo_steam", FatoSnapshotJogoSteam),
     ("steam_sincronizacao", SincronizacaoSteam),
@@ -341,6 +345,47 @@ def banco(sessao: Session = Depends(get_db)) -> SaudeBanco:
     tabelas.sort(key=lambda t: t.linhas, reverse=True)
 
     return SaudeBanco(tamanho_texto=tamanho, tabelas=tabelas)
+
+
+# ---------------------------------------------------------------------------
+# Catalogo Steam (Fase 35) - progresso do crawl completo + sync incremental.
+#
+# Diferente de `/banco`, que so conta linhas: aqui mostra o CHECKPOINT em si
+# (`steam_sincronizacao`) - concluido ou nao, ultimo appid, quando rodou pela
+# ultima vez. `dim_jogo_steam` (catalogo MONITORADO, exibido em `/banco`) nao
+# muda com o crawl - so `dim_app_steam_nome` (o indice completo) muda, e e
+# isso que este endpoint deixa claro.
+# ---------------------------------------------------------------------------
+
+
+@router.get(
+    "/steam-catalogo",
+    response_model=SaudeCatalogoSteam,
+    dependencies=[Depends(exigir_admin)],
+)
+def steam_catalogo(sessao: Session = Depends(get_db)) -> SaudeCatalogoSteam:
+    fases = [
+        SincronizacaoSteamStatus(
+            fase=linha.tipo_sincronizacao,
+            status=linha.status,
+            last_appid=linha.last_appid,
+            registros_processados=linha.registros_processados,
+            registros_criados=linha.registros_criados,
+            registros_atualizados=linha.registros_atualizados,
+            registros_falhos=linha.registros_falhos,
+            iniciada_em=linha.iniciada_em,
+            concluida_em=linha.concluida_em,
+            atualizado_em=linha.atualizado_em,
+        )
+        for linha in sessao.execute(
+            select(SincronizacaoSteam).order_by(SincronizacaoSteam.tipo_sincronizacao)
+        ).scalars()
+    ]
+    apps_indexados = sessao.execute(
+        select(func.count()).select_from(DimAppSteamNome)
+    ).scalar_one()
+
+    return SaudeCatalogoSteam(fases=fases, apps_indexados=apps_indexados)
 
 
 # ---------------------------------------------------------------------------

@@ -1466,6 +1466,29 @@ class StatusAdmin(BaseModel):
     admin: bool
 
 
+class SincronizacaoSteamStatus(BaseModel):
+    """Uma fase do sync do catalogo Steam (Fase 35) - linha de `steam_sincronizacao`."""
+
+    fase: str
+    status: str
+    last_appid: int | None
+    registros_processados: int
+    registros_criados: int
+    registros_atualizados: int
+    registros_falhos: int
+    iniciada_em: datetime
+    concluida_em: datetime | None
+    atualizado_em: datetime
+
+
+class SaudeCatalogoSteam(BaseModel):
+    """Progresso do catalogo completo da Steam - checkpoint de verdade,
+    nao so contagem crua de linhas (ver `dim_app_steam_nome` em `/banco`)."""
+
+    fases: list[SincronizacaoSteamStatus] = Field(default_factory=list)
+    apps_indexados: int
+
+
 class ContaResumo(BaseModel):
     """So o que nao fere a LGPD: nome e data de criacao. Sem e-mail, sem uid
     do Firebase, sem nada que identifique a pessoa fora do proprio site."""

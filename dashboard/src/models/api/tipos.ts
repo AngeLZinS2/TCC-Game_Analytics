@@ -1266,6 +1266,26 @@ export interface StatusAdmin {
   admin: boolean;
 }
 
+/** Uma fase do sync do catálogo Steam (Fase 35) — linha de `steam_sincronizacao`. */
+export interface SincronizacaoSteamStatus {
+  fase: string;
+  status: string;
+  last_appid: number | null;
+  registros_processados: number;
+  registros_criados: number;
+  registros_atualizados: number;
+  registros_falhos: number;
+  iniciada_em: string;
+  concluida_em: string | null;
+  atualizado_em: string;
+}
+
+/** Progresso do catálogo completo da Steam — checkpoint, não só contagem crua. */
+export interface SaudeCatalogoSteam {
+  fases: SincronizacaoSteamStatus[];
+  apps_indexados: number;
+}
+
 /** Só o que não fere a LGPD: nome e data de criação, sem e-mail nem uid. */
 export interface ContaResumo {
   nome_exibicao: string | null;

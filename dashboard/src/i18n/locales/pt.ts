@@ -1460,6 +1460,22 @@ const pt = {
     banco: {
       titulo: "Banco de dados",
     },
+    catalogoSteam: {
+      titulo: "Catálogo Steam",
+      descricao: "Progresso do índice completo da Steam (GetAppList) — checkpoint persistido, não uma contagem crua.",
+      appsIndexados: "{{contagem}} apps indexados",
+      semDado: "Sincronização ainda não rodou.",
+      processados: "{{contagem}} processados",
+      fases: {
+        catalogo_inicial: "Carga inicial",
+        catalogo_incremental: "Sync incremental",
+      },
+      status: {
+        concluido: "Concluído",
+        em_andamento: "Em andamento",
+        falhou: "Falhou",
+      },
+    },
   },
 
   recomendacoes: {
