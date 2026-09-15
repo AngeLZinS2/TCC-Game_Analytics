@@ -83,9 +83,15 @@ class Settings(BaseSettings):
     #: carga inicial concluida) volta a bater na Steam com
     #: `if_modified_since`. A tarefa roda a cada
     #: `agendador_steam_catalogo_minutos`, mas so executa o passo
-    #: incremental de fato quando este intervalo (em horas) ja passou desde
-    #: o ultimo sync bem-sucedido - os ticks intermediarios sao no-op.
-    steam_sync_intervalo_horas: int = Field(default=24, ge=1)
+    #: incremental de fato quando este intervalo ja passou desde o ultimo
+    #: sync bem-sucedido - os ticks intermediarios sao no-op. Em MINUTOS
+    #: (nao horas): a chamada e uma unica pagina filtrada pela propria
+    #: Steam (`if_modified_since`), barata mesmo rodando com frequencia -
+    #: o padrao (15min) deixa novas promocoes do catalogo INTEIRO
+    #: aparecerem rapido sem virar scraping agressivo (isso quem e caro e
+    #: `agendador_steam_precos_alterados_minutos` abaixo, que so confirma
+    #: preco dos apps sinalizados, nunca do catalogo inteiro).
+    steam_sync_intervalo_minutos: int = Field(default=15, ge=1)
 
     # --- Steam ---
     #: Quantas avaliacoes escritas pedir por jogo (0 traz so o resumo agregado).
@@ -140,6 +146,15 @@ class Settings(BaseSettings):
     #: carga inicial do catalogo sem segurar o laco do agendador nem
     #: atrasar as outras tarefas.
     agendador_steam_catalogo_minutos: int = Field(default=20, ge=5)
+
+    #: Intervalo da tarefa que confirma preco/promocao SO dos apps que o
+    #: `steam_catalogo` ja sinalizou como alterados (`apps_com_preco_alterado()`)
+    #: - nunca a lista inteira de monitorados (isso continua sendo
+    #: `agendador_steam_minutos`, de hora em hora). Pode ficar curto (10min)
+    #: porque cada execucao so busca appdetails dos poucos apps sinalizados,
+    #: nao de todos os ~90 monitorados - e o novo real do lote costuma ser
+    #: pequeno (23 apps numa rodada real de sync incremental).
+    agendador_steam_precos_alterados_minutos: int = Field(default=10, ge=1)
 
     #: Intervalo do snapshot de usuarios simultaneos da PLATAFORMA Steam
     #: (`valvesoftware.com/about/stats`), em minutos. Numero unico, chamada

@@ -152,6 +152,28 @@ def _coletar_steam(settings: Settings, storage: RawStorage) -> CollectionResult:
         coletor.close()
 
 
+def _coletar_steam_precos_alterados(settings: Settings, storage: RawStorage) -> CollectionResult:
+    """Confirma preco/promocao SO dos apps sinalizados pelo `steam_catalogo`
+    (Fase 35) - nunca a lista inteira de monitorados (isso e `_coletar_steam`
+    acima, de hora em hora). Pode rodar com frequencia (10 em 10 min por
+    padrao) sem virar scraping agressivo: o lote e so quem a propria Steam
+    ja confirmou que mudou de preco (tipicamente umas dezenas de apps, nao
+    os ~90 monitorados inteiros) - e quando nao ha ninguem sinalizado, nem
+    chama a rede.
+    """
+    from services.collectors.steam_collector import SteamCollector, apps_com_preco_alterado
+
+    alterados = apps_com_preco_alterado()
+    if not alterados:
+        return CollectionResult(fonte="steam", sucesso=True)
+
+    coletor = SteamCollector(raw_storage=storage, app_ids=alterados, settings=settings)
+    try:
+        return coletor.run(carregar=True)
+    finally:
+        coletor.close()
+
+
 def _coletar_steam_catalogo(settings: Settings, storage: RawStorage) -> CollectionResult:
     """Indice do catalogo completo + sync incremental de preco (Fase 35).
 
@@ -738,6 +760,13 @@ def montar_tarefas(settings: Settings) -> list[Tarefa]:
                 nome="steam_catalogo",
                 intervalo_segundos=settings.agendador_steam_catalogo_minutos * 60,
                 executar=_coletar_steam_catalogo,
+            )
+        )
+        tarefas.append(
+            Tarefa(
+                nome="steam_precos_alterados",
+                intervalo_segundos=settings.agendador_steam_precos_alterados_minutos * 60,
+                executar=_coletar_steam_precos_alterados,
             )
         )
     tarefas += [

@@ -365,6 +365,7 @@ def test_tarefa_de_catalogo_steam_so_entra_com_chave(monkeypatch):
         agendador_steam_online_minutos = 15
         steam_api_key = None
         agendador_steam_catalogo_minutos = 20
+        agendador_steam_precos_alterados_minutos = 10
         agendador_agenda_proxima_minutos = 5
         agendador_opendota_minutos = 360
         agendador_liquipedia_minutos = 720
@@ -397,12 +398,14 @@ def test_tarefa_de_catalogo_steam_so_entra_com_chave(monkeypatch):
 
     nomes = {t.nome for t in montar_tarefas(SemChave())}
     assert "steam_catalogo" not in nomes
+    assert "steam_precos_alterados" not in nomes
 
     class ComChave(SemChave):
         steam_api_key = "chave-de-teste"
 
     tarefas = {t.nome: t.intervalo_segundos for t in montar_tarefas(ComChave())}
     assert tarefas.get("steam_catalogo") == 20 * 60
+    assert tarefas.get("steam_precos_alterados") == 10 * 60
 
 
 def test_pandascore_troca_o_hltv_quando_ha_chave():

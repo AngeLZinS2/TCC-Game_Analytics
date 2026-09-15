@@ -14,10 +14,11 @@ Duas fases, na mesma tarefa:
      retorna - nunca o catalogo inteiro de uma vez, para nao segurar o
      laco do `agendador.py`.
   2. **catalogo_incremental** - depois de concluida, passa a rodar so
-     quando `STEAM_SYNC_INTERVALO_HORAS` ja passou desde o ultimo sync,
+     quando `STEAM_SYNC_INTERVALO_MINUTOS` ja passou desde o ultimo sync,
      usando `if_modified_since`. Marca `pendente_atualizacao_preco` (em
      `load_steam_catalogo.py`) para qualquer app cujo `price_change_number`
-     tenha mudado - a fila que `apps_com_preco_alterado()` depois drena.
+     tenha mudado - a fila que `apps_com_preco_alterado()` depois drena
+     (numa tarefa separada e rapida - ver `agendador.py::_coletar_steam_precos_alterados`).
 """
 
 from __future__ import annotations
@@ -82,10 +83,10 @@ class SteamCatalogoCollector(BaseCollector[ResultadoCatalogoSteam]):
                 else estado_inicial.concluida_em
             )
             if referencia is not None:
-                decorridas_h = (
+                decorridos_min = (
                     datetime.now(timezone.utc) - referencia
-                ).total_seconds() / 3600
-                if decorridas_h < self.settings.steam_sync_intervalo_horas:
+                ).total_seconds() / 60
+                if decorridos_min < self.settings.steam_sync_intervalo_minutos:
                     self._fase = None
                     return 0, None
 
