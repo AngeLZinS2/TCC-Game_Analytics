@@ -16,6 +16,7 @@ import { useOfertasSteam } from "@models/api/consultas";
 import type { OfertaSteam } from "@models/api/tipos";
 import type { FiltrosOfertasSteam } from "@models/api/consultas";
 import { Consulta, Icone } from "@views/componentes/base";
+import { BannerDestaque } from "@views/componentes/BannerDestaque";
 import { Paginacao, Pilula } from "@views/componentes/hud";
 import { ArteJogo } from "@views/componentes/CapaJogo";
 import { fmtMoeda, fmtNumero, fmtRelativo } from "@util/formatos";
@@ -60,16 +61,39 @@ export function OfertasPagina() {
   const total = ofertas.data?.total ?? 0;
   const totalPaginas = Math.max(1, Math.ceil(total / porPagina));
 
+  // As mesmas capas que a grade logo abaixo mostra - sem chamada extra.
+  const imagensHero = (ofertas.data?.itens ?? [])
+    .map((o) => o.imagem_header)
+    .filter((url): url is string => Boolean(url))
+    .slice(0, 8);
+
   return (
     <div className="space-y-space-xl">
-      <div className="flex flex-col gap-space-base border-b border-outline-variant/30 pb-space-base pt-space-base">
-        <span className="font-headline-md text-headline-md uppercase tracking-wide text-on-surface-variant">
-          {t("ofertas.titulo")}
+      <BannerDestaque imagens={imagensHero}>
+        <span className="flex items-center gap-space-xxs font-label-caps text-label-caps uppercase tracking-widest text-primary">
+          <Icone nome="auto_awesome" className="text-[15px]" />
+          {t("ofertas.hero.eyebrow")}
         </span>
-        <p className="max-w-2xl font-body-sm text-body-sm text-on-surface-variant">
-          {t("ofertas.descricao")}
+        <h1 className="max-w-xl font-headline-lg text-headline-lg font-bold text-on-surface">
+          {t("ofertas.hero.titulo")}
+          <span className="text-tertiary">{t("ofertas.hero.tituloDestaque")}</span>
+        </h1>
+        <p className="max-w-lg font-body-sm text-body-sm text-on-surface-variant">
+          {t("ofertas.hero.descricao")}
         </p>
+        <div className="flex flex-wrap gap-space-xs pt-space-xs">
+          <ChipHero icone="schedule" texto={t("ofertas.hero.chipTempoReal")} />
+          <ChipHero icone="verified" texto={t("ofertas.hero.chipPrimeiroPartido")} />
+          {total > 0 && (
+            <ChipHero
+              icone="local_fire_department"
+              texto={t("ofertas.hero.chipTotal", { total: fmtNumero(total) })}
+            />
+          )}
+        </div>
+      </BannerDestaque>
 
+      <div className="flex flex-col gap-space-base border-b border-outline-variant/30 pb-space-base pt-space-base">
         <div className="relative max-w-md">
           <Icone
             nome="manage_search"
@@ -157,6 +181,15 @@ export function OfertasPagina() {
         }
       </Consulta>
     </div>
+  );
+}
+
+function ChipHero({ icone, texto }: { icone: string; texto: string }) {
+  return (
+    <span className="inline-flex items-center gap-space-xxs rounded-full bg-surface-container-lowest/80 px-space-sm py-space-xxs font-badge-status text-badge-status text-on-surface-variant ring-1 ring-outline-variant/30 backdrop-blur-sm">
+      <Icone nome={icone} className="text-[13px] text-primary" />
+      {texto}
+    </span>
   );
 }
 

@@ -661,6 +661,16 @@ const en: Traducoes = {
     titulo: "Deals",
     descricao:
       "Promotions open RIGHT NOW on Steam itself — price observed by us, never inferred. No official Valve events: only real, per-game discounts show up here.",
+    hero: {
+      eyebrow: "Featured deals",
+      titulo: "Great games, ",
+      tituloDestaque: "amazing prices",
+      descricao:
+        "Real discounts straight from Steam, no catalog heuristics — what shows up here is the price we actually observed, game by game.",
+      chipTempoReal: "Updated every hour",
+      chipPrimeiroPartido: "Observed price, never inferred",
+      chipTotal: "{{total}} deals right now",
+    },
     buscarPlaceholder: "Search a deal by title…",
     buscarAriaLabel: "Search a deal by title",
     descontoMinimo: "Minimum discount",
@@ -672,6 +682,16 @@ const en: Traducoes = {
     verJogo: "View game",
     paginacao: {
       exibindo: "Showing {{fatia}} of {{total}}",
+    },
+  },
+
+  catalogoLayout: {
+    hero: {
+      eyebrow: "Full catalog",
+      titulo: "The whole catalog, ",
+      tituloDestaque: "in one place",
+      descricao:
+        "Steam and Xbox in the same panel — each game's sheet, price and popularity, straight from the store itself.",
     },
   },
 
