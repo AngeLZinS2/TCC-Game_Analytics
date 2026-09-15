@@ -25,6 +25,7 @@ from typing import Any, Sequence
 
 import requests
 
+from services.collectors import liquipedia_rate_limit
 from services.collectors.base import BaseCollector, RawRecord
 from services.collectors.http_client import RateLimitedClient
 from config import Settings, get_settings
@@ -69,6 +70,8 @@ class LiquipediaCollector(BaseCollector[ResultadoAgenda]):
         self.client.session.headers.update({"Accept-Encoding": "gzip"})
 
     def collect(self) -> list[RawRecord]:
+        liquipedia_rate_limit.checar()
+
         parametros = {
             "action": "parse",
             "format": "json",
@@ -82,6 +85,14 @@ class LiquipediaCollector(BaseCollector[ResultadoAgenda]):
             )
         except (requests.RequestException, ValueError) as exc:
             self.falhas += 1
+            if liquipedia_rate_limit.eh_429(exc):
+                # 429 e sinal do SERVIDOR - antes disto o erro virava so um
+                # resultado "vazio mas com sucesso" (`falhas=1, sucesso=True`),
+                # entao o laco do agendador nunca via excecao nenhuma e
+                # seguia martelando a proxima wiki (foi o que aconteceu em
+                # 2026-09-15). Agora propaga de verdade.
+                liquipedia_rate_limit.acionar()
+                raise
             self.logger.warning(
                 "falha ao coletar agenda",
                 extra={"wiki": self.wiki, "erro": f"{type(exc).__name__}: {exc}"},

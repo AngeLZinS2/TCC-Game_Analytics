@@ -27,6 +27,7 @@ from typing import Any, Sequence
 
 import requests
 
+from services.collectors import liquipedia_rate_limit
 from services.collectors.base import BaseCollector, RawRecord
 from services.collectors.http_client import RateLimitedClient
 from config import Settings, get_settings
@@ -93,6 +94,11 @@ class OwcsStandingsCollector(BaseCollector[ResultadoRanking]):
             corpo = self.client.get_json(URL_API, parametros)
         except (requests.RequestException, ValueError) as exc:
             self.falhas += 1
+            if liquipedia_rate_limit.eh_429(exc):
+                # 429 e sinal do SERVIDOR, nao de UMA regiao/stage - ver o
+                # comentario gemeo em `liquipedia_collector.py`.
+                liquipedia_rate_limit.acionar()
+                raise
             self.logger.warning(
                 "falha ao buscar página do OWCS",
                 extra={"regiao": regiao_pg, "stage": stage, "erro": str(exc)},
@@ -107,11 +113,26 @@ class OwcsStandingsCollector(BaseCollector[ResultadoRanking]):
             return None
 
     def collect(self) -> list[RawRecord]:
+        liquipedia_rate_limit.checar()
+
         ano = date.today().year
         registros: list[RawRecord] = []
         for regiao_pg, slug in REGIOES.items():
             for stage in STAGES:
-                html = self._texto_renderizado(ano, regiao_pg, stage)
+                try:
+                    html = self._texto_renderizado(ano, regiao_pg, stage)
+                except (requests.RequestException, ValueError) as exc:
+                    if liquipedia_rate_limit.eh_429(exc):
+                        # `acionar()` ja foi chamado dentro de
+                        # `_texto_renderizado` - aqui so para de vez a
+                        # varredura de regiao/stage, em vez de continuar
+                        # martelando as combinacoes seguintes.
+                        logger.error(
+                            "429 da Liquipedia - parando a varredura do OWCS",
+                            extra={"regiao": regiao_pg, "stage": stage},
+                        )
+                        return registros
+                    raise
                 if html is None:
                     continue
                 if len(parse_standings(html, slug)) < _MIN_LINHAS:

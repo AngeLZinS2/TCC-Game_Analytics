@@ -28,6 +28,7 @@ from __future__ import annotations
 import logging
 from typing import Any, Iterator, Sequence
 
+from services.collectors import liquipedia_rate_limit
 from services.collectors.base import BaseCollector, RawRecord
 from services.collectors.http_client import RateLimitedClient
 from config import Settings, get_settings
@@ -122,6 +123,8 @@ class LiquipediaWikiCollector(BaseCollector[ResultadoEquipes]):
             yield list(titulos[inicio : inicio + TITULOS_POR_LOTE])
 
     def collect(self) -> list[RawRecord]:
+        liquipedia_rate_limit.checar()
+
         titulos = self._titulos()
         logger.info(
             "indice de equipes lido",
@@ -145,6 +148,16 @@ class LiquipediaWikiCollector(BaseCollector[ResultadoEquipes]):
                 )
             except Exception as exc:  # noqa: BLE001 - um lote nao derruba a coleta
                 self.falhas += 1
+                if liquipedia_rate_limit.eh_429(exc):
+                    # 429 e sinal do SERVIDOR, nao de UM lote - continuar
+                    # martelaria a mesma parede nos lotes seguintes (foi o
+                    # que aconteceu em 2026-09-15).
+                    liquipedia_rate_limit.acionar()
+                    logger.error(
+                        "429 da Liquipedia - parando os lotes de equipes desta wiki",
+                        extra={"fonte": self.fonte, "lote": numero},
+                    )
+                    break
                 logger.warning(
                     "lote de equipes falhou",
                     extra={

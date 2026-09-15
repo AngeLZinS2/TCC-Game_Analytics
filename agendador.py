@@ -241,8 +241,11 @@ def _coletar_liquipedia(settings: Settings, storage: RawStorage) -> CollectionRe
     completa leva uns 35-40 minutos. Ainda cabe folgado no intervalo padrao de
     12h da tarefa.
     """
+    from services.collectors import liquipedia_rate_limit
     from services.collectors.liquipedia_collector import LiquipediaCollector
     from services.etl.wikis import com_agenda
+
+    liquipedia_rate_limit.checar()
 
     parciais: list[CollectionResult] = []
     wikis = com_agenda()
@@ -253,6 +256,18 @@ def _coletar_liquipedia(settings: Settings, storage: RawStorage) -> CollectionRe
         try:
             parciais.append(coletor.run(carregar=True))
         except Exception as exc:  # noqa: BLE001 - uma wiki nao derruba a varredura
+            if liquipedia_rate_limit.eh_429(exc):
+                # 429 e sinal do SERVIDOR, nao de uma wiki - continuar pra
+                # proxima so martelaria a mesma parede 60+ vezes seguidas
+                # (foi exatamente isso que aconteceu em 2026-09-15).
+                liquipedia_rate_limit.acionar()
+                logger.error(
+                    "429 da Liquipedia - parando a varredura e pausando por "
+                    f"{liquipedia_rate_limit.ESPERA_APOS_429_SEGUNDOS}s",
+                    extra={"wiki": wiki.codigo},
+                )
+                parciais.append(CollectionResult(fonte="liquipedia", sucesso=False))
+                break
             logger.warning(
                 "agenda de uma wiki falhou",
                 extra={"wiki": wiki.codigo, "erro": f"{type(exc).__name__}: {exc}"},
@@ -287,8 +302,11 @@ def _coletar_equipes(settings: Settings, storage: RawStorage) -> CollectionResul
     """
     global _proxima_wiki_de_equipes
 
+    from services.collectors import liquipedia_rate_limit
     from services.collectors.liquipedia_wiki_collector import LiquipediaWikiCollector
     from services.etl.wikis import com_times
+
+    liquipedia_rate_limit.checar()
 
     todas = com_times()
     if not todas:
@@ -313,6 +331,15 @@ def _coletar_equipes(settings: Settings, storage: RawStorage) -> CollectionResul
         try:
             parciais.append(coletor.run(carregar=True))
         except Exception as exc:  # noqa: BLE001
+            if liquipedia_rate_limit.eh_429(exc):
+                liquipedia_rate_limit.acionar()
+                logger.error(
+                    "429 da Liquipedia - parando o rodizio de equipes e "
+                    f"pausando por {liquipedia_rate_limit.ESPERA_APOS_429_SEGUNDOS}s",
+                    extra={"wiki": wiki.codigo},
+                )
+                parciais.append(CollectionResult(fonte="liquipedia", sucesso=False))
+                break
             logger.warning(
                 "equipes de uma wiki falharam",
                 extra={"wiki": wiki.codigo, "erro": f"{type(exc).__name__}: {exc}"},
@@ -320,6 +347,15 @@ def _coletar_equipes(settings: Settings, storage: RawStorage) -> CollectionResul
             parciais.append(CollectionResult(fonte="liquipedia", sucesso=False))
         finally:
             coletor.close()
+
+        # `LiquipediaWikiCollector.collect()` ja aciona o breaker e para
+        # sozinho (retorno normal, sem levantar) quando ve um 429 num lote -
+        # o `except` acima nunca chega a rodar nesse caso. Sem esta checagem
+        # o rodizio deste laco seguiria pra proxima wiki da lista mesmo com
+        # o breaker ja ligado, so pra esbarrar em `checar()` de novo do lado
+        # de dentro do proximo coletor.
+        if liquipedia_rate_limit.esta_bloqueada():
+            break
 
         # Mesmo motivo do sleep em `_coletar_liquipedia`: o cliente e novo a
         # cada wiki, entao o intervalo minimo nao sobrevive entre iteracoes
@@ -353,11 +389,14 @@ def _coletar_brackets(settings: Settings, storage: RawStorage) -> CollectionResu
     """
     global _proxima_wiki_de_brackets
 
+    from services.collectors import liquipedia_rate_limit
     from services.collectors.liquipedia_bracket_collector import (
         LiquipediaBracketCollector,
         torneios_conhecidos,
     )
     from services.etl.wikis import com_agenda
+
+    liquipedia_rate_limit.checar()
 
     todas = com_agenda()
     if not todas:
@@ -389,6 +428,15 @@ def _coletar_brackets(settings: Settings, storage: RawStorage) -> CollectionResu
         try:
             parciais.append(coletor.run(carregar=True))
         except Exception as exc:  # noqa: BLE001
+            if liquipedia_rate_limit.eh_429(exc):
+                liquipedia_rate_limit.acionar()
+                logger.error(
+                    "429 da Liquipedia - parando o rodizio de brackets e "
+                    f"pausando por {liquipedia_rate_limit.ESPERA_APOS_429_SEGUNDOS}s",
+                    extra={"wiki": wiki.codigo},
+                )
+                parciais.append(CollectionResult(fonte="liquipedia", sucesso=False))
+                break
             logger.warning(
                 "brackets de uma wiki falharam",
                 extra={"wiki": wiki.codigo, "erro": f"{type(exc).__name__}: {exc}"},
@@ -396,6 +444,14 @@ def _coletar_brackets(settings: Settings, storage: RawStorage) -> CollectionResu
             parciais.append(CollectionResult(fonte="liquipedia", sucesso=False))
         finally:
             coletor.close()
+
+        # `LiquipediaBracketCollector.collect()` ja aciona o breaker e para
+        # sozinho (retorno normal, sem levantar) quando ve um 429 num
+        # torneio - o `except` acima e so para outros erros que escapem do
+        # coletor. Sem esta checagem o rodizio seguiria pra proxima wiki
+        # mesmo com o breaker ja ligado.
+        if liquipedia_rate_limit.esta_bloqueada():
+            break
 
         # O coletor ja pausa ENTRE torneios da mesma wiki (dentro do proprio
         # `client`, que e reaproveitado ali, no intervalo PROPRIO de
