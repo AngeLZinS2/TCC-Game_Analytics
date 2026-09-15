@@ -30,6 +30,8 @@ export interface VisaoGeral {
   steam_usuarios_em_jogo: number | null;
   /** Variação % de `steam_usuarios_online` vs a coleta anterior. */
   steam_usuarios_online_variacao: number | null;
+  /** Janela mais antiga de telemetria — quanto histórico existe de verdade. */
+  historico_steam_desde: string | null;
   partidas: number;
   linhas_fato_partida: number;
   jogadores: number;
@@ -90,6 +92,13 @@ export interface PontoSerieTotal {
   janela_coleta: string;
   jogadores_simultaneos: number | null;
   jogos: number;
+}
+
+/** Série recente de jogadores de UM jogo — o mini-gráfico do ranking. */
+export interface SerieJogadoresJogo {
+  app_id: number;
+  /** Do mais antigo para o mais recente. */
+  valores: number[];
 }
 
 export interface ConquistaDestaque {

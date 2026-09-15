@@ -23,6 +23,7 @@ import type {
   PartidaAgendada,
   PartidasPorDia,
   PontoSerieTotal,
+  SerieJogadoresJogo,
   ResumoJogador,
   ResumoPartidas,
   AvaliacaoClassificada,
@@ -127,11 +128,39 @@ export function useCategoriasSteam() {
   });
 }
 
-/** Serie do catalogo inteiro somado - o sparkline do KPI de jogadores. */
-export function useSerieTotalSteam() {
+/**
+ * Serie do catalogo inteiro somado - o sparkline do KPI de jogadores.
+ *
+ * Sem `dias`, devolve a série INTEIRA: é assim que a tela descobre quanto
+ * histórico existe de verdade, para não oferecer um período maior do que o
+ * que foi coletado.
+ */
+export function useSerieTotalSteam(dias?: number) {
   return useQuery({
-    queryKey: ["steam", "serie-total"],
-    queryFn: () => buscar<PontoSerieTotal[]>("/api/steam/serie-total"),
+    queryKey: ["steam", "serie-total", dias ?? "tudo"],
+    queryFn: () =>
+      buscar<PontoSerieTotal[]>(
+        "/api/steam/serie-total",
+        dias ? { dias } : undefined,
+      ),
+  });
+}
+
+/**
+ * Série de jogadores de vários jogos numa chamada só — os mini-gráficos do
+ * ranking. Uma requisição por linha seriam dez requisições por um fio de 40px.
+ */
+export function useSeriesJogadoresSteam(appIds: number[], dias?: number) {
+  const chave = appIds.join(",");
+  return useQuery({
+    queryKey: ["steam", "series-jogadores", chave, dias ?? "tudo"],
+    queryFn: () =>
+      buscar<SerieJogadoresJogo[]>("/api/steam/series-jogadores", {
+        app_ids: chave,
+        ...(dias ? { dias } : {}),
+      }),
+    enabled: appIds.length > 0,
+    staleTime: 60_000,
   });
 }
 

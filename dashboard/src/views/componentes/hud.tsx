@@ -45,16 +45,33 @@ const ACENTO: Record<Acento, { texto: string; ponto: string; brilho: string }> =
 export function Sparkline({
   valores,
   className = "text-primary-container",
+  compacto = false,
 }: {
   valores: number[];
   className?: string;
+  /** Versão de linha de lista: sem margem no topo e mais baixo que o do KPI. */
+  compacto?: boolean;
 }) {
   const { t } = useTranslation();
+  // `entrou` rearma sempre que a serie muda - trocar de jogo/periodo faz o
+  // traco se desenhar de novo em vez de saltar pra silhueta nova.
+  //
+  // Fica ANTES do early return de proposito: a serie do ranking chega por
+  // requisicao, entao o mesmo componente renderiza primeiro com zero pontos
+  // (caminho curto) e depois com a serie cheia. Com o hook depois do return,
+  // essa segunda renderizacao tinha mais hooks que a primeira e o React
+  // derrubava a tela inteira (erro #310).
+  const entrou = useEntrarNaTela(valores.join(","));
+
   // Um ponto so nao tem silhueta: dois pontos identicos desenhariam uma reta
   // horizontal, que sugere "estavel" quando o certo e "ainda nao da para ver".
   if (valores.length < 2) {
     return (
-      <div className="flex h-9 items-center font-label-caps text-label-caps text-outline">
+      <div
+        className={`flex items-center font-label-caps text-label-caps text-outline ${
+          compacto ? "h-6" : "h-9"
+        }`}
+      >
         {valores.length === 1 ? t("comum.sparkline.umPonto") : t("comum.sparkline.nenhumPonto")}
       </div>
     );
@@ -71,12 +88,11 @@ export function Sparkline({
   });
 
   const linha = `M ${pontos.join(" L ")}`;
-  // `entrou` rearma sempre que a serie muda - trocar de jogo/periodo faz o
-  // traco se desenhar de novo em vez de saltar pra silhueta nova.
-  const entrou = useEntrarNaTela(valores.join(","));
 
   return (
-    <div className="mt-space-md flex h-9 w-full items-end">
+    <div
+      className={`flex w-full items-end ${compacto ? "h-6" : "mt-space-md h-9"}`}
+    >
       <svg
         className={`h-full w-full overflow-visible ${className}`}
         viewBox="0 0 200 36"

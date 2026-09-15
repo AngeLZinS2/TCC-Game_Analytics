@@ -65,6 +65,10 @@ def visao_geral(sessao: Session = Depends(get_db)) -> VisaoGeral:
         else None
     )
 
+    # Quanto historico de telemetria existe - o seletor de periodo do catalogo
+    # nao pode oferecer um recorte maior do que o que foi coletado.
+    historico_desde = sessao.scalar(select(func.min(FatoSnapshotJogoSteam.janela_coleta)))
+
     coletas = sessao.execute(
         select(
             RawData.fonte,
@@ -85,6 +89,7 @@ def visao_geral(sessao: Session = Depends(get_db)) -> VisaoGeral:
         steam_usuarios_online=steam_online,
         steam_usuarios_em_jogo=steam_em_jogo,
         steam_usuarios_online_variacao=steam_online_variacao,
+        historico_steam_desde=historico_desde,
         partidas=contar(DimPartida),
         linhas_fato_partida=contar(FatoPartidaJogador),
         jogadores=contar(DimJogador),

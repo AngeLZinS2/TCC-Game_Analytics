@@ -40,6 +40,10 @@ class VisaoGeral(BaseModel):
     steam_usuarios_em_jogo: int | None = None
     #: Variacao % de `steam_usuarios_online` vs a coleta anterior.
     steam_usuarios_online_variacao: float | None = None
+    #: Janela mais antiga de `fato_snapshot_jogo_steam`. E quanto historico
+    #: existe de verdade - o seletor de periodo do catalogo usa isto para nao
+    #: oferecer "90 dias" quando so ha duas semanas coletadas.
+    historico_steam_desde: datetime | None = None
     partidas: int
     linhas_fato_partida: int
     jogadores: int
@@ -147,6 +151,19 @@ class PontoSerieTotal(BaseModel):
     janela_coleta: datetime
     jogadores_simultaneos: int | None
     jogos: int
+
+
+class SerieJogadoresJogo(BaseModel):
+    """A serie recente de jogadores simultaneos de UM jogo.
+
+    Alimenta o mini-grafico de cada linha do ranking. Vem em lote (varios
+    `app_id` numa chamada) de proposito: uma chamada por jogo seriam dez
+    requisicoes para desenhar dez fios de 40px.
+    """
+
+    app_id: int
+    #: Do mais antigo para o mais recente - e a ordem que o sparkline desenha.
+    valores: list[int]
 
 
 class ConquistaDestaque(BaseModel):

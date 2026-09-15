@@ -30,6 +30,7 @@ import {
   useJogosSteam,
   useSaude,
   useSerieTotalSteam,
+  useSeriesJogadoresSteam,
   useVisaoGeral,
 } from "@models/api/consultas";
 import type {
@@ -48,9 +49,9 @@ import {
 } from "@views/componentes/base";
 import { CapaJogo } from "@views/componentes/CapaJogo";
 import { CartaoJogoSteam } from "@views/componentes/CartaoJogoSteam";
+import { RankingJogos } from "@views/componentes/RankingJogos";
 import {
   BarraFina,
-  BarraRanking,
   KpiHud,
   Paginacao,
   Pilula,
@@ -72,7 +73,9 @@ import {
   paraNumero,
 } from "@util/formatos";
 
-const NO_RANKING = 8;
+//: Dez linhas, cinco por coluna no desktop - o ranking é uma leitura rápida do
+//: topo, não a lista inteira (que é a tabela de telemetria logo abaixo).
+const NO_RANKING = 10;
 
 type Ordenacao = "jogadores" | "avaliacoes" | "preco" | "trending";
 
@@ -95,7 +98,7 @@ const CHIP_CLASSIFICACAO = {
   negativa: "bg-error/10 text-error",
 } as const;
 
-export function SteamPagina() {
+export function SteamPagina({ periodo }: { periodo?: number } = {}) {
   const { t } = useTranslation();
   const navegar = useNavigate();
   const campoBusca = useRef<HTMLInputElement>(null);
@@ -127,7 +130,7 @@ export function SteamPagina() {
   // generos dele, entao o maior genero nunca foi o catalogo. Com 45 jogos
   // e 37 de Action, a tela dizia "exibindo 45 de 37".
   const visaoGeral = useVisaoGeral();
-  const serieTotal = useSerieTotalSteam();
+  const serieTotal = useSerieTotalSteam(periodo);
   const saude = useSaude();
 
   // A busca do banco cobre os jogos monitorados. A partir de dois caracteres
@@ -166,6 +169,20 @@ export function SteamPagina() {
   // Sem segunda coleta, nenhum jogo tem variacao - e a ordenacao por tendencia
   // devolveria a mesma lista fingindo ter ordenado.
   const temVariacao = (jogos.data ?? []).some((j) => j.variacao_jogadores !== null);
+
+  // O topo do ranking e a serie de cada linha. `useMemo` porque a lista de
+  // ids vira a chave da consulta em lote - recalcular a cada render dispararia
+  // uma requisicao nova por render.
+  const topoRanking = useMemo(
+    () => lista.filter((j) => j.jogadores_simultaneos !== null).slice(0, NO_RANKING),
+    [lista],
+  );
+  const idsRanking = useMemo(() => topoRanking.map((j) => j.app_id), [topoRanking]);
+  const seriesRanking = useSeriesJogadoresSteam(idsRanking, periodo);
+  const seriesPorJogo = useMemo(
+    () => new Map((seriesRanking.data ?? []).map((s) => [s.app_id, s.valores])),
+    [seriesRanking.data],
+  );
 
   const idsNaBase = new Set(lista.map((jogo) => jogo.app_id));
 
@@ -325,8 +342,16 @@ export function SteamPagina() {
                 100
               : null;
 
+          // Série de "jogos com telemetria por janela" - o mesmo payload de
+          // `serie-total`, segunda coluna. Não é uma segunda chamada.
+          const valoresJogos = serie.map((p) => p.jogos ?? 0);
+          const variacaoJogos =
+            valoresJogos.length > 1 && valoresJogos.at(-2)
+              ? ((valoresJogos.at(-1)! - valoresJogos.at(-2)!) / valoresJogos.at(-2)!) * 100
+              : null;
+
           return (
-            <section className="grid grid-cols-1 gap-space-base md:grid-cols-3">
+            <section className="grid grid-cols-1 gap-space-base sm:grid-cols-2 xl:grid-cols-4">
               <KpiHud
                 etiqueta={t("catalogoSteam.kpis.concurrentUsers")}
                 canto={
@@ -354,16 +379,11 @@ export function SteamPagina() {
                 valorNumerico={emTela.length}
                 formatarValor={fmtNumero}
                 rotulo={t("catalogoSteam.kpis.jogosMonitoradosAtivos")}
+                variacao={variacaoJogos}
+                notaVariacao={t("catalogoSteam.kpis.vsColetaAnterior")}
                 acento="secundaria"
-                notaVariacao={t("catalogoSteam.kpis.gratuitos", { contagem: gratuitos })}
               >
-                <Segmentos
-                  acesos={Math.round(
-                    (emTela.filter((j) => j.janela_coleta).length /
-                      Math.max(emTela.length, 1)) *
-                      6,
-                  )}
-                />
+                <Sparkline valores={valoresJogos} className="text-secondary" />
               </KpiHud>
 
               <KpiHud
@@ -390,6 +410,32 @@ export function SteamPagina() {
                   />
                 </div>
               </KpiHud>
+
+              {/* Cobertura da coleta: quantos dos jogos em tela chegaram a ter
+                  uma janela de telemetria. `Segmentos` em vez de sparkline
+                  porque é uma proporção de agora, não uma série no tempo. */}
+              <KpiHud
+                etiqueta={t("catalogoSteam.kpis.cobertura")}
+                canto={t("catalogoSteam.kpis.gratuitos", { contagem: gratuitos })}
+                valor={fmtPercentual(
+                  emTela.length
+                    ? (emTela.filter((j) => j.janela_coleta).length / emTela.length) * 100
+                    : null,
+                  0,
+                )}
+                rotulo={t("catalogoSteam.kpis.comTelemetria", {
+                  contagem: emTela.filter((j) => j.janela_coleta).length,
+                })}
+                acento="primaria"
+              >
+                <Segmentos
+                  acesos={Math.round(
+                    (emTela.filter((j) => j.janela_coleta).length /
+                      Math.max(emTela.length, 1)) *
+                      6,
+                  )}
+                />
+              </KpiHud>
             </section>
           );
         }}
@@ -398,48 +444,71 @@ export function SteamPagina() {
       {/* ==================== RANKING ==================== */}
       <section className="space-y-space-md rounded-xl bg-surface-container-low p-space-base shadow-2xl">
         <div className="flex flex-wrap items-center justify-between gap-space-sm">
-          <h2 className="flex items-center gap-space-xs font-headline-md text-headline-md uppercase tracking-wide text-on-surface">
-            <Icone nome="leaderboard" className="text-[20px] text-primary-container" />
-            {t("catalogoSteam.ranking.titulo")}
-          </h2>
-          <span className="font-label-caps text-label-caps uppercase tracking-widest text-outline">
-            {t("catalogoSteam.ranking.maxReferencia")}{" "}
-            <span className="text-primary">
-              {fmtNumero(lista[0]?.jogadores_simultaneos)}
+          <div className="flex flex-col">
+            <h2 className="flex items-center gap-space-xs font-headline-md text-headline-md uppercase tracking-wide text-on-surface">
+              <Icone nome="leaderboard" className="text-[20px] text-primary-container" />
+              {t("catalogoSteam.ranking.titulo")}
+            </h2>
+            <span className="mt-0.5 font-title-code text-title-code text-outline">
+              {t("catalogoSteam.ranking.subtitulo")}
             </span>
-          </span>
+          </div>
+          <div className="flex items-center gap-space-md">
+            <span className="font-label-caps text-label-caps uppercase tracking-widest text-outline">
+              {t("catalogoSteam.ranking.maxReferencia")}{" "}
+              <span className="text-primary">
+                {fmtNumero(lista[0]?.jogadores_simultaneos)}
+              </span>
+            </span>
+            {/* "Ver todos" leva à lista completa, que é a tabela logo abaixo:
+                ordena por jogadores e rola até ela. Não há uma terceira tela de
+                ranking para onde apontar - e inventar uma rota morta seria pior
+                que o link não existir. */}
+            <button
+              type="button"
+              onClick={() => {
+                setOrdenacao("jogadores");
+                document
+                  .getElementById("telemetria-catalogo")
+                  ?.scrollIntoView({ behavior: "smooth", block: "start" });
+              }}
+              className="flex shrink-0 items-center gap-space-xxs rounded font-title-code text-title-code text-primary transition-colors hover:text-primary-container focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+            >
+              {t("catalogoSteam.ranking.verTodos")}
+              <Icone nome="arrow_forward" className="text-[14px]" />
+            </button>
+          </div>
         </div>
 
         <Consulta estado={jogos} vazio={vazioDaTelemetria}>
-          {() => {
-            const topo = lista
-              .filter((j) => j.jogadores_simultaneos !== null)
-              .slice(0, NO_RANKING);
-            const maximo = topo[0]?.jogadores_simultaneos || 1;
-
-            return (
-              <div className="grid gap-space-xs">
-                {topo.map((jogo, indice) => (
-                  <BarraRanking
-                    key={jogo.app_id}
-                    posicao={indice + 1}
-                    etiqueta={jogo.generos[0]}
-                    corEtiqueta={jogo.generos[0] ? corDoGenero(jogo.generos[0]) : undefined}
-                    nome={jogo.nome}
-                    valor={fmtNumero(jogo.jogadores_simultaneos)}
-                    variacao={jogo.variacao_jogadores}
-                    proporcao={(jogo.jogadores_simultaneos ?? 0) / maximo}
-                    aoClicar={() => navegar(`/steam/${jogo.app_id}`)}
-                  />
-                ))}
-              </div>
-            );
-          }}
+          {() =>
+            topoRanking.length === 0 ? (
+              <p className="py-space-lg text-center font-body-sm text-body-sm text-on-surface-variant">
+                {vazioDaTelemetria}
+              </p>
+            ) : (
+              <RankingJogos
+                itens={topoRanking.map((jogo) => ({
+                  app_id: jogo.app_id,
+                  nome: jogo.nome,
+                  imagem_header: jogo.imagem_header,
+                  generos: jogo.generos,
+                  jogadores_simultaneos: jogo.jogadores_simultaneos,
+                  variacao: jogo.variacao_jogadores,
+                  serie: seriesPorJogo.get(jogo.app_id) ?? [],
+                }))}
+                aoAbrir={(appId) => navegar(`/steam/${appId}`)}
+              />
+            )
+          }
         </Consulta>
       </section>
 
       {/* ==================== TABELA DE TELEMETRIA ==================== */}
-      <section className="space-y-space-md rounded-xl bg-surface-container-low p-space-base shadow-2xl">
+      <section
+        id="telemetria-catalogo"
+        className="scroll-mt-space-lg space-y-space-md rounded-xl bg-surface-container-low p-space-base shadow-2xl"
+      >
         <div className="flex flex-col justify-between gap-space-base lg:flex-row lg:items-center">
           <div className="flex flex-col">
             <h2 className="flex items-center gap-space-xs font-headline-md text-headline-md uppercase tracking-wide text-on-surface">

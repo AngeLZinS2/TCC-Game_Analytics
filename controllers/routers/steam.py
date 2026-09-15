@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import logging
 import time
+from datetime import datetime, timedelta, timezone
 from typing import Literal
 
 import requests
@@ -32,6 +33,7 @@ from views.schemas import (
     PontoSerie,
     PontoSerieTotal,
     PromocaoAtivaSteam,
+    SerieJogadoresJogo,
 )
 from models.models import (
     DimAppSteamNome,
@@ -43,6 +45,7 @@ from models.models import (
     PromocaoSteam,
 )
 from models.session import get_db
+from config import get_settings
 
 logger = logging.getLogger(__name__)
 
@@ -578,23 +581,124 @@ def detalhar_jogo(app_id: int, sessao: Session = Depends(get_db)) -> DetalheJogo
 
 
 @router.get("/serie-total", response_model=list[PontoSerieTotal])
-def serie_total(sessao: Session = Depends(get_db)) -> list[PontoSerieTotal]:
+def serie_total(
+    sessao: Session = Depends(get_db),
+    dias: int | None = Query(None, ge=1, le=3650),
+) -> list[PontoSerieTotal]:
     """Jogadores simultaneos somados sobre todo o catalogo, por janela de coleta.
 
     E a serie que o sparkline do KPI desenha. Somar no banco e nao no navegador
     importa porque a alternativa seria baixar a serie inteira de cada jogo so
     para reduzi-la a um numero por janela.
+
+    `dias` recorta a janela de tempo (o seletor de periodo da tela). Sem ele, a
+    serie inteira - que e tambem como a tela descobre QUANTO historico existe,
+    para nao oferecer um periodo maior do que o que foi coletado.
     """
-    consulta = (
-        select(
-            FatoSnapshotJogoSteam.janela_coleta.label("janela_coleta"),
-            func.sum(FatoSnapshotJogoSteam.jogadores_simultaneos).label("jogadores"),
-            func.count(func.distinct(FatoSnapshotJogoSteam.app_id)).label("jogos"),
-        )
-        .group_by(FatoSnapshotJogoSteam.janela_coleta)
-        .order_by(FatoSnapshotJogoSteam.janela_coleta)
+    consulta = select(
+        FatoSnapshotJogoSteam.janela_coleta.label("janela_coleta"),
+        func.sum(FatoSnapshotJogoSteam.jogadores_simultaneos).label("jogadores"),
+        func.count(func.distinct(FatoSnapshotJogoSteam.app_id)).label("jogos"),
     )
+    if dias is not None:
+        corte = datetime.now(timezone.utc) - timedelta(days=dias)
+        consulta = consulta.where(FatoSnapshotJogoSteam.janela_coleta >= corte)
+    consulta = consulta.group_by(FatoSnapshotJogoSteam.janela_coleta).order_by(
+        FatoSnapshotJogoSteam.janela_coleta
+    )
+    return _sem_janela_incompleta(
+        [
+            PontoSerieTotal(
+                janela_coleta=janela, jogadores_simultaneos=jogadores, jogos=jogos
+            )
+            for janela, jogadores, jogos in sessao.execute(consulta)
+        ]
+    )
+
+
+#: Pontos por jogo no mini-grafico do ranking. Um fio de ~40px nao comporta as
+#: 97 janelas que ja existem, e mandar todas so engordaria a resposta.
+_PONTOS_SERIE_RANKING = 24
+
+
+#: Cobertura minima, sobre a melhor janela do recorte, para uma janela entrar
+#: na serie agregada. Uma janela com 10 dos ~160 jogos nao mede o catalogo -
+#: mede dez jogos.
+_COBERTURA_MINIMA = 0.5
+
+
+def _sem_janela_incompleta(
+    pontos: list[PontoSerieTotal],
+) -> list[PontoSerieTotal]:
+    """Corta as janelas do FIM que a coleta nao chegou a preencher.
+
+    A coleta percorre o catalogo ao longo da janela, e quando ela e
+    interrompida no meio a janela fica com uma fracao dos jogos. Somar essa
+    fracao e comparar com a janela anterior compara populacoes diferentes:
+    medido aqui, 154 jogos numa janela e 10 na seguinte viravam "-100%" e um
+    sparkline despencando ate o chao - sem que jogador nenhum tivesse saido.
+
+    So o FIM e cortado: um buraco no meio da serie e historico de verdade
+    (a coleta ficou fora do ar naquele dia) e continua a vista.
+    """
+    if not pontos:
+        return pontos
+    melhor = max(p.jogos for p in pontos)
+    if melhor <= 0:
+        return pontos
+    # O proprio ponto de melhor cobertura para o laco, entao `corte` nunca
+    # chega a zero: uma serie toda rala (catalogo novo, poucos jogos em todas
+    # as janelas) volta inteira, que e o certo.
+    corte = len(pontos)
+    while pontos[corte - 1].jogos < melhor * _COBERTURA_MINIMA:
+        corte -= 1
+    return pontos[:corte]
+
+
+@router.get("/series-jogadores", response_model=list[SerieJogadoresJogo])
+def series_jogadores(
+    sessao: Session = Depends(get_db),
+    app_ids: str = Query(..., description="app_ids separados por virgula"),
+    dias: int | None = Query(None, ge=1, le=3650),
+) -> list[SerieJogadoresJogo]:
+    """Serie recente de jogadores simultaneos de varios jogos, numa chamada.
+
+    Existe para o mini-grafico de cada linha do ranking: sem ele, a tela teria
+    de pedir a ficha completa de cada jogo (uma requisicao por linha) so para
+    extrair a serie. Devolve so os ultimos `_PONTOS_SERIE_RANKING` pontos de
+    cada jogo.
+    """
+    ids: list[int] = []
+    for pedaco in app_ids.split(","):
+        pedaco = pedaco.strip()
+        if pedaco.isdigit():
+            ids.append(int(pedaco))
+    # Teto defensivo: o ranking mostra dez linhas; um `app_ids` gigante viraria
+    # uma varredura da tabela de fato inteira.
+    ids = ids[:50]
+    if not ids:
+        return []
+
+    consulta = select(
+        FatoSnapshotJogoSteam.app_id,
+        FatoSnapshotJogoSteam.janela_coleta,
+        FatoSnapshotJogoSteam.jogadores_simultaneos,
+    ).where(
+        FatoSnapshotJogoSteam.app_id.in_(ids),
+        FatoSnapshotJogoSteam.jogadores_simultaneos.is_not(None),
+    )
+    if dias is not None:
+        corte = datetime.now(timezone.utc) - timedelta(days=dias)
+        consulta = consulta.where(FatoSnapshotJogoSteam.janela_coleta >= corte)
+    consulta = consulta.order_by(
+        FatoSnapshotJogoSteam.app_id, FatoSnapshotJogoSteam.janela_coleta
+    )
+
+    por_jogo: dict[int, list[int]] = {}
+    for app_id, _janela, jogadores in sessao.execute(consulta):
+        por_jogo.setdefault(app_id, []).append(int(jogadores))
+
     return [
-        PontoSerieTotal(janela_coleta=janela, jogadores_simultaneos=jogadores, jogos=jogos)
-        for janela, jogadores, jogos in sessao.execute(consulta)
+        SerieJogadoresJogo(app_id=app_id, valores=valores[-_PONTOS_SERIE_RANKING:])
+        for app_id, valores in por_jogo.items()
     ]
