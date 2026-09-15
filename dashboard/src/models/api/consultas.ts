@@ -70,6 +70,7 @@ import type {
   ProvedorIA,
   CatalogoModelosIA,
   PaginaOfertasSteam,
+  TagOfertaSteam,
 } from "./tipos";
 
 export interface FiltrosJogos {
@@ -185,9 +186,28 @@ export interface FiltrosOfertasSteam {
   preco_maximo?: number;
   pais?: string;
   moeda?: string;
+  /** Id de tag de gênero (Ação, RPG…). */
+  tag?: number;
+  /** Id de tag de característica/tema (Um Jogador, Co-op…). */
+  categoria?: number;
   ordenar_por?: "desconto_desc" | "preco_asc";
   limite?: number;
   offset?: number;
+}
+
+/**
+ * As tags presentes nas ofertas de agora, com quantas ofertas cada uma tem —
+ * popula os dropdowns de gênero e categoria da tela de Ofertas.
+ *
+ * Só tag que existe nas ofertas atuais: um dropdown com as 429 tags do
+ * dicionário da Steam seria quase todo de becos sem saída.
+ */
+export function useTagsOfertasSteam() {
+  return useQuery({
+    queryKey: ["steam", "ofertas", "tags"],
+    queryFn: () => buscar<TagOfertaSteam[]>("/api/steam/ofertas/tags"),
+    staleTime: 300_000,
+  });
 }
 
 /**

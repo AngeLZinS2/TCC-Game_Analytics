@@ -20,13 +20,20 @@ import {
   useFavoritarJogo,
   useFavoritosJogos,
   useOfertasSteam,
+  useTagsOfertasSteam,
 } from "@models/api/consultas";
 import type { OfertaSteam } from "@models/api/tipos";
 import type { FiltrosOfertasSteam } from "@models/api/consultas";
 import { Consulta, Icone } from "@views/componentes/base";
 import { BannerDestaque } from "@views/componentes/BannerDestaque";
 import { BotaoFavoritar } from "@views/componentes/BotaoFavoritar";
-import { Paginacao, Pilula, SeletorModo, useModoPersistente } from "@views/componentes/hud";
+import {
+  Paginacao,
+  Pilula,
+  SeletorFiltro,
+  SeletorModo,
+  useModoPersistente,
+} from "@views/componentes/hud";
 import { ArteJogo, CapaJogo } from "@views/componentes/CapaJogo";
 import { fmtMoeda, fmtNumero, fmtRelativo } from "@util/formatos";
 
@@ -48,6 +55,8 @@ export function OfertasPagina() {
   const [mostrarMais, setMostrarMais] = useState(false);
   const [precoMaximo, setPrecoMaximo] = useState("");
   const [precoMaximoAplicado, setPrecoMaximoAplicado] = useState<number | undefined>(undefined);
+  const [genero, setGenero] = useState("");
+  const [categoria, setCategoria] = useState("");
   const [ordenarPor, setOrdenarPor] =
     useState<FiltrosOfertasSteam["ordenar_por"]>("desconto_desc");
   const [pagina, setPagina] = useState(1);
@@ -78,16 +87,28 @@ export function OfertasPagina() {
   // (~800 jogos, `usePaginacaoLocal` busca tudo de uma vez).
   useEffect(() => {
     setPagina(1);
-  }, [termoBuscado, descontoMinimo, precoMaximoAplicado, ordenarPor, porPagina]);
+  }, [termoBuscado, descontoMinimo, precoMaximoAplicado, genero, categoria, ordenarPor, porPagina]);
 
   const ofertas = useOfertasSteam({
     busca: termoBuscado || undefined,
     desconto_minimo: descontoMinimo,
     preco_maximo: precoMaximoAplicado,
+    tag: genero ? Number(genero) : undefined,
+    categoria: categoria ? Number(categoria) : undefined,
     ordenar_por: ordenarPor,
     limite: porPagina,
     offset: (pagina - 1) * porPagina,
   });
+
+  // As tags que existem nas ofertas de agora, já com a contagem - separadas
+  // em gênero (Ação, RPG…) e categoria (Um Jogador, Co-op…) pelo backend.
+  const tags = useTagsOfertasSteam();
+  const opcoesGenero = (tags.data ?? [])
+    .filter((tag) => tag.genero)
+    .map((tag) => ({ valor: String(tag.tag_id), rotulo: `${tag.nome} (${fmtNumero(tag.ofertas)})` }));
+  const opcoesCategoria = (tags.data ?? [])
+    .filter((tag) => !tag.genero)
+    .map((tag) => ({ valor: String(tag.tag_id), rotulo: `${tag.nome} (${fmtNumero(tag.ofertas)})` }));
 
   const total = ofertas.data?.total ?? 0;
   const totalPaginas = Math.max(1, Math.ceil(total / porPagina));
@@ -96,6 +117,8 @@ export function OfertasPagina() {
     setBusca("");
     setDescontoMinimo(0);
     setPrecoMaximo("");
+    setGenero("");
+    setCategoria("");
     setMostrarMais(false);
     setOrdenarPor("desconto_desc");
   }
@@ -155,19 +178,42 @@ export function OfertasPagina() {
       </BannerDestaque>
 
       <div id="grade-ofertas" className="flex flex-col gap-space-base border-b border-outline-variant/30 pb-space-base pt-space-base">
-        <div className="relative max-w-md">
-          <Icone
-            nome="manage_search"
-            className="absolute left-space-sm top-1/2 -translate-y-1/2 text-[20px] text-primary-container"
+        <div className="flex flex-col gap-space-sm lg:flex-row lg:items-center">
+          <div className="relative max-w-md flex-1">
+            <Icone
+              nome="manage_search"
+              className="absolute left-space-sm top-1/2 -translate-y-1/2 text-[20px] text-primary-container"
+            />
+            <input
+              ref={campoBusca}
+              type="search"
+              value={busca}
+              onChange={(evento) => setBusca(evento.target.value)}
+              placeholder={t("ofertas.buscarPlaceholder")}
+              aria-label={t("ofertas.buscarAriaLabel")}
+              className="w-full rounded bg-surface-container-lowest py-space-sm pl-10 pr-4 font-title-code text-title-code text-on-surface shadow-inner placeholder:text-outline focus:bg-surface-container focus:outline-none"
+            />
+          </div>
+
+          {/* Mesmo `SeletorFiltro` do Catálogo - a lista é grande demais
+              para virar fileira de pílulas, e um `<select>` nativo abriria
+              um painel branco do sistema no meio do tema escuro. */}
+          <SeletorFiltro
+            rotulo={t("ofertas.genero")}
+            valor={genero}
+            aoEscolher={setGenero}
+            rotuloTudo={t("ofertas.todosGeneros")}
+            buscavel
+            opcoes={opcoesGenero}
           />
-          <input
-            ref={campoBusca}
-            type="search"
-            value={busca}
-            onChange={(evento) => setBusca(evento.target.value)}
-            placeholder={t("ofertas.buscarPlaceholder")}
-            aria-label={t("ofertas.buscarAriaLabel")}
-            className="w-full rounded bg-surface-container-lowest py-space-sm pl-10 pr-4 font-title-code text-title-code text-on-surface shadow-inner placeholder:text-outline focus:bg-surface-container focus:outline-none"
+
+          <SeletorFiltro
+            rotulo={t("ofertas.categoria")}
+            valor={categoria}
+            aoEscolher={setCategoria}
+            rotuloTudo={t("ofertas.todasCategorias")}
+            buscavel
+            opcoes={opcoesCategoria}
           />
         </div>
 

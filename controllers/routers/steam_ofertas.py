@@ -15,13 +15,43 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy import desc, func, select
 from sqlalchemy.orm import Session
 
-from models.models import DimJogoSteam, PromocaoSteam
+from models.models import DimJogoSteam, DimTagSteam, PromocaoSteam
 from models.session import get_db
-from views.schemas import OfertaSteam, PaginaOfertasSteam
+from views.schemas import OfertaSteam, PaginaOfertasSteam, TagOfertaSteam
 
 router = APIRouter(prefix="/api/steam", tags=["steam"])
 
 OrdenarOfertaPor = Literal["desconto_desc", "preco_asc"]
+
+#: Os ids de tag que a Steam usa como GENERO de loja (as paginas
+#: `store.steampowered.com/genre/...`), conferidos contra o dicionario vivo
+#: em `/tagdata/populartags`. Tudo que nao esta aqui e caracteristica ou tema
+#: ("Um Jogador", "Co-op", "Atmosferico"), e vira o filtro de "categoria".
+#:
+#: E uma lista curada porque a Steam nao marca, no HTML da busca nem no
+#: dicionario, qual tag e genero - so o id e estavel o bastante para isso
+#: (o nome muda com o idioma da coleta).
+TAGS_DE_GENERO: frozenset[int] = frozenset(
+    {
+        19,  # Acao
+        21,  # Aventura
+        122,  # RPG
+        9,  # Estrategia
+        599,  # Simulacao
+        701,  # Esportes
+        699,  # Corrida
+        492,  # Indie
+        597,  # Casual
+        128,  # Multijogador Massivo
+        493,  # Acesso Antecipado
+        113,  # Gratuito para Jogar
+        1667,  # Terror
+        1625,  # Plataforma
+        1743,  # Luta
+        1774,  # Tiro
+        1628,  # Metroidvania
+    }
+)
 
 
 @router.get("/ofertas", response_model=PaginaOfertasSteam)
@@ -32,6 +62,8 @@ def listar_ofertas(
     preco_maximo: Decimal | None = Query(None, ge=0),
     pais: str | None = Query(None, min_length=2, max_length=2),
     moeda: str | None = Query(None, min_length=1, max_length=8),
+    tag: int | None = Query(None, description="id de tag da Steam (genero/categoria)"),
+    categoria: int | None = Query(None, description="id de tag de caracteristica/tema"),
     ordenar_por: OrdenarOfertaPor = "desconto_desc",
     limite: int = Query(24, ge=1, le=100),
     offset: int = Query(0, ge=0),
@@ -49,6 +81,12 @@ def listar_ofertas(
     ]
     if busca:
         condicoes.append(DimJogoSteam.nome.ilike(f"%{busca}%"))
+    # `tag` e `categoria` sao a MESMA coluna - o que muda e de qual dropdown
+    # o id veio (ver `TAGS_DE_GENERO`). Passar os dois filtra por ambos, que
+    # e o comportamento esperado de dois filtros combinados.
+    for id_tag in (tag, categoria):
+        if id_tag is not None:
+            condicoes.append(DimJogoSteam.tags_steam.any(id_tag))
     if pais:
         condicoes.append(PromocaoSteam.pais == pais.upper())
     if moeda:
@@ -91,3 +129,45 @@ def listar_ofertas(
         for promocao, jogo in sessao.execute(base)
     ]
     return PaginaOfertasSteam(itens=itens, total=total)
+
+
+@router.get("/ofertas/tags", response_model=list[TagOfertaSteam])
+def tags_das_ofertas(
+    sessao: Session = Depends(get_db),
+    minimo: int = Query(5, ge=1, description="descarta tag com menos ofertas que isso"),
+) -> list[TagOfertaSteam]:
+    """As tags presentes nas ofertas ABERTAS agora, com a contagem de cada uma.
+
+    Popula os dois dropdowns da tela de Ofertas. So entra tag que existe nas
+    ofertas de agora - um dropdown com as 429 tags do dicionario, a maioria
+    sem nenhuma oferta atras, seria uma lista de becos sem saida.
+
+    `minimo` corta a cauda longa (tags com duas ou tres ofertas), que enche o
+    dropdown sem ajudar a achar nada.
+    """
+    tag_id = func.unnest(DimJogoSteam.tags_steam).label("tag_id")
+    por_tag = (
+        select(tag_id, func.count().label("ofertas"))
+        .select_from(PromocaoSteam)
+        .join(DimJogoSteam, DimJogoSteam.app_id == PromocaoSteam.app_id)
+        .where(PromocaoSteam.ativa.is_(True), DimJogoSteam.tags_steam.is_not(None))
+        .group_by(tag_id)
+        .subquery()
+    )
+
+    consulta = (
+        select(por_tag.c.tag_id, por_tag.c.ofertas, DimTagSteam.nome)
+        .join(DimTagSteam, DimTagSteam.tag_id == por_tag.c.tag_id)
+        .where(por_tag.c.ofertas >= minimo)
+        .order_by(desc(por_tag.c.ofertas))
+    )
+
+    return [
+        TagOfertaSteam(
+            tag_id=id_tag,
+            nome=nome,
+            ofertas=ofertas,
+            genero=id_tag in TAGS_DE_GENERO,
+        )
+        for id_tag, ofertas, nome in sessao.execute(consulta)
+    ]

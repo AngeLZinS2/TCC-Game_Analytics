@@ -244,6 +244,19 @@ export interface PaginaOfertasSteam {
   total: number;
 }
 
+/**
+ * Uma tag da Steam presente nas ofertas ativas — Fase 35.2.
+ *
+ * `genero` separa gênero de loja (Ação, RPG, Estratégia) de característica
+ * /tema (Um Jogador, Co-op, Atmosférico): é o que divide os dois dropdowns.
+ */
+export interface TagOfertaSteam {
+  tag_id: number;
+  nome: string;
+  ofertas: number;
+  genero: boolean;
+}
+
 export interface AgregadoGenero {
   genero: string;
   jogos: number;

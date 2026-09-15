@@ -106,6 +106,13 @@ class DimJogoSteam(Base):
     #: Recursos da Steam ("Conquistas", "Cartas colecionaveis", "Nuvem",
     #: "Suporte total a controle"...). Sao os `categories` do appdetails.
     recursos: Mapped[list[str] | None] = mapped_column(ARRAY(Text))
+    #: Ids das TAGS da Steam (as votadas pela comunidade), vindas do HTML da
+    #: busca de ofertas - taxonomia diferente de `generos`/`recursos`, que
+    #: sao do `appdetails`. Guardados como id, nao nome: o nome depende do
+    #: idioma da coleta (ver `DimTagSteam`). E o que sustenta o filtro de
+    #: genero/categoria na tela de Ofertas, onde a maioria dos apps nunca
+    #: teve ficha completa coletada.
+    tags_steam: Mapped[list[int] | None] = mapped_column(ARRAY(Integer))
     #: Subconjunto de {"windows", "mac", "linux"}.
     plataformas: Mapped[list[str] | None] = mapped_column(ARRAY(Text))
     #: Idiomas de interface/legenda suportados.
@@ -347,6 +354,26 @@ class FatoSteamOnline(Base):
     usuarios_em_jogo: Mapped[int] = mapped_column(Integer, nullable=False)
 
     __table_args__ = (Index("ix_fato_steam_online_coletado_em", "coletado_em"),)
+
+
+class DimTagSteam(Base):
+    """Dicionario id -> nome das tags da Steam (Fase 35.2).
+
+    As tags chegam como ID no HTML da busca de ofertas
+    (`data-ds-tagids="[122,4747,...]"`); o nome vem de
+    `store.steampowered.com/tagdata/populartags/<idioma>`, uma requisicao
+    publica por varredura. Ficam separadas porque o id e estavel e o nome
+    nao: a mesma tag 122 e "RPG" em portugues e ingles, mas 1743 e "Luta"
+    ou "Fighting" conforme o `l=` da coleta.
+    """
+
+    __tablename__ = "dim_tag_steam"
+
+    tag_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=False)
+    nome: Mapped[str] = mapped_column(Text, nullable=False)
+    atualizado_em: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
 
 
 class DimAppSteamNome(Base):

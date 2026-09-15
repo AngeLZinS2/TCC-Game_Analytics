@@ -23,11 +23,11 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from decimal import Decimal
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from config import Settings, get_settings
-from models.models import DimJogoSteam, PromocaoSteam
+from models.models import DimJogoSteam, DimTagSteam, PromocaoSteam
 from models.session import session_scope
 from services.etl.lotes import em_lotes
 from services.etl.load_steam_precos import carregar as carregar_precos
@@ -60,6 +60,8 @@ class ResumoOfertasSteam:
     promocoes_abertas: int = 0
     promocoes_atualizadas: int = 0
     promocoes_encerradas: int = 0
+    tags_no_dicionario: int = 0
+    apps_com_tags: int = 0
 
 
 def _upsert_ficha_minima(sessao, linhas: list[LinhaOfertaSteam]) -> int:
@@ -84,14 +86,80 @@ def _upsert_ficha_minima(sessao, linhas: list[LinhaOfertaSteam]) -> int:
     return inseridos
 
 
+def _upsert_tags(sessao, tags: dict[int, str]) -> int:
+    """O dicionario id -> nome das tags. Sobrescreve o nome (a Steam pode
+    renomear uma tag), mas nunca apaga: uma tag some do dicionario popular
+    sem deixar de existir nos apps que ja a tem."""
+    if not tags:
+        return 0
+    valores = [{"tag_id": tag_id, "nome": nome} for tag_id, nome in tags.items()]
+    for lote in em_lotes(valores):
+        stmt = pg_insert(DimTagSteam).values(lote)
+        stmt = stmt.on_conflict_do_update(
+            index_elements=["tag_id"],
+            set_={"nome": stmt.excluded.nome, "atualizado_em": func.now()},
+        )
+        sessao.execute(stmt)
+    return len(valores)
+
+
+def _atualizar_tags_dos_apps(sessao, linhas: list[LinhaOfertaSteam]) -> int:
+    """Grava as tags da Steam nos apps da varredura.
+
+    Separado do upsert de ficha porque a regra e outra: a ficha nunca e
+    sobrescrita (`DO NOTHING`), mas a TAG precisa ser atualizada - os ~18 mil
+    apps que a varredura anterior criou entraram sem tag nenhuma, e sem isto
+    o filtro de genero nasceria vazio para todos eles.
+
+    E um upsert com `set_` de UMA coluna, nao um `UPDATE ... WHERE` em lote:
+    o segundo parecia mais direto, mas o SQLAlchemy recusa executemany com
+    criterio WHERE ("bulk synchronize of persistent objects not supported"),
+    e derrubava a carga inteira. Aqui o `ON CONFLICT` ja e o proprio criterio,
+    e `set_` garante que so `tags_steam` e tocado - nenhum campo de ficha.
+    """
+    com_tags = [linha for linha in linhas if linha.tags]
+    if not com_tags:
+        return 0
+
+    valores = [
+        {
+            "app_id": linha.app_id,
+            "nome": linha.nome,
+            "imagem_header": _imagem_header(linha.app_id),
+            "tags_steam": linha.tags,
+        }
+        for linha in com_tags
+    ]
+    for lote in em_lotes(valores):
+        stmt = pg_insert(DimJogoSteam).values(lote)
+        stmt = stmt.on_conflict_do_update(
+            index_elements=["app_id"],
+            set_={"tags_steam": stmt.excluded.tags_steam},
+        )
+        sessao.execute(stmt)
+    return len(com_tags)
+
+
 def carregar(
     linhas: list[LinhaOfertaSteam],
     completa: bool,
+    tags: dict[int, str] | None = None,
     settings: Settings | None = None,
 ) -> ResumoOfertasSteam:
     resumo = ResumoOfertasSteam()
     if not linhas:
         return resumo
+
+    # A varredura pagina por `start`/`count` sobre uma lista que a Steam
+    # reordena entre uma pagina e outra, entao o mesmo app reaparece em duas
+    # paginas - medido: 19.393 linhas para ~18.000 apps distintos. Deduplicar
+    # aqui, e nao em cada consumidor, porque:
+    #   * `ON CONFLICT DO UPDATE` recusa duas linhas com a mesma chave no
+    #     MESMO comando ("cannot affect row a second time") e derrubava a
+    #     carga inteira;
+    #   * sem isso o mesmo preco era processado duas vezes no historico.
+    # Fica a ULTIMA ocorrencia: paginas mais tarde sao leitura mais recente.
+    linhas = list({linha.app_id: linha for linha in linhas}.values())
 
     settings = settings or get_settings()
     pais = settings.steam_country.upper()
@@ -100,6 +168,8 @@ def carregar(
 
     with session_scope() as sessao:
         resumo.apps_novos = _upsert_ficha_minima(sessao, linhas)
+        resumo.tags_no_dicionario = _upsert_tags(sessao, tags or {})
+        resumo.apps_com_tags = _atualizar_tags_dos_apps(sessao, linhas)
 
     snapshots = [
         SnapshotSteam(
@@ -143,6 +213,8 @@ def carregar(
             "promocoes_abertas": resumo.promocoes_abertas,
             "promocoes_atualizadas": resumo.promocoes_atualizadas,
             "promocoes_encerradas": resumo.promocoes_encerradas,
+            "tags_no_dicionario": resumo.tags_no_dicionario,
+            "apps_com_tags": resumo.apps_com_tags,
             "completa": completa,
         },
     )

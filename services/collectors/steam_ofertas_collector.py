@@ -26,12 +26,24 @@ from services.etl.load_steam_ofertas import carregar
 from services.etl.transform_steam_ofertas import (
     FONTE,
     ResultadoOfertasSteam,
+    parse_dicionario_tags,
     parse_pagina,
 )
 
 logger = logging.getLogger(__name__)
 
 URL_BUSCA = "https://store.steampowered.com/search/results/"
+
+#: Dicionario publico de tags da Steam (id -> nome), no idioma da coleta.
+#: Uma requisicao por varredura - os IDs ja vem de graca em cada linha da
+#: busca, e so o nome precisa desta chamada.
+URL_TAGS = "https://store.steampowered.com/tagdata/populartags/{idioma}"
+
+#: Os dois endpoints nomeiam idioma de forma diferente - a busca quer
+#: `l=portuguese`, o dicionario de tags responde em `/brazilian`. Ambos
+#: verificados ao vivo; nao sao intercambiaveis.
+IDIOMA_BUSCA = "portuguese"
+IDIOMA_TAGS = "brazilian"
 
 #: Testado ao vivo: 100 devolve 100 linhas por chamada, sem sinal de teto
 #: menor documentado pra este endpoint.
@@ -79,7 +91,7 @@ class SteamOfertasCollector(BaseCollector[ResultadoOfertasSteam]):
                         "specials": 1,
                         "infinite": 1,
                         "cc": self.settings.steam_country,
-                        "l": "portuguese",
+                        "l": IDIOMA_BUSCA,
                     },
                 )
             except Exception as exc:  # noqa: BLE001 - uma pagina ruim nao perde as anteriores
@@ -121,6 +133,26 @@ class SteamOfertasCollector(BaseCollector[ResultadoOfertasSteam]):
                 extra={"paginas": MAX_PAGINAS},
             )
 
+        # O dicionario de tags fecha a varredura: os ids ja vieram em cada
+        # linha acima, falta so o nome deles. Uma requisicao, e uma falha aqui
+        # nao invalida as ofertas - a tela so fica sem o filtro de genero.
+        try:
+            dicionario = self.client.get_json(URL_TAGS.format(idioma=IDIOMA_TAGS))
+            registros.append(
+                RawRecord(
+                    fonte=self.fonte,
+                    endpoint="tags",
+                    identificador=IDIOMA_TAGS,
+                    payload=dicionario,
+                )
+            )
+        except Exception as exc:  # noqa: BLE001 - o dicionario e acessorio
+            self.falhas += 1
+            self.logger.warning(
+                "falha ao buscar dicionario de tags",
+                extra={"erro": f"{type(exc).__name__}: {exc}"},
+            )
+
         logger.info(
             "varredura de ofertas concluida",
             extra={
@@ -133,14 +165,23 @@ class SteamOfertasCollector(BaseCollector[ResultadoOfertasSteam]):
 
     def parse(self, registros: Sequence[RawRecord]) -> ResultadoOfertasSteam:
         linhas = []
+        tags: dict[int, str] = {}
         for registro in registros:
             if registro.fonte != self.fonte:
                 continue
+            if registro.endpoint == "tags":
+                tags = parse_dicionario_tags(registro.payload)
+                continue
             linhas.extend(parse_pagina(registro.payload))
-        return ResultadoOfertasSteam(linhas=linhas, completa=self._completa)
+        return ResultadoOfertasSteam(linhas=linhas, tags=tags, completa=self._completa)
 
     def load(self, dados: ResultadoOfertasSteam) -> int:
-        resumo = carregar(dados.linhas, completa=dados.completa, settings=self.settings)
+        resumo = carregar(
+            dados.linhas,
+            completa=dados.completa,
+            tags=dados.tags,
+            settings=self.settings,
+        )
         return resumo.promocoes_abertas + resumo.promocoes_atualizadas
 
     def close(self) -> None:

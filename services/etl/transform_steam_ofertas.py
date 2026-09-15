@@ -16,6 +16,7 @@ sinal confiavel sem pedir outro endpoint).
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass, field
 
 from bs4 import BeautifulSoup
@@ -39,11 +40,20 @@ class LinhaOfertaSteam:
     preco_final_centavos: int
     preco_original_centavos: int
     desconto_percentual: int
+    #: Ids das tags da Steam daquele app (`data-ds-tagids`). Vazio quando a
+    #: linha nao traz o atributo. Sao o que sustenta o filtro de genero da
+    #: tela de Ofertas: os apps que so existem por causa da varredura nunca
+    #: tiveram ficha (`appdetails`) e, portanto, nao tem `generos`.
+    tags: list[int] = field(default_factory=list)
 
 
 @dataclass(slots=True)
 class ResultadoOfertasSteam:
     linhas: list[LinhaOfertaSteam] = field(default_factory=list)
+    #: `{tag_id: nome}` do dicionario publico da Steam. Vazio quando a
+    #: chamada do dicionario falhou - as ofertas seguem valendo, so o
+    #: filtro de genero fica sem rotulo novo.
+    tags: dict[int, str] = field(default_factory=dict)
     #: `False` quando a varredura parou por erro/trava de seguranca antes de
     #: esgotar as paginas - o load usa isto pra NUNCA encerrar promocoes
     #: ausentes de uma varredura incompleta (ausencia so significa "nao
@@ -98,7 +108,41 @@ def parse_pagina(results_html: str) -> list[LinhaOfertaSteam]:
                 preco_final_centavos=preco_final,
                 preco_original_centavos=preco_original,
                 desconto_percentual=desconto,
+                tags=_tags(item.get("data-ds-tagids")),
             )
         )
 
     return linhas
+
+
+def _tags(bruto: object) -> list[int]:
+    """`data-ds-tagids="[122,4747,6426]"` -> `[122, 4747, 6426]`.
+
+    Tolerante de proposito: o atributo pode faltar ou vir vazio, e uma tag
+    ilegivel nao pode derrubar a oferta inteira - o preco e o que importa
+    naquela linha, a tag e o extra.
+    """
+    if not isinstance(bruto, str):
+        return []
+    try:
+        valores = json.loads(bruto)
+    except ValueError:
+        return []
+    if not isinstance(valores, list):
+        return []
+    return [int(v) for v in valores if isinstance(v, int)]
+
+
+def parse_dicionario_tags(payload: object) -> dict[int, str]:
+    """`/tagdata/populartags/<idioma>` -> `{tag_id: nome}`."""
+    if not isinstance(payload, list):
+        return {}
+    dicionario: dict[int, str] = {}
+    for item in payload:
+        if not isinstance(item, dict):
+            continue
+        tag_id = item.get("tagid")
+        nome = item.get("name")
+        if isinstance(tag_id, int) and isinstance(nome, str) and nome.strip():
+            dicionario[tag_id] = nome.strip()
+    return dicionario

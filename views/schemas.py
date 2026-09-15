@@ -310,6 +310,21 @@ class PaginaOfertasSteam(BaseModel):
     total: int
 
 
+class TagOfertaSteam(BaseModel):
+    """Uma tag da Steam presente nas ofertas ativas, com quantas tem (Fase 35.2).
+
+    `genero` separa as tags que sao genero de loja da Steam (Acao, RPG,
+    Estrategia...) das demais, que sao caracteristica/tema (Um Jogador,
+    Co-op, Atmosferico...) - a mesma divisao que o Catalogo faz entre
+    "genero" e "categoria", so que sobre a taxonomia de tags.
+    """
+
+    tag_id: int
+    nome: str
+    ofertas: int
+    genero: bool
+
+
 class DetalheJogoSteam(BaseModel):
     jogo: JogoSteam
     ficha: FichaJogoSteam
