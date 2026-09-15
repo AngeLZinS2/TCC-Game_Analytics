@@ -10,7 +10,9 @@
  */
 
 import type { ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 
+import i18n from "@i18n/index";
 import type {
   ConfrontoResultado,
   Partida,
@@ -62,7 +64,7 @@ export function paraCartao(
 export function paraCartaoPartida(p: Partida): DadosConfronto {
   const nota = [
     fmtDuracao(p.duracao_segundos),
-    p.patch ? `patch ${p.patch}` : null,
+    p.patch ? i18n.t("cartaoConfronto.patch", { patch: p.patch }) : null,
   ]
     .filter(Boolean)
     .join(" · ");
@@ -183,6 +185,7 @@ export function CartaoConfronto({
   semCabecalho?: boolean;
   aoClicar?: () => void;
 }) {
+  const { t } = useTranslation();
   const agendada = c.vitoria_a == null && c.placar_a == null;
   const venceuA = c.vitoria_a === true;
   const venceuB = c.vitoria_a === false;
@@ -195,7 +198,7 @@ export function CartaoConfronto({
         <div className="flex items-center gap-space-xs border-b border-outline-variant/20 px-space-sm py-space-xs font-label-caps text-label-caps uppercase tracking-wider text-outline">
           <Icone nome="emoji_events" className="shrink-0 text-[13px]" />
           <span className="truncate" title={c.torneio ?? undefined}>
-            {c.torneio ?? "Sem torneio"}
+            {c.torneio ?? t("visaoConfrontos.semTorneio")}
           </span>
         </div>
       )}
@@ -238,7 +241,7 @@ export function CartaoConfronto({
         {c.tem_detalhe ? (
           <span className="inline-flex shrink-0 items-center gap-space-xxs text-primary">
             <Icone nome="scoreboard" className="text-[13px]" />
-            por mapa
+            {t("cartaoConfronto.porMapa")}
           </span>
         ) : (
           c.nota && (

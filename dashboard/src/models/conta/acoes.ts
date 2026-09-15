@@ -15,33 +15,32 @@ import {
   signInWithPopup,
   signOut,
 } from "firebase/auth";
+import type { TFunction } from "i18next";
 
 import { auth } from "./cliente";
 
-const MENSAGENS: Record<string, string> = {
-  "auth/invalid-email": "E-mail inválido.",
-  "auth/user-disabled": "Esta conta foi desativada.",
-  "auth/user-not-found": "Não existe conta com este e-mail.",
-  "auth/wrong-password": "Senha incorreta.",
-  "auth/invalid-credential": "E-mail ou senha incorretos.",
-  "auth/email-already-in-use": "Já existe uma conta com este e-mail.",
-  "auth/weak-password": "A senha precisa ter pelo menos 6 caracteres.",
-  "auth/too-many-requests": "Muitas tentativas seguidas. Aguarde um pouco e tente de novo.",
-  "auth/network-request-failed": "Sem conexão com o Firebase. Confira sua internet.",
-  "auth/popup-closed-by-user": "Janela fechada antes de terminar o login.",
-  "auth/popup-blocked": "O navegador bloqueou a janela de login. Permita pop-ups para este site.",
-  "auth/cancelled-popup-request": "Login cancelado — só uma janela por vez.",
-  "auth/account-exists-with-different-credential":
-    "Já existe uma conta com este e-mail, criada com outro método de login (senha, Google ou GitHub).",
-  "auth/operation-not-allowed":
-    "Este método de login ainda não foi habilitado no Firebase.",
-};
+export function mensagemErroConta(erro: unknown, t: TFunction): string {
+  const mensagens: Record<string, string> = {
+    "auth/invalid-email": t("conta.erros.invalidEmail"),
+    "auth/user-disabled": t("conta.erros.userDisabled"),
+    "auth/user-not-found": t("conta.erros.userNotFound"),
+    "auth/wrong-password": t("conta.erros.wrongPassword"),
+    "auth/invalid-credential": t("conta.erros.invalidCredential"),
+    "auth/email-already-in-use": t("conta.erros.emailInUse"),
+    "auth/weak-password": t("conta.erros.weakPassword"),
+    "auth/too-many-requests": t("conta.erros.tooManyRequests"),
+    "auth/network-request-failed": t("conta.erros.networkFailed"),
+    "auth/popup-closed-by-user": t("conta.erros.popupClosed"),
+    "auth/popup-blocked": t("conta.erros.popupBlocked"),
+    "auth/cancelled-popup-request": t("conta.erros.popupCancelled"),
+    "auth/account-exists-with-different-credential": t("conta.erros.accountExists"),
+    "auth/operation-not-allowed": t("conta.erros.operationNotAllowed"),
+  };
 
-export function mensagemErroConta(erro: unknown): string {
   if (erro instanceof FirebaseError) {
-    return MENSAGENS[erro.code] ?? "Não foi possível completar a ação. Tente de novo.";
+    return mensagens[erro.code] ?? t("comum.erroGenerico");
   }
-  return "Não foi possível completar a ação. Tente de novo.";
+  return t("comum.erroGenerico");
 }
 
 export function entrarComEmailSenha(email: string, senha: string) {

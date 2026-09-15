@@ -22,6 +22,7 @@
  */
 
 import { useMemo, useState, type FormEvent } from "react";
+import { useTranslation } from "react-i18next";
 
 import { useModelosIA, useRemoverChaveIA, useSalvarChaveIA } from "@models/api/consultas";
 import type { ModeloIA, PerfilUsuario, ProvedorIA } from "@models/api/tipos";
@@ -66,6 +67,7 @@ export const ROTULO_PROVEDOR: Record<ProvedorIA, string> = {
 };
 
 export function PainelChaveIA({ perfil }: { perfil: PerfilUsuario | undefined }) {
+  const { t } = useTranslation();
   const salvar = useSalvarChaveIA();
   const remover = useRemoverChaveIA();
   const catalogo = useModelosIA();
@@ -119,14 +121,14 @@ export function PainelChaveIA({ perfil }: { perfil: PerfilUsuario | undefined })
   return (
     <Painel
       icone="vpn_key"
-      titulo="Sua chave de IA"
-      descricao="Opcional. Cadastre sua própria chave — OpenRouter, Anthropic (Claude) ou Google (Gemini) — e o Assistente de IA passa a usar ela só nas suas perguntas, em vez da chave compartilhada do site."
+      titulo={t("conta.chaveIA.titulo")}
+      descricao={t("conta.chaveIA.descricao")}
     >
       {temChave && !editando && perfil && (
         <div className="flex flex-wrap items-center justify-between gap-space-sm rounded-lg bg-surface-container-lowest p-space-base">
           <span className="flex items-center gap-space-xs font-body-md text-body-sm text-on-surface">
             <Icone nome="check_circle" className="text-[18px] text-tertiary" />
-            Usando sua chave da{" "}
+            {t("conta.chaveIA.usandoChavePrefixo")}{" "}
             <strong className="text-on-surface">
               {perfil.chave_ia_provedor ? ROTULO_PROVEDOR[perfil.chave_ia_provedor] : "—"}
             </strong>
@@ -144,7 +146,7 @@ export function PainelChaveIA({ perfil }: { perfil: PerfilUsuario | undefined })
               onClick={() => setEditando(true)}
               className="font-title-code text-title-code text-primary hover:underline"
             >
-              Trocar
+              {t("conta.chaveIA.trocar")}
             </button>
             <button
               type="button"
@@ -152,7 +154,7 @@ export function PainelChaveIA({ perfil }: { perfil: PerfilUsuario | undefined })
               disabled={remover.isPending}
               className="font-title-code text-title-code text-outline transition-colors hover:text-error disabled:cursor-not-allowed disabled:opacity-50"
             >
-              Remover
+              {t("conta.chaveIA.remover")}
             </button>
           </div>
         </div>
@@ -178,7 +180,7 @@ export function PainelChaveIA({ perfil }: { perfil: PerfilUsuario | undefined })
               type="password"
               value={chave}
               onChange={(evento) => setChave(evento.target.value)}
-              placeholder="cole a chave aqui"
+              placeholder={t("conta.chaveIA.colePlaceholder")}
               className={CAMPO + " flex-1"}
               autoComplete="off"
             />
@@ -192,7 +194,7 @@ export function PainelChaveIA({ perfil }: { perfil: PerfilUsuario | undefined })
               ) : (
                 <Icone nome="save" className="text-[16px]" />
               )}
-              Salvar
+              {t("conta.chaveIA.salvar")}
             </button>
             {editando && (
               <button
@@ -205,14 +207,14 @@ export function PainelChaveIA({ perfil }: { perfil: PerfilUsuario | undefined })
                 }}
                 className="font-title-code text-title-code text-outline hover:text-on-surface"
               >
-                Cancelar
+                {t("conta.chaveIA.cancelar")}
               </button>
             )}
           </div>
 
           <label className="flex flex-col gap-space-xs">
             <span className="font-title-code text-title-code text-on-surface-variant">
-              Modelo
+              {t("conta.chaveIA.modelo")}
             </span>
             <select
               value={escolha}
@@ -222,20 +224,20 @@ export function PainelChaveIA({ perfil }: { perfil: PerfilUsuario | undefined })
             >
               <option value="">
                 {provedor === "openrouter"
-                  ? "Padrão do site"
-                  : "Padrão do provedor (modelo atual e equilibrado)"}
+                  ? t("conta.chaveIA.padraoDoSite")
+                  : t("conta.chaveIA.padraoDoProvedor")}
               </option>
               {grupos.map(([grupo, itens]) => (
                 <optgroup key={grupo} label={grupo}>
                   {itens.map((item) => (
                     <option key={item.id} value={item.id}>
                       {item.nome}
-                      {item.gratuito ? " — grátis" : ""}
+                      {item.gratuito ? t("conta.chaveIA.gratis") : ""}
                     </option>
                   ))}
                 </optgroup>
               ))}
-              <option value={OUTRO}>Outro — digitar o ID…</option>
+              <option value={OUTRO}>{t("conta.chaveIA.outroDigitarId")}</option>
             </select>
           </label>
 
@@ -253,15 +255,14 @@ export function PainelChaveIA({ perfil }: { perfil: PerfilUsuario | undefined })
 
           {catalogo.isError && (
             <p className="font-body-sm text-body-sm text-outline">
-              Não deu para carregar a lista de modelos agora — escolha "Outro" e digite o
-              ID, ou deixe no padrão.
+              {t("conta.chaveIA.erroListaModelos")}
             </p>
           )}
 
           {salvar.isError && <MensagemErro erro={salvar.error} />}
 
           <p className="font-body-sm text-body-sm text-outline">
-            Chave gratuita em{" "}
+            {t("conta.chaveIA.chaveGratuitaPrefixo")}{" "}
             <a
               href={PROVEDORES[provedor].linkChave}
               target="_blank"
@@ -270,10 +271,8 @@ export function PainelChaveIA({ perfil }: { perfil: PerfilUsuario | undefined })
             >
               {PROVEDORES[provedor].linkChave.replace("https://", "")}
             </a>
-            . Fica cifrada no banco — nunca reaparece em texto puro, nem pra você.
-            {provedor !== "openrouter" && (
-              <> A busca na web do assistente não está disponível com chave direta — só via OpenRouter.</>
-            )}
+            {t("conta.chaveIA.cifradaNoBanco")}
+            {provedor !== "openrouter" && <>{t("conta.chaveIA.semBuscaWeb")}</>}
           </p>
         </form>
       )}

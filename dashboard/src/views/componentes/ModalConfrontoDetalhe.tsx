@@ -14,6 +14,9 @@
  * feed livestats da LoL Esports.
  */
 
+import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
+
 import { useConfrontoDetalhe } from "@models/api/consultas";
 import type {
   DetalheConfronto,
@@ -45,18 +48,21 @@ function Num({ valor, casas = 0 }: { valor: number | null; casas?: number }) {
 
 /* ------------------------------- Cabeçalho ------------------------------- */
 
-const ROTULO_STATUS: Record<StatusPartida, string> = {
-  em_breve: "Em breve",
-  ao_vivo: "Ao vivo",
-  encerrada: "Encerrada",
-};
+function rotuloStatus(status: StatusPartida, t: TFunction): string {
+  return {
+    em_breve: t("modalConfrontoDetalhe.status.emBreve"),
+    ao_vivo: t("modalConfrontoDetalhe.status.aoVivo"),
+    encerrada: t("modalConfrontoDetalhe.status.encerrada"),
+  }[status];
+}
 
 function SeloStatus({ status }: { status: StatusPartida }) {
+  const { t } = useTranslation();
   if (status === "ao_vivo") {
     return (
       <span className="inline-flex items-center gap-space-xxs rounded bg-error/15 px-space-xs py-space-xxs font-badge-status text-badge-status uppercase tracking-widest text-error">
         <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-error" aria-hidden />
-        ao vivo
+        {t("modalConfrontoDetalhe.status.aoVivo")}
       </span>
     );
   }
@@ -68,7 +74,7 @@ function SeloStatus({ status }: { status: StatusPartida }) {
     <span
       className={`inline-flex items-center rounded px-space-xs py-space-xxs font-badge-status text-badge-status uppercase tracking-widest ${classe}`}
     >
-      {ROTULO_STATUS[status]}
+      {rotuloStatus(status, t)}
     </span>
   );
 }
@@ -152,11 +158,12 @@ function LinhaTimeCabecalho({
 }
 
 function Cabecalho({ d }: { d: DetalheConfronto }) {
+  const { t } = useTranslation();
   const temPlacar = d.placar_a != null || d.placar_b != null;
   const decidido = d.vitoria_a != null;
   const quando =
     d.status === "ao_vivo"
-      ? "ao vivo agora"
+      ? t("modalConfrontoDetalhe.aoVivoAgora")
       : d.inicio_previsto
         ? fmtQuando(d.inicio_previsto)
         : null;
@@ -218,7 +225,7 @@ function Cabecalho({ d }: { d: DetalheConfronto }) {
             {quando}
           </span>
         )}
-        <span className="text-outline/70">fonte {d.fonte}</span>
+        <span className="text-outline/70">{t("modalConfrontoDetalhe.fonte", { fonte: d.fonte })}</span>
       </div>
 
       {d.veto && (
@@ -234,16 +241,17 @@ function Cabecalho({ d }: { d: DetalheConfronto }) {
 /* ---------------------------- Resultado por mapa ---------------------------- */
 
 function TrilhaMapas({ mapas }: { mapas: ResultadoMapa[] }) {
+  const { t } = useTranslation();
   return (
     <section className="space-y-space-xs">
       <h3 className="font-label-caps text-label-caps uppercase tracking-wider text-outline">
-        Mapas
+        {t("modalConfrontoDetalhe.mapas")}
       </h3>
       <div className="flex flex-wrap gap-space-xs">
         {mapas.map((m, i) => {
           const aoVivo = m.status === "ao_vivo";
           const decidido = m.vitoria_a != null;
-          const rotulo = m.nome ?? `Mapa ${m.posicao ?? i + 1}`;
+          const rotulo = m.nome ?? t("modalConfrontoDetalhe.mapaNumero", { n: m.posicao ?? i + 1 });
           return (
             <div
               key={`${rotulo}-${i}`}
@@ -264,7 +272,7 @@ function TrilhaMapas({ mapas }: { mapas: ResultadoMapa[] }) {
                     className="h-1.5 w-1.5 animate-pulse rounded-full bg-error"
                     aria-hidden
                   />
-                  ao vivo
+                  {t("modalConfrontoDetalhe.status.aoVivo")}
                 </span>
               ) : decidido ? (
                 <span
@@ -275,11 +283,11 @@ function TrilhaMapas({ mapas }: { mapas: ResultadoMapa[] }) {
                 </span>
               ) : m.status === "nao_jogado" ? (
                 <span className="font-badge-status text-badge-status uppercase tracking-wider text-outline/60">
-                  não jogado
+                  {t("modalConfrontoDetalhe.naoJogado")}
                 </span>
               ) : (
                 <span className="font-badge-status text-badge-status uppercase tracking-wider text-outline">
-                  a jogar
+                  {t("modalConfrontoDetalhe.aJogar")}
                 </span>
               )}
             </div>
@@ -300,6 +308,7 @@ function TabelaTime({
   time: string;
   jogadores: JogadorNoMapa[];
 }) {
+  const { t } = useTranslation();
   const linhas = [...jogadores].sort((a, b) => (b.acs ?? 0) - (a.acs ?? 0));
 
   return (
@@ -307,7 +316,7 @@ function TabelaTime({
       <table className="w-full border-collapse text-left">
         <thead>
           <tr className="bg-surface-container font-label-caps text-label-caps uppercase tracking-wider text-outline">
-            <th className="px-space-sm py-space-xs">{time || "Time"}</th>
+            <th className="px-space-sm py-space-xs">{time || t("modalConfrontoDetalhe.time")}</th>
             <th className="px-space-sm py-space-xs text-right">Rating</th>
             <th className="px-space-sm py-space-xs text-right">ACS</th>
             <th className="px-space-sm py-space-xs text-right">K</th>
@@ -362,15 +371,16 @@ function TabelaTimeLol({
   time: string;
   jogadores: JogadorNoMapa[];
 }) {
+  const { t } = useTranslation();
   return (
     <div className="rolagem-discreta overflow-x-auto rounded-lg bg-surface-container-lowest">
       <table className="w-full border-collapse text-left">
         <thead>
           <tr className="bg-surface-container font-label-caps text-label-caps uppercase tracking-wider text-outline">
-            <th className="px-space-sm py-space-xs">{time || "Time"}</th>
+            <th className="px-space-sm py-space-xs">{time || t("modalConfrontoDetalhe.time")}</th>
             <th className="px-space-sm py-space-xs text-right">K / D / A</th>
             <th className="px-space-sm py-space-xs text-right">CS</th>
-            <th className="px-space-sm py-space-xs text-right">Ouro</th>
+            <th className="px-space-sm py-space-xs text-right">{t("modalConfrontoDetalhe.ouro")}</th>
           </tr>
         </thead>
         <tbody className="font-body-md text-body-sm">
@@ -404,10 +414,11 @@ function TabelaTimeLol({
 }
 
 function Objetivos({ o }: { o: NonNullable<MapaDoConfronto["objetivos_a"]> }) {
+  const { t } = useTranslation();
   const itens: [string, number | null][] = [
-    ["Torres", o.torres],
-    ["Dragões", o.dragoes],
-    ["Barões", o.baroes],
+    [t("modalConfrontoDetalhe.torres"), o.torres],
+    [t("modalConfrontoDetalhe.dragoes"), o.dragoes],
+    [t("modalConfrontoDetalhe.baroes"), o.baroes],
   ];
   return (
     <span className="flex flex-wrap items-center gap-x-space-sm gap-y-space-xxs font-badge-status text-badge-status uppercase tracking-wider text-outline">
@@ -418,7 +429,7 @@ function Objetivos({ o }: { o: NonNullable<MapaDoConfronto["objetivos_a"]> }) {
       ))}
       {o.ouro != null && (
         <span className="tabular-nums">
-          Ouro <span className="text-on-surface">{(o.ouro / 1000).toFixed(1)}k</span>
+          {t("modalConfrontoDetalhe.ouro")} <span className="text-on-surface">{(o.ouro / 1000).toFixed(1)}k</span>
         </span>
       )}
     </span>
@@ -434,6 +445,7 @@ function CardMapaLol({
   timeA: string;
   timeB: string;
 }) {
+  const { t } = useTranslation();
   const jogA = mapa.jogadores.filter((j) => j.time !== timeB);
   const jogB = mapa.jogadores.filter((j) => j.time === timeB);
   const venceuA =
@@ -445,7 +457,7 @@ function CardMapaLol({
     <div className="space-y-space-sm rounded-xl bg-surface-container-low p-space-base">
       <div className="flex flex-wrap items-baseline justify-between gap-space-sm border-b border-outline-variant/30 pb-space-xs">
         <h3 className="font-headline-sm text-headline-sm uppercase tracking-wide text-primary">
-          {mapa.nome ?? "Jogo"}
+          {mapa.nome ?? t("modalConfrontoDetalhe.jogo")}
         </h3>
         <div className="flex items-baseline gap-space-xs font-headline-sm text-headline-sm tabular-nums">
           <span className={venceuA ? "text-tertiary" : "text-outline"}>
@@ -482,6 +494,7 @@ function CardMapa({
   timeA: string;
   timeB: string;
 }) {
+  const { t } = useTranslation();
   const times = [...new Set(mapa.jogadores.map((j) => j.time))];
   const ordenados = times.sort((a, b) => {
     const rank = (t: string) => (t === timeA ? 0 : t === timeB ? 1 : 2);
@@ -497,7 +510,7 @@ function CardMapa({
     <div className="space-y-space-sm rounded-xl bg-surface-container-low p-space-base">
       <div className="flex flex-wrap items-baseline justify-between gap-space-sm border-b border-outline-variant/30 pb-space-xs">
         <h3 className="font-headline-sm text-headline-sm uppercase tracking-wide text-primary">
-          {mapa.nome ?? "Mapa"}
+          {mapa.nome ?? t("modalConfrontoDetalhe.mapaFallback")}
         </h3>
         <div className="flex items-baseline gap-space-xs font-headline-sm text-headline-sm tabular-nums">
           <span className={venceuA ? "text-tertiary" : "text-outline"}>
@@ -538,6 +551,7 @@ export function ModalConfrontoDetalhe({
   idExterno: string | null;
   aoFechar: () => void;
 }) {
+  const { t } = useTranslation();
   const detalhe = useConfrontoDetalhe(idExterno);
 
   return (
@@ -546,11 +560,11 @@ export function ModalConfrontoDetalhe({
       titulo={
         detalhe.data
           ? `${detalhe.data.equipe_a_nome} vs ${detalhe.data.equipe_b_nome}`
-          : "Detalhe da partida"
+          : t("modalConfrontoDetalhe.detalheDaPartida")
       }
       aoFechar={aoFechar}
     >
-      <Consulta estado={detalhe} altura={240} vazio="Partida não encontrada.">
+      <Consulta estado={detalhe} altura={240} vazio={t("modalConfrontoDetalhe.partidaNaoEncontrada")}>
         {(d) => {
           const temScoreboard = d.mapas.some((m) => m.jogadores.length > 0);
           const semNada =
@@ -566,7 +580,7 @@ export function ModalConfrontoDetalhe({
               {d.streams.length > 0 && (
                 <section className="space-y-space-xs">
                   <h3 className="font-label-caps text-label-caps uppercase tracking-wider text-outline">
-                    Onde assistir
+                    {t("modalConfrontoDetalhe.ondeAssistir")}
                   </h3>
                   <CanaisTransmissao streams={d.streams} />
                 </section>
@@ -603,8 +617,8 @@ export function ModalConfrontoDetalhe({
               {semNada && (
                 <p className="rounded-lg bg-surface-container-lowest px-space-base py-space-md font-body-sm text-body-sm text-on-surface-variant">
                   {d.status === "em_breve"
-                    ? "A partida ainda não começou. Volta aqui para acompanhar o placar e os canais de transmissão."
-                    : "Sem placar por mapa desta partida — a fonte publica só o resultado da série."}
+                    ? t("modalConfrontoDetalhe.aindaNaoComecou")
+                    : t("modalConfrontoDetalhe.semPlacarPorMapa")}
                 </p>
               )}
             </div>

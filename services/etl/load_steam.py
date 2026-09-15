@@ -11,11 +11,12 @@ from __future__ import annotations
 import logging
 from datetime import datetime, timezone
 
-from sqlalchemy import func
+from sqlalchemy import func, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
 from models.models import (
+    DimAppSteamNome,
     DimJogoSteam,
     FatoAvaliacaoSteam,
     FatoSnapshotJogoSteam,
@@ -32,7 +33,26 @@ def _upsert_jogos(sessao: Session, resultado: ResultadoSteam) -> int:
     if not resultado.jogos:
         return 0
 
-    linhas = [jogo.model_dump() for jogo in resultado.jogos]
+    # Filtro defensivo: o crawl do catalogo completo (`steam_catalogo.py`) ja
+    # so traz `type=game` na origem (`include_games=1`), mas coleta manual
+    # (`/coletar`) e busca podem trazer DLC/software/demo/etc. `tipo=None`
+    # cobre payload antigo sem o campo - nao bloqueia, so nao filtra.
+    jogos_validos = [j for j in resultado.jogos if j.tipo in (None, "game")]
+    ignorados = len(resultado.jogos) - len(jogos_validos)
+    if ignorados:
+        logger.info(
+            "apps nao-jogo ignorados na carga",
+            extra={
+                "ignorados": ignorados,
+                "tipos": sorted(
+                    {j.tipo for j in resultado.jogos if j.tipo not in (None, "game")}
+                ),
+            },
+        )
+    if not jogos_validos:
+        return 0
+
+    linhas = [jogo.model_dump() for jogo in jogos_validos]
     stmt = pg_insert(DimJogoSteam).values(linhas)
     atualizaveis = {
         coluna: stmt.excluded[coluna]
@@ -82,7 +102,10 @@ def _upsert_snapshots(sessao: Session, resultado: ResultadoSteam) -> int:
     if not resultado.snapshots:
         return 0
 
-    linhas = [snap.model_dump() for snap in resultado.snapshots]
+    # `preco_original` viaja no `SnapshotSteam` so para chegar a
+    # `load_steam_precos.py` (historico/promocao, Fase 35) - `fato_snapshot_jogo_steam`
+    # nao tem essa coluna, entao sai do dict antes do upsert.
+    linhas = [snap.model_dump(exclude={"preco_original"}) for snap in resultado.snapshots]
     stmt = pg_insert(FatoSnapshotJogoSteam).values(linhas)
     atualizaveis = {
         coluna: stmt.excluded[coluna]
@@ -128,6 +151,27 @@ def _upsert_avaliacoes(sessao: Session, resultado: ResultadoSteam) -> int:
 
 def carregar(resultado: ResultadoSteam) -> int:
     """Persiste dimensao e fatos numa unica transacao. Retorna linhas afetadas."""
+    # App nao-jogo (DLC/software/demo/...) nao entra em `dim_jogo_steam` - os
+    # fatos dele (FK para a dimensao) tambem ficam de fora, senao o upsert
+    # quebraria por violar a FK de um app que nunca vai existir na dimensao.
+    ids_nao_jogo = {
+        j.app_id for j in resultado.jogos if j.tipo not in (None, "game")
+    }
+    if ids_nao_jogo:
+        resultado = resultado.model_copy(
+            update={
+                "snapshots": [
+                    s for s in resultado.snapshots if s.app_id not in ids_nao_jogo
+                ],
+                "avaliacoes": [
+                    a for a in resultado.avaliacoes if a.app_id not in ids_nao_jogo
+                ],
+                "noticias": [
+                    n for n in resultado.noticias if n.app_id not in ids_nao_jogo
+                ],
+            }
+        )
+
     with session_scope() as sessao:
         jogos = _upsert_jogos(sessao, resultado)
         # Os fatos tem FK para a dimensao: o flush precisa acontecer antes.
@@ -145,4 +189,27 @@ def carregar(resultado: ResultadoSteam) -> int:
             "noticias": noticias,
         },
     )
+
+    # Preco primeiro-partido (historico/promocao) + zera a fila de "precisa
+    # reprocessar preco" - roda depois que dim_jogo_steam ja foi commitado
+    # (FK), numa transacao propria (Fase 35).
+    _processar_precos_e_desmarcar_fila(resultado)
+
     return jogos + snapshots + avaliacoes + noticias
+
+
+def _processar_precos_e_desmarcar_fila(resultado: ResultadoSteam) -> None:
+    from services.etl import load_steam_precos  # import tardio: evita ciclo de import
+
+    app_ids = {s.app_id for s in resultado.snapshots if s.preco_no_momento is not None}
+    if not app_ids:
+        return
+
+    load_steam_precos.carregar(resultado)
+
+    with session_scope() as sessao:
+        sessao.execute(
+            update(DimAppSteamNome)
+            .where(DimAppSteamNome.app_id.in_(app_ids))
+            .values(pendente_atualizacao_preco=False)
+        )

@@ -7,6 +7,7 @@
  */
 
 import { Link, useParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 
 import { usePartida } from "@models/api/consultas";
 import type { DetalhePartida, JogadorNaPartida } from "@models/api/tipos";
@@ -53,20 +54,21 @@ function Placar({
   jogadores: JogadorNaPartida[];
   cor: string;
 }) {
+  const { t } = useTranslation();
   return (
     <div className="rolagem-discreta overflow-x-auto rounded-lg bg-surface-container-lowest">
       <table className="w-full border-collapse text-left">
         <thead>
           <tr className="bg-surface-container font-label-caps text-label-caps uppercase tracking-wider text-outline">
-            <th className="px-space-md py-space-sm">Herói / Jogador</th>
-            <th className="px-space-md py-space-sm text-right">Nível</th>
-            <th className="px-space-md py-space-sm text-center">K / D / A</th>
-            <th className="px-space-md py-space-sm text-right">LH / DN</th>
-            <th className="px-space-md py-space-sm text-right">GPM</th>
-            <th className="px-space-md py-space-sm text-right">XPM</th>
-            <th className="px-space-md py-space-sm text-right">Economia</th>
-            <th className="px-space-md py-space-sm text-right">Dano</th>
-            <th className="px-space-md py-space-sm text-right">Objetivos</th>
+            <th className="px-space-md py-space-sm">{t("partida.placar.colunas.heroiJogador")}</th>
+            <th className="px-space-md py-space-sm text-right">{t("partida.placar.colunas.nivel")}</th>
+            <th className="px-space-md py-space-sm text-center">{t("partida.placar.colunas.kda")}</th>
+            <th className="px-space-md py-space-sm text-right">{t("partida.placar.colunas.lhDn")}</th>
+            <th className="px-space-md py-space-sm text-right">{t("partida.placar.colunas.gpm")}</th>
+            <th className="px-space-md py-space-sm text-right">{t("partida.placar.colunas.xpm")}</th>
+            <th className="px-space-md py-space-sm text-right">{t("partida.placar.colunas.economia")}</th>
+            <th className="px-space-md py-space-sm text-right">{t("partida.placar.colunas.dano")}</th>
+            <th className="px-space-md py-space-sm text-right">{t("partida.placar.colunas.objetivos")}</th>
           </tr>
         </thead>
 
@@ -91,7 +93,7 @@ function Placar({
                       {linha.personagem ?? "—"}
                     </span>
                     <span className="truncate font-title-code text-title-code text-outline">
-                      {linha.jogador ?? "anônimo"}
+                      {linha.jogador ?? t("partida.placar.anonimo")}
                     </span>
                   </div>
                 </div>
@@ -136,6 +138,7 @@ function Placar({
 }
 
 export function PartidaPagina() {
+  const { t } = useTranslation();
   const { idPartida } = useParams();
   const detalhe = usePartida(Number(idPartida));
 
@@ -175,36 +178,36 @@ export function PartidaPagina() {
                 className="relative z-10 inline-flex items-center gap-space-xxs font-title-code text-title-code text-outline transition-colors hover:text-primary"
               >
                 <Icone nome="arrow_back" className="text-[16px]" />
-                Voltar para partidas
+                {t("partida.voltar")}
               </Link>
 
               <div className="relative z-10 mt-space-sm flex flex-col justify-between gap-space-base lg:flex-row lg:items-start">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-space-sm">
                     <span className="font-title-code text-title-code uppercase tracking-wider text-outline">
-                      Match ID #{partida.id_externo}
+                      {t("partida.matchId", { id: partida.id_externo })}
                     </span>
-                    {partida.patch && <Selo>Patch {partida.patch}</Selo>}
+                    {partida.patch && <Selo>{t("partida.patch", { patch: partida.patch })}</Selo>}
                     {partida.tipo_partida && (
                       <Selo cor="primario">{partida.tipo_partida}</Selo>
                     )}
                   </div>
 
                   <h1 className="mt-space-xs font-display-hero text-display-hero uppercase leading-none tracking-tight text-on-surface">
-                    {partida.liga_nome ?? "Partida"}
+                    {partida.liga_nome ?? t("partida.semTitulo")}
                   </h1>
 
                   <div className="mt-space-base flex flex-wrap gap-space-xl">
-                    <Meta rotulo="Início" valor={fmtDataHora(partida.data_inicio)} />
+                    <Meta rotulo={t("partida.meta.inicio")} valor={fmtDataHora(partida.data_inicio)} />
                     <Meta
-                      rotulo="Duração"
+                      rotulo={t("partida.meta.duracao")}
                       valor={fmtDuracao(partida.duracao_segundos)}
                       cor={PALETA_POLOS.positivo}
                     />
-                    <Meta rotulo="Modo" valor={partida.modo ?? "—"} />
+                    <Meta rotulo={t("partida.meta.modo")} valor={partida.modo ?? "—"} />
                     <Meta
-                      rotulo="Linhas de fato"
-                      valor={`${jogadores.length} jogadores`}
+                      rotulo={t("partida.meta.linhasDeFato")}
+                      valor={t("partida.meta.jogadores", { contagem: jogadores.length })}
                     />
                   </div>
                 </div>
@@ -221,7 +224,7 @@ export function PartidaPagina() {
                       className="font-label-caps text-label-caps uppercase tracking-widest opacity-80"
                       style={{ color: vencedora.cor }}
                     >
-                      Vitória
+                      {t("partida.vitoria")}
                     </div>
                     <div
                       className="font-headline-lg text-headline-lg uppercase leading-none"
@@ -231,7 +234,7 @@ export function PartidaPagina() {
                     </div>
                   </div>
                 ) : (
-                  <Selo>Sem vencedor registrado</Selo>
+                  <Selo>{t("partida.semVencedorRegistrado")}</Selo>
                 )}
               </div>
             </section>
@@ -251,14 +254,14 @@ export function PartidaPagina() {
                       {equipe.titulo.toUpperCase()}
                     </span>
                   }
-                  descricao={`${linhas.length} jogadores`}
+                  descricao={t("partida.equipe.jogadores", { contagem: linhas.length })}
                   meta={
                     venceu ? (
                       <Selo cor={equipe.chave === "radiant" ? "positivo" : "negativo"}>
-                        Venceu
+                        {t("partida.equipe.venceu")}
                       </Selo>
                     ) : (
-                      <Selo>Perdeu</Selo>
+                      <Selo>{t("partida.equipe.perdeu")}</Selo>
                     )
                   }
                 >
@@ -270,13 +273,13 @@ export function PartidaPagina() {
             {/* ==================== METRICAS EXCLUSIVAS ==================== */}
             <Painel
               icone="data_object"
-              titulo="Métricas exclusivas do jogo"
-              descricao="Vão para metricas_extras (JSONB) em vez de virarem colunas que LoL e Valorant nunca preencheriam."
-              meta={<Selo cor="primario">{chavesExtras.length} métricas</Selo>}
+              titulo={t("partida.metricasExtras.titulo")}
+              descricao={t("partida.metricasExtras.descricao")}
+              meta={<Selo cor="primario">{t("partida.metricasExtras.contagem", { contagem: chavesExtras.length })}</Selo>}
             >
               {chavesExtras.length === 0 ? (
                 <p className="rounded bg-surface-container px-space-base py-space-md font-body-md text-body-md text-on-surface-variant">
-                  Esta partida não trouxe métricas extras.
+                  {t("partida.metricasExtras.vazio")}
                 </p>
               ) : (
                 <>
@@ -294,7 +297,7 @@ export function PartidaPagina() {
                           {fmtNumero(somaExtra(chave))}
                         </div>
                         <div className="mt-space-xxs font-body-sm text-body-sm text-outline">
-                          somado na partida
+                          {t("partida.metricasExtras.somadoNaPartida")}
                         </div>
                       </div>
                     ))}
@@ -304,7 +307,7 @@ export function PartidaPagina() {
                     <table className="w-full border-collapse text-left">
                       <thead>
                         <tr className="bg-surface-container font-label-caps text-label-caps uppercase tracking-wider text-outline">
-                          <th className="px-space-md py-space-sm">Jogador</th>
+                          <th className="px-space-md py-space-sm">{t("partida.metricasExtras.jogador")}</th>
                           {chavesExtras.map((chave) => (
                             <th key={chave} className="px-space-md py-space-sm text-right">
                               {chave.replace(/_/g, " ")}
@@ -322,7 +325,7 @@ export function PartidaPagina() {
                             }`}
                           >
                             <td className="px-space-md py-space-sm text-on-surface-variant">
-                              {linha.jogador ?? `slot ${linha.slot}`}
+                              {linha.jogador ?? t("partida.metricasExtras.slot", { numero: linha.slot })}
                             </td>
                             {chavesExtras.map((chave) => (
                               <td

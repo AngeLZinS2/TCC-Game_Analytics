@@ -1,0 +1,36 @@
+{
+  "apps": [
+    {
+      "appid": 10,
+      "name": "Counter-Strike",
+      "last_modified": 1704067200,
+      "price_change_number": 20123456
+    },
+    {
+      "appid": 70,
+      "name": "Half-Life",
+      "last_modified": 1704153600,
+      "price_change_number": 20123457
+    },
+    {
+      "appid": 220,
+      "name": "Half-Life 2",
+      "last_modified": 1704240000,
+      "price_change_number": 20123458
+    },
+    {
+      "appid": 400,
+      "name": "Portal",
+      "last_modified": 1704326400,
+      "price_change_number": 20123459
+    },
+    {
+      "appid": 620,
+      "name": "",
+      "last_modified": 1704412800,
+      "price_change_number": 20123460
+    }
+  ],
+  "have_more_results": true,
+  "last_appid": 620
+}

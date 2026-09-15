@@ -15,6 +15,7 @@ export default defineConfig({
       "@views": raiz("./src/views"),
       "@controllers": raiz("./src/controllers"),
       "@util": raiz("./src/utilitarios"),
+      "@i18n": raiz("./src/i18n"),
     },
   },
   server: {

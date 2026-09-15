@@ -118,6 +118,11 @@ class SnapshotSteam(BaseModel):
     avaliacoes_negativas: int | None = None
     classificacao_steam: str | None = None
     preco_no_momento: Decimal | None = None
+    #: Preco cheio, sem desconto (`price_overview.initial`). Igual a
+    #: `preco_no_momento` quando nao ha promocao. Usado pelo historico de
+    #: preco e pela deteccao de promocao (Fase 35) - nao gravado no
+    #: snapshot em si, so passa por aqui a caminho de `load_steam_precos.py`.
+    preco_original: Decimal | None = None
     moeda: str | None = None
     desconto_percentual: int | None = None
 
@@ -465,11 +470,14 @@ def parse_preco(payload: Any, app_id: int) -> dict[str, Any]:
     gratuito = dados.get("is_free")
 
     valor = _centavos_para_decimal(preco.get("final"))
+    original = _centavos_para_decimal(preco.get("initial"))
     if valor is None and gratuito:
         valor = Decimal("0.00")
+        original = Decimal("0.00")
 
     return {
         "preco_no_momento": valor,
+        "preco_original": original if original is not None else valor,
         "moeda": preco.get("currency"),
         "desconto_percentual": preco.get("discount_percent"),
     }

@@ -15,6 +15,7 @@
  */
 
 import { Navigate, NavLink, useParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 
 import { Icone } from "@views/componentes/base";
 import { SeletorDeJogo } from "@views/componentes/SeletorDeJogo";
@@ -23,13 +24,14 @@ import { JogadoresPagina } from "../Jogadores";
 import { PartidasPagina } from "../Partidas";
 import { PrevisaoConfrontoPagina } from "../PrevisaoConfronto";
 
+/** `id` casa com as chaves de `nav.esportsAbas.<id>` nos arquivos de traducao. */
 const ABAS = [
-  { id: "partidas", rotulo: "Partidas", icone: "scoreboard" },
-  { id: "resultados", rotulo: "Resultados", icone: "flag" },
-  { id: "previsao", rotulo: "Previsão", icone: "swords", selo: "ML" },
-  { id: "ranking", rotulo: "Ranking", icone: "leaderboard" },
-  { id: "herois", rotulo: "Heróis", icone: "shield_person" },
-  { id: "jogadores", rotulo: "Jogadores", icone: "group" },
+  { id: "partidas", icone: "scoreboard" },
+  { id: "resultados", icone: "flag" },
+  { id: "previsao", icone: "swords", selo: "ML" },
+  { id: "ranking", icone: "leaderboard" },
+  { id: "herois", icone: "shield_person" },
+  { id: "jogadores", icone: "group" },
 ] as const;
 
 type AbaId = (typeof ABAS)[number]["id"];
@@ -39,6 +41,7 @@ const IDS: readonly string[] = ABAS.map((a) => a.id);
 const JOGO_PADRAO = "dota2";
 
 export function EsportsLayout() {
+  const { t } = useTranslation();
   const { jogo, aba } = useParams();
 
   if (!jogo) {
@@ -55,7 +58,7 @@ export function EsportsLayout() {
       <div className="flex flex-col gap-space-base border-b border-outline-variant/30 pb-space-base pt-space-base">
         <div className="flex flex-wrap items-center gap-space-sm">
           <span className="font-headline-md text-headline-md uppercase tracking-wide text-on-surface-variant">
-            E-Sports
+            {t("nav.itens.esports")}
           </span>
           <Icone nome="chevron_right" className="text-[18px] text-outline" />
           <SeletorDeJogo
@@ -64,10 +67,10 @@ export function EsportsLayout() {
         </div>
 
         <nav className="rolagem-discreta -mb-space-xxs flex gap-space-xxs overflow-x-auto">
-          {ABAS.map((t) => (
+          {ABAS.map((item) => (
             <NavLink
-              key={t.id}
-              to={`/esports/${jogo}/${t.id}`}
+              key={item.id}
+              to={`/esports/${jogo}/${item.id}`}
               className={({ isActive }) =>
                 [
                   "flex shrink-0 items-center gap-space-xs rounded-t px-space-md py-space-sm font-title-code text-title-code uppercase tracking-wider transition-colors",
@@ -77,11 +80,11 @@ export function EsportsLayout() {
                 ].join(" ")
               }
             >
-              <Icone nome={t.icone} className="text-[16px]" />
-              {t.rotulo}
-              {"selo" in t && t.selo && (
+              <Icone nome={item.icone} className="text-[16px]" />
+              {t(`nav.esportsAbas.${item.id}`)}
+              {"selo" in item && item.selo && (
                 <span className="rounded bg-surface-container px-space-xxs py-[1px] font-badge-status text-badge-status text-primary">
-                  {t.selo}
+                  {item.selo}
                 </span>
               )}
             </NavLink>

@@ -7,6 +7,7 @@
  */
 
 import type { ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 
 import { ErroApi } from "@models/api/cliente";
 
@@ -190,12 +191,13 @@ export function Esqueleto({ altura = 220 }: { altura?: number }) {
 }
 
 export function MensagemErro({ erro }: { erro: unknown }) {
+  const { t } = useTranslation();
   const detalhe =
     erro instanceof ErroApi
       ? erro.detalhe
       : erro instanceof Error
         ? erro.message
-        : "Erro desconhecido.";
+        : t("comum.erroDesconhecido");
 
   return (
     <div
@@ -205,7 +207,7 @@ export function MensagemErro({ erro }: { erro: unknown }) {
       <Icone nome="error" className="mt-[2px] text-[18px]" />
       <div>
         <strong className="block font-headline-sm text-headline-sm">
-          Não deu para carregar estes dados.
+          {t("comum.erroCarregarDados")}
         </strong>
         <span className="font-body-sm text-body-sm text-on-surface-variant">
           {detalhe}
@@ -222,7 +224,7 @@ export function MensagemErro({ erro }: { erro: unknown }) {
  */
 export function Consulta<T>({
   estado,
-  vazio = "Nenhum dado coletado ainda.",
+  vazio,
   altura,
   children,
 }: {
@@ -237,12 +239,14 @@ export function Consulta<T>({
   altura?: number;
   children: (dados: T) => ReactNode;
 }) {
+  const { t } = useTranslation();
+  const vazioExibido = vazio ?? t("comum.nenhumDadoColetado");
   if (estado.isPending) return <Esqueleto altura={altura} />;
   if (estado.isError) return <MensagemErro erro={estado.error} />;
-  if (estado.data === undefined) return <Aviso>{vazio}</Aviso>;
+  if (estado.data === undefined) return <Aviso>{vazioExibido}</Aviso>;
 
   const semDados = Array.isArray(estado.data) && estado.data.length === 0;
-  if (semDados) return <Aviso>{vazio}</Aviso>;
+  if (semDados) return <Aviso>{vazioExibido}</Aviso>;
 
   return (
     <div className={estado.isFetching ? "opacity-60 transition-opacity" : undefined}>

@@ -8,6 +8,7 @@
  */
 
 import { useEffect, type ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 
 import { Icone } from "./base";
 
@@ -24,6 +25,7 @@ export function Modal({
   aoFechar: () => void;
   children: ReactNode;
 }) {
+  const { t } = useTranslation();
   useEffect(() => {
     if (!aberto) return;
 
@@ -71,7 +73,7 @@ export function Modal({
           <button
             type="button"
             onClick={aoFechar}
-            aria-label="Fechar"
+            aria-label={t("comum.fechar")}
             className="shrink-0 rounded bg-surface-container p-space-xs text-on-surface-variant transition-colors hover:bg-surface-container-high hover:text-on-surface"
           >
             <Icone nome="close" className="text-[20px]" />

@@ -12,6 +12,8 @@
  * não aparece, em vez de aparecer como zero.
  */
 
+import { useTranslation } from "react-i18next";
+
 import type { ResumoConfrontos } from "@models/api/tipos";
 import { AreaNeon } from "./graficos/AreaNeon";
 import { HistogramaNeon } from "./graficos/HistogramaNeon";
@@ -20,6 +22,7 @@ import { PALETA_POLOS } from "@views/tema";
 import { fmtDataCurta, fmtNumero, fmtPercentual } from "@util/formatos";
 
 export function EstatisticasConfrontos({ dados }: { dados: ResumoConfrontos }) {
+  const { t } = useTranslation();
   const serie = dados.por_dia.map((ponto) => ponto.partidas);
   const ladoA = (dados.winrate_lado_a ?? 50) / 100;
 
@@ -27,12 +30,12 @@ export function EstatisticasConfrontos({ dados }: { dados: ResumoConfrontos }) {
     <>
       <section className="grid grid-cols-1 gap-space-base md:grid-cols-2 xl:grid-cols-4">
         <KpiHud
-          etiqueta="Confrontos decididos"
-          canto="CALENDÁRIO"
+          etiqueta={t("estatisticasConfrontos.confrontosDecididos")}
+          canto={t("estatisticasConfrontos.calendario")}
           valor={fmtNumero(dados.decididos)}
           valorNumerico={dados.decididos}
           formatarValor={fmtNumero}
-          rotulo="Séries com resultado publicado"
+          rotulo={t("estatisticasConfrontos.seriesComResultado")}
           acento="primaria"
           notaVariacao={`${fmtDataCurta(dados.primeiro_confronto)} — ${fmtDataCurta(
             dados.ultimo_confronto,
@@ -42,14 +45,14 @@ export function EstatisticasConfrontos({ dados }: { dados: ResumoConfrontos }) {
         </KpiHud>
 
         <KpiHud
-          etiqueta="Equipes no calendário"
-          canto="DIMENSÃO"
+          etiqueta={t("estatisticasConfrontos.equipesNoCalendario")}
+          canto={t("estatisticasConfrontos.dimensao")}
           valor={fmtNumero(dados.equipes)}
           valorNumerico={dados.equipes}
           formatarValor={fmtNumero}
-          rotulo="Times que apareceram em algum confronto"
+          rotulo={t("estatisticasConfrontos.timesQueApareceram")}
           acento="secundaria"
-          notaVariacao={`${fmtNumero(dados.torneios)} torneios`}
+          notaVariacao={t("estatisticasConfrontos.torneios", { n: fmtNumero(dados.torneios) })}
         />
 
         {/*
@@ -59,45 +62,54 @@ export function EstatisticasConfrontos({ dados }: { dados: ResumoConfrontos }) {
           honesta, e é o que o modelo de previsão usa como intercepto.
         */}
         <KpiHud
-          etiqueta="Vantagem do lado A"
-          canto={ladoA > 0.55 || ladoA < 0.45 ? "DESEQUILÍBRIO" : "EQUILÍBRIO"}
+          etiqueta={t("estatisticasConfrontos.vantagemLadoA")}
+          canto={
+            ladoA > 0.55 || ladoA < 0.45
+              ? t("estatisticasConfrontos.desequilibrio")
+              : t("estatisticasConfrontos.equilibrio")
+          }
           valor={fmtPercentual((dados.winrate_lado_a ?? 0), 1)}
           valorNumerico={dados.winrate_lado_a}
           formatarValor={(v) => fmtPercentual(v, 1)}
-          rotulo="Vitórias de quem é listado em primeiro"
+          rotulo={t("estatisticasConfrontos.vitoriasDeQuemListado")}
           acento="terciaria"
-          notaVariacao={`${fmtNumero(dados.vitorias_lado_a)} de ${fmtNumero(
-            dados.decididos,
-          )}`}
+          notaVariacao={t("estatisticasConfrontos.deTotal", {
+            a: fmtNumero(dados.vitorias_lado_a),
+            b: fmtNumero(dados.decididos),
+          })}
         >
           <div className="mt-space-md">
             <BarraSegmentada
               fracaoA={ladoA}
               corA={PALETA_POLOS.positivo}
               corB={PALETA_POLOS.negativo}
-              legendaEsquerda={`Lado A ${fmtPercentual(dados.winrate_lado_a ?? 0, 1)}`}
-              legendaDireita={`Lado B ${fmtPercentual(100 - (dados.winrate_lado_a ?? 0), 1)}`}
+              legendaEsquerda={t("estatisticasConfrontos.ladoALabel", {
+                pct: fmtPercentual(dados.winrate_lado_a ?? 0, 1),
+              })}
+              legendaDireita={t("estatisticasConfrontos.ladoBLabel", {
+                pct: fmtPercentual(100 - (dados.winrate_lado_a ?? 0), 1),
+              })}
             />
           </div>
         </KpiHud>
 
         <KpiHud
-          etiqueta="Confrontos agendados"
-          canto="POR VIR"
+          etiqueta={t("estatisticasConfrontos.confrontosAgendados")}
+          canto={t("estatisticasConfrontos.porVir")}
           valor={fmtNumero(dados.futuros)}
           valorNumerico={dados.futuros}
           formatarValor={fmtNumero}
-          rotulo="Ainda sem resultado publicado"
+          rotulo={t("estatisticasConfrontos.semResultado")}
           acento="primaria"
-          notaVariacao="sem duração nem jogador: o ticker não publica"
+          notaVariacao={t("estatisticasConfrontos.semDuracaoNemJogador")}
         />
       </section>
 
       <section className="grid grid-cols-1 gap-space-base xl:grid-cols-2">
         <Painel
           icone="bar_chart"
-          titulo="Formato das séries"
-          descricao="Melhor-de-N por confronto. É o que substitui a distribuição de duração — a fonte não publica quanto tempo a partida levou."
+          titulo={t("estatisticasConfrontos.formatoDasSeries")}
+          descricao={t("estatisticasConfrontos.formatoDescricao")}
         >
           <HistogramaNeon
             faixas={dados.por_formato.map((f) => ({
@@ -107,12 +119,12 @@ export function EstatisticasConfrontos({ dados }: { dados: ResumoConfrontos }) {
             formatarValor={fmtNumero}
             rodapeEsquerda={
               <span>
-                {fmtNumero(dados.por_formato.length)} formatos no calendário
+                {t("estatisticasConfrontos.formatosNoCalendario", { n: fmtNumero(dados.por_formato.length) })}
               </span>
             }
             rodapeDireita={
               <span className="text-on-surface">
-                {fmtNumero(dados.decididos + dados.futuros)} confrontos
+                {t("estatisticasConfrontos.confrontosTotal", { n: fmtNumero(dados.decididos + dados.futuros) })}
               </span>
             }
           />
@@ -120,8 +132,8 @@ export function EstatisticasConfrontos({ dados }: { dados: ResumoConfrontos }) {
 
         <Painel
           icone="show_chart"
-          titulo="Confrontos por dia"
-          descricao="Data de disputa do confronto, não a da coleta."
+          titulo={t("estatisticasConfrontos.confrontosPorDia")}
+          descricao={t("estatisticasConfrontos.dataDeDisputa")}
         >
           <AreaNeon
             pontos={dados.por_dia.map((p) => ({
@@ -131,14 +143,14 @@ export function EstatisticasConfrontos({ dados }: { dados: ResumoConfrontos }) {
             formatarValor={fmtNumero}
             rodapeEsquerda={
               <span>
-                Pico diário:{" "}
+                {t("estatisticasConfrontos.picoDiario")}{" "}
                 <strong className="text-on-surface">
-                  {fmtNumero(Math.max(0, ...serie))} confrontos
+                  {t("estatisticasConfrontos.confrontosTotal", { n: fmtNumero(Math.max(0, ...serie)) })}
                 </strong>
               </span>
             }
             rodapeDireita={
-              <span>{fmtNumero(dados.por_dia.length)} dias com confronto</span>
+              <span>{t("estatisticasConfrontos.diasComConfronto", { n: fmtNumero(dados.por_dia.length) })}</span>
             }
           />
         </Painel>

@@ -13,6 +13,7 @@
  */
 
 import { useId, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 import { useEntrarNaTela } from "@models/hooks/animacao";
 
@@ -70,6 +71,7 @@ export function AreaNeon({
   rodapeEsquerda?: React.ReactNode;
   rodapeDireita?: React.ReactNode;
 }) {
+  const { t } = useTranslation();
   // `useId` porque dois graficos na mesma pagina com o mesmo id de gradiente
   // fazem o segundo herdar o primeiro.
   const id = useId().replace(/:/g, "");
@@ -100,7 +102,7 @@ export function AreaNeon({
   if (pontos.length === 0) {
     return (
       <p className="flex h-44 items-center justify-center font-body-sm text-body-sm text-outline">
-        Nenhum ponto coletado ainda.
+        {t("comum.areaNeon.semPontos")}
       </p>
     );
   }
@@ -149,7 +151,7 @@ export function AreaNeon({
           viewBox={`0 0 ${LARGURA} ${ALTURA}`}
           preserveAspectRatio="none"
           role="img"
-          aria-label={`Série de ${pontos.length} pontos, máximo de ${formatarValor(maximo)}`}
+          aria-label={t("comum.areaNeon.serieAriaLabel", { n: pontos.length, maximo: formatarValor(maximo) })}
           onMouseLeave={() => setAtivo(null)}
           onMouseMove={(evento) => {
             const caixa = evento.currentTarget.getBoundingClientRect();

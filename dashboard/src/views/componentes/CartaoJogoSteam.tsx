@@ -8,6 +8,8 @@
  * `aoClicar` da tela, porque o fluxo "coleta e abre" mora lá.
  */
 
+import { useTranslation } from "react-i18next";
+
 import type { LinhaCatalogo } from "@models/api/tipos";
 import { CapaJogo } from "@views/componentes/CapaJogo";
 import { Icone } from "@views/componentes/base";
@@ -35,6 +37,7 @@ export function CartaoJogoSteam({
   aoClicar: () => void;
   carregando?: boolean;
 }) {
+  const { t } = useTranslation();
   const daLoja = linha.tipo === "loja";
   const nome = daLoja ? linha.candidato.nome : linha.jogo.nome;
   const appId = daLoja ? linha.candidato.app_id : linha.jogo.app_id;
@@ -77,7 +80,7 @@ export function CartaoJogoSteam({
             </span>
             {daLoja && (
               <span className="shrink-0 rounded bg-surface-container px-space-xs py-space-xxs font-badge-status text-badge-status uppercase text-outline">
-                da loja
+                {t("comum.catalogoCartao.daLoja")}
               </span>
             )}
           </span>
@@ -110,7 +113,7 @@ export function CartaoJogoSteam({
       <div className="mt-auto flex flex-wrap items-center justify-between gap-space-xs border-t border-outline-variant/15 pt-space-sm">
         {daLoja ? (
           <span className="font-title-code text-title-code text-outline">
-            {carregando ? "buscando dados…" : "sem coleta"}
+            {carregando ? t("comum.catalogoCartao.buscandoDados") : t("comum.catalogoCartao.semColeta")}
           </span>
         ) : (
           <div className="flex items-center gap-space-md">
@@ -118,7 +121,7 @@ export function CartaoJogoSteam({
               <span className="font-headline-sm text-headline-sm font-bold text-tertiary">
                 {fmtNumero(linha.jogo.jogadores_simultaneos)}
               </span>
-              <span className="font-label-caps text-label-caps text-outline">jogando</span>
+              <span className="font-label-caps text-label-caps text-outline">{t("comum.catalogoCartao.jogando")}</span>
             </span>
             <span className="font-title-code text-title-code text-on-surface-variant">
               {fmtPercentual(linha.jogo.nota_avaliacoes, 0)}{" "}

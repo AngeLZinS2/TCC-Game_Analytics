@@ -1,10 +1,12 @@
 import { Navigate, Route, Routes, useParams, useSearchParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 
 import { LayoutDashboard } from "@views/layout/LayoutDashboard";
 import { ProvedorJogo } from "@views/layout/JogoAtual";
 import { HomePagina } from "./paginas/Home";
 import { VisaoGeralPagina } from "./paginas/VisaoGeral";
 import { CatalogoLayout } from "./paginas/catalogo/CatalogoLayout";
+import { OfertasPagina } from "./paginas/Ofertas";
 import { JogoSteamPagina } from "./paginas/JogoSteam";
 import { JogoXboxPagina } from "./paginas/JogoXbox";
 import { HeroiDetalhePagina } from "./paginas/HeroiDetalhe";
@@ -36,6 +38,7 @@ function EsportsSemAba() {
 }
 
 export function App() {
+  const { t } = useTranslation();
   useTelemetriaAcesso();
 
   return (
@@ -60,6 +63,7 @@ export function App() {
             <Route path="/catalogo/:loja" element={<CatalogoLayout />} />
             <Route path="/steam" element={<Navigate to="/catalogo/steam" replace />} />
             <Route path="/steam/:appId" element={<JogoSteamPagina />} />
+            <Route path="/ofertas" element={<OfertasPagina />} />
             <Route path="/xbox/:productId" element={<JogoXboxPagina />} />
 
             {/* Area E-Sports: jogo no 1o segmento, sub-aba no 2o. */}
@@ -84,7 +88,7 @@ export function App() {
             <Route
               path="/assistente"
               element={
-                <RotaProtegida descricao="para usar o Assistente de IA">
+                <RotaProtegida descricao={t("conta.rotaProtegida.assistente")}>
                   <AssistenteIAPagina />
                 </RotaProtegida>
               }
@@ -92,13 +96,22 @@ export function App() {
             <Route
               path="/perfil"
               element={
-                <RotaProtegida descricao="para ver seu perfil">
+                <RotaProtegida descricao={t("conta.rotaProtegida.perfil")}>
                   <PerfilPagina />
                 </RotaProtegida>
               }
             />
 
-            <Route path="/admin" element={<AdminPagina />} />
+            {/* Login = a mesma conta do site; quem tem acesso é decidido pelo
+                backend (ver AdminPagina.tsx). */}
+            <Route
+              path="/admin"
+              element={
+                <RotaProtegida descricao={t("conta.rotaProtegida.admin")}>
+                  <AdminPagina />
+                </RotaProtegida>
+              }
+            />
             {/* Rota quebrada -> o painel, não a landing: quem chegou aqui já
                 estava usando o site, não é visita pela primeira vez. */}
             <Route path="*" element={<Navigate to="/painel" replace />} />

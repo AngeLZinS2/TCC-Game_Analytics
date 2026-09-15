@@ -8,7 +8,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { buscar, chamar, enviar } from "./cliente";
-import { cabecalhoAuthAdmin, salvarTokenAdmin, tokenAdmin } from "@models/admin/sessao";
 import { cabecalhoAuthUsuario } from "@models/conta/cliente";
 import { useUsuario } from "@models/conta/contexto";
 import type {
@@ -46,10 +45,11 @@ import type {
   PanoramaSentimento,
   ResumoReviews,
   ResumoReviewsXbox,
-  TokenAdmin,
   VisaoGeralAdmin,
   SaudeSistema,
   SaudeBanco,
+  StatusAdmin,
+  ListaContasAdmin,
   PrevisaoConfronto,
   RankingOficial,
   RelatorioConfronto,
@@ -67,6 +67,7 @@ import type {
   EquipeFavorita,
   ProvedorIA,
   CatalogoModelosIA,
+  OfertaSteam,
 } from "./tipos";
 
 export interface FiltrosJogos {
@@ -145,6 +146,24 @@ export function useMaisJogadosSteam(limite = 100) {
       buscar<MaisJogadoSteam[]>("/api/steam/mais-jogados", { limite }),
     staleTime: 60_000,
     refetchInterval: 120_000,
+  });
+}
+
+export interface FiltrosOfertasSteam {
+  desconto_minimo?: number;
+  preco_maximo?: number;
+  pais?: string;
+  moeda?: string;
+  ordenar_por?: "desconto_desc" | "preco_asc";
+  limite?: number;
+}
+
+/** Promoções abertas AGORA na própria Steam (Fase 35) - primeiro-partido. */
+export function useOfertasSteam(filtros: FiltrosOfertasSteam = {}) {
+  return useQuery({
+    queryKey: ["steam", "ofertas", filtros],
+    queryFn: () => buscar<OfertaSteam[]>("/api/steam/ofertas", { ...filtros }),
+    placeholderData: (anterior) => anterior,
   });
 }
 
@@ -876,26 +895,33 @@ export function useBuscarResumoSteamXbox() {
   });
 }
 
-// --- Painel admin (Fase 30) ---
+// --- Painel admin (Fase 30, login por Firebase desde a Fase 35) ---
 //
-// Sem sistema de contas: uma senha só, token guardado no localStorage
-// (`@models/admin/sessao`). Todo hook daqui manda o header `Authorization` e
-// só habilita a consulta quando já existe um token salvo — sem isso a tela
-// de login nunca chamaria `/api/admin/*` à toa.
+// Mesma conta do resto do site: todo hook manda o ID token do Firebase
+// (`cabecalhoAuthUsuario`) e só habilita a consulta quando alguém está
+// logado. O backend decide se essa conta tem acesso (403 se não tiver).
 
-export function useLoginAdmin() {
-  return useMutation({
-    mutationFn: (senha: string) => enviar<TokenAdmin>("/api/admin/login", { senha }),
-    onSuccess: (dados) => salvarTokenAdmin(dados.token),
+/** Se mostra o link do painel na barra lateral — não decide se deixa entrar
+ * (isso é o backend, em toda rota `/api/admin/*`), só se oferece o caminho. */
+export function useSouAdmin() {
+  const { usuario } = useUsuario();
+  return useQuery({
+    queryKey: ["admin", "eu-sou-admin"],
+    queryFn: async () =>
+      buscar<StatusAdmin>("/api/admin/eu-sou-admin", undefined, await cabecalhoAuthUsuario()),
+    enabled: !!usuario,
+    retry: false,
+    staleTime: 5 * 60 * 1000,
   });
 }
 
 export function useVisaoGeralAdmin() {
+  const { usuario } = useUsuario();
   return useQuery({
     queryKey: ["admin", "visao-geral"],
-    queryFn: () =>
-      buscar<VisaoGeralAdmin>("/api/admin/visao-geral", undefined, cabecalhoAuthAdmin()),
-    enabled: !!tokenAdmin(),
+    queryFn: async () =>
+      buscar<VisaoGeralAdmin>("/api/admin/visao-geral", undefined, await cabecalhoAuthUsuario()),
+    enabled: !!usuario,
     retry: false,
   });
 }
@@ -903,20 +929,37 @@ export function useVisaoGeralAdmin() {
 /** CPU/RAM/disco — reconsulta a cada 10s pra parecer um painel de monitoramento
  * de verdade, não uma foto parada. */
 export function useSistemaAdmin() {
+  const { usuario } = useUsuario();
   return useQuery({
     queryKey: ["admin", "sistema"],
-    queryFn: () => buscar<SaudeSistema>("/api/admin/sistema", undefined, cabecalhoAuthAdmin()),
-    enabled: !!tokenAdmin(),
+    queryFn: async () =>
+      buscar<SaudeSistema>("/api/admin/sistema", undefined, await cabecalhoAuthUsuario()),
+    enabled: !!usuario,
     refetchInterval: 10000,
     retry: false,
   });
 }
 
 export function useBancoAdmin() {
+  const { usuario } = useUsuario();
   return useQuery({
     queryKey: ["admin", "banco"],
-    queryFn: () => buscar<SaudeBanco>("/api/admin/banco", undefined, cabecalhoAuthAdmin()),
-    enabled: !!tokenAdmin(),
+    queryFn: async () =>
+      buscar<SaudeBanco>("/api/admin/banco", undefined, await cabecalhoAuthUsuario()),
+    enabled: !!usuario,
+    retry: false,
+  });
+}
+
+/** Quantas contas existem + nome/data de criação de cada uma — nada além
+ * disso, pra não expor e-mail ou outro dado pessoal no painel (LGPD). */
+export function useContasAdmin() {
+  const { usuario } = useUsuario();
+  return useQuery({
+    queryKey: ["admin", "contas"],
+    queryFn: async () =>
+      buscar<ListaContasAdmin>("/api/admin/contas", undefined, await cabecalhoAuthUsuario()),
+    enabled: !!usuario,
     retry: false,
   });
 }

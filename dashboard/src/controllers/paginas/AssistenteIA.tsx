@@ -28,6 +28,7 @@
  */
 
 import { useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 import { usePerguntarAssistente, useStatusAssistente, useVisaoGeral } from "@models/api/consultas";
 import type { RespostaAssistente } from "@models/api/tipos";
@@ -38,7 +39,7 @@ import { AcoesResposta } from "./assistente/AcoesResposta";
 import { BlocoDeContexto, CartaoJogoAoVivo, CartaoJogoRecomendado } from "./assistente/cartoes";
 import { CartaoResultado } from "./assistente/CartaoResultado";
 import { ComoChegamos } from "./assistente/ComoChegamos";
-import { Compositor, SUGESTOES } from "./assistente/Compositor";
+import { Compositor, sugestoesDe } from "./assistente/Compositor";
 import { GraficoSerie } from "./assistente/GraficoSerie";
 import { useHistoricoAssistente } from "./assistente/historico";
 import { CartaoConfianca, PainelFontes } from "./assistente/PainelContexto";
@@ -49,6 +50,7 @@ import { ROTULO_PROVEDOR } from "./conta/PainelChaveIA";
 import { fmtNumero, fmtRelativo } from "@util/formatos";
 
 export function AssistenteIAPagina() {
+  const { t } = useTranslation();
   const [pergunta, setPergunta] = useState("");
   const [gavetaHistorico, setGavetaHistorico] = useState(false);
   const [verDados, setVerDados] = useState(false);
@@ -78,8 +80,8 @@ export function AssistenteIAPagina() {
 
   /** As sugestoes que ainda nao foram a pergunta atual. */
   const continuar = useMemo(
-    () => SUGESTOES.filter((s) => s.pergunta !== resposta?.pergunta).slice(0, 5),
-    [resposta],
+    () => sugestoesDe(t).filter((s) => s.pergunta !== resposta?.pergunta).slice(0, 5),
+    [resposta, t],
   );
 
   function enviar(texto: string) {
@@ -99,12 +101,13 @@ export function AssistenteIAPagina() {
   // um erro: o projeto inteiro funciona sem provedor externo.
   if (status.data && !status.data.configurado) {
     return (
-      <Painel icone="key_off" titulo="Assistente não configurado">
+      <Painel icone="key_off" titulo={t("assistente.naoConfigurado.titulo")}>
         <p className="font-body-md text-body-md text-on-surface-variant">
-          Defina <code className="text-primary">OPENROUTER_API_KEY</code> no{" "}
-          <code className="text-primary">.env</code> e reinicie a API. O resto do
-          projeto funciona sem isso — o assistente é a única parte que depende de um
-          provedor externo.
+          {t("assistente.naoConfigurado.prefixo")}
+          <code className="text-primary">OPENROUTER_API_KEY</code>
+          {t("assistente.naoConfigurado.meio")}
+          <code className="text-primary">.env</code>
+          {t("assistente.naoConfigurado.sufixo")}
         </p>
       </Painel>
     );
@@ -119,13 +122,13 @@ export function AssistenteIAPagina() {
             type="button"
             onClick={() => setGavetaHistorico(true)}
             className="flex items-center gap-space-xxs rounded bg-surface-container px-space-sm py-space-xs font-title-code text-title-code text-on-surface-variant transition-colors hover:text-primary lg:hidden"
-            aria-label="Abrir histórico"
+            aria-label={t("assistente.cabecalho.abrirHistorico")}
           >
             <Icone nome="history" className="text-[16px]" />
-            Histórico
+            {t("assistente.cabecalho.historico")}
           </button>
           <h1 className="flex items-center gap-space-xs font-headline-sm text-headline-sm uppercase tracking-wide text-primary">
-            <span aria-hidden>✦</span> Assistente de Dados
+            <span aria-hidden>✦</span> {t("assistente.cabecalho.titulo")}
           </h1>
         </div>
 
@@ -136,7 +139,7 @@ export function AssistenteIAPagina() {
                 className="h-1.5 w-1.5 rounded-full bg-tertiary shadow-[0_0_6px_rgba(22,239,122,0.8)]"
                 aria-hidden
               />
-              IA online
+              {t("assistente.cabecalho.iaOnline")}
             </span>
             <span
               className="rounded bg-surface-container px-space-sm py-space-xxs text-outline"
@@ -168,11 +171,10 @@ export function AssistenteIAPagina() {
         <main className="flex min-w-0 flex-col gap-space-base">
           <div>
             <h2 className="font-headline-lg text-headline-lg text-on-surface">
-              Pergunte aos seus dados
+              {t("assistente.main.titulo")}
             </h2>
             <p className="font-body-sm text-body-sm text-outline">
-              Converse com o assistente do PlayDB e descubra insights reais — do nosso banco
-              e, quando a pergunta cita um jogo, da loja da Steam na hora.
+              {t("assistente.main.descricao")}
             </p>
           </div>
 
@@ -189,11 +191,10 @@ export function AssistenteIAPagina() {
             <div className="flex flex-col gap-space-sm rounded-xl bg-surface-container-low/90 p-space-lg shadow-2xl">
               <div className="flex items-center gap-space-xs font-headline-sm text-headline-sm text-error">
                 <Icone nome="error" className="text-[20px]" />
-                Não foi possível analisar os dados
+                {t("assistente.erro.titulo")}
               </div>
               <p className="font-body-sm text-body-sm text-on-surface-variant">
-                Não conseguimos obter uma resposta agora. O contexto sai do nosso banco,
-                mas a redação depende de um provedor externo.
+                {t("assistente.erro.corpo")}
               </p>
               <MensagemErro erro={assistente.error} />
               <button
@@ -201,7 +202,7 @@ export function AssistenteIAPagina() {
                 onClick={() => enviar(pergunta)}
                 className="self-start rounded bg-primary-container px-space-base py-space-xs font-title-code text-title-code text-on-primary transition-all hover:brightness-110"
               >
-                Tentar novamente
+                {t("assistente.erro.tentarNovamente")}
               </button>
             </div>
           )}
@@ -215,14 +216,16 @@ export function AssistenteIAPagina() {
                 ✦
               </span>
               <h3 className="font-headline-sm text-headline-sm uppercase tracking-wide text-on-surface">
-                Seus dados têm respostas
+                {t("assistente.vazio.titulo")}
               </h3>
               <p className="max-w-md font-body-sm text-body-sm text-outline">
-                Pergunte sobre jogos da Steam, partidas, heróis, preços e as métricas dos
-                modelos. {visaoGeral.data && (
+                {t("assistente.vazio.corpo")}{" "}
+                {visaoGeral.data && (
                   <>
-                    Agora há {fmtNumero(visaoGeral.data.jogos_steam)} jogos e{" "}
-                    {fmtNumero(visaoGeral.data.partidas)} partidas no banco.
+                    {t("assistente.vazio.comDados", {
+                      jogos: fmtNumero(visaoGeral.data.jogos_steam),
+                      partidas: fmtNumero(visaoGeral.data.partidas),
+                    })}
                   </>
                 )}
               </p>
@@ -250,18 +253,21 @@ export function AssistenteIAPagina() {
                 <div className="flex flex-wrap items-center justify-between gap-space-xs">
                   <span className="flex items-center gap-space-xs font-label-caps text-label-caps uppercase tracking-widest text-primary">
                     <Icone nome="chat" className="text-[16px]" />
-                    Resposta
+                    {t("assistente.resposta.label")}
                   </span>
                   <span className="flex items-center gap-space-xs">
                     {resposta.usando_chave_propria && (
                       <Selo cor="positivo">
                         <Icone nome="vpn_key" className="text-[12px]" />
-                        Sua chave{resposta.provedor_ia ? ` · ${ROTULO_PROVEDOR[resposta.provedor_ia]}` : ""}
+                        {t("assistente.resposta.suaChave")}
+                        {resposta.provedor_ia ? ` · ${ROTULO_PROVEDOR[resposta.provedor_ia]}` : ""}
                       </Selo>
                     )}
                     <span className="font-badge-status text-badge-status uppercase tracking-wider text-outline">
-                      {fmtNumero(resposta.tokens_entrada)} → {fmtNumero(resposta.tokens_saida)}{" "}
-                      tokens
+                      {t("assistente.resposta.tokens", {
+                        entrada: fmtNumero(resposta.tokens_entrada),
+                        saida: fmtNumero(resposta.tokens_saida),
+                      })}
                     </span>
                   </span>
                 </div>
@@ -272,16 +278,16 @@ export function AssistenteIAPagina() {
 
                 <p className="flex items-start gap-space-xs font-body-sm text-body-sm text-outline">
                   <Icone nome="info" className="mt-[2px] text-[16px] text-primary" />
-                  Redigido por <span className="text-on-surface">{resposta.modelo}</span> a
-                  partir do contexto ao lado. Se um número não aparece no contexto, ele não
-                  deveria aparecer na resposta — confira.
+                  {t("assistente.resposta.redigidoPrefixo")}{" "}
+                  <span className="text-on-surface">{resposta.modelo}</span>{" "}
+                  {t("assistente.resposta.redigidoSufixo")}
                 </p>
 
                 {resposta.fontes_web.length > 0 && (
                   <div className="flex flex-col gap-space-xs border-t border-outline-variant/20 pt-space-base">
                     <span className="flex items-center gap-space-xs font-label-caps text-label-caps uppercase tracking-widest text-outline">
                       <Icone nome="travel_explore" className="text-[15px]" />
-                      Fontes da web (a base não tinha a resposta)
+                      {t("assistente.resposta.fontesWeb")}
                     </span>
                     {resposta.fontes_web.map((f) => (
                       <a
@@ -309,8 +315,8 @@ export function AssistenteIAPagina() {
               {resposta.jogo_ao_vivo && (
                 <Painel
                   icone="storefront"
-                  titulo="Jogo identificado"
-                  descricao="Consultado agora na loja da Steam e no IsThereAnyDeal — vale mesmo para um jogo fora do nosso catálogo."
+                  titulo={t("assistente.jogoIdentificado.titulo")}
+                  descricao={t("assistente.jogoIdentificado.descricao")}
                 >
                   <CartaoJogoAoVivo jogo={resposta.jogo_ao_vivo} />
                 </Painel>
@@ -319,15 +325,15 @@ export function AssistenteIAPagina() {
               {resposta.recomendacoes.length > 0 && (
                 <Painel
                   icone="stadia_controller"
-                  titulo="Jogos recomendados"
+                  titulo={t("assistente.recomendados.titulo")}
                   descricao={
                     // A mesma lista sai de dois caminhos diferentes, e dizer o
                     // caminho errado é dizer a procedência errada: "a partir do
                     // catálogo" numa lista que veio da loja afirmaria que esses
                     // jogos são coletados por nós, o que não é verdade.
                     daLoja
-                      ? "Buscados na loja da Steam agora, por tag e modo online — não são do nosso catálogo. Ordem: quem tem mais gente jogando neste instante."
-                      : "Escolhidos pelo sistema a partir do catálogo — nota de avaliação e popularidade agora, não pelo modelo."
+                      ? t("assistente.recomendados.descricaoLoja")
+                      : t("assistente.recomendados.descricaoCatalogo")
                   }
                 >
                   <div className="grid grid-cols-1 gap-space-base sm:grid-cols-2 xl:grid-cols-3">
@@ -348,7 +354,7 @@ export function AssistenteIAPagina() {
               */}
               <section className="flex flex-col gap-space-sm rounded-xl bg-surface-container-low/90 p-space-lg shadow-2xl">
                 <span className="font-label-caps text-label-caps uppercase tracking-widest text-outline">
-                  Continuar explorando
+                  {t("assistente.continuarExplorando")}
                 </span>
                 <div className="grid grid-cols-1 gap-space-xs sm:grid-cols-2 xl:grid-cols-3">
                   {continuar.map((sugestao) => (
@@ -391,11 +397,10 @@ export function AssistenteIAPagina() {
           <div className="rounded-xl bg-surface-container-low/60 p-space-base">
             <div className="flex items-center gap-space-xs font-label-caps text-label-caps uppercase tracking-widest text-primary">
               <Icone nome="lightbulb" className="text-[16px]" />
-              Dica
+              {t("assistente.dica.titulo")}
             </div>
             <p className="mt-space-xs font-body-sm text-body-sm text-outline">
-              Cite o nome do jogo na pergunta: o backend busca na loja da Steam na hora,
-              mesmo para um jogo que nunca passou pelo nosso coletor.
+              {t("assistente.dica.texto")}
             </p>
           </div>
         </aside>
@@ -407,7 +412,7 @@ export function AssistenteIAPagina() {
           className="fixed inset-0 z-[90] flex bg-background/80 backdrop-blur-sm lg:hidden"
           role="dialog"
           aria-modal
-          aria-label="Histórico de perguntas"
+          aria-label={t("assistente.gaveta.aria")}
           onClick={() => setGavetaHistorico(false)}
         >
           <div
@@ -431,8 +436,8 @@ export function AssistenteIAPagina() {
       {/* ==================== O CONTEXTO INTEIRO ==================== */}
       <Modal
         aberto={verDados && Boolean(resposta)}
-        titulo="Dados consultados"
-        descricao="O contexto exato que o modelo recebeu. O chip FORA DO BANCO marca o que veio da loja da Steam, não da nossa coleta."
+        titulo={t("assistente.modal.titulo")}
+        descricao={t("assistente.modal.descricao")}
         aoFechar={() => setVerDados(false)}
       >
         <div className="space-y-space-xs">
@@ -453,6 +458,7 @@ export function AssistenteIAPagina() {
  * precisa ler isso antes.
  */
 function ComoFunciona() {
+  const { t } = useTranslation();
   const [aberto, setAberto] = useState(false);
 
   return (
@@ -465,7 +471,7 @@ function ComoFunciona() {
       >
         <span className="flex items-center gap-space-xs font-label-caps text-label-caps uppercase tracking-widest text-outline">
           <Icone nome="account_tree" className="text-[16px]" />
-          Como esta tela funciona
+          {t("assistente.comoFunciona.titulo")}
         </span>
         <Icone
           nome={aberto ? "expand_less" : "expand_more"}
@@ -479,21 +485,18 @@ function ComoFunciona() {
             {[
               {
                 icone: "search",
-                titulo: "1. Recuperação",
-                texto:
-                  "O backend escolhe os blocos relevantes pela pergunta e os monta com SQL escrito à mão. Não há texto-para-SQL nem consulta gerada pelo modelo.",
+                titulo: t("assistente.comoFunciona.passo1Titulo"),
+                texto: t("assistente.comoFunciona.passo1Texto"),
               },
               {
                 icone: "smart_toy",
-                titulo: "2. Redação",
-                texto:
-                  "O modelo recebe o contexto e a instrução de responder só com ele. Temperatura baixa: a tarefa é reproduzir números, não variar a redação.",
+                titulo: t("assistente.comoFunciona.passo2Titulo"),
+                texto: t("assistente.comoFunciona.passo2Texto"),
               },
               {
                 icone: "fact_check",
-                titulo: "3. Verificação",
-                texto:
-                  "O contexto volta junto da resposta e aparece ao lado. Qualquer número inventado fica visível na hora.",
+                titulo: t("assistente.comoFunciona.passo3Titulo"),
+                texto: t("assistente.comoFunciona.passo3Texto"),
               },
             ].map((passo) => (
               <div key={passo.titulo} className="rounded-lg bg-surface-container-lowest p-space-base">
@@ -509,14 +512,13 @@ function ComoFunciona() {
           </div>
 
           <p className="font-body-sm text-body-sm text-outline">
-            A primeira tentativa foi dar ferramentas ao modelo e deixá-lo consultar o que
-            precisasse. Os modelos gratuitos do OpenRouter ignoram{" "}
-            <code className="text-on-surface-variant">tools</code> — e ignoram até{" "}
-            <code className="text-on-surface-variant">tool_choice: "required"</code>.
-            Perguntado quantos jogos da Steam estavam sendo monitorados, um deles respondeu{" "}
-            <strong className="text-error">20.285</strong> sem chamar nada. O número
-            verdadeiro é 12. Num projeto cujo propósito é a integridade do dado, isso
-            decidiu a arquitetura.
+            {t("assistente.comoFunciona.rodapeParte1")}{" "}
+            <code className="text-on-surface-variant">tools</code>{" "}
+            {t("assistente.comoFunciona.rodapeParte2")}{" "}
+            <code className="text-on-surface-variant">tool_choice: "required"</code>
+            {t("assistente.comoFunciona.rodapeParte3")}{" "}
+            <strong className="text-error">20.285</strong>{" "}
+            {t("assistente.comoFunciona.rodapeParte4")}
           </p>
         </div>
       )}

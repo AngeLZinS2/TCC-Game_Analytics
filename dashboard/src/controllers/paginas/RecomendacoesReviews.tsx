@@ -24,6 +24,7 @@
  */
 
 import { useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 import { usePaginacaoLocal } from "@models/hooks/paginacao";
 import {
@@ -126,6 +127,7 @@ function CardJogo({
   carregando: boolean;
   aoClicar: () => void;
 }) {
+  const { t } = useTranslation();
   return (
     <button
       type="button"
@@ -156,7 +158,7 @@ function CardJogo({
             className="animate-spin text-[22px] text-primary-container"
           />
           <span className="font-label-caps text-label-caps uppercase tracking-widest text-outline">
-            buscando avaliações
+            {t("recomendacoes.buscaJogo.buscandoAvaliacoes")}
           </span>
         </span>
       )}
@@ -189,6 +191,7 @@ function BuscaDeJogo({
   selecionado: number | null;
   aoSelecionar: (appId: number) => void;
 }) {
+  const { t } = useTranslation();
   const [texto, setTexto] = useState("");
   const [termoBuscado, setTermoBuscado] = useState("");
 
@@ -253,13 +256,13 @@ function BuscaDeJogo({
           type="search"
           value={texto}
           onChange={(evento) => setTexto(evento.target.value)}
-          placeholder="Buscar qualquer jogo da Steam pelo nome…"
-          aria-label="Buscar jogo"
+          placeholder={t("recomendacoes.buscaJogo.placeholder")}
+          aria-label={t("recomendacoes.buscaJogo.ariaBuscar")}
           className="w-full rounded bg-surface-container-lowest py-space-sm pl-10 pr-space-sm font-title-code text-title-code text-on-surface shadow-inner placeholder:text-outline focus:bg-surface-container focus:outline-none"
         />
         {buscando && (
           <span className="absolute right-space-sm top-1/2 -translate-y-1/2 font-label-caps text-label-caps uppercase tracking-widest text-outline">
-            buscando na Steam…
+            {t("recomendacoes.buscaJogo.buscandoNaSteam")}
           </span>
         )}
       </div>
@@ -281,8 +284,8 @@ function BuscaDeJogo({
       {resultados.length === 0 && !buscando && (
         <p className="rounded bg-surface-container px-space-base py-space-md font-body-md text-body-md text-on-surface-variant">
           {termoBuscado.length < 2
-            ? "Digite ao menos dois caracteres para buscar no catálogo da Steam."
-            : "Nenhum jogo da Steam bate com essa busca."}
+            ? t("recomendacoes.buscaJogo.digiteDoisCaracteres")
+            : t("recomendacoes.buscaJogo.nenhumJogo")}
         </p>
       )}
     </div>
@@ -304,6 +307,7 @@ function DestaqueDoJogo({
   jogo: JogoSteam;
   coletadas: JogoSentimento | undefined;
 }) {
+  const { t } = useTranslation();
   const classificacao = classificacaoSteam(jogo.classificacao_steam);
 
   return (
@@ -322,15 +326,16 @@ function DestaqueDoJogo({
           </h2>
 
           <p className="mt-space-sm font-title-code text-title-code uppercase text-outline">
-            DEV:{" "}
+            {t("recomendacoes.destaque.dev")}{" "}
             <span className="text-on-surface-variant">
               {jogo.desenvolvedora ?? "—"}
             </span>{" "}
-            · APPID: <span className="text-on-surface-variant">{jogo.app_id}</span>
+            · {t("recomendacoes.destaque.appid")}{" "}
+            <span className="text-on-surface-variant">{jogo.app_id}</span>
           </p>
 
           <div className="mt-space-sm flex flex-wrap gap-space-xs">
-            {jogo.gratuito && <Selo cor="positivo">Gratuito</Selo>}
+            {jogo.gratuito && <Selo cor="positivo">{t("jogoSteam.gratuito")}</Selo>}
             {jogo.generos.slice(0, 4).map((genero) => (
               <span
                 key={genero}
@@ -345,7 +350,7 @@ function DestaqueDoJogo({
         <div className="grid grid-cols-1 gap-space-base sm:grid-cols-3">
           <div className="rounded-lg bg-surface-container-lowest p-space-base">
             <div className="font-label-caps text-label-caps uppercase tracking-widest text-outline">
-              Avaliações na Steam
+              {t("recomendacoes.destaque.avaliacoesNaSteam")}
             </div>
             {classificacao ? (
               <span
@@ -359,14 +364,16 @@ function DestaqueDoJogo({
               <span className="text-outline">—</span>
             )}
             <div className="mt-space-xs font-title-code text-title-code text-on-surface-variant">
-              {fmtPercentual(jogo.nota_avaliacoes, 0)} de{" "}
-              {fmtCurto(jogo.numero_avaliacoes)} análises
+              {t("recomendacoes.destaque.deAnalises", {
+                pct: fmtPercentual(jogo.nota_avaliacoes, 0),
+                total: fmtCurto(jogo.numero_avaliacoes),
+              })}
             </div>
           </div>
 
           <div className="rounded-lg bg-surface-container-lowest p-space-base">
             <div className="font-label-caps text-label-caps uppercase tracking-widest text-outline">
-              Nas avaliações coletadas
+              {t("recomendacoes.destaque.nasAvaliacoesColetadas")}
             </div>
             <div
               className="mt-space-xs font-headline-md text-headline-md leading-none"
@@ -380,20 +387,23 @@ function DestaqueDoJogo({
             </div>
             <div className="mt-space-xs font-title-code text-title-code text-on-surface-variant">
               {coletadas
-                ? `${fmtNumero(coletadas.positivas)} de ${fmtNumero(coletadas.avaliacoes)} com texto`
-                : "nenhuma coletada"}
+                ? t("recomendacoes.destaque.comTexto", {
+                    positivas: fmtNumero(coletadas.positivas),
+                    avaliacoes: fmtNumero(coletadas.avaliacoes),
+                  })
+                : t("recomendacoes.destaque.nenhumaColetada")}
             </div>
           </div>
 
           <div className="rounded-lg bg-surface-container-lowest p-space-base">
             <div className="font-label-caps text-label-caps uppercase tracking-widest text-outline">
-              Preço · jogadores agora
+              {t("recomendacoes.destaque.precoJogadoresAgora")}
             </div>
             <div className="mt-space-xs font-headline-md text-headline-md leading-none text-primary">
               {fmtMoeda(jogo.preco_no_momento, jogo.moeda)}
             </div>
             <div className="mt-space-xs font-title-code text-title-code text-on-surface-variant">
-              {fmtNumero(jogo.jogadores_simultaneos)} simultâneos
+              {t("recomendacoes.destaque.simultaneos", { n: fmtNumero(jogo.jogadores_simultaneos) })}
             </div>
           </div>
         </div>
@@ -417,9 +427,11 @@ function ResumoPorIA({
   };
   carregandoJogo: boolean;
 }) {
+  const { t } = useTranslation();
+
   if (carregandoJogo || consulta.isLoading) {
     return (
-      <Painel icone="auto_awesome" titulo="Resumo por IA">
+      <Painel icone="auto_awesome" titulo={t("recomendacoes.resumoIA.titulo")}>
         <div className="h-28 animate-pulse rounded-lg bg-surface-container-high/60" />
       </Painel>
     );
@@ -427,12 +439,8 @@ function ResumoPorIA({
 
   if (consulta.isError || !consulta.data) {
     return (
-      <Painel icone="auto_awesome" titulo="Resumo por IA">
-        <Aviso>
-          Ainda sem resumo por IA para este jogo — falta chave do Groq
-          configurada, avaliações de sobra pra sintetizar, ou a próxima rodada
-          do agendador ainda não chegou nele.
-        </Aviso>
+      <Painel icone="auto_awesome" titulo={t("recomendacoes.resumoIA.titulo")}>
+        <Aviso>{t("recomendacoes.resumoIA.semResumo")}</Aviso>
       </Painel>
     );
   }
@@ -442,17 +450,21 @@ function ResumoPorIA({
   return (
     <Painel
       icone="auto_awesome"
-      titulo="Resumo por IA"
-      descricao="O que a comunidade está dizendo, sintetizado por IA a partir de uma amostra das avaliações."
+      titulo={t("recomendacoes.resumoIA.titulo")}
+      descricao={t("recomendacoes.resumoIA.descricao")}
       meta={
         <div className="flex flex-wrap items-center gap-space-xs">
-          <Selo cor="neutro">via {resumo.modelo || "IA"}</Selo>
+          <Selo cor="neutro">
+            {t("recomendacoes.resumoIA.via", { modelo: resumo.modelo || t("recomendacoes.resumoIA.ia") })}
+          </Selo>
           <span
             className="font-label-caps text-label-caps uppercase tracking-widest text-outline"
             title={fmtDataHora(resumo.gerado_em)}
           >
-            gerado {fmtRelativo(resumo.gerado_em)} · {fmtNumero(resumo.avaliacoes_usadas)}{" "}
-            avaliações na amostra
+            {t("recomendacoes.resumoIA.gerado", {
+              tempo: fmtRelativo(resumo.gerado_em),
+              n: fmtNumero(resumo.avaliacoes_usadas),
+            })}
           </span>
         </div>
       }
@@ -470,7 +482,7 @@ function ResumoPorIA({
                 style={{ color: PALETA_POLOS.positivo }}
               >
                 <Icone nome="thumb_up" className="text-[13px]" />
-                O que agradou
+                {t("recomendacoes.resumoIA.oQueAgradou")}
               </div>
               <ul className="mt-space-sm flex flex-col gap-space-xs">
                 {resumo.positivos.map((ponto, i) => (
@@ -492,7 +504,7 @@ function ResumoPorIA({
                 style={{ color: PALETA_POLOS.negativo }}
               >
                 <Icone nome="thumb_down" className="text-[13px]" />
-                O que incomodou
+                {t("recomendacoes.resumoIA.oQueIncomodou")}
               </div>
               <ul className="mt-space-sm flex flex-col gap-space-xs">
                 {resumo.negativos.map((ponto, i) => (
@@ -514,6 +526,7 @@ function ResumoPorIA({
 
 /** O classificador ao vivo: um texto entra, uma probabilidade sai. */
 function Classificador({ modelo }: { modelo?: string }) {
+  const { t } = useTranslation();
   const [texto, setTexto] = useState(EXEMPLOS[0]);
   const resultado = useClassificarSentimento(texto, modelo);
 
@@ -526,15 +539,15 @@ function Classificador({ modelo }: { modelo?: string }) {
         value={texto}
         onChange={(evento) => setTexto(evento.target.value)}
         rows={4}
-        aria-label="Texto da avaliação"
-        placeholder="Escreva ou cole uma avaliação em inglês…"
+        aria-label={t("recomendacoes.classificador.ariaTexto")}
+        placeholder={t("recomendacoes.classificador.placeholder")}
         className="w-full resize-y rounded bg-surface-container-lowest p-space-md font-body-md text-body-md text-on-surface shadow-inner placeholder:text-outline focus:bg-surface-container focus:outline-none"
       />
 
       <div className="flex flex-wrap gap-space-xs">
         {EXEMPLOS.map((exemplo, indice) => (
           <Pilula key={exemplo} ativa={texto === exemplo} aoClicar={() => setTexto(exemplo)}>
-            Exemplo {indice + 1}
+            {t("recomendacoes.classificador.exemplo", { n: indice + 1 })}
           </Pilula>
         ))}
       </div>
@@ -543,14 +556,14 @@ function Classificador({ modelo }: { modelo?: string }) {
         <MensagemErro erro={resultado.error} />
       ) : probabilidade === undefined ? (
         <p className="font-body-sm text-body-sm text-outline">
-          Escreva pelo menos três caracteres.
+          {t("recomendacoes.classificador.escrevaTresCaracteres")}
         </p>
       ) : (
         <div className="rounded-lg bg-surface-container-lowest p-space-lg">
           <div className="flex items-end justify-between gap-space-base">
             <div>
               <div className="font-label-caps text-label-caps uppercase tracking-widest text-outline">
-                Probabilidade de recomendação
+                {t("recomendacoes.classificador.probabilidadeRecomendacao")}
               </div>
               <div
                 className="font-display-hero text-display-hero leading-none tracking-tight"
@@ -560,7 +573,7 @@ function Classificador({ modelo }: { modelo?: string }) {
               </div>
             </div>
             <Selo cor={positiva ? "positivo" : "negativo"}>
-              {positiva ? "Positiva" : "Negativa"}
+              {positiva ? t("recomendacoes.classificador.positiva") : t("recomendacoes.classificador.negativa")}
             </Selo>
           </div>
 
@@ -575,8 +588,7 @@ function Classificador({ modelo }: { modelo?: string }) {
           {resultado.data?.curto && (
             <p className="mt-space-sm flex items-start gap-space-xs font-body-sm text-body-sm text-outline">
               <Icone nome="warning" className="mt-[2px] text-[16px] text-error" />
-              Texto mais curto que o mínimo usado no treino — a resposta sai, mas vale
-              menos: o modelo nunca viu frases desse tamanho.
+              {t("recomendacoes.classificador.textoCurto")}
             </p>
           )}
         </div>
@@ -591,11 +603,12 @@ function Classificador({ modelo }: { modelo?: string }) {
  * amontoado de selos verdes. Texto longo fica em 4 linhas com "ler tudo".
  */
 function CartaoAvaliacao({ avaliacao }: { avaliacao: AvaliacaoClassificada }) {
+  const { t } = useTranslation();
   const [aberto, setAberto] = useState(false);
   const recomenda = avaliacao.recomendado;
   const longo = avaliacao.texto.length > 300;
   const horas = avaliacao.minutos_jogados
-    ? ` · ${fmtNumero(Math.round(avaliacao.minutos_jogados / 60))} h`
+    ? t("recomendacoes.cartaoAvaliacao.horas", { n: fmtNumero(Math.round(avaliacao.minutos_jogados / 60)) })
     : "";
 
   return (
@@ -612,12 +625,12 @@ function CartaoAvaliacao({ avaliacao }: { avaliacao: AvaliacaoClassificada }) {
               nome={recomenda ? "thumb_up" : "thumb_down"}
               className="text-[13px]"
             />
-            {recomenda ? "recomenda" : "não recomenda"}
+            {recomenda ? t("recomendacoes.cartaoAvaliacao.recomenda") : t("recomendacoes.cartaoAvaliacao.naoRecomenda")}
           </span>
           <span className="inline-flex items-center gap-space-xxs rounded-full border border-outline-variant/25 px-space-xs py-[2px] font-badge-status text-badge-status uppercase tracking-wide text-on-surface-variant">
-            modelo {fmtPercentual(avaliacao.probabilidade_positiva * 100, 0)}
+            {t("recomendacoes.cartaoAvaliacao.modelo", { pct: fmtPercentual(avaliacao.probabilidade_positiva * 100, 0) })}
             {!avaliacao.acertou && (
-              <span style={{ color: TOKENS.secundaria }}>· errou</span>
+              <span style={{ color: TOKENS.secundaria }}>{t("recomendacoes.cartaoAvaliacao.errou")}</span>
             )}
           </span>
         </div>
@@ -644,7 +657,7 @@ function CartaoAvaliacao({ avaliacao }: { avaliacao: AvaliacaoClassificada }) {
           onClick={() => setAberto((a) => !a)}
           className="mt-space-xs font-badge-status text-badge-status uppercase tracking-wide text-primary transition-colors hover:text-primary-fixed"
         >
-          {aberto ? "mostrar menos" : "ler tudo"}
+          {aberto ? t("recomendacoes.cartaoAvaliacao.mostrarMenos") : t("recomendacoes.cartaoAvaliacao.lerTudo")}
         </button>
       )}
     </article>
@@ -652,6 +665,7 @@ function CartaoAvaliacao({ avaliacao }: { avaliacao: AvaliacaoClassificada }) {
 }
 
 export function RecomendacoesReviewsPagina() {
+  const { t } = useTranslation();
   const [modelo, setModelo] = useState<string | undefined>();
   const [appId, setAppId] = useState<number | null>(null);
   const [apenasErros, setApenasErros] = useState(false);
@@ -720,14 +734,14 @@ export function RecomendacoesReviewsPagina() {
 
   if (comparacao.isError) {
     return (
-      <Painel icone="sentiment_satisfied" titulo="Sentimento de reviews">
+      <Painel icone="sentiment_satisfied" titulo={t("recomendacoes.erroTreino.titulo")}>
         <MensagemErro erro={comparacao.error} />
         <p className="mt-space-base font-body-md text-body-md text-on-surface-variant">
-          Colete o texto das avaliações e treine com{" "}
+          {t("recomendacoes.erroTreino.prefixo")}{" "}
           <code className="rounded bg-surface-container px-space-xs py-space-xxs font-title-code text-title-code text-primary">
             python cli.py collect steam
           </code>{" "}
-          e{" "}
+          {t("recomendacoes.erroTreino.meio")}{" "}
           <code className="rounded bg-surface-container px-space-xs py-space-xxs font-title-code text-title-code text-primary">
             python cli.py train-sentimento
           </code>
@@ -750,26 +764,30 @@ export function RecomendacoesReviewsPagina() {
             <div className="flex flex-col gap-space-xs">
               <div className="flex flex-wrap items-center gap-space-sm">
                 <h1 className="font-headline-lg text-headline-lg uppercase tracking-wide text-on-surface">
-                  Recomendações por Reviews
+                  {t("recomendacoes.cabecalho.titulo")}
                 </h1>
-                <Selo cor="primario">NLP</Selo>
+                <Selo cor="primario">{t("recomendacoes.cabecalho.nlpBadge")}</Selo>
                 <span className="hidden font-label-caps text-label-caps uppercase tracking-wider text-outline sm:inline">
-                  ML // Deck 07
+                  {t("recomendacoes.cabecalho.deckLabel")}
                 </span>
               </div>
 
               <p className="font-body-sm text-body-sm text-on-surface-variant">
-                O rótulo não foi anotado à mão: é o <strong>polegar do próprio autor</strong>{" "}
-                (<code className="text-primary">voted_up</code>). O modelo aprende a relação
-                entre o texto escrito e o voto de quem escreveu — treinado sobre{" "}
-                {fmtNumero(relatorio.conjunto.avaliacoes)} avaliações em {relatorio.idioma},
-                de {relatorio.conjunto.jogos} jogos.
+                {t("recomendacoes.cabecalho.rotuloPrefixo")}{" "}
+                <strong>{t("recomendacoes.cabecalho.rotuloNegrito")}</strong>{" "}
+                (<code className="text-primary">voted_up</code>
+                {t("recomendacoes.cabecalho.rotuloMeio")}{" "}
+                {t("recomendacoes.cabecalho.rotuloSufixo", {
+                  n: fmtNumero(relatorio.conjunto.avaliacoes),
+                  idioma: relatorio.idioma,
+                  jogos: relatorio.conjunto.jogos,
+                })}
               </p>
             </div>
 
             <div className="flex flex-wrap items-center gap-space-xs">
               <span className="font-label-caps text-label-caps uppercase tracking-widest text-outline">
-                Modelo:
+                {t("recomendacoes.cabecalho.modeloLabel")}
               </span>
               {relatorio.modelos.map((m) => (
                 <Pilula
@@ -787,12 +805,12 @@ export function RecomendacoesReviewsPagina() {
           {/* ==================== BUSCA + DESTAQUE ==================== */}
           <Painel
             icone="storefront"
-            titulo="Jogo em destaque"
-            descricao="Busque um jogo para ver a recepção do público e as estatísticas dele."
+            titulo={t("recomendacoes.jogoEmDestaque.titulo")}
+            descricao={t("recomendacoes.jogoEmDestaque.descricao")}
             meta={
               coletadasDoJogo ? (
                 <Selo cor="primario">
-                  {fmtNumero(coletadasDoJogo.avaliacoes)} avaliações coletadas
+                  {t("recomendacoes.jogoEmDestaque.avaliacoesColetadas", { n: fmtNumero(coletadasDoJogo.avaliacoes) })}
                 </Selo>
               ) : undefined
             }
@@ -827,45 +845,45 @@ export function RecomendacoesReviewsPagina() {
               return (
                 <section className="grid grid-cols-1 gap-space-base md:grid-cols-2 xl:grid-cols-4">
                   <KpiHud
-                    etiqueta="Recomendação observada"
-                    canto="RÓTULO REAL"
+                    etiqueta={t("recomendacoes.kpis.recomendacaoObservada")}
+                    canto={t("recomendacoes.kpis.rotuloReal")}
                     valor={fmtPercentual(taxa)}
                     valorNumerico={taxa}
                     formatarValor={(v) => fmtPercentual(v)}
-                    rotulo={jogoSelecionado?.nome ?? "jogo selecionado"}
+                    rotulo={jogoSelecionado?.nome ?? t("recomendacoes.kpis.jogoSelecionado")}
                     acento="terciaria"
                     variacao={geral === null ? null : taxa - geral}
-                    notaVariacao="vs. média do catálogo"
+                    notaVariacao={t("recomendacoes.kpis.vsMediaCatalogo")}
                   />
                   <KpiHud
-                    etiqueta="Avaliações com texto"
-                    canto="COLETADAS"
+                    etiqueta={t("recomendacoes.kpis.avaliacoesComTexto")}
+                    canto={t("recomendacoes.kpis.coletadas")}
                     valor={fmtNumero(dados.avaliacoes)}
                     valorNumerico={dados.avaliacoes}
                     formatarValor={fmtNumero}
-                    rotulo={`${fmtNumero(dados.positivas)} recomendam`}
+                    rotulo={t("recomendacoes.kpis.recomendam", { n: fmtNumero(dados.positivas) })}
                     acento="primaria"
-                    notaVariacao={`${fmtNumero(dados.avaliacoes - dados.positivas)} não recomendam`}
+                    notaVariacao={t("recomendacoes.kpis.naoRecomendam", { n: fmtNumero(dados.avaliacoes - dados.positivas) })}
                   />
                   <KpiHud
-                    etiqueta="Aspecto mais criticado"
-                    canto="PALAVRA-CHAVE"
+                    etiqueta={t("recomendacoes.kpis.aspectoMaisCriticado")}
+                    canto={t("recomendacoes.kpis.palavraChave")}
                     valor={
                       piorAspecto ? fmtPercentual(piorAspecto.percentual_positivo, 0) : "—"
                     }
                     valorNumerico={piorAspecto?.percentual_positivo ?? null}
                     formatarValor={(v) => fmtPercentual(v, 0)}
-                    rotulo={piorAspecto?.aspecto ?? "amostra insuficiente"}
+                    rotulo={piorAspecto?.aspecto ?? t("recomendacoes.kpis.amostraInsuficiente")}
                     acento="secundaria"
                     notaVariacao={
                       piorAspecto
-                        ? `${fmtNumero(piorAspecto.avaliacoes)} avaliações citam`
+                        ? t("recomendacoes.kpis.avaliacoesCitam", { n: fmtNumero(piorAspecto.avaliacoes) })
                         : undefined
                     }
                   />
                   <KpiHud
-                    etiqueta="ROC-AUC do modelo"
-                    canto="ORDENAÇÃO"
+                    etiqueta={t("recomendacoes.kpis.rocAuc")}
+                    canto={t("recomendacoes.kpis.ordenacao")}
                     valor={metricas ? fmtDecimal(metricas.roc_auc, 3) : "—"}
                     valorNumerico={metricas?.roc_auc ?? null}
                     formatarValor={(v) => fmtDecimal(v, 3)}
@@ -873,7 +891,7 @@ export function RecomendacoesReviewsPagina() {
                     acento="primaria"
                     notaVariacao={
                       metricas
-                        ? `balanceada ${fmtPercentual(metricas.acuracia_balanceada * 100)}`
+                        ? t("recomendacoes.kpis.balanceada", { pct: fmtPercentual(metricas.acuracia_balanceada * 100) })
                         : undefined
                     }
                   />
@@ -888,26 +906,28 @@ export function RecomendacoesReviewsPagina() {
               <section className="grid grid-cols-1 gap-space-base xl:grid-cols-2">
                 <Painel
                   icone="show_chart"
-                  titulo="Tendência de recomendação"
-                  descricao="Percentual de avaliações positivas por dia de publicação. Contagem sobre o rótulo real."
-                  meta={<Selo>{dados.por_dia.length} dias</Selo>}
+                  titulo={t("recomendacoes.tendencia.titulo")}
+                  descricao={t("recomendacoes.tendencia.descricao")}
+                  meta={<Selo>{t("recomendacoes.tendencia.dias", { n: dados.por_dia.length })}</Selo>}
                 >
                   {dados.por_dia.length < 2 ? (
                     <p className="rounded bg-surface-container px-space-base py-space-md font-body-md text-body-md text-on-surface-variant">
-                      Só há {dados.por_dia.length} dia com avaliação publicada para este
-                      jogo — a série ganha forma conforme a coleta cresce.
+                      {t("recomendacoes.tendencia.soHaDias", { n: dados.por_dia.length })}
                     </p>
                   ) : (
                     <AreaNeon
                       pontos={dados.por_dia.map((ponto) => ({
                         rotulo: fmtDataCurta(ponto.dia),
                         valor: ponto.percentual_positivo,
-                        detalhe: `${fmtPercentual(ponto.percentual_positivo)} de ${fmtNumero(ponto.avaliacoes)} avaliações`,
+                        detalhe: t("recomendacoes.tendencia.deAvaliacoes", {
+                          pct: fmtPercentual(ponto.percentual_positivo),
+                          n: fmtNumero(ponto.avaliacoes),
+                        }),
                       }))}
                       formatarValor={(valor) => `${Math.round(valor)}%`}
                       rodapeEsquerda={
                         <>
-                          Média do período:{" "}
+                          {t("recomendacoes.tendencia.mediaDoPeriodo")}{" "}
                           <strong className="font-title-code text-title-code text-on-surface">
                             {fmtPercentual(
                               (dados.positivas / Math.max(dados.avaliacoes, 1)) * 100,
@@ -922,9 +942,9 @@ export function RecomendacoesReviewsPagina() {
 
                 <Painel
                   icone="donut_large"
-                  titulo="Recomendação por aspecto"
-                  descricao="Entre as avaliações deste jogo que mencionam cada tema, quantas recomendam."
-                  meta={<Selo>Filtro por palavra-chave</Selo>}
+                  titulo={t("recomendacoes.aspectos.titulo")}
+                  descricao={t("recomendacoes.aspectos.descricao")}
+                  meta={<Selo>{t("recomendacoes.aspectos.filtroPalavraChave")}</Selo>}
                 >
                   <div className="space-y-space-sm">
                     {dados.aspectos.map((aspecto) => {
@@ -934,7 +954,7 @@ export function RecomendacoesReviewsPagina() {
                         <div
                           key={aspecto.aspecto}
                           className="flex items-center gap-space-xs sm:gap-space-sm"
-                          title={`Termos: ${aspecto.termos.join(", ")}`}
+                          title={t("recomendacoes.aspectos.termos", { lista: aspecto.termos.join(", ") })}
                         >
                           <span className="w-20 shrink-0 truncate font-body-sm text-body-sm text-on-surface-variant sm:w-32">
                             {aspecto.aspecto}
@@ -970,11 +990,9 @@ export function RecomendacoesReviewsPagina() {
                   </div>
 
                   <p className="font-body-sm text-body-sm text-outline">
-                    Aspectos com menos de {MINIMO_POR_ASPECTO} avaliações aparecem
-                    apagados: com três menções, uma delas muda a porcentagem em 33 pontos.
-                    E isto <strong>não é</strong> análise de sentimento por aspecto — é um
-                    filtro por lista de palavras sobre o rótulo real, então ironia não é
-                    detectada e uma avaliação que cita dois temas conta nos dois.
+                    {t("recomendacoes.aspectos.notaPrefixo", { n: MINIMO_POR_ASPECTO })}{" "}
+                    <strong>{t("recomendacoes.aspectos.notaNegrito")}</strong>{" "}
+                    {t("recomendacoes.aspectos.notaSufixo")}
                   </p>
                 </Painel>
               </section>
@@ -991,17 +1009,17 @@ export function RecomendacoesReviewsPagina() {
             icone="reviews"
             titulo={
               jogoSelecionado
-                ? `Avaliações de ${jogoSelecionado.nome}`
-                : "Avaliações classificadas"
+                ? t("recomendacoes.avaliacoes.tituloComJogo", { jogo: jogoSelecionado.nome })
+                : t("recomendacoes.avaliacoes.tituloGenerico")
             }
-            descricao="Avaliações reais, com a previsão do modelo ao lado do voto que o autor deu."
+            descricao={t("recomendacoes.avaliacoes.descricao")}
             meta={
               <Pilula
                 ativa={apenasErros}
                 icone="error"
                 aoClicar={() => setApenasErros((atual) => !atual)}
               >
-                Só os erros
+                {t("recomendacoes.avaliacoes.soOsErros")}
               </Pilula>
             }
           >
@@ -1009,8 +1027,8 @@ export function RecomendacoesReviewsPagina() {
               estado={avaliacoes}
               vazio={
                 apenasErros
-                  ? "O modelo acertou todas as avaliações desta amostra."
-                  : "Nenhuma avaliação com texto para este jogo."
+                  ? t("recomendacoes.avaliacoes.vazioErros")
+                  : t("recomendacoes.avaliacoes.vazioGeral")
               }
             >
               {() => (
@@ -1033,19 +1051,15 @@ export function RecomendacoesReviewsPagina() {
                 opcoesPorPagina={[5, 15, 25, 50]}
                 aoMudarPagina={pagAvaliacoes.setPagina}
                 aoMudarPorPagina={pagAvaliacoes.setPorPagina}
-                resumo={
-                  <>
-                    {pagAvaliacoes.fatia.length} de {listaAvaliacoes.length}
-                  </>
-                }
+                resumo={t("recomendacoes.avaliacoes.resumoPaginacao", {
+                  fatia: pagAvaliacoes.fatia.length,
+                  total: listaAvaliacoes.length,
+                })}
               />
             </div>
 
             <p className="font-body-sm text-body-sm text-outline">
-              O filtro de erro existe para a tela não virar folheto: é onde dá para ver o
-              que o modelo não aprendeu — ironia, avaliação misturando idiomas, elogio
-              escrito com palavrão. Só avaliações em {relatorio.idioma} aparecem aqui, que
-              é o idioma em que o modelo foi treinado.
+              {t("recomendacoes.avaliacoes.notaPrefixo", { idioma: relatorio.idioma })}
             </p>
           </Painel>
 
@@ -1053,8 +1067,8 @@ export function RecomendacoesReviewsPagina() {
             {() => (
               <Painel
                 icone="leaderboard"
-                titulo="Recepção por jogo"
-                descricao="Todos os jogos monitorados, pelo rótulo real. Clique para ver as avaliações."
+                titulo={t("recomendacoes.recepcaoPorJogo.titulo")}
+                descricao={t("recomendacoes.recepcaoPorJogo.descricao")}
               >
                 {/* `max-w-3xl`: numa tela muito larga a coluna estica demais e
                     os nomes ficam longe das barras. */}
@@ -1106,11 +1120,10 @@ export function RecomendacoesReviewsPagina() {
                     opcoesPorPagina={[5, 15, 25, 50]}
                     aoMudarPagina={pagPorJogo.setPagina}
                     aoMudarPorPagina={pagPorJogo.setPorPagina}
-                    resumo={
-                      <>
-                        {pagPorJogo.fatia.length} de {listaPorJogo.length} jogos
-                      </>
-                    }
+                    resumo={t("recomendacoes.recepcaoPorJogo.resumoPaginacao", {
+                      fatia: pagPorJogo.fatia.length,
+                      total: listaPorJogo.length,
+                    })}
                   />
                 </div>
               </Painel>
@@ -1122,16 +1135,16 @@ export function RecomendacoesReviewsPagina() {
           <section className="grid grid-cols-1 gap-space-base xl:grid-cols-2">
             <Painel
               icone="model_training"
-              titulo="Classificador ao vivo"
-              descricao={`Texto novo, avaliado por ${metricas?.nome ?? "modelo ativo"}. Aqui é previsão, não contagem.`}
+              titulo={t("recomendacoes.modeloSecao.classificadorAoVivo")}
+              descricao={`${t("recomendacoes.modeloSecao.descricaoPrefixo")} ${metricas?.nome ?? t("recomendacoes.modeloSecao.modeloAtivoFallback")}${t("recomendacoes.modeloSecao.descricaoSufixo")}`}
             >
               <Classificador modelo={ativo} />
             </Painel>
 
             <Painel
               icone="format_quote"
-              titulo="Termos que o modelo aprendeu"
-              descricao="Os pesos da regressão logística, que é o único dos três em que cada palavra tem um peso legível."
+              titulo={t("recomendacoes.modeloSecao.termosTitulo")}
+              descricao={t("recomendacoes.modeloSecao.termosDescricao")}
               meta={comTermos ? <Selo cor="primario">{comTermos.nome}</Selo> : undefined}
             >
               {comTermos ? (
@@ -1147,13 +1160,18 @@ export function RecomendacoesReviewsPagina() {
                               : PALETA_POLOS.negativo,
                         }}
                       >
-                        Puxam para {lado === "positivos" ? "positivo" : "negativo"}
+                        {t("recomendacoes.modeloSecao.puxamPara", {
+                          lado:
+                            lado === "positivos"
+                              ? t("recomendacoes.modeloSecao.positivo")
+                              : t("recomendacoes.modeloSecao.negativo"),
+                        })}
                       </div>
                       <div className="flex flex-wrap gap-space-xs">
                         {comTermos.termos[lado].map(([termo, peso]) => (
                           <span
                             key={termo}
-                            title={`peso ${peso}`}
+                            title={t("recomendacoes.modeloSecao.peso", { peso })}
                             className="rounded px-space-xs py-space-xxs font-title-code text-title-code"
                             style={{
                               background:
@@ -1175,7 +1193,7 @@ export function RecomendacoesReviewsPagina() {
                 </div>
               ) : (
                 <p className="font-body-md text-body-md text-outline">
-                  Nenhum modelo com peso por palavra treinado.
+                  {t("recomendacoes.modeloSecao.semTermos")}
                 </p>
               )}
             </Painel>

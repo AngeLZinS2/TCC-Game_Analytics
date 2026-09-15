@@ -19,6 +19,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 
 import { usePaginacaoLocal } from "@models/hooks/paginacao";
 import {
@@ -75,16 +76,16 @@ const NO_RANKING = 8;
 
 type Ordenacao = "jogadores" | "avaliacoes" | "preco" | "trending";
 
-const ORDENACOES: { valor: Ordenacao; rotulo: string; icone?: string }[] = [
-  { valor: "jogadores", rotulo: "Mais Jogados (CCU)", icone: "trending_up" },
-  { valor: "avaliacoes", rotulo: "Melhor Avaliados" },
-  { valor: "preco", rotulo: "Preço" },
-  { valor: "trending", rotulo: "Trending 24h", icone: "local_fire_department" },
+const ORDENACOES: { valor: Ordenacao; icone?: string }[] = [
+  { valor: "jogadores", icone: "trending_up" },
+  { valor: "avaliacoes" },
+  { valor: "preco" },
+  { valor: "trending", icone: "local_fire_department" },
 ];
 
 const MODOS_CATALOGO = [
-  { id: "tabela", icone: "table_rows", rotulo: "Tabela" },
-  { id: "cartoes", icone: "grid_view", rotulo: "Cartões" },
+  { id: "tabela", icone: "table_rows" },
+  { id: "cartoes", icone: "grid_view" },
 ] as const;
 type ModoCatalogo = (typeof MODOS_CATALOGO)[number]["id"];
 
@@ -95,6 +96,7 @@ const CHIP_CLASSIFICACAO = {
 } as const;
 
 export function SteamPagina() {
+  const { t } = useTranslation();
   const navegar = useNavigate();
   const campoBusca = useRef<HTMLInputElement>(null);
 
@@ -192,8 +194,13 @@ export function SteamPagina() {
   //: TELEMETRIA, e apontar para onde os resultados estao.
   const vazioDaTelemetria =
     daLoja.length > 0
-      ? "Sem telemetria: os jogos desta busca existem na loja da Steam, mas ainda não foram coletados. Abra um deles na tabela abaixo."
-      : "Nenhum jogo bate com esse filtro.";
+      ? t("catalogoSteam.tabela.semTelemetria")
+      : t("catalogoSteam.tabela.nenhumJogo");
+
+  const modosCatalogo = MODOS_CATALOGO.map((modo) => ({
+    ...modo,
+    rotulo: t(`catalogoSteam.modos.${modo.id}`),
+  }));
 
   /**
    * Abre um jogo, coletando primeiro se ele ainda nao estiver no banco.
@@ -235,8 +242,8 @@ export function SteamPagina() {
               type="search"
               value={busca}
               onChange={(evento) => setBusca(evento.target.value)}
-              placeholder="Buscar jogo por título ou desenvolvedora…"
-              aria-label="Buscar jogo"
+              placeholder={t("catalogoSteam.buscarPlaceholder")}
+              aria-label={t("catalogoSteam.buscarAriaLabel")}
               className="w-full rounded bg-surface-container-lowest py-space-sm pl-10 pr-20 font-title-code text-title-code text-on-surface shadow-inner placeholder:text-outline focus:bg-surface-container focus:outline-none"
             />
             <kbd className="absolute right-space-sm top-1/2 -translate-y-1/2 rounded bg-surface-container px-space-xs py-space-xxs font-label-caps text-label-caps text-outline">
@@ -252,10 +259,10 @@ export function SteamPagina() {
               com as 50+ categorias da Steam isso ficava feio o bastante para
               destoar da tela inteira. */}
           <SeletorFiltro
-            rotulo="Gênero"
+            rotulo={t("catalogoSteam.genero")}
             valor={genero}
             aoEscolher={setGenero}
-            rotuloTudo={`Todos (${totalCatalogo || 0})`}
+            rotuloTudo={t("catalogoSteam.todos", { contagem: totalCatalogo || 0 })}
             opcoes={(generos.data ?? []).map((item: AgregadoGenero) => ({
               valor: item.genero,
               rotulo: `${item.genero} (${item.jogos})`,
@@ -263,10 +270,10 @@ export function SteamPagina() {
           />
 
           <SeletorFiltro
-            rotulo="Categoria"
+            rotulo={t("catalogoSteam.categoria")}
             valor={categoria}
             aoEscolher={setCategoria}
-            rotuloTudo="Todas"
+            rotuloTudo={t("catalogoSteam.todas")}
             buscavel
             opcoes={(categorias.data ?? []).map((item) => ({
               valor: item.categoria,
@@ -276,7 +283,7 @@ export function SteamPagina() {
 
           <div className="flex flex-wrap items-center gap-space-xs">
             <span className="mr-space-xs hidden font-label-caps text-label-caps uppercase text-outline sm:inline">
-              Ordenar:
+              {t("catalogoSteam.ordenar")}
             </span>
             {ORDENACOES.map((opcao) => {
               const indisponivel = opcao.valor === "trending" && !temVariacao;
@@ -285,16 +292,12 @@ export function SteamPagina() {
                   key={opcao.valor}
                   ativa={ordenacao === opcao.valor}
                   desabilitada={indisponivel}
-                  titulo={
-                    indisponivel
-                      ? "Precisa de pelo menos duas coletas para haver tendência"
-                      : undefined
-                  }
+                  titulo={indisponivel ? t("catalogoSteam.trendingIndisponivel") : undefined}
                   icone={opcao.icone}
                   corIcone={opcao.valor === "trending" ? "text-error" : undefined}
                   aoClicar={() => setOrdenacao(opcao.valor)}
                 >
-                  {opcao.rotulo}
+                  {t(`catalogoSteam.ordenacoes.${opcao.valor}`)}
                 </Pilula>
               );
             })}
@@ -325,32 +328,34 @@ export function SteamPagina() {
           return (
             <section className="grid grid-cols-1 gap-space-base md:grid-cols-3">
               <KpiHud
-                etiqueta="VALVE_CONCURRENT_USERS // AGORA"
+                etiqueta={t("catalogoSteam.kpis.concurrentUsers")}
                 canto={
                   genero || categoria
-                    ? `FILTRO: ${[genero, categoria].filter(Boolean).join(" + ").toUpperCase()}`
-                    : "CATÁLOGO INTEIRO"
+                    ? t("catalogoSteam.kpis.filtro", {
+                        filtro: [genero, categoria].filter(Boolean).join(" + ").toUpperCase(),
+                      })
+                    : t("catalogoSteam.kpis.catalogoInteiro")
                 }
                 valor={fmtNumero(somaJogadores)}
                 valorNumerico={somaJogadores}
                 formatarValor={fmtNumero}
-                rotulo="Jogadores conectados agora"
+                rotulo={t("catalogoSteam.kpis.jogadoresConectados")}
                 variacao={variacaoTotal}
-                notaVariacao="vs. coleta anterior"
+                notaVariacao={t("catalogoSteam.kpis.vsColetaAnterior")}
                 acento="primaria"
               >
                 <Sparkline valores={valoresSerie} />
               </KpiHud>
 
               <KpiHud
-                etiqueta="INDEXED_ENTITIES // CATÁLOGO"
-                canto={saude.data?.status === "ok" ? "100% OK" : "SEM CONTATO"}
+                etiqueta={t("catalogoSteam.kpis.indexedEntities")}
+                canto={saude.data?.status === "ok" ? t("catalogoSteam.kpis.ok") : t("catalogoSteam.kpis.semContato")}
                 valor={fmtNumero(emTela.length)}
                 valorNumerico={emTela.length}
                 formatarValor={fmtNumero}
-                rotulo="Jogos monitorados ativos"
+                rotulo={t("catalogoSteam.kpis.jogosMonitoradosAtivos")}
                 acento="secundaria"
-                notaVariacao={`${gratuitos} gratuitos`}
+                notaVariacao={t("catalogoSteam.kpis.gratuitos", { contagem: gratuitos })}
               >
                 <Segmentos
                   acesos={Math.round(
@@ -362,16 +367,18 @@ export function SteamPagina() {
               </KpiHud>
 
               <KpiHud
-                etiqueta="PEAK_CCU // HISTÓRICO"
-                canto="SOMA DOS PICOS"
+                etiqueta={t("catalogoSteam.kpis.peakCcu")}
+                canto={t("catalogoSteam.kpis.somaDosPicos")}
                 valor={fmtCurto(somaPicos)}
                 valorNumerico={somaPicos}
                 formatarValor={fmtCurto}
-                rotulo="Maior audiência já coletada"
+                rotulo={t("catalogoSteam.kpis.maiorAudiencia")}
                 acento="terciaria"
                 notaVariacao={
                   somaJogadores && somaPicos
-                    ? `agora em ${((somaJogadores / somaPicos) * 100).toFixed(0)}% do pico`
+                    ? t("catalogoSteam.kpis.agoraNoPico", {
+                        percentual: ((somaJogadores / somaPicos) * 100).toFixed(0),
+                      })
                     : undefined
                 }
               >
@@ -393,10 +400,10 @@ export function SteamPagina() {
         <div className="flex flex-wrap items-center justify-between gap-space-sm">
           <h2 className="flex items-center gap-space-xs font-headline-md text-headline-md uppercase tracking-wide text-on-surface">
             <Icone nome="leaderboard" className="text-[20px] text-primary-container" />
-            Top jogos por jogadores simultâneos
+            {t("catalogoSteam.ranking.titulo")}
           </h2>
           <span className="font-label-caps text-label-caps uppercase tracking-widest text-outline">
-            Máx. referência{" "}
+            {t("catalogoSteam.ranking.maxReferencia")}{" "}
             <span className="text-primary">
               {fmtNumero(lista[0]?.jogadores_simultaneos)}
             </span>
@@ -437,19 +444,22 @@ export function SteamPagina() {
           <div className="flex flex-col">
             <h2 className="flex items-center gap-space-xs font-headline-md text-headline-md uppercase tracking-wide text-on-surface">
               <Icone nome="table_rows" className="text-[20px] text-primary-container" />
-              Catálogo de telemetria e mercado
+              {t("catalogoSteam.tabela.titulo")}
             </h2>
             <span className="mt-0.5 font-title-code text-title-code text-outline">
-              Exibindo {lista.length} de {totalCatalogo || lista.length} jogos
-              monitorados na Valve Store
-              {daLoja.length > 0 && ` · +${daLoja.length} da loja, sem coleta ainda`}
+              {t("catalogoSteam.tabela.exibindo", {
+                lista: lista.length,
+                total: totalCatalogo || lista.length,
+              })}
+              {daLoja.length > 0 &&
+                t("catalogoSteam.tabela.maisDaLoja", { contagem: daLoja.length })}
             </span>
           </div>
 
           <div className="flex flex-wrap items-center gap-space-sm">
-            <SeletorModo modos={MODOS_CATALOGO} valor={modo} aoMudar={setModo} />
+            <SeletorModo modos={modosCatalogo} valor={modo} aoMudar={setModo} />
             <Botao icone="file_download" aoClicar={() => exportarCsv(lista)}>
-              Exportar CSV
+              {t("catalogoSteam.tabela.exportarCsv")}
             </Botao>
           </div>
         </div>
@@ -464,8 +474,8 @@ export function SteamPagina() {
           estado={{ ...jogos, data: linhas }}
           vazio={
             termoBuscado.length >= 2 && catalogo.isFetching
-              ? "Buscando na loja da Steam…"
-              : "Nenhum jogo bate com esse filtro."
+              ? t("catalogoSteam.tabela.buscandoNaLoja")
+              : t("catalogoSteam.tabela.nenhumJogo")
           }
         >
           {() =>
@@ -489,14 +499,14 @@ export function SteamPagina() {
               <table className="w-full border-collapse text-left">
                 <thead>
                   <tr className="bg-surface-container font-label-caps text-label-caps uppercase tracking-wider text-outline">
-                    <th className="px-space-md py-space-sm">Jogo &amp; AppID</th>
-                    <th className="px-space-md py-space-sm">Gêneros</th>
-                    <th className="px-space-md py-space-sm">Jogadores simultâneos</th>
-                    <th className="px-space-md py-space-sm">% Avaliações</th>
-                    <th className="px-space-md py-space-sm">Classificação Steam</th>
-                    <th className="px-space-md py-space-sm">Preço</th>
-                    <th className="px-space-md py-space-sm">Última coleta</th>
-                    <th className="px-space-md py-space-sm text-right">Ações</th>
+                    <th className="px-space-md py-space-sm">{t("catalogoSteam.tabela.colunas.jogo")}</th>
+                    <th className="px-space-md py-space-sm">{t("catalogoSteam.tabela.colunas.generos")}</th>
+                    <th className="px-space-md py-space-sm">{t("catalogoSteam.tabela.colunas.jogadoresSimultaneos")}</th>
+                    <th className="px-space-md py-space-sm">{t("catalogoSteam.tabela.colunas.avaliacoes")}</th>
+                    <th className="px-space-md py-space-sm">{t("catalogoSteam.tabela.colunas.classificacao")}</th>
+                    <th className="px-space-md py-space-sm">{t("catalogoSteam.tabela.colunas.preco")}</th>
+                    <th className="px-space-md py-space-sm">{t("catalogoSteam.tabela.colunas.ultimaColeta")}</th>
+                    <th className="px-space-md py-space-sm text-right">{t("catalogoSteam.tabela.colunas.acoes")}</th>
                   </tr>
                 </thead>
 
@@ -537,7 +547,7 @@ export function SteamPagina() {
                                 {jogo.nome}
                               </span>
                               <div className="flex items-center gap-space-xs font-title-code text-title-code text-outline">
-                                <span>AppID:</span>
+                                <span>{t("catalogoSteam.tabela.appId")}</span>
                                 <span className="font-bold text-on-surface-variant">
                                   {jogo.app_id}
                                 </span>
@@ -572,7 +582,7 @@ export function SteamPagina() {
                               {fmtNumero(jogo.jogadores_simultaneos)}
                             </span>
                             <span className="font-label-caps text-label-caps text-outline">
-                              Pico: {fmtNumero(jogo.pico_jogadores)}
+                              {t("catalogoSteam.tabela.pico", { contagem: fmtNumero(jogo.pico_jogadores) })}
                             </span>
                           </div>
                         </td>
@@ -661,23 +671,28 @@ export function SteamPagina() {
           opcoesPorPagina={[5, 15, 25, 50]}
           aoMudarPagina={paginacao.setPagina}
           aoMudarPorPagina={paginacao.setPorPagina}
-          resumo={
-            <>
-              Exibindo {fmtNumero(paginacao.fatia.length)} de {fmtNumero(linhas.length)}
-            </>
-          }
+          resumo={t("catalogoSteam.paginacao.exibindo", {
+            fatia: fmtNumero(paginacao.fatia.length),
+            total: fmtNumero(linhas.length),
+          })}
         />
 
         <div className="flex flex-wrap items-center justify-between gap-space-sm font-label-caps text-label-caps uppercase tracking-widest text-outline">
           <span>
-            Pipeline:{" "}
+            {t("catalogoSteam.rodape.pipeline")}{" "}
             <span className={saude.data?.status === "ok" ? "text-tertiary" : "text-error"}>
-              {saude.data?.status === "ok" ? "ativo" : "sem contato"}
+              {saude.data?.status === "ok" ? t("catalogoSteam.rodape.ativo") : t("catalogoSteam.rodape.semContato")}
             </span>
           </span>
           <span>
-            Steam store ingest · {serieTotal.data?.length ?? 0}{" "}
-            {serieTotal.data?.length === 1 ? "coleta" : "coletas"}
+            {t("catalogoSteam.rodape.ingest", {
+              contagem: serieTotal.data?.length ?? 0,
+              palavra: t(
+                serieTotal.data?.length === 1
+                  ? "catalogoSteam.rodape.coleta"
+                  : "catalogoSteam.rodape.coletas",
+              ),
+            })}
           </span>
         </div>
       </section>
@@ -708,6 +723,7 @@ function LinhaDaLoja({
   carregando: boolean;
   aoClicar: () => void;
 }) {
+  const { t } = useTranslation();
   const vazio = <span className="text-outline">—</span>;
 
   return (
@@ -729,11 +745,11 @@ function LinhaDaLoja({
                 {candidato.nome}
               </span>
               <span className="shrink-0 rounded bg-surface-container px-space-xs py-space-xxs font-badge-status text-badge-status uppercase text-outline">
-                da loja
+                {t("catalogoSteam.tabela.daLoja")}
               </span>
             </span>
             <div className="flex items-center gap-space-xs font-title-code text-title-code text-outline">
-              <span>AppID:</span>
+              <span>{t("catalogoSteam.tabela.appId")}</span>
               <span className="font-bold text-on-surface-variant">
                 {candidato.app_id}
               </span>
@@ -757,7 +773,7 @@ function LinhaDaLoja({
 
       <td className="px-space-md py-space-sm">
         <span className="font-title-code text-title-code text-outline">
-          {carregando ? "buscando dados…" : "sem coleta"}
+          {carregando ? t("catalogoSteam.tabela.buscandoDados") : t("catalogoSteam.tabela.semColeta")}
         </span>
       </td>
 

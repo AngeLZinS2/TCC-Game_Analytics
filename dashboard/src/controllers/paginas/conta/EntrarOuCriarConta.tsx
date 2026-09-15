@@ -13,6 +13,8 @@
  */
 
 import { useState, type FormEvent } from "react";
+import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 
 import {
   criarContaComEmailSenha,
@@ -29,11 +31,13 @@ import { MarcaGithub, MarcaGoogle } from "@views/componentes/MarcasOAuth";
 type Modo = "entrar" | "cadastro" | "recuperar";
 type Provedor = "google" | "github";
 
-const TEXTOS: Record<Modo, { titulo: string; acao: string; icone: string }> = {
-  entrar: { titulo: "Entrar", acao: "Entrar", icone: "login" },
-  cadastro: { titulo: "Criar conta", acao: "Criar conta", icone: "person_add" },
-  recuperar: { titulo: "Recuperar senha", acao: "Enviar e-mail", icone: "mail" },
-};
+function textosDe(t: TFunction): Record<Modo, { titulo: string; acao: string; icone: string }> {
+  return {
+    entrar: { titulo: t("conta.entrar.titulo"), acao: t("conta.entrar.acao"), icone: "login" },
+    cadastro: { titulo: t("conta.cadastro.titulo"), acao: t("conta.cadastro.acao"), icone: "person_add" },
+    recuperar: { titulo: t("conta.recuperar.titulo"), acao: t("conta.recuperar.acao"), icone: "mail" },
+  };
+}
 
 const BOTAO_SOCIAL =
   "flex min-h-[44px] items-center justify-center gap-space-xs rounded border border-outline-variant/40 " +
@@ -41,12 +45,16 @@ const BOTAO_SOCIAL =
   "transition-colors hover:bg-surface-container-high disabled:cursor-not-allowed disabled:opacity-50";
 
 export function EntrarOuCriarConta({
-  titulo = "Entre para continuar",
-  descricao = "Esta área é exclusiva para quem tem conta no PlayDB.",
+  titulo,
+  descricao,
 }: {
   titulo?: string;
   descricao?: string;
 }) {
+  const { t } = useTranslation();
+  const tituloExibido = titulo ?? t("conta.tituloPadrao");
+  const descricaoExibida = descricao ?? t("conta.descricaoPadrao");
+  const textos = textosDe(t);
   const [modo, setModo] = useState<Modo>("entrar");
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
@@ -71,7 +79,7 @@ export function EntrarOuCriarConta({
         setEmailEnviado(true);
       }
     } catch (excecao) {
-      setErro(mensagemErroConta(excecao));
+      setErro(mensagemErroConta(excecao, t));
     } finally {
       setEnviando(false);
     }
@@ -83,7 +91,7 @@ export function EntrarOuCriarConta({
     try {
       await (provedor === "google" ? entrarComGoogle() : entrarComGithub());
     } catch (excecao) {
-      setErro(mensagemErroConta(excecao));
+      setErro(mensagemErroConta(excecao, t));
     } finally {
       setProvedorSocial(null);
     }
@@ -95,7 +103,7 @@ export function EntrarOuCriarConta({
     setEmailEnviado(false);
   }
 
-  const texto = TEXTOS[modo];
+  const texto = textos[modo];
   const ocupado = enviando || provedorSocial !== null;
 
   return (
@@ -104,23 +112,24 @@ export function EntrarOuCriarConta({
         <div className="flex flex-col items-center gap-space-xs text-center">
           <Icone nome="account_circle" className="text-[32px] text-primary" />
           <h1 className="font-headline-sm text-headline-sm uppercase tracking-wide text-on-surface">
-            {titulo}
+            {tituloExibido}
           </h1>
-          <p className="font-body-sm text-body-sm text-outline">{descricao}</p>
+          <p className="font-body-sm text-body-sm text-outline">{descricaoExibida}</p>
         </div>
 
         {emailEnviado ? (
           <div className="mt-space-lg flex flex-col items-center gap-space-sm text-center">
             <Icone nome="mark_email_read" className="text-[28px] text-tertiary" />
             <p className="font-body-md text-body-sm text-on-surface-variant">
-              Enviamos um link de redefinição de senha para <strong>{email}</strong>.
+              {t("conta.emailEnviadoPrefixo")} <strong>{email}</strong>
+              {t("conta.emailEnviadoSufixo")}
             </p>
             <button
               type="button"
               onClick={() => trocarModo("entrar")}
               className="font-title-code text-title-code text-primary hover:underline"
             >
-              Voltar para o login
+              {t("conta.voltarParaLogin")}
             </button>
           </div>
         ) : (
@@ -139,7 +148,7 @@ export function EntrarOuCriarConta({
                     ) : (
                       <MarcaGoogle />
                     )}
-                    Continuar com Google
+                    {t("conta.continuarComGoogle")}
                   </button>
                   <button
                     type="button"
@@ -152,14 +161,14 @@ export function EntrarOuCriarConta({
                     ) : (
                       <MarcaGithub />
                     )}
-                    Continuar com GitHub
+                    {t("conta.continuarComGithub")}
                   </button>
                 </div>
 
                 <div className="flex items-center gap-space-sm" aria-hidden>
                   <span className="h-px flex-1 bg-outline-variant/30" />
                   <span className="font-label-caps text-label-caps uppercase tracking-widest text-outline">
-                    ou com e-mail
+                    {t("conta.ouComEmail")}
                   </span>
                   <span className="h-px flex-1 bg-outline-variant/30" />
                 </div>
@@ -169,7 +178,7 @@ export function EntrarOuCriarConta({
             <form onSubmit={enviar} className="flex flex-col gap-space-base">
               <label className="flex flex-col gap-space-xxs">
                 <span className="font-label-caps text-label-caps uppercase tracking-widest text-outline">
-                  E-mail
+                  {t("conta.email")}
                 </span>
                 <input
                   type="email"
@@ -177,7 +186,7 @@ export function EntrarOuCriarConta({
                   value={email}
                   onChange={(evento) => setEmail(evento.target.value)}
                   className={CAMPO}
-                  placeholder="voce@exemplo.com"
+                  placeholder={t("conta.placeholderEmail")}
                   autoComplete="email"
                 />
               </label>
@@ -185,7 +194,7 @@ export function EntrarOuCriarConta({
               {modo !== "recuperar" && (
                 <label className="flex flex-col gap-space-xxs">
                   <span className="font-label-caps text-label-caps uppercase tracking-widest text-outline">
-                    Senha
+                    {t("conta.senha")}
                   </span>
                   <input
                     type="password"
@@ -227,29 +236,29 @@ export function EntrarOuCriarConta({
                       onClick={() => trocarModo("recuperar")}
                       className="text-outline hover:text-primary hover:underline"
                     >
-                      Esqueci minha senha
+                      {t("conta.esqueciSenha")}
                     </button>
                     <span className="text-on-surface-variant">
-                      Não tem conta?{" "}
+                      {t("conta.naoTemConta")}{" "}
                       <button
                         type="button"
                         onClick={() => trocarModo("cadastro")}
                         className="text-primary hover:underline"
                       >
-                        Criar conta
+                        {t("conta.criarConta")}
                       </button>
                     </span>
                   </>
                 )}
                 {modo !== "entrar" && (
                   <span className="text-on-surface-variant">
-                    Já tem conta?{" "}
+                    {t("conta.jaTemConta")}{" "}
                     <button
                       type="button"
                       onClick={() => trocarModo("entrar")}
                       className="text-primary hover:underline"
                     >
-                      Entrar
+                      {t("conta.entrarLink")}
                     </button>
                   </span>
                 )}

@@ -18,6 +18,8 @@
  */
 
 import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 
 import { useJogosDisponiveis } from "@models/api/consultas";
 import type { JogoDisponivel } from "@models/api/tipos";
@@ -25,15 +27,12 @@ import { useJogoAtual } from "@views/layout/JogoAtual";
 import { corDoJogo } from "@views/tema";
 import { Icone } from "./base";
 
-/** O que a linha de um jogo indisponível mostra em vez da contagem. */
-const SEM_DADO = "Nada coletado ainda";
-
-function oQueTem(jogo: JogoDisponivel): string {
+function oQueTem(jogo: JogoDisponivel, t: TFunction): string {
   return [
-    jogo.partidas ? `${jogo.partidas} partidas` : null,
-    jogo.equipes ? `${jogo.equipes} equipes` : null,
-    jogo.agenda ? `${jogo.agenda} na agenda` : null,
-    jogo.personagens ? `${jogo.personagens} personagens` : null,
+    jogo.partidas ? t("comum.seletorDeJogo.partidas", { n: jogo.partidas }) : null,
+    jogo.equipes ? t("comum.seletorDeJogo.equipes", { n: jogo.equipes }) : null,
+    jogo.agenda ? t("comum.seletorDeJogo.naAgenda", { n: jogo.agenda }) : null,
+    jogo.personagens ? t("comum.seletorDeJogo.personagens", { n: jogo.personagens }) : null,
   ]
     .filter(Boolean)
     .join(" · ");
@@ -64,6 +63,7 @@ export function SeletorDeJogo({
    */
   listar?: (jogo: JogoDisponivel) => boolean;
 }) {
+  const { t } = useTranslation();
   const jogos = useJogosDisponiveis();
   const { jogo: atual, definirJogo } = useJogoAtual();
   const [aberto, setAberto] = useState(false);
@@ -137,7 +137,7 @@ export function SeletorDeJogo({
         <div className="absolute left-0 top-full z-30 w-[min(20rem,calc(100vw-11rem))] pt-space-xs sm:w-max sm:max-w-none">
           <div
             role="listbox"
-            aria-label="Selecionar jogo"
+            aria-label={t("comum.seletorDeJogo.selecionarJogo")}
             className="rolagem-discreta flex max-h-80 w-full min-w-0 max-w-full flex-col gap-space-xxs overflow-y-auto rounded-lg border border-outline-variant/30 bg-surface-container-low p-space-xs shadow-2xl sm:min-w-52"
           >
             {listados.map((jogo) => {
@@ -173,7 +173,7 @@ export function SeletorDeJogo({
                     <span className="truncate">{jogo.nome}</span>
                   </span>
                   <span className="w-full truncate pl-[16px] font-label-caps text-label-caps text-outline">
-                    {podeEscolher ? oQueTem(jogo) : SEM_DADO}
+                    {podeEscolher ? oQueTem(jogo, t) : t("comum.seletorDeJogo.semDado")}
                   </span>
                 </button>
               );

@@ -1,8 +1,14 @@
-"""Contrato do painel admin: login por senha + token, e o gate nas rotas
-protegidas. Sem sistema de contas - so uma senha (`ADMIN_SENHA`).
+"""Contrato do painel admin: mesma conta do site (Firebase), autorizada por
+uma lista de uids (`ADMIN_FIREBASE_UIDS`) - nao ha senha propria.
+
+Nao ha como emitir um ID token real do Firebase num teste -
+`verificar_token_firebase` e trocada por um dublê (monkeypatch), do mesmo
+jeito que `test_usuario.py` faz.
 """
 
 from __future__ import annotations
+
+import uuid
 
 import pytest
 from fastapi.testclient import TestClient
@@ -10,10 +16,10 @@ from sqlalchemy import text
 
 from config import get_settings
 from controllers.main import app
-from controllers.routers import admin
+from controllers.routers import admin, usuario
 from models.session import get_engine
 
-SENHA_TESTE = "senha-de-teste-bem-forte"
+CABECALHO = {"Authorization": "Bearer token-de-teste"}
 
 
 @pytest.fixture(scope="module")
@@ -27,53 +33,60 @@ def cliente() -> TestClient:
 
 
 @pytest.fixture
-def com_senha(monkeypatch: pytest.MonkeyPatch):
-    """Configura ADMIN_SENHA so pro escopo do teste, sem tocar no .env."""
-    settings = get_settings().model_copy(update={"admin_senha": SENHA_TESTE})
+def com_usuario(monkeypatch: pytest.MonkeyPatch):
+    """Conta logada comum, sem acesso ao painel - uid novo a cada teste."""
+    uid = f"uid-teste-{uuid.uuid4().hex[:12]}"
+    claims = {"sub": uid, "email": "teste@playdb.local", "name": "Conta de Teste"}
+    monkeypatch.setattr(usuario, "verificar_token_firebase", lambda *a, **k: claims)
+    return claims
+
+
+@pytest.fixture
+def com_admin(com_usuario, monkeypatch: pytest.MonkeyPatch):
+    """A mesma conta de `com_usuario`, agora na lista de administradores."""
+    settings = get_settings().model_copy(update={"admin_firebase_uids": com_usuario["sub"]})
     monkeypatch.setattr(admin, "get_settings", lambda: settings)
-    return settings
+    return com_usuario
 
 
-def test_login_sem_senha_configurada_da_503(cliente: TestClient, monkeypatch):
-    settings = get_settings().model_copy(update={"admin_senha": None})
-    monkeypatch.setattr(admin, "get_settings", lambda: settings)
-    resposta = cliente.post("/api/admin/login", json={"senha": "qualquer"})
-    assert resposta.status_code == 503
-
-
-def test_login_senha_errada_da_401(cliente: TestClient, com_senha):
-    resposta = cliente.post("/api/admin/login", json={"senha": "errada"})
-    assert resposta.status_code == 401
-
-
-def test_login_senha_certa_devolve_token(cliente: TestClient, com_senha):
-    resposta = cliente.post("/api/admin/login", json={"senha": SENHA_TESTE})
-    assert resposta.status_code == 200
-    corpo = resposta.json()
-    assert corpo["token"]
-    assert "." in corpo["token"]
-    assert corpo["expira_em"]
-
-
-def test_rota_protegida_sem_token_da_401(cliente: TestClient, com_senha):
+def test_rota_protegida_sem_token_da_401(cliente: TestClient):
     resposta = cliente.get("/api/admin/visao-geral")
     assert resposta.status_code == 401
 
 
-def test_rota_protegida_com_token_de_outra_senha_da_401(cliente: TestClient, com_senha):
-    resposta = cliente.get(
-        "/api/admin/visao-geral",
-        headers={"Authorization": "Bearer 9999999999.assinaturafalsa"},
-    )
+def test_rota_protegida_sem_admin_configurado_da_503(cliente: TestClient, com_usuario, monkeypatch):
+    settings = get_settings().model_copy(update={"admin_firebase_uids": None})
+    monkeypatch.setattr(admin, "get_settings", lambda: settings)
+    resposta = cliente.get("/api/admin/visao-geral", headers=CABECALHO)
+    assert resposta.status_code == 503
+
+
+def test_rota_protegida_conta_fora_da_lista_da_403(cliente: TestClient, com_usuario, monkeypatch):
+    settings = get_settings().model_copy(update={"admin_firebase_uids": "outro-uid-qualquer"})
+    monkeypatch.setattr(admin, "get_settings", lambda: settings)
+    resposta = cliente.get("/api/admin/visao-geral", headers=CABECALHO)
+    assert resposta.status_code == 403
+
+
+def test_eu_sou_admin_sem_token_da_401(cliente: TestClient):
+    resposta = cliente.get("/api/admin/eu-sou-admin")
     assert resposta.status_code == 401
 
 
-def test_rota_protegida_com_token_valido_funciona(cliente: TestClient, com_senha):
-    token = cliente.post("/api/admin/login", json={"senha": SENHA_TESTE}).json()["token"]
+def test_eu_sou_admin_conta_comum_devolve_falso(cliente: TestClient, com_usuario):
+    resposta = cliente.get("/api/admin/eu-sou-admin", headers=CABECALHO)
+    assert resposta.status_code == 200
+    assert resposta.json() == {"admin": False}
 
-    resposta = cliente.get(
-        "/api/admin/visao-geral", headers={"Authorization": f"Bearer {token}"}
-    )
+
+def test_eu_sou_admin_conta_admin_devolve_verdadeiro(cliente: TestClient, com_admin):
+    resposta = cliente.get("/api/admin/eu-sou-admin", headers=CABECALHO)
+    assert resposta.status_code == 200
+    assert resposta.json() == {"admin": True}
+
+
+def test_rota_protegida_com_conta_admin_funciona(cliente: TestClient, com_admin):
+    resposta = cliente.get("/api/admin/visao-geral", headers=CABECALHO)
     assert resposta.status_code == 200
     corpo = resposta.json()
     for chave in (
@@ -88,20 +101,27 @@ def test_rota_protegida_com_token_valido_funciona(cliente: TestClient, com_senha
         assert chave in corpo
 
 
-def test_sistema_devolve_alguma_fonte(cliente: TestClient, com_senha):
-    token = cliente.post("/api/admin/login", json={"senha": SENHA_TESTE}).json()["token"]
-    resposta = cliente.get(
-        "/api/admin/sistema", headers={"Authorization": f"Bearer {token}"}
-    )
+def test_sistema_devolve_alguma_fonte(cliente: TestClient, com_admin):
+    resposta = cliente.get("/api/admin/sistema", headers=CABECALHO)
     assert resposta.status_code == 200
     assert resposta.json()["fonte"] in ("netdata", "local")
 
 
-def test_banco_devolve_tamanho_e_tabelas(cliente: TestClient, com_senha):
-    token = cliente.post("/api/admin/login", json={"senha": SENHA_TESTE}).json()["token"]
-    resposta = cliente.get(
-        "/api/admin/banco", headers={"Authorization": f"Bearer {token}"}
-    )
+def test_contas_devolve_total_e_lista_sem_dado_pessoal(cliente: TestClient, com_admin):
+    resposta = cliente.get("/api/admin/contas", headers=CABECALHO)
+    assert resposta.status_code == 200
+    corpo = resposta.json()
+    assert isinstance(corpo["total"], int)
+    assert corpo["total"] >= 1
+    assert isinstance(corpo["contas"], list)
+    assert len(corpo["contas"]) >= 1
+    for conta in corpo["contas"]:
+        # so nome + data de criacao - nunca e-mail nem uid (LGPD).
+        assert set(conta.keys()) == {"nome_exibicao", "criado_em"}
+
+
+def test_banco_devolve_tamanho_e_tabelas(cliente: TestClient, com_admin):
+    resposta = cliente.get("/api/admin/banco", headers=CABECALHO)
     assert resposta.status_code == 200
     corpo = resposta.json()
     assert corpo["tamanho_texto"]

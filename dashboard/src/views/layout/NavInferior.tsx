@@ -16,35 +16,39 @@
  */
 
 import { NavLink } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 
 import { Icone } from "@views/componentes/base";
 
 interface ItemInferior {
   rota: string;
-  rotulo: string;
+  /** Chave de traducao em `nav.inferior.<chave>`. */
+  chave: string;
   icone: string;
   /** Rota-raiz: ativo por prefixo (E-Sports tem sub-rotas). */
   prefixo?: boolean;
 }
 
 const ITENS: ItemInferior[] = [
-  { rota: "/painel", rotulo: "Geral", icone: "space_dashboard" },
-  { rota: "/catalogo", rotulo: "Catálogo", icone: "sports_esports", prefixo: true },
-  { rota: "/esports", rotulo: "E-Sports", icone: "emoji_events", prefixo: true },
-  { rota: "/recomendacoes", rotulo: "Reviews", icone: "sentiment_satisfied" },
-  { rota: "/assistente", rotulo: "IA", icone: "smart_toy" },
-  { rota: "/perfil", rotulo: "Perfil", icone: "account_circle" },
+  { rota: "/painel", chave: "geral", icone: "space_dashboard" },
+  { rota: "/catalogo", chave: "catalogo", icone: "sports_esports", prefixo: true },
+  { rota: "/esports", chave: "esports", icone: "emoji_events", prefixo: true },
+  { rota: "/recomendacoes", chave: "reviews", icone: "sentiment_satisfied" },
+  { rota: "/assistente", chave: "ia", icone: "smart_toy" },
+  { rota: "/perfil", chave: "perfil", icone: "account_circle" },
 ];
 
 export function NavInferior() {
+  const { t } = useTranslation();
+
   return (
     <nav
       className="fixed inset-x-0 bottom-0 z-50 flex border-t border-outline-variant/30 bg-surface-container-lowest/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-md md:hidden"
-      aria-label="Navegação principal"
+      aria-label={t("nav.navegacaoPrincipal")}
     >
       {ITENS.map((item) => (
         <NavLink
-          key={item.rota}
+          key={item.chave}
           to={item.rota}
           end={item.rota === "/" || !item.prefixo}
           className={({ isActive }) =>
@@ -58,7 +62,7 @@ export function NavInferior() {
           }
         >
           <Icone nome={item.icone} className="text-[22px]" />
-          {item.rotulo}
+          {t(`nav.inferior.${item.chave}`)}
         </NavLink>
       ))}
 
@@ -67,7 +71,7 @@ export function NavInferior() {
         className="flex min-h-[54px] flex-1 flex-col items-center justify-center gap-0.5 py-space-xs font-badge-status text-badge-status uppercase tracking-wide text-on-surface-variant transition-colors"
       >
         <Icone nome="install_mobile" className="text-[22px]" />
-        APK
+        {t("nav.inferior.apk")}
       </a>
     </nav>
   );

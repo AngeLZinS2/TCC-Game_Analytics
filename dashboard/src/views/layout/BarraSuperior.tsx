@@ -29,36 +29,40 @@
  */
 
 import { Link, NavLink, useLocation } from "react-router-dom";
+import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 
 import { useDestaquesHome, useSaude } from "@models/api/consultas";
 import { Icone } from "@views/componentes/base";
 import { MenuEsports } from "@views/componentes/MenuEsports";
+import { SeletorIdioma } from "@views/componentes/SeletorIdioma";
 import { NAVEGACAO, type ItemNavegacao } from "./navegacao";
 import { corDoJogo } from "@views/tema";
 import { fmtQuando } from "@util/formatos";
 
-/** O rotulo de cada sub-aba de E-Sports, para o "voce esta aqui". */
+/** A chave de traducao de cada sub-aba de E-Sports, para o "voce esta aqui". */
 const ABAS_ESPORTS: Record<string, string> = {
-  partidas: "Partidas",
-  resultados: "Resultados",
-  previsao: "Previsao",
-  ranking: "Ranking",
-  herois: "Herois",
-  jogadores: "Jogadores",
+  partidas: "partidas",
+  resultados: "resultados",
+  previsao: "previsao",
+  ranking: "ranking",
+  herois: "herois",
+  jogadores: "jogadores",
 };
 
 /** O rotulo da rota atual, para o "voce esta aqui" da direita. */
-function useTituloDaRota(): string {
+function useTituloDaRota(t: TFunction): string {
   const { pathname } = useLocation();
 
-  if (pathname.startsWith("/steam/")) return "Detalhe do Jogo";
-  if (pathname.startsWith("/xbox/")) return "Detalhe do Jogo";
-  if (pathname.startsWith("/partidas/")) return "Detalhe da Partida";
-  if (pathname.startsWith("/herois/")) return "Detalhe do Heroi";
+  if (pathname.startsWith("/steam/")) return t("nav.tituloRota.detalheDoJogo");
+  if (pathname.startsWith("/xbox/")) return t("nav.tituloRota.detalheDoJogo");
+  if (pathname.startsWith("/partidas/")) return t("nav.tituloRota.detalheDaPartida");
+  if (pathname.startsWith("/herois/")) return t("nav.tituloRota.detalheDoHeroi");
   if (pathname.startsWith("/esports/")) {
     const aba = pathname.split("/")[3];
-    const sufixo = aba && ABAS_ESPORTS[aba] ? ` · ${ABAS_ESPORTS[aba]}` : "";
-    return `E-Sports${sufixo}`;
+    const chave = aba ? ABAS_ESPORTS[aba] : undefined;
+    const sufixo = chave ? ` · ${t(`nav.esportsAbas.${chave}`)}` : "";
+    return `${t("nav.itens.esports")}${sufixo}`;
   }
   if (pathname.startsWith("/catalogo")) {
     const loja = pathname.split("/")[2];
@@ -66,11 +70,11 @@ function useTituloDaRota(): string {
       string,
       string
     >)[loja ?? ""];
-    return nome ? `Catálogo · ${nome}` : "Catálogo de Jogos";
+    return nome ? t("nav.tituloRota.catalogoLoja", { loja: nome }) : t("nav.tituloRota.catalogoDeJogos");
   }
 
   const item = NAVEGACAO.find((i) => i.rota === pathname);
-  return item?.rotulo ?? "PlayDB";
+  return item ? t(`nav.itens.${item.chave}`) : "PlayDB";
 }
 
 /**
@@ -98,10 +102,14 @@ const BOTAO_NAV =
   "group relative flex h-10 w-10 items-center justify-center rounded-lg transition-colors";
 
 function ItemNav({ item }: { item: ItemNavegacao }) {
+  const { t } = useTranslation();
+
   // E-Sports abre o menu de jogos no hover, em vez da dica de uma linha.
   if (item.menuEsports) {
     return <MenuEsports item={item} />;
   }
+
+  const rotulo = t(`nav.itens.${item.chave}`);
 
   // Sem rota: o icone existe para mostrar o produto inteiro, mas nao e um
   // link. `aria-disabled` em vez de `disabled` porque nao e um controle, e um
@@ -110,7 +118,7 @@ function ItemNav({ item }: { item: ItemNavegacao }) {
     return (
       <span className={`${BOTAO_NAV} cursor-not-allowed text-outline/50`} aria-disabled>
         <Icone nome={item.icone} className="text-[20px]" />
-        <Dica texto={item.rotulo} selo={item.selo ?? "EM BREVE"} />
+        <Dica texto={rotulo} selo={item.selo ?? t("comum.emBreve").toUpperCase()} />
       </span>
     );
   }
@@ -126,13 +134,14 @@ function ItemNav({ item }: { item: ItemNavegacao }) {
       }
     >
       <Icone nome={item.icone} className="text-[20px]" />
-      <Dica texto={item.rotulo} selo={item.selo} />
+      <Dica texto={rotulo} selo={item.selo} />
     </NavLink>
   );
 }
 
 /** Ticker de "acontecendo agora" — some no mobile e quando não há nada. */
 function Ticker() {
+  const { t } = useTranslation();
   const { data } = useDestaquesHome();
   const itens = data?.ao_vivo.slice(0, 8) ?? [];
   if (itens.length === 0) return null;
@@ -157,7 +166,7 @@ function Ticker() {
             <span className="text-outline">vs</span>
             <span className="text-on-surface">{c.equipe_b_nome}</span>
             <span className="text-outline">
-              {c.ao_vivo ? "· ao vivo" : `· ${fmtQuando(c.inicio_previsto)}`}
+              {c.ao_vivo ? `· ${t("nav.aoVivo")}` : `· ${fmtQuando(c.inicio_previsto)}`}
             </span>
           </span>
         ))}
@@ -167,7 +176,8 @@ function Ticker() {
 }
 
 export function BarraSuperior() {
-  const titulo = useTituloDaRota();
+  const { t } = useTranslation();
+  const titulo = useTituloDaRota(t);
   const saude = useSaude();
   const online = saude.data?.status === "ok";
 
@@ -185,7 +195,7 @@ export function BarraSuperior() {
 
       <nav className="hidden items-center gap-space-xxs md:flex lg:hidden">
         {NAVEGACAO.map((item) => (
-          <ItemNav key={item.rotulo} item={item} />
+          <ItemNav key={item.chave} item={item} />
         ))}
         {/* Landing do app: página estática, fora da SPA — `<a>` de verdade. */}
         <a
@@ -193,7 +203,7 @@ export function BarraSuperior() {
           className="group relative flex h-10 w-10 items-center justify-center rounded-lg text-on-surface-variant transition-colors hover:bg-surface-container hover:text-on-surface"
         >
           <Icone nome="install_mobile" className="text-[19px]" />
-          <Dica texto="APK Mobile ↗" />
+          <Dica texto={`${t("nav.apkMobile")} ↗`} />
         </a>
       </nav>
 
@@ -209,6 +219,8 @@ export function BarraSuperior() {
       <Ticker />
 
       <div className="ml-auto flex shrink-0 items-center gap-space-sm lg:ml-0">
+        <SeletorIdioma compacto />
+
         <a
           href="/docs"
           target="_blank"
@@ -216,7 +228,7 @@ export function BarraSuperior() {
           className="group relative hidden h-9 w-9 items-center justify-center rounded-lg text-on-surface-variant transition-colors hover:bg-surface-container hover:text-on-surface sm:flex"
         >
           <Icone nome="menu_book" className="text-[18px]" />
-          <Dica texto="Documentação ↗" />
+          <Dica texto={`${t("nav.documentacao")} ↗`} />
         </a>
 
         <span
@@ -224,13 +236,13 @@ export function BarraSuperior() {
             "inline-flex items-center gap-space-xs rounded px-space-sm py-space-xs font-badge-status text-badge-status uppercase md:px-space-md",
             online ? "bg-tertiary/10 text-tertiary" : "bg-error/10 text-error",
           ].join(" ")}
-          title={saude.data ? `latência ${saude.data.latenciaMs}ms` : undefined}
+          title={saude.data ? t("nav.latencia", { ms: saude.data.latenciaMs }) : undefined}
         >
           <span
             className={`h-2 w-2 rounded-full ${online ? "animate-pulse bg-tertiary" : "bg-error"}`}
             aria-hidden
           />
-          <span className="hidden sm:inline">{online ? "API no ar" : "API fora"}</span>
+          <span className="hidden sm:inline">{online ? t("nav.apiNoAr") : t("nav.apiFora")}</span>
         </span>
       </div>
     </header>

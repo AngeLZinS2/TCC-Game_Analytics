@@ -9,6 +9,7 @@
 
 import { useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 
 import { useDesfavoritarJogo, useFavoritarJogo, useFavoritosJogos, useJogoSteam } from "@models/api/consultas";
 import type {
@@ -17,7 +18,9 @@ import type {
   MenorPrecoHistorico,
   NoticiaSteam,
   OfertaLoja,
+  PontoHistoricoPrecoSteam,
   PontoSerie,
+  PromocaoAtivaSteam,
 } from "@models/api/tipos";
 import { Botao, Consulta, Icone, Selo } from "@views/componentes/base";
 import { BotaoFavoritar } from "@views/componentes/BotaoFavoritar";
@@ -38,11 +41,12 @@ import {
   paraNumero,
 } from "@util/formatos";
 
-/** Janelas do seletor do grafico principal, em dias. `null` = tudo. */
+/** Janelas do seletor do grafico principal, em dias. `null` = tudo (`rotulo`
+ * tambem `null` nesse caso - o texto vem de `painel.periodos.tudo`). */
 const PERIODOS = [
   { valor: 7, rotulo: "7D" },
   { valor: 30, rotulo: "30D" },
-  { valor: null, rotulo: "Tudo" },
+  { valor: null, rotulo: null },
 ] as const;
 
 const CHIP_CLASSIFICACAO = {
@@ -52,6 +56,7 @@ const CHIP_CLASSIFICACAO = {
 } as const;
 
 export function JogoSteamPagina() {
+  const { t } = useTranslation();
   const { appId } = useParams();
   const [periodo, setPeriodo] = useState<number | null>(null);
 
@@ -79,7 +84,7 @@ export function JogoSteamPagina() {
         const pontos = serieRecortada.map((ponto: PontoSerie) => ({
           rotulo: fmtDataHora(ponto.janela_coleta),
           valor: ponto.jogadores_simultaneos ?? 0,
-          detalhe: `${fmtNumero(ponto.jogadores_simultaneos)} jogadores`,
+          detalhe: t("jogoSteam.grafico.jogadores", { contagem: fmtNumero(ponto.jogadores_simultaneos) }),
         }));
 
         return (
@@ -96,7 +101,7 @@ export function JogoSteamPagina() {
                 className="relative z-10 inline-flex items-center gap-space-xxs font-title-code text-title-code text-outline transition-colors hover:text-primary"
               >
                 <Icone nome="arrow_back" className="text-[16px]" />
-                Voltar para o catálogo
+                {t("jogoSteam.voltar")}
               </Link>
 
               {/*
@@ -122,7 +127,7 @@ export function JogoSteamPagina() {
                       <BotaoFavoritar
                         favoritado={Boolean(favoritado)}
                         ocupado={favoritar.isPending || desfavoritar.isPending}
-                        rotulo="Favoritar jogo"
+                        rotulo={t("jogoSteam.favoritarJogo")}
                         aoAlternar={() =>
                           favoritado
                             ? desfavoritar.mutate({ fonte: "steam", jogo_id: String(jogo.app_id) })
@@ -132,23 +137,23 @@ export function JogoSteamPagina() {
                     </div>
 
                     <p className="mt-space-xs font-title-code text-title-code uppercase text-outline">
-                      DEV: <span className="text-on-surface-variant">{jogo.desenvolvedora ?? "—"}</span>{" "}
-                      · PUB:{" "}
+                      {t("jogoSteam.dev")} <span className="text-on-surface-variant">{jogo.desenvolvedora ?? "—"}</span>{" "}
+                      · {t("jogoSteam.pub")}{" "}
                       <span className="text-on-surface-variant">{jogo.publicadora ?? "—"}</span>
                       {jogo.data_lancamento && (
                         <>
-                          {" "}· LANÇAMENTO:{" "}
+                          {" "}· {t("jogoSteam.lancamento")}{" "}
                           <span className="text-on-surface-variant">
                             {fmtData(jogo.data_lancamento)}
                           </span>
                         </>
                       )}
-                      {" "}· APPID:{" "}
+                      {" "}· {t("jogoSteam.appid")}{" "}
                       <span className="text-on-surface-variant">{jogo.app_id}</span>
                     </p>
 
                     <div className="mt-space-sm flex flex-wrap items-center gap-space-xs">
-                      {jogo.gratuito && <Selo cor="positivo">Gratuito</Selo>}
+                      {jogo.gratuito && <Selo cor="positivo">{t("jogoSteam.gratuito")}</Selo>}
                       {jogo.generos.map((genero) => (
                         <span
                           key={genero}
@@ -164,7 +169,7 @@ export function JogoSteamPagina() {
                       {jogo.nota_metacritic !== null && (
                         <span
                           className="inline-flex items-center gap-space-xxs rounded border border-tertiary/30 px-space-xs py-space-xxs font-badge-status text-badge-status uppercase text-outline"
-                          title="Nota da crítica no Metacritic"
+                          title={t("jogoSteam.metacriticTitle")}
                         >
                           Metacritic
                           <strong className="font-title-code text-title-code text-tertiary">
@@ -184,14 +189,14 @@ export function JogoSteamPagina() {
             {/* ==================== KPIS ==================== */}
             <section className="grid grid-cols-1 gap-space-base md:grid-cols-2 xl:grid-cols-4">
               <KpiHud
-                etiqueta="Jogadores simultâneos"
-                canto="AGORA"
+                etiqueta={t("jogoSteam.kpis.jogadoresSimultaneos")}
+                canto={t("jogoSteam.kpis.agora")}
                 valor={fmtNumero(jogo.jogadores_simultaneos)}
                 valorNumerico={jogo.jogadores_simultaneos}
                 formatarValor={fmtNumero}
-                rotulo={`Coletado ${fmtRelativo(jogo.janela_coleta)}`}
+                rotulo={t("jogoSteam.kpis.coletado", { tempo: fmtRelativo(jogo.janela_coleta) })}
                 variacao={jogo.variacao_jogadores}
-                notaVariacao="vs. coleta anterior"
+                notaVariacao={t("jogoSteam.kpis.vsColetaAnterior")}
                 acento="primaria"
               >
                 <div className="mt-space-md">
@@ -208,12 +213,12 @@ export function JogoSteamPagina() {
               </KpiHud>
 
               <KpiHud
-                etiqueta="Avaliações positivas"
-                canto="STEAM REVIEWS"
+                etiqueta={t("jogoSteam.kpis.avaliacoesPositivas")}
+                canto={t("jogoSteam.kpis.steamReviews")}
                 valor={fmtPercentual(jogo.nota_avaliacoes, 0)}
                 valorNumerico={paraNumero(jogo.nota_avaliacoes)}
                 formatarValor={(v) => fmtPercentual(v, 0)}
-                rotulo={`${fmtCurto(jogo.numero_avaliacoes)} avaliações no total`}
+                rotulo={t("jogoSteam.kpis.avaliacoesNoTotal", { contagem: fmtCurto(jogo.numero_avaliacoes) })}
                 acento="terciaria"
               >
                 <div className="mt-space-md">
@@ -227,37 +232,45 @@ export function JogoSteamPagina() {
                     </span>
                   ) : (
                     <span className="font-label-caps text-label-caps text-outline">
-                      sem classificação
+                      {t("jogoSteam.kpis.semClassificacao")}
                     </span>
                   )}
                 </div>
               </KpiHud>
 
               <KpiHud
-                etiqueta="Pico histórico"
-                canto="PEAK CCU"
+                etiqueta={t("jogoSteam.kpis.picoHistorico")}
+                canto={t("jogoSteam.kpis.peakCcu")}
                 valor={fmtCurto(jogo.pico_jogadores)}
                 valorNumerico={jogo.pico_jogadores}
                 formatarValor={fmtCurto}
-                rotulo="Maior valor já coletado"
+                rotulo={t("jogoSteam.kpis.maiorValorColetado")}
                 acento="secundaria"
-                notaVariacao={`${fmtNumero(dados.serie.length)} snapshots na série`}
+                notaVariacao={t("jogoSteam.kpis.snapshotsNaSerie", { contagem: fmtNumero(dados.serie.length) })}
               />
 
               <KpiHud
-                etiqueta="Preço atual"
+                etiqueta={t("jogoSteam.kpis.precoAtual")}
                 canto={jogo.moeda ?? "—"}
                 valor={fmtMoeda(jogo.preco_no_momento, jogo.moeda)}
                 valorNumerico={paraNumero(jogo.preco_no_momento)}
                 formatarValor={(v) => fmtMoeda(v, jogo.moeda)}
                 rotulo={
                   jogo.desconto_percentual
-                    ? `${jogo.desconto_percentual}% de desconto`
-                    : "sem desconto"
+                    ? t("jogoSteam.kpis.descontoPercentual", { percentual: jogo.desconto_percentual })
+                    : t("jogoSteam.kpis.semDesconto")
                 }
                 acento="primaria"
               />
             </section>
+
+            {/* ==================== PRECO NA STEAM (Fase 35) ==================== */}
+            <PrecoNaSteam
+              appId={jogo.app_id}
+              moeda={jogo.moeda}
+              promocao={dados.promocao_ativa}
+              historico={dados.historico_preco_steam}
+            />
 
             {/* ==================== ONDE COMPRAR ==================== */}
             <OndeComprar
@@ -281,13 +294,13 @@ export function JogoSteamPagina() {
             {/* ==================== GRAFICO PRINCIPAL ==================== */}
             <Painel
               icone="show_chart"
-              titulo="Jogadores simultâneos ao longo do tempo"
-              descricao="Um ponto por janela de coleta (padrão: 1 hora)."
+              titulo={t("jogoSteam.grafico.titulo")}
+              descricao={t("jogoSteam.grafico.descricao")}
               meta={
                 <div className="flex items-center rounded bg-surface-container-low p-space-xxs shadow-sm">
                   {PERIODOS.map((opcao) => (
                     <button
-                      key={opcao.rotulo}
+                      key={opcao.rotulo ?? "tudo"}
                       type="button"
                       aria-pressed={periodo === opcao.valor}
                       onClick={() => setPeriodo(opcao.valor)}
@@ -297,7 +310,7 @@ export function JogoSteamPagina() {
                           : "text-on-surface-variant hover:text-on-surface"
                       }`}
                     >
-                      {opcao.rotulo}
+                      {opcao.rotulo ?? t("painel.periodos.tudo")}
                     </button>
                   ))}
                 </div>
@@ -306,8 +319,8 @@ export function JogoSteamPagina() {
               {dados.serie.length < 2 && (
                 <p className="rounded bg-surface-container px-space-base py-space-md font-body-md text-body-md text-on-surface-variant">
                   {dados.serie.length === 0
-                    ? "Nenhum snapshot coletado ainda para este jogo."
-                    : "Só existe uma coleta até agora — a série ganha forma quando o coletor rodar de novo."}
+                    ? t("jogoSteam.grafico.nenhumSnapshot")
+                    : t("jogoSteam.grafico.umaColeta")}
                 </p>
               )}
 
@@ -316,7 +329,7 @@ export function JogoSteamPagina() {
                 formatarValor={(valor) => fmtCurto(valor)}
                 rodapeEsquerda={
                   <>
-                    Pico da série:{" "}
+                    {t("jogoSteam.grafico.picoDaSerie")}{" "}
                     <strong className="font-title-code text-title-code text-on-surface">
                       {fmtNumero(Math.max(...pontos.map((p) => p.valor), 0))}
                     </strong>
@@ -331,29 +344,45 @@ export function JogoSteamPagina() {
               <section className="grid grid-cols-1 gap-space-base xl:grid-cols-2">
                 <Painel
                   icone="payments"
-                  titulo="Histórico de preço"
-                  descricao="O mesmo eixo de tempo da série de jogadores."
+                  titulo={t("jogoSteam.precoHistorico.titulo")}
+                  descricao={
+                    dados.historico_preco_steam.length > 0
+                      ? t("jogoSteam.precoHistorico.descricaoDedup")
+                      : t("jogoSteam.precoHistorico.descricao")
+                  }
                 >
+                  {/* Preferimos o historico deduplicado (Fase 35) - so uma
+                      linha quando o preco muda de verdade. Sem ele ainda
+                      (app nao reprocessado), cai no snapshot horario de
+                      sempre, para a secao nao ficar vazia. */}
                   <AreaNeon
-                    pontos={dados.serie.map((ponto) => ({
-                      rotulo: fmtDataHora(ponto.janela_coleta),
-                      valor: paraNumero(ponto.preco_no_momento) ?? 0,
-                      detalhe: fmtMoeda(ponto.preco_no_momento, jogo.moeda),
-                    }))}
+                    pontos={
+                      dados.historico_preco_steam.length > 0
+                        ? dados.historico_preco_steam.map((ponto) => ({
+                            rotulo: fmtDataHora(ponto.registrado_em),
+                            valor: paraNumero(ponto.preco_final) ?? 0,
+                            detalhe: fmtMoeda(ponto.preco_final, jogo.moeda),
+                          }))
+                        : dados.serie.map((ponto) => ({
+                            rotulo: fmtDataHora(ponto.janela_coleta),
+                            valor: paraNumero(ponto.preco_no_momento) ?? 0,
+                            detalhe: fmtMoeda(ponto.preco_no_momento, jogo.moeda),
+                          }))
+                    }
                     formatarValor={(valor) => fmtMoeda(valor, jogo.moeda)}
                   />
                 </Painel>
 
                 <Painel
                   icone="reviews"
-                  titulo="Volume de avaliações"
-                  descricao="Contagem acumulada de reviews a cada coleta."
+                  titulo={t("jogoSteam.volumeAvaliacoes.titulo")}
+                  descricao={t("jogoSteam.volumeAvaliacoes.descricao")}
                 >
                   <AreaNeon
                     pontos={dados.serie.map((ponto) => ({
                       rotulo: fmtDataHora(ponto.janela_coleta),
                       valor: ponto.numero_avaliacoes ?? 0,
-                      detalhe: `${fmtNumero(ponto.numero_avaliacoes)} avaliações`,
+                      detalhe: t("jogoSteam.volumeAvaliacoes.avaliacoes", { contagem: fmtNumero(ponto.numero_avaliacoes) }),
                     }))}
                     formatarValor={(valor) => fmtCurto(valor)}
                   />
@@ -364,31 +393,31 @@ export function JogoSteamPagina() {
             {/* ==================== TABELA ==================== */}
             <Painel
               icone="table_rows"
-              titulo="Histórico de telemetria"
-              descricao="Uma linha por (app_id, janela de coleta) — a chave de idempotência do fato."
+              titulo={t("jogoSteam.tabela.titulo")}
+              descricao={t("jogoSteam.tabela.descricao")}
               meta={
                 <Botao icone="file_download" aoClicar={() => exportarCsv(dados)}>
-                  Exportar CSV
+                  {t("jogoSteam.tabela.exportarCsv")}
                 </Botao>
               }
             >
               {dados.serie.length === 0 ? (
                 <p className="rounded bg-surface-container px-space-base py-space-md font-body-md text-body-md text-on-surface-variant">
-                  Nada coletado ainda.
+                  {t("jogoSteam.tabela.nadaColetado")}
                 </p>
               ) : (
                 <div className="rolagem-discreta overflow-x-auto rounded-lg bg-surface-container-lowest">
                   <table className="w-full border-collapse text-left">
                     <thead>
                       <tr className="bg-surface-container font-label-caps text-label-caps uppercase tracking-wider text-outline">
-                        <th className="px-space-md py-space-sm">Janela de coleta</th>
+                        <th className="px-space-md py-space-sm">{t("jogoSteam.tabela.colunas.janela")}</th>
                         <th className="px-space-md py-space-sm text-right">
-                          Jogadores (CCU)
+                          {t("jogoSteam.tabela.colunas.jogadoresCcu")}
                         </th>
-                        <th className="px-space-md py-space-sm text-right">Nota</th>
-                        <th className="px-space-md py-space-sm text-right">Avaliações</th>
-                        <th className="px-space-md py-space-sm text-right">Preço</th>
-                        <th className="px-space-md py-space-sm text-right">Desconto</th>
+                        <th className="px-space-md py-space-sm text-right">{t("jogoSteam.tabela.colunas.nota")}</th>
+                        <th className="px-space-md py-space-sm text-right">{t("jogoSteam.tabela.colunas.avaliacoes")}</th>
+                        <th className="px-space-md py-space-sm text-right">{t("jogoSteam.tabela.colunas.preco")}</th>
+                        <th className="px-space-md py-space-sm text-right">{t("jogoSteam.tabela.colunas.desconto")}</th>
                       </tr>
                     </thead>
 
@@ -549,6 +578,7 @@ function TileFicha({
 }
 
 function FichaDoJogo({ ficha, nome }: { ficha: FichaJogoSteam; nome: string }) {
+  const { t } = useTranslation();
   const vazia =
     ficha.recursos.length === 0 &&
     ficha.idiomas.length === 0 &&
@@ -558,10 +588,9 @@ function FichaDoJogo({ ficha, nome }: { ficha: FichaJogoSteam; nome: string }) {
 
   if (vazia) {
     return (
-      <Painel icone="badge" titulo="Ficha do jogo">
+      <Painel icone="badge" titulo={t("jogoSteam.ficha.titulo")}>
         <p className="rounded-lg bg-surface-container-lowest px-space-base py-space-md font-body-md text-body-sm text-outline">
-          A ficha ainda não foi coletada — ela vem do <code>appdetails</code> e do SteamSpy,
-          e o coletor da Steam a preenche na próxima passada.
+          {t("jogoSteam.ficha.naoColetada")}
         </p>
       </Painel>
     );
@@ -578,8 +607,8 @@ function FichaDoJogo({ ficha, nome }: { ficha: FichaJogoSteam; nome: string }) {
     : notasNumericas.length > 0
       ? `${Math.max(...notasNumericas)}+`
       : orgaos.length > 0
-        ? "Classificado"
-        : "Livre";
+        ? t("jogoSteam.ficha.classificado")
+        : t("jogoSteam.ficha.livre");
   const plataformas = ficha.plataformas.map(
     (p) => ({ windows: "Windows", mac: "macOS", linux: "Linux" })[p] ?? p,
   );
@@ -588,12 +617,12 @@ function FichaDoJogo({ ficha, nome }: { ficha: FichaJogoSteam; nome: string }) {
   return (
     <Painel
       icone="badge"
-      titulo="Ficha do jogo"
-      descricao="O que a página da Steam informa, mais as estimativas do SteamSpy."
+      titulo={t("jogoSteam.ficha.titulo")}
+      descricao={t("jogoSteam.ficha.descricao")}
     >
       {/* ---------- resumo em quatro tiles ---------- */}
       <div className="grid grid-cols-2 gap-space-sm lg:grid-cols-4">
-        <TileFicha icone="shield_person" rotulo="Classificação" acento="tertiary">
+        <TileFicha icone="shield_person" rotulo={t("jogoSteam.ficha.classificacao")} acento="tertiary">
           <div className="font-headline-sm text-headline-sm text-on-surface">{idadeSelo}</div>
           {orgaos.length > 0 && (
             <div className="mt-space-xxs font-title-code text-title-code text-outline">
@@ -605,32 +634,37 @@ function FichaDoJogo({ ficha, nome }: { ficha: FichaJogoSteam; nome: string }) {
           )}
         </TileFicha>
 
-        <TileFicha icone="devices" rotulo="Plataformas" acento="primary">
+        <TileFicha icone="devices" rotulo={t("jogoSteam.ficha.plataformas")} acento="primary">
           <div className="font-headline-sm text-headline-sm text-on-surface">
             {plataformas.length > 0 ? plataformas.join(" · ") : "—"}
           </div>
           {ficha.suporte_controle && (
             <div className="mt-space-xxs font-title-code text-title-code text-outline">
-              <Icone nome="stadia_controller" className="align-middle text-[13px]" /> controle{" "}
-              {ficha.suporte_controle === "full" ? "total" : "parcial"}
+              <Icone nome="stadia_controller" className="align-middle text-[13px]" />{" "}
+              {t("jogoSteam.ficha.controle", {
+                tipo:
+                  ficha.suporte_controle === "full"
+                    ? t("jogoSteam.ficha.controleTotal")
+                    : t("jogoSteam.ficha.controleParcial"),
+              })}
             </div>
           )}
         </TileFicha>
 
-        <TileFicha icone="language" rotulo="Idiomas" acento="secondary">
+        <TileFicha icone="language" rotulo={t("jogoSteam.ficha.idiomas")} acento="secondary">
           <div className="font-headline-sm text-headline-sm text-on-surface">
             {ficha.idiomas.length || "—"}
           </div>
           {ficha.idiomas_com_audio.length > 0 && (
             <div className="mt-space-xxs font-title-code text-title-code text-outline">
-              {ficha.idiomas_com_audio.length} com dublagem
+              {t("jogoSteam.ficha.comDublagem", { contagem: ficha.idiomas_com_audio.length })}
             </div>
           )}
         </TileFicha>
 
-        <TileFicha icone="trophy" rotulo="Conquistas" acento="tertiary">
+        <TileFicha icone="trophy" rotulo={t("jogoSteam.ficha.conquistas")} acento="tertiary">
           <div className="font-headline-sm text-headline-sm text-on-surface">
-            {ficha.conquistas_total ? fmtNumero(ficha.conquistas_total) : "nenhuma"}
+            {ficha.conquistas_total ? fmtNumero(ficha.conquistas_total) : t("jogoSteam.ficha.nenhuma")}
           </div>
           {ficha.conquistas_destaque.length > 0 && (
             <div className="mt-space-xs flex gap-space-xxs">
@@ -663,7 +697,7 @@ function FichaDoJogo({ ficha, nome }: { ficha: FichaJogoSteam; nome: string }) {
       {(modos.length > 0 || outros.length > 0) && (
         <div className="rounded-xl bg-surface-container-lowest p-space-base">
           <div className="font-label-caps text-label-caps uppercase tracking-widest text-outline">
-            Modos de jogo e recursos
+            {t("jogoSteam.ficha.modosDeJogoRecursos")}
           </div>
           {modos.length > 0 && (
             <div className="mt-space-sm flex flex-wrap gap-space-xs">
@@ -704,40 +738,40 @@ function FichaDoJogo({ ficha, nome }: { ficha: FichaJogoSteam; nome: string }) {
           {ficha.donos_estimados && (
             <div>
               <div className="font-label-caps text-label-caps uppercase tracking-widest text-outline">
-                Donos estimados
+                {t("jogoSteam.ficha.donosEstimados")}
               </div>
               <div className="mt-space-xxs font-headline-kpi text-headline-kpi leading-none text-primary-container">
                 {faixaDeDonos(ficha.donos_estimados)}
               </div>
               <div className="mt-space-xxs font-title-code text-title-code text-outline">
-                faixa do SteamSpy · não é número exato
+                {t("jogoSteam.ficha.faixaSteamSpy")}
               </div>
             </div>
           )}
           {tempoDeJogo(ficha.tempo_jogo_medio_min) && (
             <div>
               <div className="font-label-caps text-label-caps uppercase tracking-widest text-outline">
-                Tempo de jogo médio
+                {t("jogoSteam.ficha.tempoDeJogoMedio")}
               </div>
               <div className="mt-space-xxs font-headline-kpi text-headline-kpi leading-none text-secondary">
                 {tempoDeJogo(ficha.tempo_jogo_medio_min)}
               </div>
               <div className="mt-space-xxs font-title-code text-title-code text-outline">
-                por dono, no total
+                {t("jogoSteam.ficha.porDono")}
               </div>
             </div>
           )}
           {ficha.analises_totais !== null && (
             <div>
               <div className="font-label-caps text-label-caps uppercase tracking-widest text-outline">
-                Recomendações na loja
+                {t("jogoSteam.ficha.recomendacoesNaLoja")}
               </div>
               <div className="mt-space-xxs font-headline-kpi text-headline-kpi leading-none text-tertiary-container">
                 {fmtCurto(ficha.analises_totais)}
               </div>
               {(ficha.dlc_ids.length > 0 || ficha.site_oficial) && (
                 <div className="mt-space-xxs font-title-code text-title-code text-outline">
-                  {ficha.dlc_ids.length > 0 && `${ficha.dlc_ids.length} DLC`}
+                  {ficha.dlc_ids.length > 0 && t("jogoSteam.ficha.dlc", { contagem: ficha.dlc_ids.length })}
                   {ficha.dlc_ids.length > 0 && ficha.site_oficial && " · "}
                   {ficha.site_oficial && (
                     <a
@@ -746,7 +780,7 @@ function FichaDoJogo({ ficha, nome }: { ficha: FichaJogoSteam; nome: string }) {
                       rel="noreferrer"
                       className="text-primary hover:underline"
                     >
-                      site oficial ↗
+                      {t("jogoSteam.ficha.siteOficial")}
                     </a>
                   )}
                 </div>
@@ -761,7 +795,7 @@ function FichaDoJogo({ ficha, nome }: { ficha: FichaJogoSteam; nome: string }) {
         <div className="rounded-xl bg-surface-container-lowest p-space-base">
           <div className="flex items-center gap-space-xs font-label-caps text-label-caps uppercase tracking-widest text-outline">
             <Icone nome="sell" className="text-[15px] text-secondary" />
-            O que a comunidade marca
+            {t("jogoSteam.ficha.oQueComunidadeMarca")}
           </div>
           <div className="mt-space-sm space-y-space-xs">
             {ficha.tags_comunidade.slice(0, 8).map(([tag, votos]) => (
@@ -791,7 +825,8 @@ function FichaDoJogo({ ficha, nome }: { ficha: FichaJogoSteam; nome: string }) {
 
       <p className="font-body-sm text-body-sm text-outline">
         <strong>{nome}</strong> · Steam Store API + SteamSpy
-        {ficha.coletado_ficha_em && ` · atualizada ${fmtRelativo(ficha.coletado_ficha_em)}`}
+        {ficha.coletado_ficha_em &&
+          t("jogoSteam.ficha.atualizada", { tempo: fmtRelativo(ficha.coletado_ficha_em) })}
       </p>
     </Painel>
   );
@@ -802,6 +837,7 @@ function FichaDoJogo({ ficha, nome }: { ficha: FichaJogoSteam; nome: string }) {
 // ---------------------------------------------------------------------------
 
 function CartaoNoticia({ noticia, destaque }: { noticia: NoticiaSteam; destaque: boolean }) {
+  const { t } = useTranslation();
   const oficial = !noticia.feed || FEEDS_OFICIAIS.includes(noticia.feed);
 
   return (
@@ -822,7 +858,7 @@ function CartaoNoticia({ noticia, destaque }: { noticia: NoticiaSteam; destaque:
                 : "bg-surface-container-high text-outline"
             }`}
           >
-            {oficial ? "Steam · oficial" : noticia.feed}
+            {oficial ? t("jogoSteam.noticias.oficial") : noticia.feed}
           </span>
         )}
         <span className="font-title-code text-title-code text-outline">
@@ -830,7 +866,7 @@ function CartaoNoticia({ noticia, destaque }: { noticia: NoticiaSteam; destaque:
         </span>
         {destaque && (
           <span className="rounded bg-tertiary-container/15 px-space-xs py-space-xxs font-badge-status text-badge-status uppercase text-tertiary-container">
-            mais recente
+            {t("jogoSteam.noticias.maisRecente")}
           </span>
         )}
       </div>
@@ -851,7 +887,7 @@ function CartaoNoticia({ noticia, destaque }: { noticia: NoticiaSteam; destaque:
 
       {noticia.url && (
         <span className="mt-space-sm inline-flex items-center gap-space-xxs font-title-code text-title-code text-primary opacity-0 transition-opacity group-hover:opacity-100">
-          Abrir na Steam <Icone nome="open_in_new" className="text-[14px]" />
+          {t("jogoSteam.noticias.abrirNaSteam")} <Icone nome="open_in_new" className="text-[14px]" />
         </span>
       )}
     </a>
@@ -859,12 +895,12 @@ function CartaoNoticia({ noticia, destaque }: { noticia: NoticiaSteam; destaque:
 }
 
 function UltimasAtualizacoes({ noticias }: { noticias: NoticiaSteam[] }) {
+  const { t } = useTranslation();
   if (noticias.length === 0) {
     return (
-      <Painel icone="campaign" titulo="Últimas atualizações">
+      <Painel icone="campaign" titulo={t("jogoSteam.noticias.titulo")}>
         <p className="rounded-lg bg-surface-container-lowest px-space-base py-space-md font-body-md text-body-sm text-outline">
-          Nenhuma notícia coletada ainda. O feed oficial do jogo — patch notes e anúncios do
-          estúdio — entra na próxima coleta da Steam.
+          {t("jogoSteam.noticias.vazio")}
         </p>
       </Painel>
     );
@@ -873,11 +909,11 @@ function UltimasAtualizacoes({ noticias }: { noticias: NoticiaSteam[] }) {
   return (
     <Painel
       icone="campaign"
-      titulo="Últimas atualizações"
-      descricao="Patch notes e anúncios do feed oficial da Steam."
+      titulo={t("jogoSteam.noticias.titulo")}
+      descricao={t("jogoSteam.noticias.descricao")}
       meta={
         <Selo cor="neutro">
-          {noticias.length} {noticias.length === 1 ? "post" : "posts"}
+          {noticias.length} {noticias.length === 1 ? t("jogoSteam.noticias.post") : t("jogoSteam.noticias.posts")}
         </Selo>
       }
     >
@@ -887,6 +923,58 @@ function UltimasAtualizacoes({ noticias }: { noticias: NoticiaSteam[] }) {
         ))}
       </div>
     </Painel>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Preco na Steam (Fase 35) - primeiro-partido, distinto do "Onde comprar"
+// (ITAD, cross-loja) logo abaixo. O link para a loja e sempre gerado a
+// partir do app_id, nunca de um dado vindo do front.
+// ---------------------------------------------------------------------------
+
+function PrecoNaSteam({
+  appId,
+  moeda,
+  promocao,
+  historico,
+}: {
+  appId: number;
+  moeda: string | null;
+  promocao: PromocaoAtivaSteam | null;
+  historico: PontoHistoricoPrecoSteam[];
+}) {
+  const { t } = useTranslation();
+  const menor =
+    historico.length > 0
+      ? historico.reduce((min, p) =>
+          Number(p.preco_final) < Number(min.preco_final) ? p : min
+        )
+      : null;
+
+  return (
+    <div className="flex flex-wrap items-center gap-space-base rounded-xl bg-surface-container-lowest px-space-base py-space-sm">
+      {promocao && (
+        <span className="flex items-center gap-space-xs font-body-sm text-body-sm text-on-surface-variant">
+          <Icone nome="local_offer" className="text-[16px] text-tertiary" />
+          {t("jogoSteam.precoSteam.promocaoDesde", { data: fmtData(promocao.iniciada_em) })}
+        </span>
+      )}
+      {menor && (
+        <span className="font-body-sm text-body-sm text-on-surface-variant">
+          {t("jogoSteam.precoSteam.menorHistorico")}{" "}
+          <strong className="text-tertiary-container">{fmtMoeda(menor.preco_final, moeda)}</strong>
+        </span>
+      )}
+      <a
+        href={`https://store.steampowered.com/app/${appId}`}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="ml-auto inline-flex items-center gap-space-xs font-title-code text-title-code text-primary hover:underline"
+      >
+        {t("jogoSteam.precoSteam.verNaSteam")}
+        <Icone nome="open_in_new" className="text-[14px]" />
+      </a>
+    </div>
   );
 }
 
@@ -916,6 +1004,7 @@ function OndeComprar({
   menor: MenorPrecoHistorico | null;
   gratuito: boolean | null;
 }) {
+  const { t } = useTranslation();
   if (gratuito) return null;
   if (ofertas.length === 0) {
     // Sem oferta ativa agora - mas se o ITAD ja viu o jogo em promocao algum
@@ -924,22 +1013,21 @@ function OndeComprar({
     return (
       <Painel
         icone="sell"
-        titulo="Onde comprar"
-        descricao="Comparação de preço entre lojas (IsThereAnyDeal)."
+        titulo={t("jogoSteam.ondeComprar.titulo")}
+        descricao={t("jogoSteam.ondeComprar.descricao")}
       >
         <p className="rounded-lg bg-surface-container-lowest px-space-base py-space-md font-body-md text-body-sm text-outline">
-          {menor
-            ? "Nenhuma loja com oferta agora."
-            : "Este jogo ainda não passou pelo coletor de preço (IsThereAnyDeal) — a próxima rodada periódica traz o comparativo."}
+          {menor ? t("jogoSteam.ondeComprar.nenhumaOferta") : t("jogoSteam.ondeComprar.naoColetado")}
         </p>
         {menor && (
           <p className="mt-space-sm font-body-md text-body-sm text-on-surface-variant">
-            Já custou{" "}
+            {t("jogoSteam.ondeComprar.jaCustou")}{" "}
             <strong className="text-tertiary-container">
               {moedaBr(menor.preco, menor.moeda)}
             </strong>
-            {menor.loja && ` na ${menor.loja}`}
-            {menor.data && ` (${fmtData(menor.data)})`} — o menor preço já registrado.
+            {menor.loja && t("jogoSteam.ondeComprar.naLoja", { loja: menor.loja })}
+            {menor.data && t("jogoSteam.ondeComprar.naData", { data: fmtData(menor.data) })}
+            {t("jogoSteam.ondeComprar.menorPrecoRegistrado")}
           </p>
         )}
       </Painel>
@@ -959,19 +1047,19 @@ function OndeComprar({
   return (
     <Painel
       icone="sell"
-      titulo="Onde comprar"
-      descricao="Preço atual em outras lojas — IsThereAnyDeal, ~33 lojas."
+      titulo={t("jogoSteam.ondeComprar.titulo")}
+      descricao={t("jogoSteam.ondeComprar.descricaoComOfertas")}
       meta={
         menor !== null && (
           <span
             className="rounded-lg bg-surface-container-lowest px-space-sm py-space-xs font-title-code text-title-code text-outline"
             title={
               menor.data
-                ? `menor preço registrado, em ${fmtData(menor.data)}`
-                : "menor preço registrado"
+                ? t("jogoSteam.ondeComprar.menorPrecoEm", { data: fmtData(menor.data) })
+                : t("jogoSteam.ondeComprar.menorPrecoRegistradoTitle")
             }
           >
-            mínima histórica:{" "}
+            {t("jogoSteam.ondeComprar.minimaHistorica")}{" "}
             <strong className="text-tertiary-container">
               {moedaBr(menor.preco, menor.moeda)}
             </strong>
@@ -983,22 +1071,22 @@ function OndeComprar({
       {/* faixa-resumo */}
       <div className="flex flex-wrap items-baseline gap-space-sm rounded-xl bg-surface-container-lowest p-space-base">
         <span className="font-label-caps text-label-caps uppercase tracking-widest text-outline">
-          Melhor preço
+          {t("jogoSteam.ondeComprar.melhorPreco")}
         </span>
         <span className="font-headline-kpi text-headline-kpi leading-none text-primary-container">
           {moedaBr(maisBarata.preco, maisBarata.moeda)}
         </span>
         <span className="font-title-code text-title-code text-on-surface-variant">
-          na {maisBarata.loja}
+          {t("jogoSteam.ondeComprar.na", { loja: maisBarata.loja })}
         </span>
         {economia > 0 && (
           <span className="rounded bg-tertiary-container/15 px-space-xs py-space-xxs font-badge-status text-badge-status uppercase text-tertiary-container">
-            {moedaBr(economia, maisBarata.moeda)} abaixo da Steam
+            {t("jogoSteam.ondeComprar.abaixoDaSteam", { valor: moedaBr(economia, maisBarata.moeda) })}
           </span>
         )}
         {naMinima && (
           <span className="rounded bg-tertiary-container/15 px-space-xs py-space-xxs font-badge-status text-badge-status uppercase text-tertiary-container">
-            no menor preço de sempre
+            {t("jogoSteam.ondeComprar.noMenorPrecoDeSempre")}
           </span>
         )}
       </div>
@@ -1008,10 +1096,10 @@ function OndeComprar({
         <table className="w-full border-collapse text-left">
           <thead>
             <tr className="bg-surface-container font-label-caps text-label-caps uppercase tracking-wider text-outline">
-              <th className="px-space-md py-space-sm">Loja</th>
-              <th className="px-space-md py-space-sm text-right">Preço</th>
-              <th className="px-space-md py-space-sm text-right">De</th>
-              <th className="px-space-md py-space-sm text-right">Desc.</th>
+              <th className="px-space-md py-space-sm">{t("jogoSteam.ondeComprar.colunas.loja")}</th>
+              <th className="px-space-md py-space-sm text-right">{t("jogoSteam.ondeComprar.colunas.preco")}</th>
+              <th className="px-space-md py-space-sm text-right">{t("jogoSteam.ondeComprar.colunas.de")}</th>
+              <th className="px-space-md py-space-sm text-right">{t("jogoSteam.ondeComprar.colunas.desc")}</th>
               <th className="px-space-md py-space-sm" />
             </tr>
           </thead>
@@ -1032,7 +1120,7 @@ function OndeComprar({
                   </span>
                   {o.melhor && (
                     <span className="ml-space-xs rounded bg-primary-container/15 px-space-xxs py-[1px] font-badge-status text-badge-status uppercase text-primary-container">
-                      melhor
+                      {t("jogoSteam.ondeComprar.melhor")}
                     </span>
                   )}
                   {o.drm && (
@@ -1068,7 +1156,7 @@ function OndeComprar({
                       rel="noreferrer"
                       className="inline-flex items-center gap-space-xxs font-title-code text-title-code text-primary hover:underline"
                     >
-                      abrir <Icone nome="open_in_new" className="text-[13px]" />
+                      {t("jogoSteam.ondeComprar.abrir")} <Icone nome="open_in_new" className="text-[13px]" />
                     </a>
                   )}
                 </td>
@@ -1079,8 +1167,7 @@ function OndeComprar({
       </div>
 
       <p className="font-body-sm text-body-sm text-outline">
-        Preço em BRL para o Brasil. Chave de Steam de loja terceira ativa na sua conta
-        normalmente — confira a coluna de DRM. Fonte: isthereanydeal.com
+        {t("jogoSteam.ondeComprar.rodape")}
       </p>
     </Painel>
   );
@@ -1097,6 +1184,7 @@ function OndeComprar({
  * HowLongToBeat, curada por quem terminou o jogo.
  */
 function TempoParaZerar({ ficha, nomeSteam }: { ficha: FichaJogoSteam; nomeSteam: string }) {
+  const { t } = useTranslation();
   const temTempo =
     ficha.hltb_horas_historia !== null ||
     ficha.hltb_horas_extras !== null ||
@@ -1106,13 +1194,13 @@ function TempoParaZerar({ ficha, nomeSteam }: { ficha: FichaJogoSteam; nomeSteam
     return (
       <Painel
         icone="hourglass_top"
-        titulo="Quanto tempo leva"
-        descricao="Estimativa da comunidade (HowLongToBeat)."
+        titulo={t("jogoSteam.tempoParaZerar.titulo")}
+        descricao={t("jogoSteam.tempoParaZerar.descricao")}
       >
         <p className="rounded-lg bg-surface-container-lowest px-space-base py-space-md font-body-md text-body-sm text-outline">
           {ficha.coletado_tempo_em
-            ? "Não encontramos tempo suficiente registrado pela comunidade para esse jogo."
-            : "Este jogo ainda não passou pelo coletor de tempo (HowLongToBeat) — a próxima rodada periódica traz a estimativa."}
+            ? t("jogoSteam.tempoParaZerar.semTempoRegistrado")
+            : t("jogoSteam.tempoParaZerar.naoColetado")}
         </p>
       </Painel>
     );
@@ -1126,8 +1214,8 @@ function TempoParaZerar({ ficha, nomeSteam }: { ficha: FichaJogoSteam; nomeSteam
   return (
     <Painel
       icone="hourglass_top"
-      titulo="Quanto tempo leva"
-      descricao="Estimativa da comunidade (HowLongToBeat)."
+      titulo={t("jogoSteam.tempoParaZerar.titulo")}
+      descricao={t("jogoSteam.tempoParaZerar.descricao")}
       meta={
         ficha.hltb_id && (
           <a
@@ -1136,7 +1224,7 @@ function TempoParaZerar({ ficha, nomeSteam }: { ficha: FichaJogoSteam; nomeSteam
             rel="noreferrer"
             className="inline-flex items-center gap-space-xxs rounded-lg bg-surface-container-lowest px-space-sm py-space-xs font-title-code text-title-code text-primary hover:underline"
           >
-            ver no HowLongToBeat <Icone nome="open_in_new" className="text-[13px]" />
+            {t("jogoSteam.tempoParaZerar.verNoHltb")} <Icone nome="open_in_new" className="text-[13px]" />
           </a>
         )
       }
@@ -1144,7 +1232,7 @@ function TempoParaZerar({ ficha, nomeSteam }: { ficha: FichaJogoSteam; nomeSteam
       <div className="grid grid-cols-1 gap-space-sm rounded-xl bg-surface-container-lowest p-space-base sm:grid-cols-3">
         <div>
           <div className="font-label-caps text-label-caps uppercase tracking-widest text-outline">
-            História principal
+            {t("jogoSteam.tempoParaZerar.historiaPrincipal")}
           </div>
           <div className="mt-space-xxs font-headline-kpi text-headline-kpi leading-none text-primary-container">
             {ficha.hltb_horas_historia !== null ? `${fmtDecimal(ficha.hltb_horas_historia)}h` : "—"}
@@ -1152,7 +1240,7 @@ function TempoParaZerar({ ficha, nomeSteam }: { ficha: FichaJogoSteam; nomeSteam
         </div>
         <div>
           <div className="font-label-caps text-label-caps uppercase tracking-widest text-outline">
-            História + extras
+            {t("jogoSteam.tempoParaZerar.historiaExtras")}
           </div>
           <div className="mt-space-xxs font-headline-kpi text-headline-kpi leading-none text-secondary">
             {ficha.hltb_horas_extras !== null ? `${fmtDecimal(ficha.hltb_horas_extras)}h` : "—"}
@@ -1160,7 +1248,7 @@ function TempoParaZerar({ ficha, nomeSteam }: { ficha: FichaJogoSteam; nomeSteam
         </div>
         <div>
           <div className="font-label-caps text-label-caps uppercase tracking-widest text-outline">
-            Completista (100%)
+            {t("jogoSteam.tempoParaZerar.completista")}
           </div>
           <div className="mt-space-xxs font-headline-kpi text-headline-kpi leading-none text-tertiary-container">
             {ficha.hltb_horas_completista !== null
@@ -1172,8 +1260,9 @@ function TempoParaZerar({ ficha, nomeSteam }: { ficha: FichaJogoSteam; nomeSteam
 
       {nomeDivergente && (
         <p className="font-body-sm text-body-sm text-outline">
-          Casado como <strong className="text-on-surface-variant">{nomeDivergente}</strong> no
-          HowLongToBeat — o site não tem o mesmo id da Steam, o casamento é por nome.
+          {t("jogoSteam.tempoParaZerar.casadoComo")}{" "}
+          <strong className="text-on-surface-variant">{nomeDivergente}</strong>{" "}
+          {t("jogoSteam.tempoParaZerar.noHltb")}
         </p>
       )}
     </Painel>
@@ -1197,6 +1286,7 @@ function TempoParaZerar({ ficha, nomeSteam }: { ficha: FichaJogoSteam; nomeSteam
  * publica - a Steam entrega só o mínimo em vários (9 dos nossos 25).
  */
 function RequisitosEIdiomas({ ficha }: { ficha: FichaJogoSteam }) {
+  const { t } = useTranslation();
   const temRecomendado = Boolean(ficha.requisitos_recomendados);
   const [aba, setAba] = useState<"minimos" | "recomendados">("minimos");
 
@@ -1208,11 +1298,11 @@ function RequisitosEIdiomas({ ficha }: { ficha: FichaJogoSteam }) {
   return (
     <Painel
       icone="memory"
-      titulo="Requisitos e idiomas"
-      descricao="O que a máquina precisa e em que línguas o jogo chega."
+      titulo={t("jogoSteam.requisitos.titulo")}
+      descricao={t("jogoSteam.requisitos.descricao")}
       meta={
         ficha.idiomas.length > 0 && (
-          <Selo>{ficha.idiomas.length} idiomas</Selo>
+          <Selo>{t("jogoSteam.requisitos.idiomasContagem", { contagem: ficha.idiomas.length })}</Selo>
         )
       }
     >
@@ -1223,8 +1313,8 @@ function RequisitosEIdiomas({ ficha }: { ficha: FichaJogoSteam }) {
             <div className="flex gap-space-xxs">
               {(
                 [
-                  ["minimos", "Mínimos"],
-                  ["recomendados", "Recomendados"],
+                  ["minimos", t("jogoSteam.requisitos.minimos")],
+                  ["recomendados", t("jogoSteam.requisitos.recomendados")],
                 ] as const
               )
                 .filter(([chave]) => chave === "minimos" || temRecomendado)
@@ -1247,9 +1337,9 @@ function RequisitosEIdiomas({ ficha }: { ficha: FichaJogoSteam }) {
               {!temRecomendado && (
                 <span
                   className="self-center pl-space-sm font-body-sm text-body-sm text-outline"
-                  title="A Steam não publica requisitos recomendados para este jogo"
+                  title={t("jogoSteam.requisitos.semRecomendadosTitle")}
                 >
-                  sem recomendados publicados
+                  {t("jogoSteam.requisitos.semRecomendadosPublicados")}
                 </span>
               )}
             </div>
@@ -1297,10 +1387,10 @@ function RequisitosEIdiomas({ ficha }: { ficha: FichaJogoSteam }) {
         {ficha.idiomas.length > 0 && (
           <div className="flex flex-col gap-space-sm">
             <div className="font-label-caps text-label-caps uppercase tracking-widest text-outline">
-              Idiomas
+              {t("jogoSteam.requisitos.idiomas")}
               <span className="ml-space-xs text-on-surface-variant">
                 <Icone nome="volume_up" className="align-middle text-[12px] text-primary" />{" "}
-                = com dublagem
+                {t("jogoSteam.requisitos.comDublagem")}
               </span>
             </div>
 

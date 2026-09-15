@@ -10,6 +10,8 @@
  */
 
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 
 import type { RespostaAssistente } from "@models/api/tipos";
 import { Icone } from "@views/componentes/base";
@@ -21,7 +23,7 @@ interface Etapa {
   icone: string;
 }
 
-function etapasDe(resposta: RespostaAssistente): Etapa[] {
+function etapasDe(resposta: RespostaAssistente, t: TFunction): Etapa[] {
   const linhas = resposta.blocos.reduce(
     (soma, bloco) => soma + bloco.conteudo.split("\n").length,
     0,
@@ -30,20 +32,24 @@ function etapasDe(resposta: RespostaAssistente): Etapa[] {
 
   const etapas: Etapa[] = [
     {
-      titulo: "Lemos a pergunta",
+      titulo: t("assistente.comoChegamos.lemos"),
       detalhe: resposta.pergunta,
       icone: "help",
     },
     {
-      titulo: `Escolhemos ${resposta.blocos.length} ${
-        resposta.blocos.length === 1 ? "bloco" : "blocos"
-      }`,
+      titulo: t("assistente.comoChegamos.escolhemos", {
+        n: resposta.blocos.length,
+        palavra:
+          resposta.blocos.length === 1
+            ? t("assistente.comoChegamos.bloco")
+            : t("assistente.comoChegamos.blocos"),
+      }),
       detalhe: resposta.blocos.map((b) => b.titulo).join(" · "),
       icone: "checklist",
     },
     {
-      titulo: "Consultamos o banco",
-      detalhe: `${fmtNumero(linhas)} linhas de contexto, por SQL escrito à mão`,
+      titulo: t("assistente.comoChegamos.consultamosBanco"),
+      detalhe: t("assistente.comoChegamos.consultamosBancoDetalhe", { n: fmtNumero(linhas) }),
       icone: "database",
     },
   ];
@@ -52,7 +58,7 @@ function etapasDe(resposta: RespostaAssistente): Etapa[] {
   // condicional (a pergunta precisa citar um jogo).
   if (daLoja.length > 0) {
     etapas.push({
-      titulo: "Consultamos a loja agora",
+      titulo: t("assistente.comoChegamos.consultamosLoja"),
       detalhe: daLoja.map((b) => b.titulo).join(" · "),
       icone: "storefront",
     });
@@ -60,17 +66,17 @@ function etapasDe(resposta: RespostaAssistente): Etapa[] {
 
   etapas.push(
     {
-      titulo: "O modelo redigiu",
+      titulo: t("assistente.comoChegamos.modeloRedigiu"),
       detalhe: `${resposta.modelo}${
         resposta.tokens_entrada
-          ? ` · ${fmtNumero(resposta.tokens_entrada)} tokens de contexto`
+          ? t("assistente.comoChegamos.modeloRedigiuTokens", { n: fmtNumero(resposta.tokens_entrada) })
           : ""
       }`,
       icone: "smart_toy",
     },
     {
-      titulo: "Devolvemos o contexto junto",
-      detalhe: "todo número da resposta pode ser conferido aqui na tela",
+      titulo: t("assistente.comoChegamos.devolvemos"),
+      detalhe: t("assistente.comoChegamos.devolvemosDetalhe"),
       icone: "fact_check",
     },
   );
@@ -79,8 +85,9 @@ function etapasDe(resposta: RespostaAssistente): Etapa[] {
 }
 
 export function ComoChegamos({ resposta }: { resposta: RespostaAssistente }) {
+  const { t } = useTranslation();
   const [aberto, setAberto] = useState(false);
-  const etapas = etapasDe(resposta);
+  const etapas = etapasDe(resposta, t);
 
   return (
     <div className="rounded-xl bg-surface-container-low/90 shadow-2xl">
@@ -92,7 +99,7 @@ export function ComoChegamos({ resposta }: { resposta: RespostaAssistente }) {
       >
         <span className="flex items-center gap-space-xs font-label-caps text-label-caps uppercase tracking-widest text-primary">
           <Icone nome="account_tree" className="text-[16px]" />
-          Como chegamos nessa resposta?
+          {t("assistente.comoChegamos.titulo")}
         </span>
         <Icone
           nome={aberto ? "expand_less" : "expand_more"}

@@ -10,27 +10,30 @@
  * etapas ficam em andamento, com a nota do que realmente demora.
  */
 
+import { useTranslation } from "react-i18next";
+
 import { Icone } from "@views/componentes/base";
 
-const ETAPAS: { rotulo: string; detalhe: string }[] = [
-  { rotulo: "Pergunta enviada", detalhe: "POST /api/assistente/perguntar" },
-  { rotulo: "Blocos escolhidos", detalhe: "pela pergunta, no Python" },
-  { rotulo: "Contexto montado", detalhe: "SQL escrito à mão" },
-  { rotulo: "Resposta redigida", detalhe: "provedor externo" },
-];
-
 export function Processando() {
+  const { t } = useTranslation();
+  const etapas: { rotulo: string; detalhe: string }[] = [
+    { rotulo: t("assistente.processando.etapa1"), detalhe: t("assistente.processando.etapa1Detalhe") },
+    { rotulo: t("assistente.processando.etapa2"), detalhe: t("assistente.processando.etapa2Detalhe") },
+    { rotulo: t("assistente.processando.etapa3"), detalhe: t("assistente.processando.etapa3Detalhe") },
+    { rotulo: t("assistente.processando.etapa4"), detalhe: t("assistente.processando.etapa4Detalhe") },
+  ];
+
   return (
     <div className="flex flex-col gap-space-base rounded-xl bg-surface-container-low/90 p-space-lg shadow-2xl">
       <div className="flex items-center gap-space-xs font-label-caps text-label-caps uppercase tracking-widest text-primary">
         <span className="animate-pulse" aria-hidden>
           ✦
         </span>
-        Analisando seus dados…
+        {t("assistente.processando.titulo")}
       </div>
 
       <ol className="flex flex-col gap-space-sm" aria-live="polite">
-        {ETAPAS.map((etapa, indice) => {
+        {etapas.map((etapa, indice) => {
           const concluida = indice === 0;
           return (
             <li key={etapa.rotulo} className="flex items-center gap-space-sm">
@@ -65,8 +68,7 @@ export function Processando() {
       </div>
 
       <p className="font-body-sm text-body-sm text-outline">
-        O contexto sai do banco em milissegundos — o que demora é a resposta do
-        provedor.
+        {t("assistente.processando.rodape")}
       </p>
     </div>
   );

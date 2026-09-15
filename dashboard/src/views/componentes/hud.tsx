@@ -8,6 +8,7 @@
  */
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 
 import { useContagem, useEntrarNaTela } from "@models/hooks/animacao";
 import { Icone } from "./base";
@@ -48,12 +49,13 @@ export function Sparkline({
   valores: number[];
   className?: string;
 }) {
+  const { t } = useTranslation();
   // Um ponto so nao tem silhueta: dois pontos identicos desenhariam uma reta
   // horizontal, que sugere "estavel" quando o certo e "ainda nao da para ver".
   if (valores.length < 2) {
     return (
       <div className="flex h-9 items-center font-label-caps text-label-caps text-outline">
-        série ainda com {valores.length === 1 ? "um ponto" : "nenhum ponto"}
+        {valores.length === 1 ? t("comum.sparkline.umPonto") : t("comum.sparkline.nenhumPonto")}
       </div>
     );
   }
@@ -631,6 +633,7 @@ export function Paginacao({
   aoMudarPorPagina: (quantidade: number) => void;
   resumo?: ReactNode;
 }) {
+  const { t } = useTranslation();
   // Janela de no maximo 5 numeros em volta da pagina atual: com 148 paginas,
   // listar todas empurraria o resto da faixa para fora da tela.
   const inicio = Math.max(1, Math.min(pagina - 2, totalPaginas - 4));
@@ -644,7 +647,7 @@ export function Paginacao({
       <div className="flex items-center gap-space-sm font-label-caps text-label-caps uppercase tracking-widest text-outline">
         <span>{resumo}</span>
         <label className="flex items-center gap-space-xs">
-          Linhas por página
+          {t("comum.paginacao.linhasPorPagina")}
           <select
             value={porPagina}
             onChange={(evento) => aoMudarPorPagina(Number(evento.target.value))}
@@ -669,7 +672,7 @@ export function Paginacao({
           type="button"
           onClick={() => aoMudarPagina(pagina - 1)}
           disabled={pagina <= 1}
-          aria-label="Página anterior"
+          aria-label={t("comum.paginacao.paginaAnterior")}
           className="rounded bg-surface-container p-space-xs text-on-surface-variant transition-colors hover:bg-surface-container-high disabled:cursor-not-allowed disabled:opacity-40"
         >
           <Icone nome="chevron_left" className="text-[18px]" />
@@ -708,7 +711,7 @@ export function Paginacao({
           type="button"
           onClick={() => aoMudarPagina(pagina + 1)}
           disabled={pagina >= totalPaginas}
-          aria-label="Próxima página"
+          aria-label={t("comum.paginacao.proximaPagina")}
           className="rounded bg-surface-container p-space-xs text-on-surface-variant transition-colors hover:bg-surface-container-high disabled:cursor-not-allowed disabled:opacity-40"
         >
           <Icone nome="chevron_right" className="text-[18px]" />
@@ -901,6 +904,7 @@ export function SeletorFiltro({
   rotuloTudo: string;
   buscavel?: boolean;
 }) {
+  const { t } = useTranslation();
   const [aberto, setAberto] = useState(false);
   const [busca, setBusca] = useState("");
   const raiz = useRef<HTMLDivElement>(null);
@@ -990,7 +994,7 @@ export function SeletorFiltro({
                   type="search"
                   value={busca}
                   onChange={(evento) => setBusca(evento.target.value)}
-                  placeholder={`Buscar em ${opcoes.length}…`}
+                  placeholder={t("comum.seletorFiltro.buscarEm", { n: opcoes.length })}
                   className="mb-space-xxs shrink-0 rounded bg-surface-container px-space-sm py-space-xs font-title-code text-title-code text-on-surface outline-none placeholder:text-outline focus:bg-surface-container-high"
                 />
               )}
@@ -1028,7 +1032,7 @@ export function SeletorFiltro({
 
               {buscavel && filtradas.length === 0 && (
                 <p className="shrink-0 px-space-sm py-space-xs font-body-sm text-body-sm text-outline">
-                  Nada encontrado.
+                  {t("comum.seletorFiltro.nadaEncontrado")}
                 </p>
               )}
             </div>

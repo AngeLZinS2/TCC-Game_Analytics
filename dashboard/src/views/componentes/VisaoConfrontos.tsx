@@ -14,6 +14,8 @@
  */
 
 import { useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 
 import type { ConfrontoResultado, Partida, PartidaAgendada } from "@models/api/tipos";
 import { PALETA_POLOS } from "@views/tema";
@@ -29,11 +31,13 @@ type Modo = "cartoes" | "kanban" | "lista";
  *  partida de Dota (grão de jogo). O `coercao` diz como virar `DadosConfronto`. */
 type Entrada = ConfrontoResultado | PartidaAgendada | Partida;
 
-const MODOS: { id: Modo; icone: string; rotulo: string }[] = [
-  { id: "cartoes", icone: "grid_view", rotulo: "Cartões" },
-  { id: "kanban", icone: "workspaces", rotulo: "Por torneio" },
-  { id: "lista", icone: "view_agenda", rotulo: "Lista" },
-];
+function modosDe(t: TFunction): { id: Modo; icone: string; rotulo: string }[] {
+  return [
+    { id: "cartoes", icone: "grid_view", rotulo: t("visaoConfrontos.cartoes") },
+    { id: "kanban", icone: "workspaces", rotulo: t("visaoConfrontos.porTorneio") },
+    { id: "lista", icone: "view_agenda", rotulo: t("visaoConfrontos.lista") },
+  ];
+}
 
 /** Chave padrão do localStorage — a aba Partidas passa uma própria. */
 export const CHAVE_MODO_PADRAO = "playdb:confrontos-modo";
@@ -60,9 +64,11 @@ export function SeletorModoConfrontos({
   modo: Modo;
   aoMudar: (m: Modo) => void;
 }) {
+  const { t } = useTranslation();
+  const modos = modosDe(t);
   return (
     <div className="flex items-center rounded bg-surface-container-low p-space-xxs shadow-sm">
-      {MODOS.map((m) => (
+      {modos.map((m) => (
         <button
           key={m.id}
           type="button"
@@ -156,6 +162,7 @@ function LinhaLista({
   aoClicar?: () => void;
   par: boolean;
 }) {
+  const { t } = useTranslation();
   const semResultado = c.vitoria_a == null && c.placar_a == null;
   // Dota: decidido mas sem placar numérico (BO1) — o vencedor destaca no nome.
   const semPlacar = c.placar_a == null && c.placar_b == null;
@@ -185,7 +192,7 @@ function LinhaLista({
         <Sigla logo={c.equipe_a_logo} tag={c.equipe_a_tag} nome={c.equipe_a_nome} />
         {semPlacar && !semResultado ? (
           <span className="shrink-0 px-0.5 font-label-caps text-label-caps uppercase tracking-wider text-outline">
-            vs
+            {t("visaoConfrontos.vs")}
           </span>
         ) : (
           <span className="flex shrink-0 items-center gap-0.5">
@@ -254,6 +261,7 @@ export function VisaoConfrontos<T extends Entrada = ConfrontoResultado | Partida
   /** Clique num cartão/linha. Quando definido, substitui o modal de detalhe. */
   aoClicarItem?: (c: DadosConfronto) => void;
 }) {
+  const { t } = useTranslation();
   const [aberto, setAberto] = useState<string | null>(null);
 
   const itens = useMemo<DadosConfronto[]>(
@@ -271,12 +279,12 @@ export function VisaoConfrontos<T extends Entrada = ConfrontoResultado | Partida
   const porTorneio = useMemo(() => {
     const mapa = new Map<string, DadosConfronto[]>();
     for (const c of itens) {
-      const chave = c.torneio ?? "Sem torneio";
+      const chave = c.torneio ?? t("visaoConfrontos.semTorneio");
       mapa.set(chave, [...(mapa.get(chave) ?? []), c]);
     }
     // Coluna com mais confrontos primeiro: é onde o olho começa.
     return [...mapa.entries()].sort((a, b) => b[1].length - a[1].length);
-  }, [itens]);
+  }, [itens, t]);
 
   return (
     <>

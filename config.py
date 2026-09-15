@@ -60,6 +60,33 @@ class Settings(BaseSettings):
     # OpenDota: 60 requisicoes por minuto -> 1,05s de folga entre chamadas.
     opendota_rate_limit_seconds: float = 1.05
 
+    # --- Steam: catalogo completo, sync incremental, precos (Fase 35) ---
+    #: Rate limit dedicado do `SteamStoreClient` (GetAppList/appdetails do
+    #: catalogo). Separado do `steam_store_rate_limit_seconds` (usado pelo
+    #: `SteamCollector` monitorado) porque sao ritmos de coleta diferentes -
+    #: a Steam nao documenta um limite oficial, entao o padrao fica
+    #: conservador e ajustavel sem mudar codigo.
+    steam_requests_per_second: float = Field(default=2.0, gt=0)
+    #: Atraso extra (ms) entre chamadas do `SteamStoreClient`, alem do rate
+    #: limit acima - 0 desliga.
+    steam_request_delay_ms: int = Field(default=0, ge=0)
+    #: Quantas PAGINAS do `GetAppList` processar por execucao da tarefa
+    #: `steam_catalogo` - nao quantidade de apps: cada pagina traz ate
+    #: 50.000 resultados (`max_results`), entao o padrao (1) ja cobre ate
+    #: 50.000 apps por execucao. O catalogo total nunca e assumido fixo -
+    #: o crawl so para quando a Steam sinaliza `have_more_results=false`.
+    steam_sync_pages_per_run: int = Field(default=1, ge=1)
+    #: Pausa entre paginas dentro da mesma execucao (quando
+    #: `steam_sync_pages_per_run` > 1).
+    steam_sync_delay_seconds: float = Field(default=1.0, ge=0)
+    #: De quanto em quanto tempo o passo INCREMENTAL do catalogo (depois da
+    #: carga inicial concluida) volta a bater na Steam com
+    #: `if_modified_since`. A tarefa roda a cada
+    #: `agendador_steam_catalogo_minutos`, mas so executa o passo
+    #: incremental de fato quando este intervalo (em horas) ja passou desde
+    #: o ultimo sync bem-sucedido - os ticks intermediarios sao no-op.
+    steam_sync_intervalo_horas: int = Field(default=24, ge=1)
+
     # --- Steam ---
     #: Quantas avaliacoes escritas pedir por jogo (0 traz so o resumo agregado).
     #: Cabe numa chamada so ate 100 - acima disso a Steam pagina por cursor, e
@@ -104,6 +131,15 @@ class Settings(BaseSettings):
     #: coleta cairia na mesma janela e viraria um UPDATE da primeira. O
     #: intervalo acompanha o grao do fato; mudar um sem o outro so gasta rede.
     agendador_steam_minutos: int = Field(default=60, ge=5)
+
+    #: Intervalo da tarefa `steam_catalogo` (indice do catalogo completo +
+    #: sync incremental de preco), em minutos. Fica mais curto que o resto
+    #: do agendador de proposito: cada execucao processa so
+    #: `steam_sync_pages_per_run` pagina(s) do `GetAppList` (uma chamada
+    #: HTTP rapida) e retorna, entao um intervalo de 15-30min acelera a
+    #: carga inicial do catalogo sem segurar o laco do agendador nem
+    #: atrasar as outras tarefas.
+    agendador_steam_catalogo_minutos: int = Field(default=20, ge=5)
 
     #: Intervalo do snapshot de usuarios simultaneos da PLATAFORMA Steam
     #: (`valvesoftware.com/about/stats`), em minutos. Numero unico, chamada
@@ -369,14 +405,13 @@ class Settings(BaseSettings):
     #: avaliacoes novas sem resumir tudo toda hora.
     resumo_reviews_revalidar_dias: int = Field(default=7, ge=1)
 
-    # --- Painel admin (Fase 30) ---
-    #: Senha do painel `/admin`. Sem ela configurada, o painel fica
-    #: inacessivel (todo login recusa) - estado esperado ate configurar, como
-    #: o assistente sem OPENROUTER_API_KEY. So a senha, sem usuario: o painel
-    #: e de operacao interna, nao um sistema de contas.
-    admin_senha: str | None = None
-    #: Validade do token emitido no login, em horas.
-    admin_token_horas: int = Field(default=12, ge=1)
+    # --- Painel admin (Fase 30, login por Firebase desde a Fase 35) ---
+    #: UIDs do Firebase com acesso ao painel `/admin`, separados por virgula.
+    #: Sem isso configurado, o painel fica inacessivel (503) - estado esperado
+    #: ate configurar, como o assistente sem OPENROUTER_API_KEY. Nao ha senha
+    #: separada: quem loga com uma dessas contas (Google/GitHub/e-mail, ja
+    #: verificado pelo Firebase) entra direto, via `exigir_admin`.
+    admin_firebase_uids: str | None = None
     #: Onde o Netdata da VPS escuta. De dentro do container, o host precisa
     #: do mapeamento `extra_hosts: host.docker.internal:host-gateway` no
     #: compose (Netdata roda no host, nao em container, bind so em

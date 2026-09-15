@@ -6,6 +6,8 @@
  * do card em volta (só o `<summary>` alterna).
  */
 
+import { useTranslation } from "react-i18next";
+
 import type { StreamCanal } from "@models/api/tipos";
 import { Icone } from "./base";
 
@@ -16,6 +18,7 @@ const ICONE_PLATAFORMA: Record<string, string> = {
 };
 
 function LinhaCanal({ c }: { c: StreamCanal }) {
+  const { t } = useTranslation();
   return (
     <a
       href={c.url}
@@ -36,7 +39,7 @@ function LinhaCanal({ c }: { c: StreamCanal }) {
       )}
       {c.principal && (
         <span className="shrink-0 font-badge-status text-badge-status uppercase text-primary">
-          oficial
+          {t("comum.canaisTransmissao.oficial")}
         </span>
       )}
     </a>
@@ -51,6 +54,7 @@ export function CanaisTransmissao({
   /** No card da grade o espaço é curto: só o gatilho, a lista abre por cima. */
   compacto?: boolean;
 }) {
+  const { t } = useTranslation();
   if (!streams || streams.length === 0) return null;
 
   if (streams.length === 1) {
@@ -64,7 +68,7 @@ export function CanaisTransmissao({
         onClick={(e) => e.stopPropagation()}
       >
         <Icone nome="play_circle" className="text-[14px]" />
-        assistir
+        {t("comum.canaisTransmissao.assistir")}
       </a>
     );
   }
@@ -76,7 +80,7 @@ export function CanaisTransmissao({
         onClick={(e) => e.stopPropagation()}
       >
         <Icone nome="play_circle" className="text-[14px]" />
-        assistir · {streams.length} canais
+        {t("comum.canaisTransmissao.assistirComCanais", { n: streams.length })}
         <Icone
           nome="expand_more"
           className="text-[14px] transition-transform group-open:rotate-180"

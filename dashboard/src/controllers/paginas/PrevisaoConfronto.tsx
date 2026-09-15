@@ -19,6 +19,8 @@
  */
 
 import { useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 
 import { useEntrarNaTela } from "@models/hooks/animacao";
 import {
@@ -70,8 +72,8 @@ const DIAS_NO_KANBAN = 5;
  * Counter-Strike ele apareceria do mesmo jeito, como se a partida tivesse
  * lados chamados Radiant e Dire — o que não existe fora do Dota.
  */
-function rotuloDoLado(jogo: string, lado: "a" | "b"): string {
-  const base = lado === "a" ? "Lado A" : "Lado B";
+function rotuloDoLado(jogo: string, lado: "a" | "b", t: TFunction): string {
+  const base = lado === "a" ? t("previsao.ladoA") : t("previsao.ladoB");
   if (jogo !== "dota2") return base;
   return lado === "a" ? `${base} (Radiant)` : `${base} (Dire)`;
 }
@@ -81,7 +83,7 @@ function rotuloDoLado(jogo: string, lado: "a" | "b"): string {
  * sua — a Valve publica o Regional Standings de CS, o vlr.gg o rating de
  * Valorant — e chamar tudo de "Valve" (como era) mentia numa tela de Valorant.
  */
-function fonteExterna(jogo: string): string {
+function fonteExterna(jogo: string, t: TFunction): string {
   if (jogo === "counterstrike") return "Valve";
   if (jogo === "valorant") return "vlr.gg";
   if (jogo === "rainbowsix") return "R6 Esports";
@@ -89,11 +91,51 @@ function fonteExterna(jogo: string): string {
   if (jogo === "rocketleague") return "RLCS";
   if (jogo === "dota2") return "DLTV";
   if (jogo === "leagueoflegends") return "LoL Esports";
-  return "Ranking";
+  return t("previsao.fonteRanking");
+}
+
+/**
+ * Traduz o `rotulo` de um fator/contribuicao (fatores.py, backend) para o
+ * idioma atual - os valores possiveis sao um conjunto fechado, gerado em
+ * `services/ml/confronto.py`. Sem match conhecido, devolve o rotulo original
+ * (portugues) em vez de quebrar - mais seguro que mascarar um rotulo novo
+ * que o backend passe a mandar.
+ */
+function traduzirRotuloFator(rotulo: string, t: TFunction): string {
+  const FIXOS: Record<string, string> = {
+    "Força estimada": t("previsao.fatores.forcaEstimada"),
+    Winrate: t("previsao.fatores.winrate"),
+    "Partidas coletadas": t("previsao.fatores.partidasColetadas"),
+    "Ouro por minuto": t("previsao.fatores.ouroPorMinuto"),
+    "Experiência por minuto": t("previsao.fatores.experienciaPorMinuto"),
+    "KDA médio": t("previsao.fatores.kdaMedio"),
+    "Duração média": t("previsao.fatores.duracaoMedia"),
+    "Vantagem de lado": t("previsao.fatores.vantagemDeLado"),
+    "Forma recente": t("previsao.fatores.formaRecente"),
+    "Confronto direto": t("previsao.fatores.confrontoDireto"),
+    "Saldo de placar recente": t("previsao.fatores.saldoDePlacarRecente"),
+  };
+  if (rotulo in FIXOS) return FIXOS[rotulo];
+
+  const forma = rotulo.match(/^Forma \(últimos (\d+)\)$/);
+  if (forma) return t("previsao.fatores.formaUltimos", { n: forma[1] });
+
+  const saldo = rotulo.match(/^Saldo de (.+)$/);
+  if (saldo) {
+    const UNIDADES: Record<string, string> = {
+      mapas: t("previsao.unidadePlacar.mapas"),
+      jogos: t("previsao.unidadePlacar.jogos"),
+      pontos: t("previsao.unidadePlacar.pontos"),
+    };
+    return t("previsao.fatores.saldoDe", { unidade: UNIDADES[saldo[1]] ?? saldo[1] });
+  }
+
+  return rotulo;
 }
 
 /** O aviso de confiabilidade. Aparece sempre, com o tom que os números pedem. */
 function AvisoValidacao({ validacao }: { validacao: ValidacaoConfronto }) {
+  const { t } = useTranslation();
   if (!validacao.suficiente) {
     return (
       <div className="flex items-start gap-space-sm rounded-xl border border-outline-variant/40 bg-surface-container-low/60 px-space-lg py-space-base">
@@ -118,26 +160,26 @@ function AvisoValidacao({ validacao }: { validacao: ValidacaoConfronto }) {
       <Icone nome={superaBase ? "verified" : "warning"} className="mt-[2px] text-[18px]" />
       <div className="font-body-md text-body-md text-on-surface-variant">
         <strong className="text-on-surface">
-          Validação temporal em {validacao.avaliadas} partidas:{" "}
-          {fmtPercentual((validacao.acuracia ?? 0) * 100)} de acerto (±
-          {fmtPercentual((validacao.margem_erro ?? 0) * 100)}), contra uma taxa base de{" "}
-          {fmtPercentual((validacao.taxa_base ?? 0) * 100)}.
+          {t("previsao.aviso.validacaoTemporal", {
+            avaliadas: validacao.avaliadas,
+            acuracia: fmtPercentual((validacao.acuracia ?? 0) * 100),
+            margem: fmtPercentual((validacao.margem_erro ?? 0) * 100),
+            taxaBase: fmtPercentual((validacao.taxa_base ?? 0) * 100),
+          })}
         </strong>{" "}
         {superaBase ? (
-          <>
-            O modelo supera o chute, mas a margem de erro ainda é larga — mais partidas
-            estreitam o intervalo.
-          </>
+          <>{t("previsao.aviso.modeloSupera")}</>
         ) : (
           <>
             <span style={{ color: PALETA_POLOS.negativo }}>
-              Com esta amostra o modelo ainda não demonstrou poder preditivo:
+              {t("previsao.aviso.semPoderPreditivoPrefixo")}
             </span>{" "}
-            acertar sempre no lado mais frequente daria o mesmo resultado. O ROC-AUC de{" "}
-            {fmtDecimal(validacao.roc_auc ?? 0, 3)} sugere algum sinal na ordenação, mas{" "}
-            {validacao.avaliadas} partidas não decidem isso. Leia as probabilidades como{" "}
-            <strong className="text-on-surface">uma leitura do histórico</strong>, não como
-            uma aposta validada. O que muda esse quadro é coletar mais partidas.
+            {t("previsao.aviso.semPoderPreditivoSufixo", {
+              rocAuc: fmtDecimal(validacao.roc_auc ?? 0, 3),
+              avaliadas: validacao.avaliadas,
+            })}{" "}
+            <strong className="text-on-surface">{t("previsao.aviso.leituraDoHistorico")}</strong>
+            {t("previsao.aviso.naoComoAposta")}
           </>
         )}
       </div>
@@ -159,6 +201,7 @@ function LinhaRankingOficial({
   equipe: EquipeRankingOficial;
   indice: number;
 }) {
+  const { t } = useTranslation();
   const favoritosEquipes = useFavoritosEquipes();
   const favoritar = useFavoritarEquipe();
   const desfavoritar = useDesfavoritarEquipe();
@@ -186,7 +229,7 @@ function LinhaRankingOficial({
             <BotaoFavoritar
               favoritado={Boolean(favoritado)}
               ocupado={favoritar.isPending || desfavoritar.isPending}
-              rotulo="Favoritar time"
+              rotulo={t("previsao.favoritarTime")}
               tamanho="sm"
               aoAlternar={() => {
                 const id = equipe.id_equipe as number;
@@ -217,7 +260,8 @@ function LadoDoConfronto({
   rotuloLado: string;
   jogo: string;
 }) {
-  const fonte = fonteExterna(jogo);
+  const { t } = useTranslation();
+  const fonte = fonteExterna(jogo, t);
   const favoritosEquipes = useFavoritosEquipes();
   const favoritar = useFavoritarEquipe();
   const desfavoritar = useDesfavoritarEquipe();
@@ -252,7 +296,7 @@ function LadoDoConfronto({
           <BotaoFavoritar
             favoritado={Boolean(favoritado)}
             ocupado={favoritar.isPending || desfavoritar.isPending}
-            rotulo="Favoritar time"
+            rotulo={t("previsao.favoritarTime")}
             tamanho="sm"
             aoAlternar={() =>
               favoritado ? desfavoritar.mutate(equipe.id_equipe) : favoritar.mutate(equipe.id_equipe)
@@ -267,8 +311,8 @@ function LadoDoConfronto({
             className="mt-space-xxs inline-flex items-center gap-1 rounded-full bg-surface-container-high px-2 py-[1px] font-title-code text-title-code text-on-surface-variant"
             title={
               equipe.pontos_ranking !== null
-                ? `${equipe.pontos_ranking} pontos no ranking ${fonte}`
-                : `Posição no ranking ${fonte}`
+                ? t("previsao.pontosNoRanking", { pontos: equipe.pontos_ranking, fonte })
+                : t("previsao.posicaoNoRanking", { fonte })
             }
           >
             <Icone nome="social_leaderboard" className="text-[13px] text-primary" />
@@ -296,11 +340,12 @@ function LadoDoConfronto({
  * da o mesmo veredito num relance, com o numero que sustenta ele no `title`.
  */
 function BadgeConfianca({ validacao }: { validacao: ValidacaoConfronto }) {
+  const { t } = useTranslation();
   if (!validacao.suficiente) {
     return (
       <span className="inline-flex items-center gap-space-xs rounded-full bg-surface-container px-space-md py-space-xs font-badge-status text-badge-status uppercase tracking-widest text-outline">
         <Icone nome="help" className="text-[14px]" />
-        Amostra curta · {validacao.avaliadas} partidas
+        {t("previsao.badgeConfianca.amostraCurta", { avaliadas: validacao.avaliadas })}
       </span>
     );
   }
@@ -312,10 +357,10 @@ function BadgeConfianca({ validacao }: { validacao: ValidacaoConfronto }) {
     <span
       className="inline-flex items-center gap-space-xs rounded-full px-space-md py-space-xs font-badge-status text-badge-status uppercase tracking-widest"
       style={{ color: cor, background: `${cor}1a` }}
-      title={`ROC-AUC ${fmtDecimal(validacao.roc_auc ?? 0, 3)} sobre ${validacao.avaliadas} partidas de teste, taxa base ${fmtPercentual((validacao.taxa_base ?? 0) * 100, 0)}`}
+      title={`ROC-AUC ${fmtDecimal(validacao.roc_auc ?? 0, 3)} · ${validacao.avaliadas} · ${fmtPercentual((validacao.taxa_base ?? 0) * 100, 0)}`}
     >
       <Icone nome={superaBase ? "verified" : "warning"} className="text-[14px]" />
-      {superaBase ? "Supera o chute" : "Sem poder preditivo"} ·{" "}
+      {superaBase ? t("previsao.badgeConfianca.superaOChute") : t("previsao.badgeConfianca.semPoderPreditivo")} ·{" "}
       {fmtPercentual((validacao.acuracia ?? 0) * 100, 0)}
     </span>
   );
@@ -368,9 +413,11 @@ function CartaoFator({
   nomeA: string;
   nomeB: string;
 }) {
+  const { t } = useTranslation();
   const indefinido = fator.valor_a === null || fator.valor_b === null;
   const favoreceA = (fator.diferenca ?? 0) > 0;
   const fracaoA = fracaoDoFator(fator);
+  const rotuloTraduzido = traduzirRotuloFator(fator.rotulo, t);
 
   return (
     <div className="relative overflow-hidden rounded-xl bg-surface-container p-space-base">
@@ -387,11 +434,11 @@ function CartaoFator({
             nome={iconeDoFator(fator.rotulo)}
             className={`text-[16px] ${fator.peso_no_modelo ? "text-primary" : ""}`}
           />
-          {fator.rotulo}
+          {rotuloTraduzido}
         </span>
         {fator.peso_no_modelo && (
           <span className="shrink-0 rounded bg-primary/10 px-space-xs py-space-xxs font-badge-status text-badge-status uppercase text-primary">
-            entra na conta
+            {t("previsao.entraNaConta")}
           </span>
         )}
       </div>
@@ -422,7 +469,7 @@ function CartaoFator({
 
       {indefinido ? (
         <div className="mt-space-sm font-body-sm text-body-sm text-outline">
-          sem dado dos dois lados
+          {t("previsao.semDadoDosDoisLados")}
         </div>
       ) : (
         <div className="mt-space-sm">
@@ -461,6 +508,7 @@ function DetalheConfronto({
   jogo: string;
   priorExterno?: PrioExternoConfronto | null;
 }) {
+  const { t } = useTranslation();
   const favoritoA = previsao.probabilidade_a >= previsao.probabilidade_b;
   const corFavorito = favoritoA ? PALETA_POLOS.positivo : PALETA_POLOS.negativo;
   // Rearma sempre que o confronto muda (outro card do kanban, outra dupla no
@@ -473,17 +521,18 @@ function DetalheConfronto({
       <div className="flex flex-wrap items-center justify-between gap-space-sm rounded-lg border border-outline-variant/30 bg-surface-container-lowest px-space-lg py-space-sm">
         <span className="flex flex-wrap items-center gap-space-xs font-title-code text-title-code uppercase tracking-widest text-on-surface-variant">
           <Icone nome="psychology" className="text-[16px] text-primary" />
-          Motor de previsão
-          <span className="text-outline">· Bradley-Terry regularizado</span>
+          {t("previsao.motorPrevisao")}
+          <span className="text-outline">{t("previsao.bradleyTerry")}</span>
           {priorExterno && (
             <span
               className="text-outline"
-              title={`Prior: diferença de ranking da ${priorExterno.fonte} (peso ${fmtDecimal(
-                priorExterno.peso,
-                2,
-              )}, snapshot de ${priorExterno.data_mais_recente}). Puxa o time de pouco histórico para a posição dele no ranking em vez de para 50%.`}
+              title={t("previsao.priorTitle", {
+                fonte: priorExterno.fonte,
+                peso: fmtDecimal(priorExterno.peso, 2),
+                data: priorExterno.data_mais_recente,
+              })}
             >
-              · prior: ranking {priorExterno.fonte}
+              {t("previsao.priorRanking", { fonte: priorExterno.fonte })}
             </span>
           )}
         </span>
@@ -496,15 +545,15 @@ function DetalheConfronto({
             equipe={previsao.equipe_a}
             probabilidade={previsao.probabilidade_a}
             cor={PALETA_POLOS.positivo}
-            rotuloLado={rotuloDoLado(jogo, "a")}
+            rotuloLado={rotuloDoLado(jogo, "a", t)}
             jogo={jogo}
           />
-          <span className="font-headline-md text-headline-md text-outline">VS</span>
+          <span className="font-headline-md text-headline-md text-outline">{t("previsao.vs")}</span>
           <LadoDoConfronto
             equipe={previsao.equipe_b}
             probabilidade={previsao.probabilidade_b}
             cor={PALETA_POLOS.negativo}
-            rotuloLado={rotuloDoLado(jogo, "b")}
+            rotuloLado={rotuloDoLado(jogo, "b", t)}
             jogo={jogo}
           />
         </div>
@@ -535,15 +584,13 @@ function DetalheConfronto({
         <BarraSegmentada
           fracaoA={previsao.probabilidade_a}
           legendaEsquerda={
-            previsao.confrontos_diretos > 0 ? (
-              <>
-                Confrontos diretos: {previsao.vitorias_diretas_a}–
-                {previsao.confrontos_diretos - previsao.vitorias_diretas_a} para{" "}
-                {previsao.equipe_a.nome}
-              </>
-            ) : (
-              <>Nunca se enfrentaram nos dados coletados</>
-            )
+            previsao.confrontos_diretos > 0
+              ? t("previsao.confrontosDiretos", {
+                  a: previsao.vitorias_diretas_a,
+                  b: previsao.confrontos_diretos - previsao.vitorias_diretas_a,
+                  nome: previsao.equipe_a.nome,
+                })
+              : t("previsao.nuncaSeEnfrentaram")
           }
           legendaDireita={
             previsao.probabilidade_a >= 0.5
@@ -557,11 +604,10 @@ function DetalheConfronto({
       <div>
         <h3 className="flex items-center gap-space-xs font-headline-sm text-headline-sm uppercase tracking-wide text-on-surface">
           <Icone nome="balance" className="text-[20px] text-primary" />
-          Estatísticas pré-partida
+          {t("previsao.estatisticasPrePartida.titulo")}
         </h3>
         <p className="mt-space-xxs font-body-sm text-body-sm text-outline">
-          A força e as features de contexto marcadas entram na conta. As outras linhas
-          descrevem os times, mas não são somadas — já estão embutidas na força.
+          {t("previsao.estatisticasPrePartida.descricao")}
         </p>
 
         <div className="mt-space-md grid grid-cols-1 gap-space-sm sm:grid-cols-2 lg:grid-cols-3">
@@ -576,10 +622,7 @@ function DetalheConfronto({
         </div>
 
         <p className="mt-space-md font-body-sm text-body-sm text-outline">
-          <Icone nome="bolt" className="text-[14px] text-primary" /> marca o que o modelo
-          pesou: a força (estimada de quem venceu quem) e, quando mostraram sinal, a forma
-          recente, o confronto direto e o saldo de placar. Uma feature de contexto só
-          entra com peso positivo — a direção dela é conhecida.
+          <Icone nome="bolt" className="text-[14px] text-primary" /> {t("previsao.estatisticasPrePartida.legenda")}
         </p>
       </div>
 
@@ -606,14 +649,15 @@ function ContaLogOdds({
   nomeA: string;
   nomeB: string;
 }) {
+  const { t } = useTranslation();
   const total = contribuicoes.reduce((s, c) => s + c.log_odds, 0);
   const maior = Math.max(...contribuicoes.map((c) => Math.abs(c.log_odds)), 0.01);
 
   return (
     <div className="rounded-lg bg-surface-container p-space-base">
       <div className="flex items-center justify-between font-label-caps text-label-caps uppercase tracking-widest text-outline">
-        <span>De onde saiu a probabilidade (log-odds)</span>
-        <span>+ favorece {nomeA} · − favorece {nomeB}</span>
+        <span>{t("previsao.logOdds.titulo")}</span>
+        <span>{t("previsao.logOdds.favorece", { a: nomeA, b: nomeB })}</span>
       </div>
 
       <div className="mt-space-md flex flex-col gap-space-xs">
@@ -622,7 +666,7 @@ function ContaLogOdds({
           return (
             <div key={c.rotulo} className="flex items-center gap-space-sm">
               <span className="w-40 shrink-0 truncate font-body-sm text-body-sm text-on-surface-variant">
-                {c.rotulo}
+                {traduzirRotuloFator(c.rotulo, t)}
               </span>
               <div className="relative h-3 flex-1 rounded-full bg-surface-container-highest">
                 <div
@@ -649,11 +693,11 @@ function ContaLogOdds({
 
       <div className="mt-space-md flex items-center justify-between border-t border-outline-variant/30 pt-space-sm font-body-sm text-body-sm">
         <span className="text-on-surface-variant">
-          Soma {fmtDecimal(total, 3)} → sigmoide →{" "}
+          {t("previsao.logOdds.soma", { total: fmtDecimal(total, 3) })}
           <span className="font-title-code text-title-code text-primary">
             {fmtPercentual(probabilidadeA * 100, 1)}
-          </span>{" "}
-          para {nomeA}
+          </span>
+          {t("previsao.logOdds.para", { nome: nomeA })}
         </span>
       </div>
     </div>
@@ -668,9 +712,10 @@ function CardConfronto({
   jogo: ConfrontoAgendado;
   aoClicar: () => void;
 }) {
+  const { t, i18n } = useTranslation();
   const tem = jogo.probabilidade_a !== null;
   const favoritoA = (jogo.probabilidade_a ?? 0.5) >= 0.5;
-  const horario = new Date(jogo.inicio_previsto).toLocaleTimeString("pt-BR", {
+  const horario = new Date(jogo.inicio_previsto).toLocaleTimeString(i18n.language, {
     hour: "2-digit",
     minute: "2-digit",
   });
@@ -742,8 +787,8 @@ function CardConfronto({
               mentir: num jogo sem modelo ajustado nao falta o historico DESTE
               time - falta o ajuste do jogo inteiro. */}
           {jogo.motivo_sem_previsao?.startsWith("o modelo")
-            ? "sem modelo para este jogo"
-            : "sem histórico coletado"}
+            ? t("previsao.kanban.semModeloParaEsteJogo")
+            : t("previsao.kanban.semHistoricoColetado")}
         </div>
       )}
 
@@ -757,7 +802,7 @@ function CardConfronto({
 }
 
 /** Rótulo da coluna: "Hoje", "Amanhã" ou a data. */
-function rotuloDoDia(dia: string): string {
+function rotuloDoDia(dia: string, t: TFunction, idioma: string): string {
   const data = new Date(`${dia}T12:00:00`);
   const hoje = new Date();
   hoje.setHours(0, 0, 0, 0);
@@ -766,10 +811,10 @@ function rotuloDoDia(dia: string): string {
   meiaNoite.setHours(0, 0, 0, 0);
 
   const diferenca = Math.round((meiaNoite.getTime() - hoje.getTime()) / 86400_000);
-  if (diferenca === 0) return "Hoje";
-  if (diferenca === 1) return "Amanhã";
+  if (diferenca === 0) return t("previsao.kanban.hoje");
+  if (diferenca === 1) return t("previsao.kanban.amanha");
 
-  return data.toLocaleDateString("pt-BR", {
+  return data.toLocaleDateString(idioma, {
     weekday: "short",
     day: "2-digit",
     month: "2-digit",
@@ -791,6 +836,7 @@ export function PrevisaoConfrontoPagina({
 }: {
   secao?: "previsao" | "ranking";
 } = {}) {
+  const { t, i18n } = useTranslation();
   const [liga, setLiga] = useState<string | null>(null);
   const [minPartidas, setMinPartidas] = useState(3);
   const [equipeA, setEquipeA] = useState<number | null>(null);
@@ -914,37 +960,33 @@ export function PrevisaoConfrontoPagina({
             <div className="flex flex-col gap-space-xs">
               <div className="flex flex-wrap items-center gap-space-sm">
                 <h1 className="font-headline-lg text-headline-lg uppercase tracking-wide text-on-surface">
-                  {emRanking ? "Ranking" : "Previsão de Confronto"}
+                  {emRanking ? t("previsao.cabecalho.ranking") : t("previsao.cabecalho.previsaoDeConfronto")}
                 </h1>
-                <Selo cor="primario">{emRanking ? "Oficial" : "Antes da partida"}</Selo>
+                <Selo cor="primario">{emRanking ? t("previsao.cabecalho.oficial") : t("previsao.cabecalho.antesDaPartida")}</Selo>
                 {!emRanking && (
                   <span className="hidden font-label-caps text-label-caps uppercase tracking-wider text-outline sm:inline">
-                    ML // Deck 05
+                    {t("previsao.cabecalho.mlDeck")}
                   </span>
                 )}
               </div>
 
               {emRanking ? (
                 <p className="font-body-sm text-body-sm text-on-surface-variant">
-                  O ranking que a fonte de referência de cada jogo publica. CS
-                  vem da Valve, Valorant do vlr.gg, R6 do R6 Esports (SI Points),
-                  Overwatch da tabela do Stage do OWCS, Rocket League do
-                  leaderboard da RLCS (blast.tv), Dota 2 do ranking mundial do
-                  DLTV (a Valve não classifica desde o fim do DPC); os outros
-                  ainda estão em integração.
+                  {t("previsao.cabecalho.descricaoRanking")}
                 </p>
               ) : dados ? (
                 <p className="font-body-sm text-body-sm text-on-surface-variant">
-                  Qual time tem mais chance de vencer, a partir do histórico de{" "}
-                  {fmtNumero(dados.confrontos)} confrontos entre {dados.equipes} equipes.
-                  Método: <strong>{dados.metodo}</strong>.
+                  {t("previsao.cabecalho.descricaoComDados", {
+                    confrontos: fmtNumero(dados.confrontos),
+                    equipes: dados.equipes,
+                  })}
+                  <strong>{dados.metodo}</strong>.
                 </p>
               ) : (
                 <p className="font-body-sm text-body-sm text-on-surface-variant">
-                  O calendário deste jogo vem da Liquipedia e aparece abaixo.{" "}
-                  <strong className="text-error">A previsão, não:</strong> ela precisa de
-                  partidas com resultado — no Dota 2 vêm da OpenDota, nos outros jogos do
-                  histórico da Liquipedia — e ainda não há o bastante para este jogo.
+                  {t("previsao.cabecalho.descricaoSemDados")}
+                  <strong className="text-error">{t("previsao.cabecalho.aPrevisaoNao")}</strong>
+                  {t("previsao.cabecalho.descricaoSemDadosSufixo")}
                 </p>
               )}
             </div>
@@ -953,14 +995,14 @@ export function PrevisaoConfrontoPagina({
             <div className="flex flex-wrap items-center gap-space-sm">
               <label className={LABEL_CAMPO}>
                 <span className="font-label-caps text-label-caps uppercase tracking-widest text-outline">
-                  Campeonato
+                  {t("previsao.cabecalho.campeonato")}
                 </span>
                 <select
                   value={liga ?? ""}
                   onChange={(evento) => setLiga(evento.target.value || null)}
                   className={CAMPO}
                 >
-                  <option value="">Todos</option>
+                  <option value="">{t("previsao.cabecalho.todos")}</option>
                   {ligas.data?.map((item: LigaConfronto) => (
                     <option key={item.liga} value={item.liga}>
                       {item.liga} ({item.confrontos})
@@ -971,7 +1013,7 @@ export function PrevisaoConfrontoPagina({
 
               <label className={LABEL_CAMPO}>
                 <span className="font-label-caps text-label-caps uppercase tracking-widest text-outline">
-                  Mín. partidas
+                  {t("previsao.cabecalho.minPartidas")}
                 </span>
                 <select
                   value={minPartidas}
@@ -996,32 +1038,34 @@ export function PrevisaoConfrontoPagina({
           {/* ==================== KANBAN DA AGENDA ==================== */}
           <Painel
             icone="view_kanban"
-            titulo="Próximos confrontos"
+            titulo={t("previsao.kanban.proximosConfrontos")}
             // Era "Calendário da Liquipedia" fixo. Deixou de ser verdade
             // quando League of Legends passou a vir do OP.GG: a frase é uma
             // afirmação de procedência, e afirmar a fonte errada é o mesmo
             // defeito que marcar dado de terceiro como medição nossa.
-            descricao={`Calendário ${
-              jogo === "leagueoflegends" ? "do OP.GG" : "da Liquipedia"
-            }, uma coluna por dia. Clique num card para ver as estatísticas e o porquê.`}
+            descricao={`${
+              jogo === "leagueoflegends"
+                ? t("previsao.kanban.calendarioOpgg")
+                : t("previsao.kanban.calendarioLiquipedia")
+            }${t("previsao.kanban.descricaoSufixo")}`}
             meta={
               <Pilula
                 ativa={soComPrevisao}
                 icone="filter_alt"
                 aoClicar={() => setSoComPrevisao((atual) => !atual)}
               >
-                Só com previsão
+                {t("previsao.kanban.soComPrevisao")}
               </Pilula>
             }
           >
             <Consulta
               estado={agenda}
-              vazio="Nenhum confronto futuro na agenda. Colete com `cli.py collect liquipedia`."
+              vazio={t("previsao.kanban.vazio")}
             >
               {() =>
                 colunas.length === 0 ? (
                   <p className="rounded bg-surface-container px-space-base py-space-md font-body-md text-body-md text-on-surface-variant">
-                    Nenhum confronto futuro no recorte.
+                    {t("previsao.kanban.nenhumNoRecorte")}
                   </p>
                 ) : (
                   <div className="rolagem-discreta flex gap-space-base overflow-x-auto pb-space-sm">
@@ -1034,13 +1078,13 @@ export function PrevisaoConfrontoPagina({
                         <div key={dia} className="flex w-72 shrink-0 flex-col gap-space-sm">
                           <div className="flex items-center justify-between gap-space-xs rounded bg-surface-container px-space-md py-space-sm">
                             <span className="font-title-code text-title-code uppercase tracking-wider text-on-surface">
-                              {rotuloDoDia(dia)}
+                              {rotuloDoDia(dia, t, i18n.language)}
                             </span>
                             <span className="font-label-caps text-label-caps uppercase tracking-widest text-outline">
-                              {jogos.length} jogo{jogos.length === 1 ? "" : "s"}
+                              {jogos.length} {jogos.length === 1 ? t("previsao.kanban.jogo") : t("previsao.kanban.jogos")}
                               {comPrevisao > 0 && (
                                 <span className="ml-space-xs text-primary">
-                                  · {comPrevisao} c/ previsão
+                                  {t("previsao.kanban.comPrevisao", { contagem: comPrevisao })}
                                 </span>
                               )}
                             </span>
@@ -1064,9 +1108,7 @@ export function PrevisaoConfrontoPagina({
             </Consulta>
 
             <p className="font-body-sm text-body-sm text-outline">
-              Um confronto sem previsão é um em que pelo menos um dos times nunca apareceu
-              num confronto decidido que coletamos — no Dota 2 o histórico vem da OpenDota,
-              nos outros jogos do próprio ticker da Liquipedia.
+              {t("previsao.kanban.rodape")}
             </p>
           </Painel>
 
@@ -1097,12 +1139,10 @@ export function PrevisaoConfrontoPagina({
                   <Icone nome="help" className="mt-[2px] text-[18px]" />
                   <div className="font-body-md text-body-md text-on-surface-variant">
                     <strong className="text-on-surface">
-                      Sem previsão para este confronto.
+                      {t("previsao.modal.semPrevisao.titulo")}
                     </strong>{" "}
-                    {aberto.motivo_sem_previsao}. O histórico vem da OpenDota no Dota 2 e
-                    do ticker da Liquipedia nos outros jogos. Um time só recebe força
-                    depois de aparecer num confronto decidido — coletar mais é o que
-                    resolve.
+                    {aberto.motivo_sem_previsao}
+                    {t("previsao.modal.semPrevisao.sufixo")}
                   </div>
                 </div>
 
@@ -1120,8 +1160,12 @@ export function PrevisaoConfrontoPagina({
                       </div>
                       <div className="mt-space-xxs font-body-sm text-body-sm text-outline">
                         {lado.equipe
-                          ? `${lado.equipe.vitorias}/${lado.equipe.partidas} partidas coletadas · força ${fmtDecimal(lado.equipe.forca, 3)}`
-                          : "nenhuma partida coletada"}
+                          ? t("previsao.modal.semPrevisao.partidasColetadas", {
+                              v: lado.equipe.vitorias,
+                              p: lado.equipe.partidas,
+                              forca: fmtDecimal(lado.equipe.forca, 3),
+                            })
+                          : t("previsao.modal.semPrevisao.nenhumaPartidaColetada")}
                       </div>
                     </div>
                   ))}
@@ -1143,9 +1187,9 @@ export function PrevisaoConfrontoPagina({
               confrontos (abaixo) nao depende do modelo. */}
           {!dados && !emRanking && (
             <p className="rounded-xl bg-surface-container-low/90 px-space-lg py-space-base font-body-md text-body-md text-on-surface-variant shadow-lg">
-              Ainda não há modelo de força ajustado para este jogo — ele precisa
-              de partidas com resultado. O calendário está na aba{" "}
-              <strong className="text-on-surface">Previsão</strong>.
+              {t("previsao.semModeloAjustado.prefixo")}
+              <strong className="text-on-surface">{t("previsao.cabecalho.previsaoDeConfronto")}</strong>
+              {t("previsao.semModeloAjustado.sufixo")}
             </p>
           )}
           {(dados || emRanking) && (
@@ -1154,8 +1198,8 @@ export function PrevisaoConfrontoPagina({
           {!emRanking && dados && (
           <Painel
             icone="swords"
-            titulo="Simular um confronto"
-            descricao="Dois times quaisquer, com jogo agendado ou não. A vantagem de lado entra na conta separada da força."
+            titulo={t("previsao.simulador.titulo")}
+            descricao={t("previsao.simulador.descricao")}
             meta={
               equipes.length >= 2 ? (
                 <button
@@ -1167,7 +1211,7 @@ export function PrevisaoConfrontoPagina({
                   className="inline-flex items-center gap-space-xs rounded bg-surface-container px-space-md py-space-xs font-title-code text-title-code text-primary transition-colors hover:bg-surface-container-high"
                 >
                   <Icone nome="swap_horiz" className="text-[18px]" />
-                  Inverter lados
+                  {t("previsao.simulador.inverterLados")}
                 </button>
               ) : undefined
             }
@@ -1175,8 +1219,8 @@ export function PrevisaoConfrontoPagina({
             <div className="flex flex-col gap-space-sm sm:flex-row">
               {(
                 [
-                  [rotuloDoLado(jogo, "a"), equipeA, setEquipeA],
-                  [rotuloDoLado(jogo, "b"), equipeB, setEquipeB],
+                  [rotuloDoLado(jogo, "a", t), equipeA, setEquipeA],
+                  [rotuloDoLado(jogo, "b", t), equipeB, setEquipeB],
                 ] as const
               ).map(([rotulo, valor, definir]) => (
                 <label key={rotulo} className="flex flex-1 flex-col gap-space-xs">
@@ -1200,7 +1244,7 @@ export function PrevisaoConfrontoPagina({
 
             {previsao.isError && <MensagemErro erro={previsao.error} />}
 
-            <Consulta estado={previsao} altura={260} vazio="Escolha dois times diferentes.">
+            <Consulta estado={previsao} altura={260} vazio={t("previsao.simulador.escolhaDoisTimes")}>
               {(resultado: TipoPrevisao) => (
                 <DetalheConfronto previsao={resultado} jogo={jogo} priorExterno={dados?.prior_externo ?? null} />
               )}
@@ -1215,8 +1259,10 @@ export function PrevisaoConfrontoPagina({
           {rankingOficial.data && regiaoRanking ? (
           <Painel
             icone="social_leaderboard"
-            titulo={`Ranking oficial — ${rankingOficial.data.fonte}`}
-            descricao={`O ranking que a cena acompanha, direto da fonte e separado por região como ela publica. Snapshot de ${fmtDataCurta(rankingOficial.data.data_referencia)}.`}
+            titulo={t("previsao.rankingOficial.titulo", { fonte: rankingOficial.data.fonte })}
+            descricao={t("previsao.rankingOficial.descricao", {
+              data: fmtDataCurta(rankingOficial.data.data_referencia),
+            })}
             meta={
               rankingOficial.data.url_fonte ? (
                 <a
@@ -1225,7 +1271,7 @@ export function PrevisaoConfrontoPagina({
                   rel="noreferrer"
                   className="inline-flex items-center gap-space-xxs rounded bg-surface-container px-space-md py-space-xs font-title-code text-title-code text-primary transition-colors hover:bg-surface-container-high"
                 >
-                  ver em {rankingOficial.data.fonte}
+                  {t("previsao.rankingOficial.verEm", { fonte: rankingOficial.data.fonte })}
                   <Icone nome="open_in_new" className="text-[14px]" />
                 </a>
               ) : undefined
@@ -1234,7 +1280,7 @@ export function PrevisaoConfrontoPagina({
             <div className="flex flex-wrap items-center gap-space-sm">
               <label className={LABEL_CAMPO}>
                 <span className="font-label-caps text-label-caps uppercase tracking-widest text-outline">
-                  Região
+                  {t("previsao.rankingOficial.regiao")}
                 </span>
                 <select
                   value={regiaoRanking.slug}
@@ -1254,14 +1300,14 @@ export function PrevisaoConfrontoPagina({
               <table className="w-full border-collapse text-left">
                 <thead>
                   <tr className="bg-surface-container font-label-caps text-label-caps uppercase tracking-wider text-outline">
-                    <th className="px-space-md py-space-sm">#</th>
-                    <th className="px-space-md py-space-sm">Equipe</th>
+                    <th className="px-space-md py-space-sm">{t("previsao.rankingOficial.numero")}</th>
+                    <th className="px-space-md py-space-sm">{t("previsao.rankingOficial.equipe")}</th>
                     <th className="px-space-md py-space-sm text-right">
                       {/* Standings (LoL) publicam V-D; vlr.gg/Valve publicam
                           um rating numérico. */}
                       {regiaoRanking.equipes.some((e) => e.vitorias !== null)
-                        ? "V-D"
-                        : "Rating"}
+                        ? t("previsao.rankingOficial.vd")
+                        : t("previsao.rankingOficial.rating")}
                     </th>
                   </tr>
                 </thead>
@@ -1274,16 +1320,14 @@ export function PrevisaoConfrontoPagina({
             </div>
 
             <p className="font-body-sm text-body-sm text-outline">
-              É esse o ranking que o modelo de previsão usa como referência
-              inicial (prior) para um time com pouco histórico coletado.
+              {t("previsao.rankingOficial.rodape")}
             </p>
           </Painel>
           ) : (
           <p className="rounded-xl bg-surface-container-low/90 px-space-lg py-space-base font-body-md text-body-md text-on-surface-variant shadow-lg">
-            O ranking oficial deste jogo ainda está sendo integrado. Enquanto isso,
-            a aba <strong className="text-on-surface">Previsão</strong> usa a força
-            que o modelo estima internamente — mas ela não vira ranking público
-            até termos dado suficiente e confiável.
+            {t("previsao.rankingOficial.aindaIntegrando.prefixo")}
+            <strong className="text-on-surface">{t("previsao.cabecalho.previsaoDeConfronto")}</strong>
+            {t("previsao.rankingOficial.aindaIntegrando.sufixo")}
           </p>
           )}
 

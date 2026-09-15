@@ -9,6 +9,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 
 import {
   useAgendaPartidas,
@@ -59,12 +60,13 @@ import {
   fmtRelativo,
 } from "@util/formatos";
 
-/** Janelas do seletor de periodo, em dias. `null` = tudo. */
+/** Janelas do seletor de periodo, em dias. `null` = tudo (rotulo `null`
+ * tambem - o texto vem de `painel.periodos.tudo`). */
 const PERIODOS = [
   { valor: 7, rotulo: "7D" },
   { valor: 30, rotulo: "30D" },
   { valor: 90, rotulo: "90D" },
-  { valor: null, rotulo: "Tudo" },
+  { valor: null, rotulo: null },
 ] as const;
 
 /** O lado vencedor escrito, com a cor que o placar usa. */
@@ -138,6 +140,7 @@ export function PartidasPagina({
 }: {
   secao?: "partidas" | "resultados";
 } = {}) {
+  const { t } = useTranslation();
   const navegar = useNavigate();
   const { jogo } = useJogoAtual();
   const emResultados = secao === "resultados";
@@ -230,7 +233,7 @@ export function PartidasPagina({
         <div className="flex flex-col gap-space-xs">
           <div className="flex flex-wrap items-center gap-space-sm">
             <h1 className="font-headline-lg text-headline-lg uppercase tracking-wide text-on-surface">
-              {emResultados ? "Resultados" : "Partidas"}
+              {emResultados ? t("partidas.cabecalho.resultados") : t("partidas.cabecalho.partidas")}
             </h1>
             <div className="inline-flex items-center gap-space-xs rounded bg-surface-container-high px-space-sm py-space-xxs shadow-inner">
               <span className="relative flex h-2.5 w-2.5">
@@ -251,11 +254,11 @@ export function PartidasPagina({
                   online ? "text-tertiary" : "text-error"
                 }`}
               >
-                {online ? "Feed ativo" : "Sem contato"}
+                {online ? t("partidas.cabecalho.feedAtivo") : t("partidas.cabecalho.semContato")}
               </span>
             </div>
             <span className="hidden font-label-caps text-label-caps uppercase tracking-wider text-outline sm:inline">
-              {emResultados ? "Head-to-head // Deck 04" : "Match Analytics // Deck 02"}
+              {emResultados ? t("partidas.cabecalho.deckResultados") : t("partidas.cabecalho.deckPartidas")}
             </span>
           </div>
 
@@ -267,10 +270,10 @@ export function PartidasPagina({
           */}
           <p className="font-body-sm text-body-sm text-on-surface-variant">
             {emResultados
-              ? "Placar da série decidida, do calendário — Liquipedia e OP.GG. O grão é o confronto: um 3x1 é uma linha, não três partidas."
+              ? t("partidas.cabecalho.descricaoResultados")
               : temPartidaDetalhada
-                ? "Star schema de partidas profissionais. Uma partida vira dez linhas de fato — uma por jogador — e as dimensões são compartilhadas entre os jogos."
-                : "Este jogo não tem partida com detalhe por jogador — a fonte publica o resultado do confronto, não o que aconteceu dentro dele. Veja a aba Resultados."}
+                ? t("partidas.cabecalho.descricaoComDetalhe")
+                : t("partidas.cabecalho.descricaoSemDetalhe")}
           </p>
         </div>
 
@@ -279,7 +282,7 @@ export function PartidasPagina({
           <div className="flex items-center rounded bg-surface-container-low p-space-xxs shadow-sm">
             {PERIODOS.map((opcao) => (
               <button
-                key={opcao.rotulo}
+                key={opcao.rotulo ?? "tudo"}
                 type="button"
                 aria-pressed={periodo === opcao.valor}
                 onClick={() => setPeriodo(opcao.valor)}
@@ -289,7 +292,7 @@ export function PartidasPagina({
                     : "text-on-surface-variant hover:text-on-surface"
                 }`}
               >
-                {opcao.rotulo}
+                {opcao.rotulo ?? t("painel.periodos.tudo")}
               </button>
             ))}
           </div>
@@ -299,7 +302,7 @@ export function PartidasPagina({
             aoClicar={() => partidas.refetch()}
             desabilitado={partidas.isFetching}
           >
-            {partidas.isFetching ? "Atualizando…" : "Atualizar telemetria"}
+            {partidas.isFetching ? t("partidas.cabecalho.atualizando") : t("partidas.cabecalho.atualizarTelemetria")}
           </Botao>
         </div>
         )}
@@ -315,14 +318,14 @@ export function PartidasPagina({
           {temPartidaDetalhada && (
           <label className={LABEL_CAMPO}>
             <span className="font-label-caps text-label-caps uppercase tracking-widest text-outline">
-              Torneio
+              {t("partidas.filtros.torneio")}
             </span>
             <select
               value={liga}
               onChange={(evento) => setLiga(evento.target.value)}
               className={CAMPO}
             >
-              <option value="">Todos os torneios</option>
+              <option value="">{t("partidas.filtros.todosOsTorneios")}</option>
               {filtros.data?.ligas.map((nome) => (
                 <option key={nome} value={nome}>
                   {nome}
@@ -335,14 +338,14 @@ export function PartidasPagina({
           {temPartidaDetalhada && (
           <label className={LABEL_CAMPO}>
             <span className="font-label-caps text-label-caps uppercase tracking-widest text-outline">
-              Modo
+              {t("partidas.filtros.modo")}
             </span>
             <select
               value={modo}
               onChange={(evento) => setModo(evento.target.value)}
               className={CAMPO}
             >
-              <option value="">Todos os modos</option>
+              <option value="">{t("partidas.filtros.todosOsModos")}</option>
               {filtros.data?.modos.map((nome) => (
                 <option key={nome} value={nome}>
                   {nome}
@@ -362,8 +365,8 @@ export function PartidasPagina({
               type="search"
               value={busca}
               onChange={(evento) => setBusca(evento.target.value)}
-              placeholder="Buscar por torneio ou ID da partida…"
-              aria-label="Buscar partida"
+              placeholder={t("partidas.filtros.buscarPlaceholder")}
+              aria-label={t("partidas.filtros.buscarAriaLabel")}
               className="w-full rounded bg-surface-container-lowest py-space-sm pl-10 pr-space-sm font-title-code text-title-code text-on-surface shadow-inner placeholder:text-outline focus:bg-surface-container focus:outline-none"
             />
           </div>
@@ -389,17 +392,17 @@ export function PartidasPagina({
       {!emResultados && (
         <Painel
           icone="event_upcoming"
-          titulo="Próximas partidas"
-          descricao="As que ainda vão acontecer — PandaScore (CS, LoL, CoD, OW, R6, RL), vlr.gg (Valorant) e o ticker da Liquipedia. Atualiza sozinha."
+          titulo={t("partidas.proximasPartidas.titulo")}
+          descricao={t("partidas.proximasPartidas.descricao")}
           meta={
             <div className="flex flex-wrap items-center gap-space-sm">
               <SeletorModoConfrontos modo={modoAgenda} aoMudar={setModoAgenda} />
               {agenda.isFetching ? (
                 <span className="font-label-caps text-label-caps uppercase tracking-widest text-primary">
-                  atualizando…
+                  {t("partidas.proximasPartidas.atualizando")}
                 </span>
               ) : (
-                <Selo cor="primario">{agenda.data?.length ?? 0} marcadas</Selo>
+                <Selo cor="primario">{t("partidas.proximasPartidas.marcadas", { contagem: agenda.data?.length ?? 0 })}</Selo>
               )}
             </div>
           }
@@ -407,7 +410,7 @@ export function PartidasPagina({
           <Consulta
             estado={agenda}
             altura={160}
-            vazio="Nenhuma partida marcada para este jogo por enquanto."
+            vazio={t("partidas.proximasPartidas.vazio")}
           >
             {(lista: PartidaAgendada[]) => (
               <VisaoConfrontos confrontos={lista} modo={modoAgenda} />
@@ -420,9 +423,9 @@ export function PartidasPagina({
           existe, mas as próximas partidas acima e a aba Resultados sim. */}
       {!emResultados && !temPartidaDetalhada && (
         <p className="rounded-xl bg-surface-container-low/90 px-space-lg py-space-base font-body-md text-body-md text-on-surface-variant shadow-lg">
-          Este jogo não tem partida com detalhe por jogador (duração, KDA) — a
-          fonte publica só o placar da série. O histórico decidido está na aba{" "}
-          <strong className="text-on-surface">Resultados</strong>.
+          {t("partidas.semDetalhePorJogadorPrefixo")}
+          <strong className="text-on-surface">{t("partidas.cabecalho.resultados")}</strong>
+          {t("partidas.semDetalhePorJogadorSufixo")}
         </p>
       )}
 
@@ -436,12 +439,12 @@ export function PartidasPagina({
           return (
             <section className="grid grid-cols-1 gap-space-base md:grid-cols-2 xl:grid-cols-4">
               <KpiHud
-                etiqueta="Partidas analisadas"
-                canto="STAR SCHEMA"
+                etiqueta={t("partidas.kpis.partidasAnalisadas")}
+                canto={t("partidas.kpis.starSchema")}
                 valor={fmtNumero(dados.partidas)}
                 valorNumerico={dados.partidas}
                 formatarValor={fmtNumero}
-                rotulo="Partidas profissionais"
+                rotulo={t("partidas.kpis.partidasProfissionais")}
                 acento="primaria"
                 notaVariacao={`${fmtDataCurta(dados.primeira_partida)} — ${fmtDataCurta(dados.ultima_partida)}`}
               >
@@ -449,14 +452,14 @@ export function PartidasPagina({
               </KpiHud>
 
               <KpiHud
-                etiqueta="Duração mediana"
-                canto="MEDIANA"
+                etiqueta={t("partidas.kpis.duracaoMediana")}
+                canto={t("partidas.kpis.mediana")}
                 valor={fmtDuracao(dados.duracao_mediana_segundos)}
                 valorNumerico={dados.duracao_mediana_segundos}
                 formatarValor={fmtDuracao}
-                rotulo="Metade das partidas abaixo disso"
+                rotulo={t("partidas.kpis.metadeAbaixo")}
                 acento="secundaria"
-                notaVariacao={`média de ${fmtDuracao(dados.duracao_media_segundos)}`}
+                notaVariacao={t("partidas.kpis.mediaDe", { tempo: fmtDuracao(dados.duracao_media_segundos) })}
               >
                 <div className="mt-space-md">
                   <BarraFina
@@ -477,41 +480,39 @@ export function PartidasPagina({
               </KpiHud>
 
               <KpiHud
-                etiqueta="Radiant vs Dire"
-                canto="EQUILÍBRIO"
+                etiqueta={t("partidas.kpis.radiantVsDire")}
+                canto={t("partidas.kpis.equilibrio")}
                 valor={fmtPercentual(dados.winrate_radiant)}
                 valorNumerico={dados.winrate_radiant}
                 formatarValor={(v) => fmtPercentual(v)}
-                rotulo="Vitórias do lado Radiant"
+                rotulo={t("partidas.kpis.vitoriasRadiant")}
                 acento="terciaria"
               >
                 <div className="mt-space-md">
                   <BarraSegmentada
                     fracaoA={winrateRadiant}
-                    legendaEsquerda={
-                      <>
-                        Radiant {fmtPercentual(dados.winrate_radiant, 1)} · Dire{" "}
-                        {fmtPercentual(100 - (dados.winrate_radiant ?? 50), 1)}
-                      </>
-                    }
+                    legendaEsquerda={t("partidas.kpis.radiantDirePct", {
+                      radiant: fmtPercentual(dados.winrate_radiant, 1),
+                      dire: fmtPercentual(100 - (dados.winrate_radiant ?? 50), 1),
+                    })}
                     legendaDireita={
                       Math.abs((dados.winrate_radiant ?? 50) - 50) < 5
-                        ? "EQUILIBRADO"
-                        : "DESVIO"
+                        ? t("partidas.kpis.equilibrado")
+                        : t("partidas.kpis.desvio")
                     }
                   />
                 </div>
               </KpiHud>
 
               <KpiHud
-                etiqueta="Jogadores monitorados"
-                canto={`${fmtNumero(dados.personagens_usados)} HERÓIS`}
+                etiqueta={t("partidas.kpis.jogadoresMonitorados")}
+                canto={t("partidas.kpis.herois", { contagem: fmtNumero(dados.personagens_usados) })}
                 valor={fmtNumero(dados.jogadores_distintos)}
                 valorNumerico={dados.jogadores_distintos}
                 formatarValor={fmtNumero}
-                rotulo="Jogadores distintos no recorte"
+                rotulo={t("partidas.kpis.jogadoresDistintos")}
                 acento="primaria"
-                notaVariacao="fatos anônimos não contam"
+                notaVariacao={t("partidas.kpis.fatosAnonimos")}
               />
             </section>
           );
@@ -524,8 +525,8 @@ export function PartidasPagina({
       <section className="grid grid-cols-1 gap-space-base xl:grid-cols-2">
         <Painel
           icone="bar_chart"
-          titulo="Distribuição de duração das partidas"
-          descricao="Faixas de 10 minutos. A coluna destacada é a moda."
+          titulo={t("partidas.distribuicao.titulo")}
+          descricao={t("partidas.distribuicao.descricao")}
         >
           <Consulta estado={resumo}>
             {(dados: ResumoPartidas) => (
@@ -534,16 +535,16 @@ export function PartidasPagina({
                   rotulo: faixa.rotulo,
                   valor: faixa.partidas,
                 }))}
-                formatarValor={(valor) => `${fmtNumero(valor)} partidas`}
+                formatarValor={(valor) => t("partidas.distribuicao.partidas", { contagem: fmtNumero(valor) })}
                 rodapeEsquerda={
                   <>
-                    Mediana:{" "}
+                    {t("partidas.distribuicao.mediana")}{" "}
                     <strong className="font-title-code text-title-code text-on-surface">
                       {fmtDuracao(dados.duracao_mediana_segundos)}
                     </strong>
                   </>
                 }
-                rodapeDireita={`${fmtNumero(dados.partidas)} partidas`}
+                rodapeDireita={t("partidas.distribuicao.partidas", { contagem: fmtNumero(dados.partidas) })}
               />
             )}
           </Consulta>
@@ -551,8 +552,8 @@ export function PartidasPagina({
 
         <Painel
           icone="show_chart"
-          titulo="Volume de ingestão de partidas"
-          descricao="Data de disputa da partida, não a da coleta."
+          titulo={t("partidas.ingestao.titulo")}
+          descricao={t("partidas.ingestao.descricao")}
         >
           <Consulta estado={porDia}>
             {(dados: PartidasPorDia[]) => (
@@ -560,18 +561,20 @@ export function PartidasPagina({
                 pontos={dados.map((ponto) => ({
                   rotulo: fmtDataCurta(ponto.data),
                   valor: ponto.partidas,
-                  detalhe: `${fmtNumero(ponto.partidas)} partidas`,
+                  detalhe: t("partidas.distribuicao.partidas", { contagem: fmtNumero(ponto.partidas) }),
                 }))}
                 formatarValor={(valor) => fmtCurto(valor)}
                 rodapeEsquerda={
                   <>
-                    Pico diário:{" "}
+                    {t("partidas.ingestao.picoDiario")}{" "}
                     <strong className="font-title-code text-title-code text-on-surface">
-                      {fmtNumero(Math.max(...dados.map((p) => p.partidas), 0))} partidas
+                      {t("partidas.ingestao.picoPartidas", {
+                        contagem: fmtNumero(Math.max(...dados.map((p) => p.partidas), 0)),
+                      })}
                     </strong>
                   </>
                 }
-                rodapeDireita={`${dados.length} dias com coleta`}
+                rodapeDireita={t("partidas.ingestao.diasComColeta", { contagem: dados.length })}
               />
             )}
           </Consulta>
@@ -583,13 +586,15 @@ export function PartidasPagina({
       {emResultados && (
       <Painel
         icone="scoreboard"
-        titulo="Confrontos com resultado"
-        descricao="Placar da série, do calendário — Liquipedia e OP.GG. Um 3x1 é um confronto, não três partidas."
+        titulo={t("partidas.confrontosDecididos.titulo")}
+        descricao={t("partidas.confrontosDecididos.descricao")}
         meta={
           <div className="flex flex-wrap items-center gap-space-sm">
             <SeletorModoConfrontos modo={modoConfrontos} aoMudar={setModoConfrontos} />
             <Selo>
-              {Math.min(confrontos.data?.length ?? 0, porPaginaConfrontos)} em tela
+              {t("partidas.confrontosDecididos.emTela", {
+                contagem: Math.min(confrontos.data?.length ?? 0, porPaginaConfrontos),
+              })}
             </Selo>
           </div>
         }
@@ -597,7 +602,7 @@ export function PartidasPagina({
         <Consulta
           estado={confrontos}
           altura={200}
-          vazio="Nenhum confronto decidido no calendário deste jogo."
+          vazio={t("partidas.confrontosDecididos.vazio")}
         >
           {(lista) => {
             const naPagina = lista.slice(0, porPaginaConfrontos);
@@ -614,7 +619,7 @@ export function PartidasPagina({
                   opcoesPorPagina={[5, 15, 25, 50]}
                   aoMudarPagina={setPaginaConfrontos}
                   aoMudarPorPagina={setPorPaginaConfrontos}
-                  resumo={<>{naPagina.length} confrontos nesta página</>}
+                  resumo={t("partidas.confrontosDecididos.confrontosNestaPagina", { contagem: naPagina.length })}
                 />
               </>
             );
@@ -628,24 +633,24 @@ export function PartidasPagina({
       {!emResultados && temPartidaDetalhada && (
       <Painel
         icone="history"
-        titulo="Histórico operacional de partidas"
+        titulo={t("partidas.historico.titulo")}
         descricao={
           modoHistorico === "lista"
-            ? "Clique em uma linha para ver o placar completo."
-            : "Cada partida é um jogo (BO1). Clique para ver o placar completo."
+            ? t("partidas.historico.descricaoLista")
+            : t("partidas.historico.descricaoCartao")
         }
         meta={
           <div className="flex flex-wrap items-center gap-space-sm">
             <SeletorModoConfrontos modo={modoHistorico} aoMudar={setModoHistorico} />
-            <Selo cor="primario">{visiveis.length} em tela</Selo>
+            <Selo cor="primario">{t("partidas.historico.emTela", { contagem: visiveis.length })}</Selo>
           </div>
         }
       >
-        <Consulta estado={partidas} vazio="Nenhuma partida bate com esse filtro.">
+        <Consulta estado={partidas} vazio={t("partidas.historico.vazio")}>
           {() =>
             visiveis.length === 0 ? (
               <p className="rounded bg-surface-container px-space-base py-space-md font-body-md text-body-md text-on-surface-variant">
-                Nenhuma partida desta página bate com o modo ou a busca.
+                {t("partidas.historico.nenhumaNaPagina")}
               </p>
             ) : modoHistorico !== "lista" ? (
               <VisaoConfrontos
@@ -661,14 +666,14 @@ export function PartidasPagina({
                 <table className="w-full border-collapse text-left">
                   <thead>
                     <tr className="bg-surface-container font-label-caps text-label-caps uppercase tracking-wider text-outline">
-                      <th className="px-space-md py-space-sm">Match ID</th>
-                      <th className="px-space-md py-space-sm">Times</th>
-                      <th className="px-space-md py-space-sm">Liga / Torneio</th>
-                      <th className="px-space-md py-space-sm">Modo</th>
-                      <th className="px-space-md py-space-sm">Duração</th>
-                      <th className="px-space-md py-space-sm">Vencedor</th>
-                      <th className="px-space-md py-space-sm">Patch</th>
-                      <th className="px-space-md py-space-sm text-right">Disputada</th>
+                      <th className="px-space-md py-space-sm">{t("partidas.historico.colunas.matchId")}</th>
+                      <th className="px-space-md py-space-sm">{t("partidas.historico.colunas.times")}</th>
+                      <th className="px-space-md py-space-sm">{t("partidas.historico.colunas.liga")}</th>
+                      <th className="px-space-md py-space-sm">{t("partidas.historico.colunas.modo")}</th>
+                      <th className="px-space-md py-space-sm">{t("partidas.historico.colunas.duracao")}</th>
+                      <th className="px-space-md py-space-sm">{t("partidas.historico.colunas.vencedor")}</th>
+                      <th className="px-space-md py-space-sm">{t("partidas.historico.colunas.patch")}</th>
+                      <th className="px-space-md py-space-sm text-right">{t("partidas.historico.colunas.disputada")}</th>
                     </tr>
                   </thead>
 
@@ -744,24 +749,24 @@ export function PartidasPagina({
           aoMudarPorPagina={setPorPagina}
           resumo={
             <>
-              Exibindo {visiveis.length} de {daPagina.length} nesta página
-              {modo || busca ? " (recorte local)" : ""}
+              {t("partidas.historico.exibindo", { visiveis: visiveis.length, total: daPagina.length })}
+              {modo || busca ? t("partidas.historico.recorteLocal") : ""}
             </>
           }
         />
 
         <div className="flex flex-wrap items-center justify-between gap-space-sm border-t border-outline-variant/30 pt-space-sm font-label-caps text-label-caps uppercase tracking-widest text-outline">
           <span>
-            Pipeline:{" "}
+            {t("partidas.historico.pipeline")}{" "}
             <span className={online ? "text-tertiary" : "text-error"}>
-              {online ? "ativo" : "sem contato"}
+              {online ? t("partidas.historico.ativo") : t("partidas.historico.semContato")}
             </span>
           </span>
           <span
             style={{ color: PALETA_POLOS.neutro }}
             className="font-title-code text-title-code"
           >
-            OpenDota ingest · {fmtNumero(resumo.data?.partidas)} partidas
+            {t("partidas.historico.ingest", { contagem: fmtNumero(resumo.data?.partidas) })}
           </span>
         </div>
       </Painel>

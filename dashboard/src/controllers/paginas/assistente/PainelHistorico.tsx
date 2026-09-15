@@ -6,12 +6,13 @@
  */
 
 import { useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 import { Icone } from "@views/componentes/base";
 import { agruparPorDia, type EntradaHistorico } from "./historico";
 
-function hora(iso: string): string {
-  return new Date(iso).toLocaleTimeString("pt-BR", {
+function hora(iso: string, idioma: string): string {
+  return new Date(iso).toLocaleTimeString(idioma, {
     hour: "2-digit",
     minute: "2-digit",
   });
@@ -30,6 +31,7 @@ export function PainelHistorico({
   aoEscolher: (pergunta: string) => void;
   aoLimpar: () => void;
 }) {
+  const { t, i18n } = useTranslation();
   const [busca, setBusca] = useState("");
 
   // O filtro e local e a lista tem teto de 50 - nao precisa de debounce nem
@@ -39,14 +41,14 @@ export function PainelHistorico({
     const filtradas = termo
       ? entradas.filter((e) => e.pergunta.toLowerCase().includes(termo))
       : entradas;
-    return agruparPorDia(filtradas);
-  }, [entradas, busca]);
+    return agruparPorDia(filtradas, t, i18n.language);
+  }, [entradas, busca, t, i18n.language]);
 
   return (
     <div className="flex h-full flex-col gap-space-sm rounded-xl bg-surface-container-low/90 p-space-base shadow-2xl">
       <div className="flex items-center justify-between gap-space-xs">
         <h2 className="font-label-caps text-label-caps uppercase tracking-widest text-outline">
-          Histórico
+          {t("assistente.historico.titulo")}
         </h2>
         <span className="font-badge-status text-badge-status uppercase text-outline/70">
           {entradas.length ? `${entradas.length}` : ""}
@@ -60,8 +62,8 @@ export function PainelHistorico({
             type="search"
             value={busca}
             onChange={(evento) => setBusca(evento.target.value)}
-            placeholder="Buscar"
-            aria-label="Buscar no histórico"
+            placeholder={t("assistente.historico.buscarPlaceholder")}
+            aria-label={t("assistente.historico.buscarAria")}
             className="w-full bg-transparent py-space-xxs font-body-sm text-body-sm text-on-surface outline-none placeholder:text-outline"
           />
         </div>
@@ -77,8 +79,8 @@ export function PainelHistorico({
         ) : grupos.length === 0 ? (
           <p className="py-space-base font-body-sm text-body-sm text-outline">
             {busca
-              ? "Nenhuma pergunta com esse termo."
-              : "Suas perguntas aparecem aqui, ligadas à sua conta — só a pergunta em si, não a conversa inteira."}
+              ? t("assistente.historico.vazioBusca")
+              : t("assistente.historico.vazioGeral")}
           </p>
         ) : (
           grupos.map((grupo) => (
@@ -116,7 +118,7 @@ export function PainelHistorico({
                           {entrada.pergunta}
                         </span>
                         <span className="shrink-0 font-badge-status text-badge-status tabular-nums text-outline">
-                          {hora(entrada.em)}
+                          {hora(entrada.em, i18n.language)}
                         </span>
                       </button>
                     </li>
@@ -135,7 +137,7 @@ export function PainelHistorico({
           className="flex items-center justify-center gap-space-xs rounded border border-outline-variant/30 py-space-xs font-title-code text-title-code text-outline transition-colors hover:border-error/40 hover:text-error"
         >
           <Icone nome="delete" className="text-[16px]" />
-          Limpar histórico
+          {t("assistente.historico.limpar")}
         </button>
       )}
     </div>

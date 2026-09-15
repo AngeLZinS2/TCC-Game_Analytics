@@ -10,6 +10,7 @@
 
 import { useMemo } from "react";
 import { Link, useParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 
 import {
   useBuscarResumoSteamXbox,
@@ -52,12 +53,13 @@ function corDaNota(nota: number): string {
  * quem jogou a versão Steam, não a Xbox.
  */
 function ResumoPorIAXbox({ productId }: { productId: string }) {
+  const { t } = useTranslation();
   const resumo = useResumoSteamXbox(productId);
   const buscar = useBuscarResumoSteamXbox();
 
   if (resumo.isLoading) {
     return (
-      <Painel icone="auto_awesome" titulo="Resumo por IA">
+      <Painel icone="auto_awesome" titulo={t("jogoXbox.resumoIA.titulo")}>
         <div className="h-16 animate-pulse rounded-lg bg-surface-container-high/60" />
       </Painel>
     );
@@ -69,13 +71,10 @@ function ResumoPorIAXbox({ productId }: { productId: string }) {
     return (
       <Painel
         icone="auto_awesome"
-        titulo="Resumo por IA"
-        descricao="A Xbox Store não publica texto de avaliação — só a nota agregada, já mostrada acima."
+        titulo={t("jogoXbox.resumoIA.titulo")}
+        descricao={t("jogoXbox.resumoIA.descricaoSemDado")}
       >
-        <Aviso>
-          Ainda sem cruzamento pronto com o catálogo Steam. Se este jogo
-          também existir lá, dá pra buscar agora.
-        </Aviso>
+        <Aviso>{t("jogoXbox.resumoIA.aviso")}</Aviso>
 
         {buscar.isError && <MensagemErro erro={buscar.error} />}
 
@@ -89,7 +88,7 @@ function ResumoPorIAXbox({ productId }: { productId: string }) {
             nome={buscar.isPending ? "progress_activity" : "travel_explore"}
             className={`text-[16px] ${buscar.isPending ? "animate-spin" : ""}`}
           />
-          {buscar.isPending ? "Buscando na Steam…" : "Buscar avaliações na Steam"}
+          {buscar.isPending ? t("jogoXbox.resumoIA.buscando") : t("jogoXbox.resumoIA.buscarAvaliacoes")}
         </button>
       </Painel>
     );
@@ -100,17 +99,19 @@ function ResumoPorIAXbox({ productId }: { productId: string }) {
   return (
     <Painel
       icone="auto_awesome"
-      titulo="Resumo por IA"
-      descricao="A Xbox Store não publica texto de avaliação — este resumo é da comunidade da versão Steam do mesmo jogo."
+      titulo={t("jogoXbox.resumoIA.titulo")}
+      descricao={t("jogoXbox.resumoIA.descricaoComDado")}
       meta={
         <div className="flex flex-wrap items-center gap-space-xs">
-          <Selo cor="neutro">via Steam · {steamNome}</Selo>
+          <Selo cor="neutro">{t("jogoXbox.resumoIA.viaSteam", { nome: steamNome })}</Selo>
           <span
             className="font-label-caps text-label-caps uppercase tracking-widest text-outline"
             title={r.modelo}
           >
-            gerado {fmtRelativo(r.gerado_em)} · {fmtNumero(r.avaliacoes_usadas)} avaliações
-            na amostra
+            {t("jogoXbox.resumoIA.gerado", {
+              tempo: fmtRelativo(r.gerado_em),
+              contagem: fmtNumero(r.avaliacoes_usadas),
+            })}
           </span>
         </div>
       }
@@ -125,7 +126,7 @@ function ResumoPorIAXbox({ productId }: { productId: string }) {
                 className="flex items-center gap-space-xxs font-badge-status text-badge-status uppercase tracking-wide"
                 style={{ color: PALETA_POLOS.positivo }}
               >
-                <Icone nome="thumb_up" className="text-[13px]" />O que agradou
+                <Icone nome="thumb_up" className="text-[13px]" />{t("jogoXbox.resumoIA.oQueAgradou")}
               </div>
               <ul className="mt-space-sm flex flex-col gap-space-xs">
                 {r.positivos.map((ponto, i) => (
@@ -146,7 +147,7 @@ function ResumoPorIAXbox({ productId }: { productId: string }) {
                 className="flex items-center gap-space-xxs font-badge-status text-badge-status uppercase tracking-wide"
                 style={{ color: PALETA_POLOS.negativo }}
               >
-                <Icone nome="thumb_down" className="text-[13px]" />O que incomodou
+                <Icone nome="thumb_down" className="text-[13px]" />{t("jogoXbox.resumoIA.oQueIncomodou")}
               </div>
               <ul className="mt-space-sm flex flex-col gap-space-xs">
                 {r.negativos.map((ponto, i) => (
@@ -167,6 +168,7 @@ function ResumoPorIAXbox({ productId }: { productId: string }) {
 }
 
 export function JogoXboxPagina() {
+  const { t } = useTranslation();
   const { productId } = useParams();
   const detalhe = useJogoXbox(productId);
   const favoritosJogos = useFavoritosJogos();
@@ -230,7 +232,7 @@ export function JogoXboxPagina() {
                 className="relative z-10 inline-flex items-center gap-space-xxs font-title-code text-title-code text-outline transition-colors hover:text-primary"
               >
                 <Icone nome="arrow_back" className="text-[16px]" />
-                Voltar para o catálogo
+                {t("jogoSteam.voltar")}
               </Link>
 
               {/* Identidade à esquerda, galeria à direita — igual à ficha da
@@ -252,7 +254,7 @@ export function JogoXboxPagina() {
                     <BotaoFavoritar
                       favoritado={Boolean(favoritado)}
                       ocupado={favoritar.isPending || desfavoritar.isPending}
-                      rotulo="Favoritar jogo"
+                      rotulo={t("jogoSteam.favoritarJogo")}
                       aoAlternar={() =>
                         favoritado
                           ? desfavoritar.mutate({ fonte: "xbox", jogo_id: jogo.product_id })
@@ -262,18 +264,18 @@ export function JogoXboxPagina() {
                   </div>
 
                   <p className="mt-space-xs font-title-code text-title-code uppercase text-outline">
-                    DEV:{" "}
+                    {t("jogoSteam.dev")}{" "}
                     <span className="text-on-surface-variant">
                       {jogo.desenvolvedora ?? "—"}
                     </span>{" "}
-                    · PUB:{" "}
+                    · {t("jogoSteam.pub")}{" "}
                     <span className="text-on-surface-variant">
                       {jogo.publicadora ?? "—"}
                     </span>
                     {jogo.data_lancamento && (
                       <>
                         {" "}
-                        · LANÇAMENTO:{" "}
+                        · {t("jogoSteam.lancamento")}{" "}
                         <span className="text-on-surface-variant">
                           {fmtData(jogo.data_lancamento)}
                         </span>
@@ -285,12 +287,12 @@ export function JogoXboxPagina() {
                     {jogo.no_game_pass && (
                       <span className="inline-flex items-center gap-space-xxs rounded bg-tertiary/10 px-space-xs py-space-xxs font-badge-status text-badge-status uppercase text-tertiary">
                         <Icone nome="check" className="text-[13px]" />
-                        Game Pass
+                        {t("jogoXbox.gamePass")}
                       </span>
                     )}
                     {jogo.gratuito && (
                       <span className="rounded bg-tertiary/10 px-space-xs py-space-xxs font-badge-status text-badge-status uppercase text-tertiary">
-                        Gratuito
+                        {t("jogoSteam.gratuito")}
                       </span>
                     )}
                     {nota !== null && (
@@ -302,7 +304,7 @@ export function JogoXboxPagina() {
                         {fmtDecimal(nota, 1)}
                         {jogo.numero_avaliacoes ? (
                           <span className="text-outline">
-                            · {fmtNumero(jogo.numero_avaliacoes)} avaliações
+                            · {t("jogoXbox.avaliacoes", { contagem: fmtNumero(jogo.numero_avaliacoes) })}
                           </span>
                         ) : null}
                       </span>
@@ -331,44 +333,44 @@ export function JogoXboxPagina() {
             {/* ==================== KPIS ==================== */}
             <section className="grid grid-cols-1 gap-space-base md:grid-cols-3">
               <KpiHud
-                etiqueta="Preço atual"
+                etiqueta={t("jogoSteam.kpis.precoAtual")}
                 canto={jogo.moeda ?? "BRL"}
                 valor={fmtMoeda(jogo.preco_no_momento, jogo.moeda)}
                 valorNumerico={paraNumero(jogo.preco_no_momento)}
                 formatarValor={(v) => fmtMoeda(v, jogo.moeda)}
                 rotulo={
                   jogo.desconto_percentual
-                    ? `${jogo.desconto_percentual}% de desconto`
-                    : "sem desconto"
+                    ? t("jogoSteam.kpis.descontoPercentual", { percentual: jogo.desconto_percentual })
+                    : t("jogoSteam.kpis.semDesconto")
                 }
                 acento="primaria"
               />
 
               <KpiHud
-                etiqueta="Menor preço na série"
-                canto="COLETADO"
+                etiqueta={t("jogoXbox.kpis.menorPrecoNaSerie")}
+                canto={t("jogoXbox.kpis.coletado")}
                 valor={menorPreco === null ? "—" : fmtMoeda(menorPreco, "BRL")}
                 valorNumerico={menorPreco}
                 formatarValor={(v) => fmtMoeda(v, "BRL")}
-                rotulo={`${fmtNumero(serie.length)} coletas na série`}
+                rotulo={t("jogoXbox.kpis.coletasNaSerie", { contagem: fmtNumero(serie.length) })}
                 acento="secundaria"
               />
 
               <KpiHud
-                etiqueta="Nota da loja"
-                canto="MICROSOFT STORE"
+                etiqueta={t("jogoXbox.kpis.notaDaLoja")}
+                canto={t("jogoXbox.kpis.microsoftStore")}
                 valor={nota === null ? "—" : `★ ${fmtDecimal(nota, 1)}`}
                 valorNumerico={nota}
                 formatarValor={(v) => `★ ${fmtDecimal(v, 1)}`}
                 rotulo={
                   nota === null
-                    ? "sem avaliações na loja"
+                    ? t("jogoXbox.kpis.semAvaliacoesNaLoja")
                     : notaRecente !== null
-                      ? `${fmtNumero(jogo.numero_avaliacoes)} avaliações · ★ ${fmtDecimal(
-                          notaRecente,
-                          1,
-                        )} nos últimos 7 dias`
-                      : `${fmtNumero(jogo.numero_avaliacoes)} avaliações`
+                      ? t("jogoXbox.kpis.avaliacoesUltimos7Dias", {
+                          contagem: fmtNumero(jogo.numero_avaliacoes),
+                          nota: fmtDecimal(notaRecente, 1),
+                        })
+                      : t("jogoXbox.kpis.avaliacoesTotal", { contagem: fmtNumero(jogo.numero_avaliacoes) })
                 }
                 acento="terciaria"
               />
@@ -376,7 +378,7 @@ export function JogoXboxPagina() {
 
             {/* ==================== SOBRE ==================== */}
             {jogo.descricao && (
-              <Painel icone="description" titulo="Sobre">
+              <Painel icone="description" titulo={t("jogoXbox.sobre")}>
                 <p className="whitespace-pre-line font-body-md text-body-md leading-relaxed text-on-surface-variant">
                   {jogo.descricao}
                 </p>
@@ -387,7 +389,7 @@ export function JogoXboxPagina() {
 
             {/* ==================== RECURSOS E CLASSIFICAÇÃO ==================== */}
             {(temFicha || temClassificacao) && (
-              <Painel icone="tune" titulo="Recursos e classificação">
+              <Painel icone="tune" titulo={t("jogoXbox.recursosClassificacao.titulo")}>
                 {temFicha && (
                   <div className="flex flex-wrap gap-space-xs">
                     {jogo.recursos.map((recurso) => (
@@ -410,7 +412,9 @@ export function JogoXboxPagina() {
                           nome={jogo.tem_conquistas ? "trophy" : "block"}
                           className="text-[13px]"
                         />
-                        {jogo.tem_conquistas ? "Tem conquistas" : "Sem conquistas"}
+                        {jogo.tem_conquistas
+                          ? t("jogoXbox.recursosClassificacao.temConquistas")
+                          : t("jogoXbox.recursosClassificacao.semConquistas")}
                       </span>
                     )}
                   </div>
@@ -439,20 +443,20 @@ export function JogoXboxPagina() {
             {/* ==================== SÉRIE DE PREÇO ==================== */}
             <Painel
               icone="payments"
-              titulo="Histórico de preço"
-              descricao="Um ponto por coleta (padrão: a cada 6 horas), no mercado BR."
+              titulo={t("jogoXbox.precoHistorico.titulo")}
+              descricao={t("jogoXbox.precoHistorico.descricao")}
             >
               {precosSerie.length < 2 ? (
                 <p className="rounded bg-surface-container px-space-base py-space-md font-body-md text-body-md text-on-surface-variant">
                   {precosSerie.length === 0
-                    ? "Sem preço de balcão coletado — este jogo pode ser vendido só via Game Pass no Brasil."
-                    : "Só existe uma coleta até agora — a série ganha forma quando o coletor rodar de novo."}
+                    ? t("jogoXbox.precoHistorico.semColeta")
+                    : t("jogoXbox.precoHistorico.umaColeta")}
                 </p>
               ) : (
                 <AreaNeon
                   pontos={precosSerie}
                   formatarValor={(valor) => fmtMoeda(valor, "BRL")}
-                  rodapeDireita="Xbox Store · mercado BR"
+                  rodapeDireita={t("jogoXbox.precoHistorico.rodape")}
                 />
               )}
             </Painel>
@@ -461,8 +465,8 @@ export function JogoXboxPagina() {
             {notasSerie.length >= 2 && (
               <Painel
                 icone="star"
-                titulo="Nota ao longo do tempo"
-                descricao="Estrela agregada da Microsoft Store a cada coleta."
+                titulo={t("jogoXbox.notaAoLongoDoTempo.titulo")}
+                descricao={t("jogoXbox.notaAoLongoDoTempo.descricao")}
               >
                 <AreaNeon
                   pontos={notasSerie}
@@ -475,8 +479,8 @@ export function JogoXboxPagina() {
             {/* ==================== ONDE COMPRAR ==================== */}
             <Painel
               icone="sell"
-              titulo="Onde comprar"
-              descricao="A vitrine puxa da loja pública da Microsoft — a compra acontece lá."
+              titulo={t("jogoXbox.ondeComprar.titulo")}
+              descricao={t("jogoXbox.ondeComprar.descricao")}
             >
               {jogo.url_loja ? (
                 <a
@@ -486,11 +490,11 @@ export function JogoXboxPagina() {
                   className="inline-flex min-h-[40px] items-center gap-space-xs rounded bg-primary-container px-space-md py-space-xs font-title-code text-title-code text-on-primary shadow-sm transition-[filter] hover:brightness-110"
                 >
                   <Icone nome="open_in_new" className="text-[18px]" />
-                  Abrir na Microsoft Store
+                  {t("jogoXbox.ondeComprar.abrirNaMicrosoftStore")}
                 </a>
               ) : (
                 <p className="rounded bg-surface-container px-space-base py-space-md font-body-md text-body-md text-on-surface-variant">
-                  Sem link da loja para este jogo.
+                  {t("jogoXbox.ondeComprar.semLink")}
                 </p>
               )}
             </Painel>

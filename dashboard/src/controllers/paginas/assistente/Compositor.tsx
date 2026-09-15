@@ -8,48 +8,39 @@
  */
 
 import { useEffect, useRef, type KeyboardEvent } from "react";
+import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 
 import { Icone } from "@views/componentes/base";
 import { Pilula } from "@views/componentes/hud";
 
-/** Perguntas que exercitam blocos de contexto diferentes. */
-export const SUGESTOES: { rotulo: string; pergunta: string; icone: string }[] = [
-  {
-    rotulo: "Melhor winrate",
-    pergunta: "Qual herói tem o melhor winrate e em quantas partidas?",
-    icone: "swords",
-  },
-  {
-    rotulo: "Jogos em alta",
-    pergunta: "Qual jogo tem mais jogadores simultâneos e quantos?",
-    icone: "trending_up",
-  },
-  {
-    rotulo: "Recomendação",
-    pergunta: "Que jogo de ação você recomenda?",
-    icone: "stadia_controller",
-  },
-  {
-    rotulo: "Precisão das previsões",
-    pergunta: "Qual é a acurácia do modelo de previsão de confronto?",
-    icone: "target",
-  },
-  {
-    rotulo: "Menor preço",
-    pergunta: "Onde encontro o Helldivers 2 pelo menor preço?",
-    icone: "sell",
-  },
-  {
-    rotulo: "Quantos jogos?",
-    pergunta: "Quantos jogos da Steam estão sendo monitorados?",
-    icone: "inventory_2",
-  },
-  {
-    rotulo: "Pior recepção",
-    pergunta: "Qual jogo tem a pior recepção nas avaliações?",
-    icone: "thumb_down",
-  },
-];
+/** Chaves das perguntas que exercitam blocos de contexto diferentes. */
+const CHAVES_SUGESTOES = [
+  "winrate",
+  "emAlta",
+  "recomendacao",
+  "precisao",
+  "menorPreco",
+  "quantosJogos",
+  "piorRecepcao",
+] as const;
+
+export function sugestoesDe(t: TFunction): { rotulo: string; pergunta: string; icone: string }[] {
+  const icones: Record<(typeof CHAVES_SUGESTOES)[number], string> = {
+    winrate: "swords",
+    emAlta: "trending_up",
+    recomendacao: "stadia_controller",
+    precisao: "target",
+    menorPreco: "sell",
+    quantosJogos: "inventory_2",
+    piorRecepcao: "thumb_down",
+  };
+  return CHAVES_SUGESTOES.map((chave) => ({
+    rotulo: t(`assistente.sugestoes.${chave}.rotulo`),
+    pergunta: t(`assistente.sugestoes.${chave}.pergunta`),
+    icone: icones[chave],
+  }));
+}
 
 /** Abaixo disso a pergunta nao tem o que casar com nenhum bloco de contexto. */
 const MINIMO_CARACTERES = 3;
@@ -71,8 +62,10 @@ export function Compositor({
   /** Texto pronto tipo "há 4 minutos", ou `null` enquanto nao se sabe. */
   atualizadoEm: string | null;
 }) {
+  const { t } = useTranslation();
   const campo = useRef<HTMLTextAreaElement>(null);
   const podeEnviar = valor.trim().length >= MINIMO_CARACTERES && !ocupado;
+  const sugestoes = sugestoesDe(t);
 
   // Auto-resize: a textarea cresce com o texto ate um teto e depois rola.
   // Zerar a altura antes de ler `scrollHeight` e obrigatorio - sem isso ela
@@ -95,7 +88,7 @@ export function Compositor({
     <div className="flex flex-col gap-space-base">
       <div className="rounded-xl bg-surface-container-low/90 p-space-base shadow-2xl ring-1 ring-outline-variant/25 transition-colors focus-within:ring-primary/50">
         <label htmlFor="pergunta-assistente" className="sr-only">
-          O que você quer descobrir?
+          {t("assistente.compositor.campoLabel")}
         </label>
         <textarea
           id="pergunta-assistente"
@@ -105,7 +98,7 @@ export function Compositor({
           onChange={(evento) => aoMudar(evento.target.value)}
           onKeyDown={aoTeclar}
           disabled={ocupado}
-          placeholder="Ex.: qual herói tem o melhor winrate?"
+          placeholder={t("assistente.compositor.placeholder")}
           className="rolagem-discreta w-full resize-none bg-transparent font-body-lg text-body-lg text-on-surface outline-none placeholder:text-outline disabled:text-outline"
         />
 
@@ -116,12 +109,12 @@ export function Compositor({
                 className="h-1.5 w-1.5 rounded-full bg-tertiary shadow-[0_0_6px_rgba(22,239,122,0.8)]"
                 aria-hidden
               />
-              Dados disponíveis
+              {t("assistente.compositor.dadosDisponiveis")}
             </span>
             {fontesDisponiveis !== null && (
               <span className="flex items-center gap-space-xxs">
                 <Icone nome="database" className="text-[14px]" />
-                {fontesDisponiveis} fontes
+                {t("assistente.compositor.fontes", { n: fontesDisponiveis })}
               </span>
             )}
             {atualizadoEm && (
@@ -144,17 +137,17 @@ export function Compositor({
             ].join(" ")}
           >
             <Icone nome={ocupado ? "hourglass_top" : "send"} className="text-[16px]" />
-            {ocupado ? "Analisando…" : "Analisar"}
+            {ocupado ? t("assistente.compositor.analisando") : t("assistente.compositor.analisar")}
           </button>
         </div>
       </div>
 
       <div className="flex flex-col gap-space-xs">
         <span className="font-label-caps text-label-caps uppercase tracking-widest text-outline">
-          Sugestões
+          {t("assistente.compositor.sugestoesTitulo")}
         </span>
         <div className="flex flex-wrap gap-space-xs">
-          {SUGESTOES.map((sugestao) => (
+          {sugestoes.map((sugestao) => (
             <Pilula
               key={sugestao.rotulo}
               icone={sugestao.icone}

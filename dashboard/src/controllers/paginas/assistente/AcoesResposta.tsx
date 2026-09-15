@@ -12,18 +12,23 @@
  */
 
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 
 import type { RespostaAssistente } from "@models/api/tipos";
 import { Icone } from "@views/componentes/base";
 
 /** A resposta inteira em Markdown - com o contexto junto, que e o ponto. */
-function paraMarkdown(resposta: RespostaAssistente): string {
+function paraMarkdown(resposta: RespostaAssistente, t: TFunction): string {
   const blocos = resposta.blocos
     .map(
       (bloco) =>
-        `### ${bloco.titulo}\n_fonte: ${
-          bloco.fonte === "steam" ? "loja da Steam, consultada na hora" : "nosso banco"
-        }_\n\n\`\`\`\n${bloco.conteudo}\n\`\`\``,
+        `### ${bloco.titulo}\n${t("assistente.acoes.markdownFonteLinha", {
+          fonte:
+            bloco.fonte === "steam"
+              ? t("assistente.acoes.markdownFonteSteam")
+              : t("assistente.acoes.markdownFonteBanco"),
+        })}\n\n\`\`\`\n${bloco.conteudo}\n\`\`\``,
     )
     .join("\n\n");
 
@@ -32,9 +37,9 @@ function paraMarkdown(resposta: RespostaAssistente): string {
     "",
     resposta.resposta,
     "",
-    `> Gerado por ${resposta.modelo} a partir do contexto abaixo.`,
+    t("assistente.acoes.markdownGeradoPor", { modelo: resposta.modelo }),
     "",
-    "## Contexto usado",
+    t("assistente.acoes.markdownContextoUsado"),
     "",
     blocos,
     "",
@@ -52,6 +57,7 @@ export function AcoesResposta({
   aoAvaliar: (util: boolean | null) => void;
   aoVerDados: () => void;
 }) {
+  const { t } = useTranslation();
   const [copiado, setCopiado] = useState(false);
 
   async function copiar() {
@@ -66,7 +72,7 @@ export function AcoesResposta({
   }
 
   function exportar() {
-    const blob = new Blob([paraMarkdown(resposta)], {
+    const blob = new Blob([paraMarkdown(resposta, t)], {
       type: "text/markdown;charset=utf-8",
     });
     const url = URL.createObjectURL(blob);
@@ -81,7 +87,7 @@ export function AcoesResposta({
     <div className="flex flex-wrap items-center justify-between gap-space-base border-t border-outline-variant/20 pt-space-base">
       <div className="flex items-center gap-space-xs">
         <span className="font-body-sm text-body-sm text-outline">
-          Essa resposta foi útil?
+          {t("assistente.acoes.util")}
         </span>
         {[true, false].map((valor) => {
           const ativo = util === valor;
@@ -92,9 +98,9 @@ export function AcoesResposta({
               // Clicar de novo desmarca: quem errou o polegar tem como voltar.
               onClick={() => aoAvaliar(ativo ? null : valor)}
               aria-pressed={ativo}
-              aria-label={valor ? "Resposta útil" : "Resposta não útil"}
+              aria-label={valor ? t("assistente.acoes.ariaUtil") : t("assistente.acoes.ariaNaoUtil")}
               title={
-                valor ? "Marcar como útil" : "Marcar como não útil"
+                valor ? t("assistente.acoes.marcarUtil") : t("assistente.acoes.marcarNaoUtil")
               }
               className={[
                 "rounded p-space-xs transition-colors",
@@ -112,9 +118,13 @@ export function AcoesResposta({
       </div>
 
       <div className="flex flex-wrap items-center gap-space-xs">
-        <Acao icone={copiado ? "check" : "content_copy"} rotulo={copiado ? "Copiado" : "Copiar"} aoClicar={copiar} />
-        <Acao icone="download" rotulo="Exportar" aoClicar={exportar} />
-        <Acao icone="table_rows" rotulo="Ver dados" aoClicar={aoVerDados} />
+        <Acao
+          icone={copiado ? "check" : "content_copy"}
+          rotulo={copiado ? t("assistente.acoes.copiado") : t("assistente.acoes.copiar")}
+          aoClicar={copiar}
+        />
+        <Acao icone="download" rotulo={t("assistente.acoes.exportar")} aoClicar={exportar} />
+        <Acao icone="table_rows" rotulo={t("assistente.acoes.verDados")} aoClicar={aoVerDados} />
       </div>
     </div>
   );

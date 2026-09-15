@@ -8,7 +8,9 @@
  */
 
 import { useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 
+import pt from "@i18n/locales/pt";
 import {
   useMaisJogadosSteam,
   usePartidasPorDia,
@@ -31,20 +33,22 @@ import {
   fmtRelativo,
 } from "@util/formatos";
 
-/** Janelas do seletor de periodo, em dias. `null` = tudo que foi coletado. */
+/** Janelas do seletor de periodo, em dias. `null` = tudo que foi coletado.
+ * `chave` e a chave de traducao em `painel.periodos.<chave>`. */
 const PERIODOS = [
-  { valor: 1, rotulo: "24h" },
-  { valor: 7, rotulo: "7 dias" },
-  { valor: 30, rotulo: "30 dias" },
-  { valor: null, rotulo: "Tudo" },
+  { valor: 1, chave: "dia" },
+  { valor: 7, chave: "semana" },
+  { valor: 30, chave: "mes" },
+  { valor: null, chave: "tudo" },
 ] as const;
 
 /**
  * O que cada coletor busca e em que ritmo.
  *
  * Descreve o codigo dos coletores, nao um dado coletado - por isso e constante
- * e nao vem da API. A janela de 60 min do Steam e o `snapshot_bucket_minutes`
- * do `config.py`; a OpenDota nao tem janela porque o grao dela e a partida.
+ * e nao vem da API. So a cor e a API/URL de origem ficam aqui (nao mudam por
+ * idioma); etiqueta/descricao/frequencia vem de `painel.fontes.<chave>` nos
+ * arquivos de traducao (Fase 35).
  *
  * A chave e `raw_data.fonte`. `liquipedia` cobre os tres coletores da wiki
  * (agenda, equipes, brackets), que gravam sob a mesma fonte; `valve` e o
@@ -52,132 +56,27 @@ const PERIODOS = [
  * que roda no `agendador.py` precisa ter uma linha aqui - sem ela a tabela
  * mostra "—" em tipo e frequencia.
  */
-const FONTES: Record<
-  string,
-  {
-    etiqueta: string;
-    cor: string;
-    api: string;
-    descricao: string;
-    frequencia: string;
-  }
-> = {
-  steam: {
-    etiqueta: "STEAM",
-    cor: "#66C0F4",
-    api: "Steam Web API",
-    descricao: "Jogadores simultâneos, avaliações e preço da loja",
-    frequencia: "janela de 60 min",
-  },
-  steam_online: {
-    etiqueta: "STEAM",
-    cor: "#8f98a0",
-    api: "valvesoftware.com/about/stats",
-    descricao:
-      "Usuários simultâneos reais da plataforma Steam + nomes do Top 100 mais jogado",
-    frequencia: "a cada 15 min",
-  },
-  opendota: {
-    etiqueta: "DOTA 2",
-    cor: "#40d19e",
-    api: "OpenDota API",
-    descricao: "Partidas profissionais, heróis e séries minuto a minuto",
-    frequencia: "por partida",
-  },
-  dota_herois: {
-    etiqueta: "DOTA 2",
-    cor: "#e0654f",
-    api: "Datafeed dota2.com + OpenDota",
-    descricao: "Lore, habilidades e guia de itens do meta de cada herói",
-    frequencia: "semanal",
-  },
-  liquipedia: {
-    etiqueta: "LIQUIPEDIA",
-    cor: "#a78bfa",
-    api: "Liquipedia (MediaWiki API)",
-    descricao: "Agenda de confrontos, equipes e brackets de torneio — 66 wikis de esports",
-    frequencia: "ticker 2×/dia; equipes e brackets diários",
-  },
-  valve: {
-    etiqueta: "VALVE",
-    cor: "#f59e0b",
-    api: "GitHub (Regional Standings)",
-    descricao: "Ranking mundial oficial de CS2 — pontuação por equipe",
-    frequencia: "mensal (verificado toda semana)",
-  },
-  hltv: {
-    etiqueta: "CS2",
-    cor: "#3b82f6",
-    api: "hltv.org/matches",
-    descricao: "Partidas de Counter-Strike por vir — id estável, horário UTC e evento",
-    frequencia: "a cada 5 min",
-  },
-  pandascore: {
-    etiqueta: "PANDASCORE",
-    cor: "#14b8a6",
-    api: "PandaScore API",
-    descricao: "Agenda e resultados de esports (CS, LoL, CoD, OW, R6, RL; Valorant só escudo)",
-    frequencia: "a cada 30 min",
-  },
-  vlr: {
-    etiqueta: "VALORANT",
-    cor: "#ff4655",
-    api: "vlr.gg",
-    descricao: "Confrontos de Valorant: placar de série, evento e horário",
-    frequencia: "resultados 1×/dia; agenda a cada 5 min",
-  },
-  vlr_rankings: {
-    etiqueta: "VALORANT",
-    cor: "#fb7185",
-    api: "vlr.gg/rankings",
-    descricao: "Ranking de equipes por região — prior do modelo de confronto",
-    frequencia: "semanal",
-  },
-  vlr_detalhes: {
-    etiqueta: "VALORANT",
-    cor: "#fda4af",
-    api: "vlr.gg (página da partida)",
-    descricao: "Detalhe por mapa e por jogador das partidas já decididas",
-    frequencia: "diário",
-  },
-  valorant_agentes: {
-    etiqueta: "VALORANT",
-    cor: "#ff8a80",
-    api: "valorant-api.com",
-    descricao: "Elenco do VALORANT: função e habilidades dos agentes",
-    frequencia: "semanal",
-  },
-  opgg_esports: {
-    etiqueta: "LOL",
-    cor: "#5383e8",
-    api: "OP.GG (servidor MCP)",
-    descricao: "Confrontos profissionais de LoL: placar, liga, horário e escudo",
-    frequencia: "a cada 6 h",
-  },
-  lol_campeoes: {
-    etiqueta: "LOL",
-    cor: "#c8aa6e",
-    api: "OP.GG",
-    descricao: "Campeões de LoL: desempenho, tier e taxa de ban por rota",
-    frequencia: "semanal",
-  },
-  itad: {
-    etiqueta: "PREÇO",
-    cor: "#22c55e",
-    api: "IsThereAnyDeal API",
-    descricao: "Preço atual em ~33 lojas e menor preço histórico por jogo",
-    frequencia: "a cada 12 h",
-  },
-  hltb: {
-    etiqueta: "HLTB",
-    cor: "#0ea5e9",
-    api: "HowLongToBeat",
-    descricao: "Tempo estimado para zerar cada jogo",
-    frequencia: "diário",
-  },
+const FONTES_META: Record<string, { cor: string; api: string }> = {
+  steam: { cor: "#66C0F4", api: "Steam Web API" },
+  steam_online: { cor: "#8f98a0", api: "valvesoftware.com/about/stats" },
+  opendota: { cor: "#40d19e", api: "OpenDota API" },
+  dota_herois: { cor: "#e0654f", api: "Datafeed dota2.com + OpenDota" },
+  liquipedia: { cor: "#a78bfa", api: "Liquipedia (MediaWiki API)" },
+  valve: { cor: "#f59e0b", api: "GitHub (Regional Standings)" },
+  hltv: { cor: "#3b82f6", api: "hltv.org/matches" },
+  pandascore: { cor: "#14b8a6", api: "PandaScore API" },
+  vlr: { cor: "#ff4655", api: "vlr.gg" },
+  vlr_rankings: { cor: "#fb7185", api: "vlr.gg/rankings" },
+  vlr_detalhes: { cor: "#fda4af", api: "vlr.gg (página da partida)" },
+  valorant_agentes: { cor: "#ff8a80", api: "valorant-api.com" },
+  opgg_esports: { cor: "#5383e8", api: "OP.GG (servidor MCP)" },
+  lol_campeoes: { cor: "#c8aa6e", api: "OP.GG" },
+  itad: { cor: "#22c55e", api: "IsThereAnyDeal API" },
+  hltb: { cor: "#0ea5e9", api: "HowLongToBeat" },
 };
 
 export function VisaoGeralPagina() {
+  const { t } = useTranslation();
   const [periodo, setPeriodo] = useState<number | null>(7);
 
   const geral = useVisaoGeral();
@@ -221,7 +120,7 @@ export function VisaoGeralPagina() {
         <div className="flex flex-col gap-space-xs">
           <div className="flex flex-wrap items-center gap-space-sm">
             <h1 className="font-headline-lg text-headline-lg uppercase tracking-wide text-on-surface">
-              Visão Geral
+              {t("painel.titulo")}
             </h1>
 
             <div className="inline-flex items-center gap-space-xs rounded bg-surface-container-high px-space-sm py-space-xxs shadow-inner">
@@ -245,18 +144,18 @@ export function VisaoGeralPagina() {
                   online ? "text-tertiary" : "text-error"
                 }`}
               >
-                {online ? "Ao vivo" : "Sem contato"}
+                {online ? t("painel.aoVivo") : t("painel.semContato")}
               </span>
             </div>
 
             <span className="hidden font-label-caps text-label-caps uppercase tracking-wider text-outline sm:inline">
-              Telemetry // Deck 01
+              {t("painel.telemetryDeck")}
             </span>
           </div>
 
           <p className="flex items-center gap-space-xs font-body-sm text-body-sm text-on-surface-variant">
             <Icone nome="update" className="text-[15px] text-primary" />
-            Última sincronização:{" "}
+            {t("painel.ultimaSincronizacao")}{" "}
             <span className="font-title-code text-title-code text-on-surface">
               {fmtDataHora(ultimaColeta)}
             </span>
@@ -268,7 +167,7 @@ export function VisaoGeralPagina() {
           <div className="flex items-center rounded bg-surface-container-low p-space-xxs shadow-sm">
             {PERIODOS.map((opcao) => (
               <button
-                key={opcao.rotulo}
+                key={opcao.chave}
                 type="button"
                 aria-pressed={periodo === opcao.valor}
                 onClick={() => setPeriodo(opcao.valor)}
@@ -278,7 +177,7 @@ export function VisaoGeralPagina() {
                     : "text-on-surface-variant hover:text-on-surface"
                 }`}
               >
-                {opcao.rotulo}
+                {t(`painel.periodos.${opcao.chave}`)}
               </button>
             ))}
           </div>
@@ -292,7 +191,7 @@ export function VisaoGeralPagina() {
             }}
             desabilitado={geral.isFetching}
           >
-            {geral.isFetching ? "Sincronizando…" : "Sincronizar"}
+            {geral.isFetching ? t("painel.sincronizando") : t("painel.sincronizar")}
           </Botao>
         </div>
       </section>
@@ -303,7 +202,7 @@ export function VisaoGeralPagina() {
           return (
             <section className="grid grid-cols-1 gap-space-base md:grid-cols-2 xl:grid-cols-4">
               <KpiHud
-                etiqueta="Usuários simultâneos na Steam"
+                etiqueta={t("painel.kpis.usuariosSimultaneos")}
                 canto="VALVE"
                 valor={
                   dados.steam_usuarios_online !== null
@@ -312,9 +211,9 @@ export function VisaoGeralPagina() {
                 }
                 valorNumerico={dados.steam_usuarios_online}
                 formatarValor={fmtNumero}
-                rotulo="Conectados à Steam agora"
+                rotulo={t("painel.kpis.conectados")}
                 variacao={dados.steam_usuarios_online_variacao}
-                notaVariacao="vs. coleta anterior"
+                notaVariacao={t("painel.kpis.vsColetaAnterior")}
                 acento="primaria"
               >
                 <div className="mt-space-sm flex items-baseline gap-space-xs font-title-code text-title-code text-on-surface-variant">
@@ -323,19 +222,19 @@ export function VisaoGeralPagina() {
                       ? fmtNumero(dados.steam_usuarios_em_jogo)
                       : "—"}
                   </span>
-                  dentro de um jogo
+                  {t("painel.kpis.dentroDeUmJogo")}
                 </div>
               </KpiHud>
 
               <KpiHud
-                etiqueta="Snapshots da Steam"
-                canto="SÉRIE TEMPORAL"
+                etiqueta={t("painel.kpis.snapshots")}
+                canto={t("painel.kpis.serieTemporal")}
                 valor={fmtNumero(dados.snapshots_steam)}
                 valorNumerico={dados.snapshots_steam}
                 formatarValor={fmtNumero}
-                rotulo="Linhas de fato do catálogo"
+                rotulo={t("painel.kpis.linhasFatoCatalogo")}
                 acento="secundaria"
-                notaVariacao={`${fmtNumero(dados.jogos_steam)} jogos monitorados`}
+                notaVariacao={t("painel.kpis.jogosMonitorados", { contagem: fmtNumero(dados.jogos_steam) })}
               >
                 <Segmentos
                   acesos={Math.min(6, Math.ceil(serieTotal.data?.length ?? 0))}
@@ -343,27 +242,27 @@ export function VisaoGeralPagina() {
               </KpiHud>
 
               <KpiHud
-                etiqueta="Partidas coletadas"
-                canto="STAR SCHEMA"
+                etiqueta={t("painel.kpis.partidasColetadas")}
+                canto={t("painel.kpis.starSchema")}
                 valor={fmtNumero(dados.partidas)}
                 valorNumerico={dados.partidas}
                 formatarValor={fmtNumero}
-                rotulo="Partidas profissionais"
+                rotulo={t("painel.kpis.partidasProfissionais")}
                 acento="terciaria"
-                notaVariacao={`${fmtNumero(dados.linhas_fato_partida)} linhas de fato`}
+                notaVariacao={t("painel.kpis.linhasDeFato", { contagem: fmtNumero(dados.linhas_fato_partida) })}
               >
                 <BarraCheia acesa={Boolean(dados.partidas)} acento="terciaria" />
               </KpiHud>
 
               <KpiHud
-                etiqueta="Jogadores identificados"
-                canto={`${fmtNumero(dados.personagens)} HERÓIS`}
+                etiqueta={t("painel.kpis.jogadoresIdentificados")}
+                canto={t("painel.kpis.herois", { contagem: fmtNumero(dados.personagens) })}
                 valor={fmtNumero(dados.jogadores)}
                 valorNumerico={dados.jogadores}
                 formatarValor={fmtNumero}
-                rotulo="Na dimensão de jogador"
+                rotulo={t("painel.kpis.naDimensaoJogador")}
                 acento="primaria"
-                notaVariacao="fatos anônimos não contam"
+                notaVariacao={t("painel.kpis.fatosAnonimos")}
               >
                 <Segmentos
                   acesos={dados.jogadores ? 6 : 0}
@@ -379,14 +278,14 @@ export function VisaoGeralPagina() {
       <section className="grid grid-cols-1 gap-space-base xl:grid-cols-2">
         <Painel
           icone="leaderboard"
-          titulo="Top 100 mais jogados na Steam"
-          descricao="Jogadores dentro do jogo neste instante, direto da Valve — atualiza sozinho."
+          titulo={t("painel.top100.titulo")}
+          descricao={t("painel.top100.descricao")}
           meta={
             <span className="font-label-caps text-label-caps uppercase tracking-widest text-outline">
               {maisJogados.isFetching ? (
-                <span className="text-primary">atualizando…</span>
+                <span className="text-primary">{t("painel.top100.atualizando")}</span>
               ) : (
-                <>ao vivo · <span className="text-primary">Valve</span></>
+                <>{t("painel.top100.aoVivo")} · <span className="text-primary">Valve</span></>
               )}
             </span>
           }
@@ -426,7 +325,7 @@ export function VisaoGeralPagina() {
                                   ? "text-tertiary"
                                   : "text-error"
                               }`}
-                              title="Movimento vs. a semana passada"
+                              title={t("painel.top100.movimento")}
                             >
                               <Icone
                                 nome={
@@ -469,13 +368,13 @@ export function VisaoGeralPagina() {
 
         <Painel
           icone="show_chart"
-          titulo="Partidas de Dota 2 coletadas por dia"
-          descricao="Data de disputa da partida, não a da coleta."
+          titulo={t("painel.partidasPorDia.titulo")}
+          descricao={t("painel.partidasPorDia.descricao")}
           meta={
             <span className="font-label-caps text-label-caps uppercase tracking-widest text-outline">
-              Período{" "}
+              {t("painel.partidasPorDia.periodo")}{" "}
               <span className="text-primary">
-                {PERIODOS.find((p) => p.valor === periodo)?.rotulo}
+                {t(`painel.periodos.${PERIODOS.find((p) => p.valor === periodo)?.chave ?? "semana"}`)}
               </span>
             </span>
           }
@@ -486,18 +385,18 @@ export function VisaoGeralPagina() {
                 pontos={serieRecortada.map((ponto: PartidasPorDia) => ({
                   rotulo: fmtDataCurta(ponto.data),
                   valor: ponto.partidas,
-                  detalhe: `${fmtNumero(ponto.partidas)} partidas`,
+                  detalhe: t("painel.partidasPorDia.partidas", { contagem: fmtNumero(ponto.partidas) }),
                 }))}
                 formatarValor={(valor) => fmtCurto(valor)}
                 rodapeEsquerda={
                   <>
-                    No período:{" "}
+                    {t("painel.partidasPorDia.noPeriodo")}{" "}
                     <strong className="font-title-code text-title-code text-on-surface">
-                      {fmtNumero(partidasNoPeriodo)} partidas
+                      {t("painel.partidasPorDia.partidas", { contagem: fmtNumero(partidasNoPeriodo) })}
                     </strong>
                   </>
                 }
-                rodapeDireita="Valve Dota 2 Network"
+                rodapeDireita={t("painel.partidasPorDia.valveNetwork")}
               />
             )}
           </Consulta>
@@ -511,8 +410,8 @@ export function VisaoGeralPagina() {
       {/* ==================== COLETAS POR FONTE ==================== */}
       <Painel
         icone="database"
-        titulo="Coletas por fonte de dados"
-        descricao="Cada payload bruto fica gravado em disco e registrado em raw_data, o que permite reprocessar o ETL sem chamar as APIs de novo."
+        titulo={t("painel.coletas.titulo")}
+        descricao={t("painel.coletas.descricao")}
         meta={
           <span
             className={`inline-flex items-center gap-space-xs rounded px-space-xs py-space-xxs font-badge-status text-badge-status uppercase ${
@@ -527,7 +426,7 @@ export function VisaoGeralPagina() {
               }`}
               aria-hidden
             />
-            {geral.data?.coletas.length ?? 0} pipelines
+            {t("painel.coletas.pipelines", { contagem: geral.data?.coletas.length ?? 0 })}
           </span>
         }
       >
@@ -543,20 +442,24 @@ export function VisaoGeralPagina() {
               <table className="w-full border-collapse text-left">
                 <thead>
                   <tr className="bg-surface-container font-label-caps text-label-caps uppercase tracking-wider text-outline">
-                    <th className="px-space-md py-space-sm">Fonte</th>
-                    <th className="px-space-md py-space-sm">Tipo de dados</th>
-                    <th className="px-space-md py-space-sm text-center">Frequência</th>
-                    <th className="px-space-md py-space-sm text-center">Última coleta</th>
+                    <th className="px-space-md py-space-sm">{t("painel.coletas.fonte")}</th>
+                    <th className="px-space-md py-space-sm">{t("painel.coletas.tipoDados")}</th>
+                    <th className="px-space-md py-space-sm text-center">{t("painel.coletas.frequencia")}</th>
+                    <th className="px-space-md py-space-sm text-center">{t("painel.coletas.ultimaColeta")}</th>
                     <th className="px-space-md py-space-sm text-right">
-                      Payloads brutos
+                      {t("painel.coletas.payloadsBrutos")}
                     </th>
-                    <th className="px-space-md py-space-sm text-right">Status</th>
+                    <th className="px-space-md py-space-sm text-right">{t("painel.coletas.status")}</th>
                   </tr>
                 </thead>
 
                 <tbody>
                   {dados.coletas.map((coleta, indice) => {
-                    const meta = FONTES[coleta.fonte];
+                    const meta = FONTES_META[coleta.fonte];
+                    const temTraducao = Object.prototype.hasOwnProperty.call(
+                      (pt.painel.fontes as Record<string, unknown>),
+                      coleta.fonte,
+                    );
                     const ativa = coleta.payloads > 0;
 
                     return (
@@ -572,18 +475,20 @@ export function VisaoGeralPagina() {
                               className="rounded bg-surface-container-highest px-space-xs py-space-xxs font-badge-status text-badge-status"
                               style={{ color: meta?.cor ?? corDoJogo(coleta.fonte) }}
                             >
-                              {meta?.etiqueta ?? coleta.fonte.toUpperCase()}
+                              {temTraducao
+                                ? t(`painel.fontes.${coleta.fonte}.etiqueta`)
+                                : coleta.fonte.toUpperCase()}
                             </span>
                             {meta?.api ?? coleta.fonte}
                           </div>
                         </td>
 
                         <td className="px-space-md py-space-sm font-body-md text-body-sm text-on-surface-variant">
-                          {meta?.descricao ?? "—"}
+                          {temTraducao ? t(`painel.fontes.${coleta.fonte}.descricao`) : "—"}
                         </td>
 
                         <td className="px-space-md py-space-sm text-center font-title-code text-title-code text-outline">
-                          {meta?.frequencia ?? "—"}
+                          {temTraducao ? t(`painel.fontes.${coleta.fonte}.frequencia`) : "—"}
                         </td>
 
                         <td
@@ -613,7 +518,7 @@ export function VisaoGeralPagina() {
                               }`}
                               aria-hidden
                             />
-                            {ativa ? "Online / OK" : "Sem coleta"}
+                            {ativa ? t("painel.coletas.onlineOk") : t("painel.coletas.semColeta")}
                           </span>
                         </td>
                       </tr>
@@ -627,7 +532,7 @@ export function VisaoGeralPagina() {
 
         <div className="flex flex-wrap items-center justify-between gap-space-sm border-t border-outline-variant/30 pt-space-sm font-label-caps text-label-caps uppercase tracking-widest text-outline">
           <span>
-            Cobertura:{" "}
+            {t("painel.coletas.cobertura")}{" "}
             <span className="text-primary">
               {fmtPercentual(
                 geral.data?.coletas.length
@@ -638,10 +543,10 @@ export function VisaoGeralPagina() {
                 0,
               )}
             </span>{" "}
-            das fontes com payload
+            {t("painel.coletas.dasFontesComPayload")}
           </span>
           <span>
-            Latência da API{" "}
+            {t("painel.coletas.latenciaApi")}{" "}
             <span className="text-primary">
               {saude.data ? `${saude.data.latenciaMs}ms` : "—"}
             </span>

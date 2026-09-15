@@ -15,6 +15,8 @@
 
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 
 import {
   useDesfavoritarEquipe,
@@ -38,17 +40,17 @@ import { fmtData, fmtMoeda, fmtNumero, fmtRelativo } from "@util/formatos";
 import { agruparPorDia, useHistoricoAssistente } from "./assistente/historico";
 import { PainelChaveIA } from "./conta/PainelChaveIA";
 
-function hora(iso: string): string {
-  return new Date(iso).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+function hora(iso: string, idioma: string): string {
+  return new Date(iso).toLocaleTimeString(idioma, { hour: "2-digit", minute: "2-digit" });
 }
 
 /** Faixas de nivel a partir de perguntas feitas - o unico numero que a conta
  * realmente acumula hoje. Sem pontuacao escondida, so o total em faixas. */
-function nivelDoUsuario(totalPerguntas: number): { rotulo: string; icone: string } {
-  if (totalPerguntas >= 20) return { rotulo: "Analista de Dados", icone: "workspace_premium" };
-  if (totalPerguntas >= 5) return { rotulo: "Investigador", icone: "travel_explore" };
-  if (totalPerguntas >= 1) return { rotulo: "Curioso", icone: "psychology" };
-  return { rotulo: "Novo por aqui", icone: "waving_hand" };
+function nivelDoUsuario(totalPerguntas: number, t: TFunction): { rotulo: string; icone: string } {
+  if (totalPerguntas >= 20) return { rotulo: t("perfil.nivel.analista"), icone: "workspace_premium" };
+  if (totalPerguntas >= 5) return { rotulo: t("perfil.nivel.investigador"), icone: "travel_explore" };
+  if (totalPerguntas >= 1) return { rotulo: t("perfil.nivel.curioso"), icone: "psychology" };
+  return { rotulo: t("perfil.nivel.novo"), icone: "waving_hand" };
 }
 
 function diasComoMembro(iso: string): number {
@@ -58,7 +60,7 @@ function diasComoMembro(iso: string): number {
 
 /** Metodo de login em uso, pelo `providerData` do Firebase - a mesma conta
  * pode ter mais de um vinculado, mas o primeiro e o que autenticou agora. */
-function useProvedorLogin() {
+function useProvedorLogin(t: TFunction) {
   const { usuario } = useUsuario();
   const providerId = usuario?.providerData[0]?.providerId;
 
@@ -68,37 +70,26 @@ function useProvedorLogin() {
   if (providerId === "github.com") {
     return { rotulo: "GitHub", icone: <MarcaGithub /> };
   }
-  return { rotulo: "E-mail e senha", icone: <Icone nome="mail" className="text-[15px] text-primary" /> };
+  return {
+    rotulo: t("perfil.provedorEmailSenha"),
+    icone: <Icone nome="mail" className="text-[15px] text-primary" />,
+  };
 }
 
-const ATALHOS = [
-  {
-    rota: "/catalogo",
-    rotulo: "Catálogo de Jogos",
-    descricao: "Steam, Xbox e preços em ~33 lojas",
-    icone: "sports_esports",
-  },
-  {
-    rota: "/esports",
-    rotulo: "E-Sports",
-    descricao: "Partidas, ranking e previsão de confronto",
-    icone: "emoji_events",
-  },
-  {
-    rota: "/recomendacoes",
-    rotulo: "Recomendações por Reviews",
-    descricao: "O que a comunidade está gostando agora",
-    icone: "sentiment_satisfied",
-  },
+const CHAVES_ATALHOS = [
+  { rota: "/catalogo", chave: "catalogo", icone: "sports_esports" },
+  { rota: "/esports", chave: "esports", icone: "emoji_events" },
+  { rota: "/recomendacoes", chave: "recomendacoes", icone: "sentiment_satisfied" },
 ] as const;
 
 export function PerfilPagina() {
+  const { t, i18n } = useTranslation();
   const { usuario } = useUsuario();
   const perfil = usePerfilUsuario();
   const historico = useHistoricoAssistente();
   const visaoGeral = useVisaoGeral();
   const maisJogado = useMaisJogadosSteam(1);
-  const provedor = useProvedorLogin();
+  const provedor = useProvedorLogin(t);
   const favoritosJogos = useFavoritosJogos();
   const favoritosEquipes = useFavoritosEquipes();
   const desfavoritarJogo = useDesfavoritarJogo();
@@ -114,10 +105,10 @@ export function PerfilPagina() {
     }
   }
 
-  const grupos = agruparPorDia(historico.entradas);
+  const grupos = agruparPorDia(historico.entradas, t, i18n.language);
   const nivel = useMemo(
-    () => nivelDoUsuario(perfil.data?.total_perguntas_assistente ?? 0),
-    [perfil.data?.total_perguntas_assistente],
+    () => nivelDoUsuario(perfil.data?.total_perguntas_assistente ?? 0, t),
+    [perfil.data?.total_perguntas_assistente, t],
   );
   const dias = perfil.data ? diasComoMembro(perfil.data.membro_desde) : null;
   const primeiroJogo = maisJogado.data?.[0];
@@ -127,10 +118,10 @@ export function PerfilPagina() {
       <header className="flex flex-wrap items-center justify-between gap-space-sm">
         <h1 className="flex items-center gap-space-xs font-headline-lg text-headline-lg uppercase tracking-wide text-on-surface">
           <Icone nome="account_circle" className="text-[24px] text-primary" />
-          Perfil
+          {t("perfil.titulo")}
         </h1>
         <Botao icone="logout" aoClicar={sair} desabilitado={saindo}>
-          Sair
+          {t("perfil.sair")}
         </Botao>
       </header>
 
@@ -142,7 +133,7 @@ export function PerfilPagina() {
           </div>
           <div className="flex flex-col gap-space-xxs">
             <span className="font-headline-sm text-headline-sm text-on-surface">
-              Olá, {usuario?.email?.split("@")[0] ?? "visitante"}
+              {t("perfil.ola", { nome: usuario?.email?.split("@")[0] ?? t("perfil.visitante") })}
             </span>
             <div className="flex flex-wrap items-center gap-space-xs">
               <Selo cor="primario">
@@ -152,7 +143,9 @@ export function PerfilPagina() {
               {dias !== null && (
                 <Selo cor="neutro">
                   <Icone nome="calendar_today" className="text-[12px]" />
-                  {dias === 0 ? "Membro desde hoje" : `Membro há ${fmtNumero(dias)} dia${dias === 1 ? "" : "s"}`}
+                  {dias === 0
+                    ? t("perfil.membroDesdeHoje")
+                    : t(dias === 1 ? "perfil.membroHaDia" : "perfil.membroHaDias", { n: fmtNumero(dias) })}
                 </Selo>
               )}
               <Selo cor="neutro">
@@ -164,14 +157,14 @@ export function PerfilPagina() {
         </div>
       </div>
 
-      <Painel icone="badge" titulo="Sua conta">
+      <Painel icone="badge" titulo={t("perfil.suaConta.titulo")}>
         {perfil.isError ? (
           <MensagemErro erro={perfil.error} />
         ) : (
           <div className="grid grid-cols-1 gap-space-base sm:grid-cols-2">
             <div className="flex flex-col gap-space-xxs rounded-lg bg-surface-container-lowest p-space-base">
               <span className="font-label-caps text-label-caps uppercase tracking-widest text-outline">
-                E-mail
+                {t("perfil.suaConta.email")}
               </span>
               <span className="font-body-md text-body-md text-on-surface">
                 {usuario?.email ?? perfil.data?.email ?? "—"}
@@ -179,7 +172,7 @@ export function PerfilPagina() {
             </div>
             <div className="flex flex-col gap-space-xxs rounded-lg bg-surface-container-lowest p-space-base">
               <span className="font-label-caps text-label-caps uppercase tracking-widest text-outline">
-                Membro desde
+                {t("perfil.suaConta.membroDesde")}
               </span>
               <span className="font-body-md text-body-md text-on-surface">
                 {perfil.data ? fmtData(perfil.data.membro_desde) : "—"}
@@ -194,43 +187,43 @@ export function PerfilPagina() {
       {/* ==================== O PLAYDB AGORA ==================== */}
       <Painel
         icone="bolt"
-        titulo="O PlayDB agora"
-        descricao="O que o site coletou até agora — os mesmos números da Visão Geral, num resumo rápido."
+        titulo={t("perfil.playdbAgora.titulo")}
+        descricao={t("perfil.playdbAgora.descricao")}
       >
         {visaoGeral.isError ? (
           <MensagemErro erro={visaoGeral.error} />
         ) : (
           <div className="grid grid-cols-2 gap-space-base lg:grid-cols-4">
             <KpiHud
-              etiqueta="Catálogo"
+              etiqueta={t("perfil.playdbAgora.catalogo")}
               valor={visaoGeral.data ? fmtNumero(visaoGeral.data.jogos_steam + visaoGeral.data.jogos_xbox) : "—"}
               valorNumerico={visaoGeral.data ? visaoGeral.data.jogos_steam + visaoGeral.data.jogos_xbox : null}
               formatarValor={fmtNumero}
-              rotulo="jogos monitorados"
+              rotulo={t("perfil.playdbAgora.jogosMonitorados")}
               acento="primaria"
             />
             <KpiHud
-              etiqueta="Star schema"
+              etiqueta={t("perfil.playdbAgora.starSchema")}
               valor={visaoGeral.data ? fmtNumero(visaoGeral.data.partidas) : "—"}
               valorNumerico={visaoGeral.data?.partidas ?? null}
               formatarValor={fmtNumero}
-              rotulo="partidas coletadas"
+              rotulo={t("perfil.playdbAgora.partidasColetadas")}
               acento="terciaria"
             />
             <KpiHud
-              etiqueta="Valve"
+              etiqueta={t("perfil.playdbAgora.valve")}
               valor={visaoGeral.data?.steam_usuarios_online != null ? fmtNumero(visaoGeral.data.steam_usuarios_online) : "—"}
               valorNumerico={visaoGeral.data?.steam_usuarios_online ?? null}
               formatarValor={fmtNumero}
-              rotulo="conectados à Steam agora"
+              rotulo={t("perfil.playdbAgora.conectadosSteamAgora")}
               acento="secundaria"
             />
             <KpiHud
-              etiqueta="Dimensão"
+              etiqueta={t("perfil.playdbAgora.dimensao")}
               valor={visaoGeral.data ? fmtNumero(visaoGeral.data.jogadores) : "—"}
               valorNumerico={visaoGeral.data?.jogadores ?? null}
               formatarValor={fmtNumero}
-              rotulo="jogadores identificados"
+              rotulo={t("perfil.playdbAgora.jogadoresIdentificados")}
               acento="primaria"
             />
           </div>
@@ -246,14 +239,14 @@ export function PerfilPagina() {
             <CapaJogo appId={primeiroJogo.app_id} nome={primeiroJogo.nome ?? "Jogo"} className="h-12 w-12 shrink-0" />
             <div className="min-w-0 flex-1">
               <span className="font-label-caps text-label-caps uppercase tracking-widest text-outline">
-                Mais jogado na Steam agora
+                {t("perfil.playdbAgora.maisJogadoAgora")}
               </span>
               <p className="truncate font-body-md text-body-md font-bold text-on-surface">
                 {primeiroJogo.nome ?? `App ${primeiroJogo.app_id}`}
               </p>
             </div>
             <span className="shrink-0 font-title-code text-title-code text-primary">
-              {fmtNumero(primeiroJogo.jogadores_agora)} jogando
+              {fmtNumero(primeiroJogo.jogadores_agora)} {t("perfil.playdbAgora.jogando")}
             </span>
           </a>
         )}
@@ -261,17 +254,17 @@ export function PerfilPagina() {
 
       <Painel
         icone="smart_toy"
-        titulo="Perguntas ao Assistente de IA"
-        descricao="As perguntas que você já fez — só o texto da pergunta, não a resposta."
+        titulo={t("perfil.perguntasAssistente.titulo")}
+        descricao={t("perfil.perguntasAssistente.descricao")}
         meta={
           perfil.data && (
             <div className="min-w-[10rem]">
               <KpiHud
-                etiqueta="Total"
+                etiqueta={t("perfil.perguntasAssistente.total")}
                 valor={fmtNumero(perfil.data.total_perguntas_assistente)}
                 valorNumerico={perfil.data.total_perguntas_assistente}
                 formatarValor={fmtNumero}
-                rotulo="perguntas"
+                rotulo={t("perfil.perguntasAssistente.perguntas")}
                 acento="primaria"
               />
             </div>
@@ -286,11 +279,11 @@ export function PerfilPagina() {
           </div>
         ) : grupos.length === 0 ? (
           <p className="font-body-sm text-body-sm text-outline">
-            Nenhuma pergunta ainda. Vá até o{" "}
+            {t("perfil.perguntasAssistente.vazioPrefixo")}{" "}
             <Link to="/assistente" className="text-primary hover:underline">
-              Assistente de IA
+              {t("perfil.perguntasAssistente.vazioLink")}
             </Link>{" "}
-            e pergunte algo sobre os dados do PlayDB.
+            {t("perfil.perguntasAssistente.vazioSufixo")}
           </p>
         ) : (
           <div className="flex flex-col gap-space-sm">
@@ -319,7 +312,7 @@ export function PerfilPagina() {
                         {entrada.pergunta}
                       </span>
                       <span className="shrink-0 font-badge-status text-badge-status tabular-nums text-outline">
-                        {hora(entrada.em)}
+                        {hora(entrada.em, i18n.language)}
                       </span>
                     </li>
                   ))}
@@ -333,7 +326,7 @@ export function PerfilPagina() {
               className="mt-space-xs flex items-center justify-center gap-space-xs self-start rounded border border-outline-variant/30 px-space-base py-space-xs font-title-code text-title-code text-outline transition-colors hover:border-error/40 hover:text-error"
             >
               <Icone nome="delete" className="text-[16px]" />
-              Limpar histórico
+              {t("perfil.perguntasAssistente.limpar")}
             </button>
           </div>
         )}
@@ -342,8 +335,8 @@ export function PerfilPagina() {
       {/* ==================== JOGOS FAVORITOS ==================== */}
       <Painel
         icone="favorite"
-        titulo="Jogos favoritos"
-        descricao="Preço, promoção ativa e a notícia mais recente — o favorito na ficha do jogo (Steam ou Xbox) entra aqui."
+        titulo={t("perfil.jogosFavoritos.titulo")}
+        descricao={t("perfil.jogosFavoritos.descricao")}
       >
         {favoritosJogos.isError ? (
           <MensagemErro erro={favoritosJogos.error} />
@@ -356,11 +349,11 @@ export function PerfilPagina() {
             </div>
           ) : (
             <p className="font-body-sm text-body-sm text-outline">
-              Nenhum jogo favoritado ainda. Vá até o{" "}
+              {t("perfil.jogosFavoritos.vazioPrefixo")}{" "}
               <Link to="/catalogo/steam" className="text-primary hover:underline">
-                Catálogo de Jogos
+                {t("perfil.jogosFavoritos.vazioLink")}
               </Link>{" "}
-              e favorite algum na ficha dele.
+              {t("perfil.jogosFavoritos.vazioSufixo")}
             </p>
           )
         ) : (
@@ -386,7 +379,7 @@ export function PerfilPagina() {
 
                   <div className="mt-space-xxs flex flex-wrap items-center gap-space-xs">
                     <span className="font-body-sm text-body-sm text-on-surface-variant">
-                      {jogo.gratuito ? "Gratuito" : fmtMoeda(jogo.preco_atual, jogo.moeda)}
+                      {jogo.gratuito ? t("jogoSteam.gratuito") : fmtMoeda(jogo.preco_atual, jogo.moeda)}
                     </span>
                     {jogo.promocao_ativa && jogo.desconto_percentual !== null && (
                       <Selo cor="positivo">-{jogo.desconto_percentual}%</Selo>
@@ -421,8 +414,8 @@ export function PerfilPagina() {
       {/* ==================== TIMES FAVORITOS ==================== */}
       <Painel
         icone="shield"
-        titulo="Times favoritos"
-        descricao="Próxima partida agendada — o favorito no seletor da Previsão de Confronto entra aqui."
+        titulo={t("perfil.timesFavoritos.titulo")}
+        descricao={t("perfil.timesFavoritos.descricao")}
       >
         {favoritosEquipes.isError ? (
           <MensagemErro erro={favoritosEquipes.error} />
@@ -435,11 +428,11 @@ export function PerfilPagina() {
             </div>
           ) : (
             <p className="font-body-sm text-body-sm text-outline">
-              Nenhum time favoritado ainda. Vá até a{" "}
+              {t("perfil.timesFavoritos.vazioPrefixo")}{" "}
               <Link to="/esports" className="text-primary hover:underline">
-                Previsão de Confronto
+                {t("perfil.timesFavoritos.vazioLink")}
               </Link>{" "}
-              e favorite um time selecionado.
+              {t("perfil.timesFavoritos.vazioSufixo")}
             </p>
           )
         ) : (
@@ -481,7 +474,7 @@ export function PerfilPagina() {
                     </p>
                   ) : (
                     <p className="mt-space-xxs font-body-sm text-body-sm text-outline">
-                      Sem partida agendada no momento.
+                      {t("perfil.timesFavoritos.semPartidaAgendada")}
                     </p>
                   )}
                 </div>
@@ -499,9 +492,13 @@ export function PerfilPagina() {
       </Painel>
 
       {/* ==================== EXPLORE MAIS ==================== */}
-      <Painel icone="explore" titulo="Explore mais" descricao="Outras partes do PlayDB que você talvez ainda não tenha visto.">
+      <Painel
+        icone="explore"
+        titulo={t("perfil.exploreMais.titulo")}
+        descricao={t("perfil.exploreMais.descricao")}
+      >
         <div className="grid grid-cols-1 gap-space-sm sm:grid-cols-3">
-          {ATALHOS.map((atalho) => (
+          {CHAVES_ATALHOS.map((atalho) => (
             <Link
               key={atalho.rota}
               to={atalho.rota}
@@ -509,8 +506,12 @@ export function PerfilPagina() {
             >
               <Icone nome={atalho.icone} className="mt-[2px] shrink-0 text-[20px] text-primary" />
               <div className="min-w-0 flex-1">
-                <span className="font-title-code text-title-code text-on-surface">{atalho.rotulo}</span>
-                <p className="font-body-sm text-body-sm text-outline">{atalho.descricao}</p>
+                <span className="font-title-code text-title-code text-on-surface">
+                  {t(`perfil.exploreMais.${atalho.chave}.rotulo`)}
+                </span>
+                <p className="font-body-sm text-body-sm text-outline">
+                  {t(`perfil.exploreMais.${atalho.chave}.descricao`)}
+                </p>
               </div>
               <Icone nome="arrow_forward" className="mt-[2px] shrink-0 text-[16px] text-outline" />
             </Link>

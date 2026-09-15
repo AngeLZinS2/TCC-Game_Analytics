@@ -14,6 +14,9 @@
  *    e o resto da tela nao muda.
  */
 
+import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
+
 import type { RespostaAssistente, VisaoGeral } from "@models/api/tipos";
 import { Icone } from "@views/componentes/base";
 import { fmtNumero, fmtRelativo } from "@util/formatos";
@@ -51,6 +54,7 @@ export function PainelFontes({
   visaoGeral: VisaoGeral | undefined;
   aoVerDados: () => void;
 }) {
+  const { t } = useTranslation();
   // Sem resposta ainda, o painel mostra o que EXISTE no banco - e informacao
   // util (dimensiona o que da para perguntar), nao um placeholder.
   const ultimaColeta = visaoGeral?.coletas
@@ -62,7 +66,7 @@ export function PainelFontes({
   return (
     <section className="rounded-xl bg-surface-container-low/90 p-space-base shadow-2xl">
       <h2 className="font-label-caps text-label-caps uppercase tracking-widest text-outline">
-        {resposta ? "Contexto da resposta" : "Dados disponíveis"}
+        {resposta ? t("assistente.painelContexto.contextoDaResposta") : t("assistente.painelContexto.dadosDisponiveis")}
       </h2>
 
       <ul className="mt-space-sm flex flex-col">
@@ -70,29 +74,30 @@ export function PainelFontes({
           resposta.blocos.map((bloco) => (
             <LinhaFonte
               key={bloco.chave}
-              icone={descreverFonte(bloco.fonte).icone}
+              icone={descreverFonte(bloco.fonte, t).icone}
               rotulo={bloco.titulo}
-              valor={`${bloco.conteudo.split("\n").length} linhas · ${
-                descreverFonte(bloco.fonte).rotulo
-              }`}
+              valor={t("assistente.painelContexto.linhasEFonte", {
+                n: bloco.conteudo.split("\n").length,
+                fonte: descreverFonte(bloco.fonte, t).rotulo,
+              })}
             />
           ))
         ) : (
           <>
             <LinhaFonte
               icone="stadia_controller"
-              rotulo="Jogos da Steam"
-              valor={`${fmtNumero(visaoGeral?.jogos_steam)} no catálogo`}
+              rotulo={t("assistente.painelContexto.jogosDaSteam")}
+              valor={t("assistente.painelContexto.noCatalogo", { n: fmtNumero(visaoGeral?.jogos_steam) })}
             />
             <LinhaFonte
               icone="swords"
-              rotulo="Partidas"
-              valor={`${fmtNumero(visaoGeral?.partidas)} coletadas`}
+              rotulo={t("assistente.painelContexto.partidas")}
+              valor={t("assistente.painelContexto.coletadas", { n: fmtNumero(visaoGeral?.partidas) })}
             />
             <LinhaFonte
               icone="person"
-              rotulo="Personagens"
-              valor={`${fmtNumero(visaoGeral?.personagens)} registrados`}
+              rotulo={t("assistente.painelContexto.personagens")}
+              valor={t("assistente.painelContexto.registrados", { n: fmtNumero(visaoGeral?.personagens) })}
             />
           </>
         )}
@@ -100,7 +105,7 @@ export function PainelFontes({
         {ultimaColeta && (
           <LinhaFonte
             icone="schedule"
-            rotulo="Última coleta"
+            rotulo={t("assistente.painelContexto.ultimaColeta")}
             valor={fmtRelativo(ultimaColeta)}
           />
         )}
@@ -112,7 +117,7 @@ export function PainelFontes({
           onClick={aoVerDados}
           className="mt-space-sm flex w-full items-center justify-center gap-space-xs rounded bg-surface-container px-space-sm py-space-xs font-title-code text-title-code text-on-surface-variant transition-colors hover:bg-surface-container-high hover:text-primary"
         >
-          Ver todas as fontes
+          {t("assistente.painelContexto.verTodasFontes")}
           <Icone nome="unfold_more" className="text-[14px]" />
         </button>
       )}
@@ -126,7 +131,7 @@ interface Criterio {
   texto: string;
 }
 
-function criteriosDe(resposta: RespostaAssistente): Criterio[] {
+function criteriosDe(resposta: RespostaAssistente, t: TFunction): Criterio[] {
   const linhas = resposta.blocos.reduce(
     (soma, b) => soma + b.conteudo.split("\n").length,
     0,
@@ -136,34 +141,46 @@ function criteriosDe(resposta: RespostaAssistente): Criterio[] {
   return [
     {
       atendido: resposta.blocos.length >= 2,
-      texto: `${resposta.blocos.length} ${
-        resposta.blocos.length === 1 ? "bloco" : "blocos"
-      } de contexto`,
+      texto: t("assistente.painelContexto.blocoDeContexto", {
+        n: resposta.blocos.length,
+        palavra:
+          resposta.blocos.length === 1
+            ? t("assistente.comoChegamos.bloco")
+            : t("assistente.comoChegamos.blocos"),
+      }),
     },
     {
       atendido: linhas >= 10,
-      texto: `${fmtNumero(linhas)} linhas consultadas`,
+      texto: t("assistente.painelContexto.linhasConsultadas", { n: fmtNumero(linhas) }),
     },
     {
       atendido: pontos > 0,
-      texto: pontos > 0 ? `${pontos} valores comparáveis` : "nada comparável numericamente",
+      texto:
+        pontos > 0
+          ? t("assistente.painelContexto.valoresComparaveis", { n: pontos })
+          : t("assistente.painelContexto.nadaComparavel"),
     },
   ];
 }
 
 export function CartaoConfianca({ resposta }: { resposta: RespostaAssistente }) {
-  const criterios = criteriosDe(resposta);
+  const { t } = useTranslation();
+  const criterios = criteriosDe(resposta, t);
   const atendidos = criterios.filter((c) => c.atendido).length;
   const alta = atendidos === criterios.length;
   const limitada = atendidos <= 1;
 
-  const nivel = alta ? "Base sólida" : limitada ? "Base limitada" : "Base parcial";
+  const nivel = alta
+    ? t("assistente.painelContexto.baseSolida")
+    : limitada
+      ? t("assistente.painelContexto.baseLimitada")
+      : t("assistente.painelContexto.baseParcial");
   const cor = alta ? "text-tertiary" : limitada ? "text-error" : "text-primary";
 
   return (
     <section className="rounded-xl bg-surface-container-low/90 p-space-base shadow-2xl">
       <h2 className="font-label-caps text-label-caps uppercase tracking-widest text-outline">
-        Base da resposta
+        {t("assistente.painelContexto.baseDaResposta")}
       </h2>
 
       <div className={`mt-space-sm flex items-center gap-space-xs ${cor}`}>
@@ -197,9 +214,9 @@ export function CartaoConfianca({ resposta }: { resposta: RespostaAssistente }) 
         contexto, e o modelo continua sendo a parte que pode errar.
       */}
       <p className="mt-space-sm border-t border-outline-variant/20 pt-space-sm font-body-sm text-body-sm text-outline">
-        Classificação do <strong>contexto</strong>, não da redação. O provedor não
-        devolve grau de confiança — o que dá para medir aqui é o quanto de dado real
-        sustentou a resposta.
+        {t("assistente.painelContexto.classificacaoPrefixo")}{" "}
+        <strong>{t("assistente.painelContexto.classificacaoNegrito")}</strong>
+        {t("assistente.painelContexto.classificacaoSufixo")}
       </p>
     </section>
   );

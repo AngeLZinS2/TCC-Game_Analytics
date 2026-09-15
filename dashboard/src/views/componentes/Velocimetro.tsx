@@ -7,6 +7,8 @@
  * de classe Tailwind.
  */
 
+import { useTranslation } from "react-i18next";
+
 import { TOKENS } from "@views/tema";
 
 export function Velocimetro({
@@ -20,6 +22,7 @@ export function Velocimetro({
   rotulo?: string;
   tamanho?: number;
 }) {
+  const { t } = useTranslation();
   const p = Math.max(0, Math.min(1, probabilidade));
 
   const cx = 130;
@@ -39,8 +42,9 @@ export function Velocimetro({
       style={{ width: tamanho, maxWidth: "100%", height: "auto" }}
       role="img"
       aria-label={
-        `Probabilidade do modelo: ${Math.round(p * 100)}%` +
-        (rotulo ? ` para ${rotulo}` : "")
+        rotulo
+          ? t("comum.velocimetro.probabilidadeComRotulo", { pct: Math.round(p * 100), rotulo })
+          : t("comum.velocimetro.probabilidade", { pct: Math.round(p * 100) })
       }
     >
       <path

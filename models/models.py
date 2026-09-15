@@ -28,6 +28,7 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
     func,
+    text,
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
@@ -362,6 +363,165 @@ class DimAppSteamNome(Base):
     nome: Mapped[str] = mapped_column(Text, nullable=False)
     visto_em: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False
+    )
+
+    # --- Indice do catalogo completo (Fase 35, GetAppList) ----------------
+    #: "game"/"dlc"/"demo"/"software"/"music"... capturado do GetAppList
+    #: (ja filtrado a `include_games=1` la na origem) ou do appdetails.
+    tipo: Mapped[str | None] = mapped_column(String(32))
+    #: `last_modified` que a Valve devolve - usado como filtro best-effort
+    #: de `if_modified_since` no proximo passo incremental.
+    ultima_modificacao: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    #: Cursor de mudanca de preco da Valve (`price_change_number`). Uma
+    #: mudanca e detectada por DIFERENCA (!=) contra o valor salvo, nunca
+    #: assumindo que so aumenta.
+    numero_mudanca_preco: Mapped[int | None] = mapped_column(BigInteger)
+    #: A fila de "precisa reprocessar preco", persistida no Postgres (sem
+    #: Redis/Celery): marcada pelo sync incremental quando
+    #: `numero_mudanca_preco` muda, zerada so depois que o `appdetails`
+    #: daquele app_id foi reprocessado com sucesso.
+    pendente_atualizacao_preco: Mapped[bool] = mapped_column(
+        Boolean, server_default="false", nullable=False
+    )
+
+
+class SincronizacaoSteam(Base):
+    """Checkpoint/estado da sincronizacao do catalogo Steam (Fase 35).
+
+    Uma linha por `tipo_sincronizacao` ("catalogo_inicial" /
+    "catalogo_incremental" / "precos"). `last_appid` e os contadores sao
+    gravados a cada execucao (nao so no final) - e o que da checkpoint de
+    verdade ao crawl paginado de `GetAppList`: um crash no meio perde no
+    maximo a pagina em andamento, nunca o progresso ja salvo.
+    """
+
+    __tablename__ = "steam_sincronizacao"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    tipo_sincronizacao: Mapped[str] = mapped_column(String(32), nullable=False)
+    status: Mapped[str] = mapped_column(String(16), nullable=False)
+    last_appid: Mapped[int | None] = mapped_column(BigInteger)
+    ultimo_price_change_number: Mapped[int | None] = mapped_column(BigInteger)
+    iniciada_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    concluida_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    registros_processados: Mapped[int] = mapped_column(Integer, server_default="0", nullable=False)
+    registros_criados: Mapped[int] = mapped_column(Integer, server_default="0", nullable=False)
+    registros_atualizados: Mapped[int] = mapped_column(Integer, server_default="0", nullable=False)
+    registros_falhos: Mapped[int] = mapped_column(Integer, server_default="0", nullable=False)
+    erro: Mapped[str | None] = mapped_column(Text)
+    atualizado_em: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    __table_args__ = (
+        UniqueConstraint("tipo_sincronizacao", name="uq_steam_sincronizacao_tipo"),
+    )
+
+
+class HistoricoPrecoSteam(Base):
+    """Serie de preco por jogo, primeiro-partido (nao ITAD) - Fase 35.
+
+    Append-only, deduplicado em DUAS camadas: a aplicacao so insere quando
+    o preco final mudou de verdade desde a ultima linha daquele
+    (app_id, pais, moeda); a `UniqueConstraint` em `janela_coleta` (mesmo
+    bucket horario que `fato_snapshot_jogo_steam` ja usa, via
+    `truncar_janela()`) e uma rede de seguranca no proprio Postgres via
+    `on_conflict_do_nothing` - reprocessar o mesmo payload nunca duplica.
+    """
+
+    __tablename__ = "steam_historico_preco"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    app_id: Mapped[int] = mapped_column(
+        ForeignKey("dim_jogo_steam.app_id", ondelete="CASCADE"), nullable=False
+    )
+    pais: Mapped[str] = mapped_column(String(2), nullable=False)
+    moeda: Mapped[str] = mapped_column(String(8), nullable=False)
+    preco_original: Mapped[int | None] = mapped_column(Integer)
+    preco_final: Mapped[int] = mapped_column(Integer, nullable=False)
+    desconto_percentual: Mapped[int] = mapped_column(Integer, nullable=False)
+    janela_coleta: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    registrado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint(
+            "app_id", "pais", "moeda", "janela_coleta",
+            name="uq_historico_preco_app_janela",
+        ),
+        Index("ix_historico_preco_app", "app_id", "pais", "moeda", "registrado_em"),
+    )
+
+
+class PromocaoSteam(Base):
+    """Promocao real de um jogo, por transicao de desconto (Fase 35).
+
+    Uma promocao NUNCA e inferida de agregado de catalogo - so abre na
+    transicao `desconto=0 -> desconto>0` observada NAQUELE app, e so fecha
+    na transicao inversa. Enquanto ativa, uma mudanca de preco atualiza a
+    MESMA linha (nunca cria outra) - o indice unico parcial garante isso
+    tambem no banco, nao so na logica do ETL.
+    """
+
+    __tablename__ = "steam_promocoes"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    app_id: Mapped[int] = mapped_column(
+        ForeignKey("dim_jogo_steam.app_id", ondelete="CASCADE"), nullable=False
+    )
+    pais: Mapped[str] = mapped_column(String(2), nullable=False)
+    moeda: Mapped[str] = mapped_column(String(8), nullable=False)
+    preco_original: Mapped[int] = mapped_column(Integer, nullable=False)
+    preco_final: Mapped[int] = mapped_column(Integer, nullable=False)
+    desconto_percentual: Mapped[int] = mapped_column(Integer, nullable=False)
+    iniciada_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    encerrada_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    ativa: Mapped[bool] = mapped_column(Boolean, server_default="true", nullable=False)
+    criada_em: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    atualizada_em: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    __table_args__ = (
+        Index(
+            "uq_promocao_ativa_app_pais", "app_id", "pais",
+            unique=True, postgresql_where=text("ativa"),
+        ),
+    )
+
+
+class EventoSteam(Base):
+    """Evento de catalogo (sale sazonal, festival...) - Fase 35.
+
+    A Steam NAO tem endpoint publico de calendario de eventos oficiais.
+    Esta tabela existe pronta para uma fonte oficial/curada futura - nenhum
+    coletor escreve aqui ainda. `steam_event_id` fica `NULL` ate existir
+    uma fonte real; `tipo_evento` e aberto (nunca assumido como so os
+    nomes de sale conhecidos hoje).
+    """
+
+    __tablename__ = "steam_eventos"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    steam_event_id: Mapped[str | None] = mapped_column(String(64))
+    titulo: Mapped[str] = mapped_column(Text, nullable=False)
+    descricao: Mapped[str | None] = mapped_column(Text)
+    imagem_url: Mapped[str | None] = mapped_column(Text)
+    url: Mapped[str | None] = mapped_column(Text)
+    tipo_evento: Mapped[str] = mapped_column(String(32), nullable=False)
+    iniciado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    encerrado_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    ativo: Mapped[bool] = mapped_column(Boolean, server_default="true", nullable=False)
+    criado_em: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    atualizado_em: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    __table_args__ = (
+        UniqueConstraint("steam_event_id", name="uq_steam_eventos_steam_event_id"),
     )
 
 

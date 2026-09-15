@@ -13,6 +13,7 @@
  */
 
 import { Navigate, NavLink, useParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 
 import { Icone } from "@views/componentes/base";
 import { SteamPagina } from "../Steam";
@@ -31,6 +32,7 @@ const IDS: readonly string[] = LOJAS.map((l) => l.id);
 const LOJA_PADRAO: LojaId = "steam";
 
 export function CatalogoLayout() {
+  const { t } = useTranslation();
   const { loja } = useParams();
 
   if (!loja || !IDS.includes(loja)) {
@@ -44,7 +46,7 @@ export function CatalogoLayout() {
       <div className="flex flex-col gap-space-base border-b border-outline-variant/30 pb-space-base pt-space-base">
         <div className="flex flex-wrap items-center gap-space-sm">
           <span className="font-headline-md text-headline-md uppercase tracking-wide text-on-surface-variant">
-            Catálogo de Jogos
+            {t("nav.itens.catalogo")}
           </span>
         </div>
 

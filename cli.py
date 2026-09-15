@@ -19,6 +19,7 @@ from logging_config import configurar_logging
 
 FONTES = (
     "steam",
+    "steam-catalogo",
     "steam-online",
     "opendota",
     "liquipedia",
@@ -93,9 +94,12 @@ def _parser() -> argparse.ArgumentParser:
         "--all-apps",
         action="store_true",
         help=(
-            "descobre todos os apps da Steam via ISteamApps/GetAppList. "
-            "Combine com --min-players para filtrar e --limit-apps para limitar. "
-            "Sem filtros, sao ~200k apps (pode levar semanas)."
+            "descobre todos os apps da Steam via ISteamApps/GetAppList numa "
+            "chamada so, sem checkpoint (cursor so em memoria - um crash "
+            "recomeça do zero). Combine com --min-players para filtrar e "
+            "--limit-apps para limitar. Para uma carga completa com "
+            "checkpoint persistido (resume apos crash/restart) e sync "
+            "incremental depois, use `collect steam-catalogo` em vez disso."
         ),
     )
     steam.add_argument(
@@ -264,6 +268,15 @@ def _construir_coletor(args: argparse.Namespace, storage):
             # --limit-apps sem --all-apps: trunca a semente/resultado anterior
             coletor.app_ids = coletor.app_ids[: args.limit_apps]
         return coletor
+
+    if args.fonte == "steam-catalogo":
+        from services.collectors.steam_catalogo import SteamCatalogoCollector
+
+        # Sem argumentos proprios: cada execucao processa so
+        # STEAM_SYNC_PAGES_PER_RUN pagina(s), retomando do checkpoint salvo
+        # em `steam_sincronizacao` (carga inicial) ou rodando o passo
+        # incremental (`if_modified_since`) quando ja concluida.
+        return SteamCatalogoCollector(raw_storage=storage, settings=settings)
 
     if args.fonte == "steam-online":
         from services.collectors.steam_online import SteamOnlineCollector
@@ -441,6 +454,10 @@ def _construir_coletor(args: argparse.Namespace, storage):
 def _carregador(fonte: str):
     if fonte == "steam":
         from services.etl.load_steam import carregar
+
+        return carregar
+    if fonte == "steam-catalogo":
+        from services.etl.load_steam_catalogo import carregar
 
         return carregar
     if fonte == "liquipedia":

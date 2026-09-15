@@ -7,13 +7,16 @@
  * mesmo padrao do Assistente de IA quando falta a `OPENROUTER_API_KEY`.
  */
 
+import { useTranslation } from "react-i18next";
+
 import { Painel } from "@views/componentes/hud";
 
 export function PlayStationEmBreve() {
+  const { t } = useTranslation();
   return (
-    <Painel icone="schedule" titulo="PlayStation Store — em breve">
+    <Painel icone="schedule" titulo={t("catalogoPlayStation.titulo")}>
       <p className="rounded-lg bg-surface-container-lowest px-space-base py-space-md font-body-md text-body-md text-on-surface-variant">
-        A vitrine da PlayStation Store depende da aprovação da chave da API do{" "}
+        {t("catalogoPlayStation.descricaoPrefixo")}
         <a
           href="https://platprices.com"
           target="_blank"
@@ -21,10 +24,8 @@ export function PlayStationEmBreve() {
           className="text-primary hover:underline"
         >
           PlatPrices
-        </a>{" "}
-        — preços, descontos e status do PS Plus. Assim que sair, esta aba passa a
-        listar o catálogo do jeito que as outras já fazem. O resto do site
-        funciona sem isso.
+        </a>
+        {t("catalogoPlayStation.descricaoSufixo")}
       </p>
     </Painel>
   );

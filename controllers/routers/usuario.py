@@ -61,6 +61,7 @@ def exigir_usuario(authorization: str | None = Header(default=None)) -> UsuarioA
             get_settings().firebase_jwks_cache_segundos,
         )
     except TokenInvalido as exc:
+        logger.warning("token do Firebase rejeitado", extra={"erro": str(exc)})
         raise HTTPException(status_code=401, detail="sessao invalida ou expirada") from exc
 
     uid = str(claims["sub"])

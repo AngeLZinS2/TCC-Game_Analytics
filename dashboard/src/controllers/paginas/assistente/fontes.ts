@@ -12,6 +12,8 @@
  * erro barato dos dois.
  */
 
+import type { TFunction } from "i18next";
+
 export interface DescricaoFonte {
   /** `false` só para o que a plataforma coletou e mediu. */
   interna: boolean;
@@ -22,34 +24,39 @@ export interface DescricaoFonte {
   chip: string;
 }
 
-const CONHECIDAS: Record<string, DescricaoFonte> = {
-  banco: { interna: true, icone: "database", rotulo: "nosso banco", chip: "" },
-  steam: {
-    interna: false,
-    icone: "storefront",
-    rotulo: "loja da Steam, agora",
-    chip: "fora do banco",
-  },
-  opgg: {
-    interna: false,
-    icone: "leaderboard",
-    rotulo: "OP.GG, agora",
-    chip: "OP.GG",
-  },
-  web: {
-    interna: false,
-    icone: "travel_explore",
-    rotulo: "busca na web, agora",
-    chip: "web",
-  },
-};
+export function descreverFonte(fonte: string, t: TFunction): DescricaoFonte {
+  const conhecidas: Record<string, DescricaoFonte> = {
+    banco: {
+      interna: true,
+      icone: "database",
+      rotulo: t("assistente.fontes.banco.rotulo"),
+      chip: t("assistente.fontes.banco.chip"),
+    },
+    steam: {
+      interna: false,
+      icone: "storefront",
+      rotulo: t("assistente.fontes.steam.rotulo"),
+      chip: t("assistente.fontes.steam.chip"),
+    },
+    opgg: {
+      interna: false,
+      icone: "leaderboard",
+      rotulo: t("assistente.fontes.opgg.rotulo"),
+      chip: t("assistente.fontes.opgg.chip"),
+    },
+    web: {
+      interna: false,
+      icone: "travel_explore",
+      rotulo: t("assistente.fontes.web.rotulo"),
+      chip: t("assistente.fontes.web.chip"),
+    },
+  };
 
-export function descreverFonte(fonte: string): DescricaoFonte {
   return (
-    CONHECIDAS[fonte] ?? {
+    conhecidas[fonte] ?? {
       interna: false,
       icone: "public",
-      rotulo: `${fonte}, agora`,
+      rotulo: t("assistente.fontes.fallbackRotulo", { fonte }),
       chip: fonte,
     }
   );

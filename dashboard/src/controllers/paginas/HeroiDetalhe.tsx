@@ -15,6 +15,8 @@
 
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 
 import { useDetalhePersonagem } from "@models/api/consultas";
 import type {
@@ -69,19 +71,23 @@ function TabelaMapas({
   linhas,
   metricas,
   recorte,
+  t,
 }: {
   linhas: EstatisticaMapa[];
   metricas: MetricaEsporte[];
   recorte: string;
+  t: TFunction;
 }) {
   return (
     <div className="rolagem-discreta overflow-x-auto">
       <table className="w-full border-collapse text-left">
         <thead>
           <tr className="bg-surface-container font-label-caps text-label-caps uppercase tracking-wider text-outline">
-            <th className="px-space-md py-space-sm">{recorte === "rota" ? "Rota" : "Mapa"}</th>
-            <th className="px-space-md py-space-sm text-right">Partidas</th>
-            <th className="px-space-md py-space-sm">Winrate</th>
+            <th className="px-space-md py-space-sm">
+              {recorte === "rota" ? t("heroiDetalhe.desempenho.colRota") : t("heroiDetalhe.desempenho.colMapa")}
+            </th>
+            <th className="px-space-md py-space-sm text-right">{t("heroiDetalhe.desempenho.colPartidas")}</th>
+            <th className="px-space-md py-space-sm">{t("heroiDetalhe.desempenho.colWinrate")}</th>
             {metricas.map((m) => (
               <th key={m.chave} className="px-space-md py-space-sm text-right" title={m.descricao}>
                 {m.rotulo}
@@ -235,12 +241,12 @@ function BlocoRuna({ runa, rotulo }: { runa: RunaGuia; rotulo: string }) {
 }
 
 /** A aba "Guia": build, ordem de skill, feitiços, runas, combos. */
-function AbaGuia({ guia, nome }: { guia: GuiaPersonagem; nome: string }) {
+function AbaGuia({ guia, nome, t }: { guia: GuiaPersonagem; nome: string; t: TFunction }) {
   const prioridade = guia.prioridade_habilidades;
   const fonteRotulo =
     guia.fonte === "OP.GG"
       ? guia.rota
-        ? `OP.GG · rota ${guia.rota}`
+        ? `OP.GG · ${t("heroiDetalhe.recorte.rota")} ${guia.rota}`
         : "OP.GG"
       : guia.fonte;
 
@@ -249,11 +255,11 @@ function AbaGuia({ guia, nome }: { guia: GuiaPersonagem; nome: string }) {
       {guia.grupos.length > 0 && (
         <Painel
           icone="shopping_bag"
-          titulo="Build do meta"
-          descricao={`${fonteRotulo}. O que a comunidade compra em ${nome} no momento.`}
+          titulo={t("heroiDetalhe.guia.buildDoMetaTitulo")}
+          descricao={t("heroiDetalhe.guia.buildDoMetaDescricao", { fonte: fonteRotulo, nome })}
           meta={
             guia.atualizado_em ? (
-              <Selo>coleta {fmtData(guia.atualizado_em)}</Selo>
+              <Selo>{t("heroiDetalhe.guia.coleta", { data: fmtData(guia.atualizado_em) })}</Selo>
             ) : undefined
           }
         >
@@ -268,10 +274,10 @@ function AbaGuia({ guia, nome }: { guia: GuiaPersonagem; nome: string }) {
       {(guia.ordem_habilidades.length > 0 || guia.nota_habilidades) && (
         <Painel
           icone="trending_up"
-          titulo="Ordem de habilidades"
+          titulo={t("heroiDetalhe.guia.ordemHabilidadesTitulo")}
           descricao={
             prioridade.length > 0
-              ? `Prioridade de maximizar: ${prioridade.join(" › ")}.`
+              ? t("heroiDetalhe.guia.prioridadeDeMaximizar", { lista: prioridade.join(" › ") })
               : undefined
           }
         >
@@ -286,12 +292,12 @@ function AbaGuia({ guia, nome }: { guia: GuiaPersonagem; nome: string }) {
       )}
 
       {(guia.feiticos.length > 0 || guia.runa_primaria || guia.runa_secundaria) && (
-        <Painel icone="auto_awesome" titulo="Feitiços e runas">
+        <Painel icone="auto_awesome" titulo={t("heroiDetalhe.guia.feiticosERunas")}>
           <div className="flex flex-col gap-space-base">
             {guia.feiticos.length > 0 && (
               <div className="flex flex-col gap-space-xxs">
                 <span className="font-label-caps text-label-caps uppercase tracking-widest text-outline">
-                  Feitiços de invocador
+                  {t("heroiDetalhe.guia.feiticosDeInvocador")}
                 </span>
                 <div className="flex flex-wrap gap-space-xs">
                   {guia.feiticos.map((f, i) => (
@@ -303,10 +309,10 @@ function AbaGuia({ guia, nome }: { guia: GuiaPersonagem; nome: string }) {
               </div>
             )}
             {guia.runa_primaria && (
-              <BlocoRuna runa={guia.runa_primaria} rotulo="Primária" />
+              <BlocoRuna runa={guia.runa_primaria} rotulo={t("heroiDetalhe.guia.primaria")} />
             )}
             {guia.runa_secundaria && (
-              <BlocoRuna runa={guia.runa_secundaria} rotulo="Secundária" />
+              <BlocoRuna runa={guia.runa_secundaria} rotulo={t("heroiDetalhe.guia.secundaria")} />
             )}
           </div>
         </Painel>
@@ -315,8 +321,8 @@ function AbaGuia({ guia, nome }: { guia: GuiaPersonagem; nome: string }) {
       {guia.combos.length > 0 && (
         <Painel
           icone="smart_display"
-          titulo="Combos"
-          descricao="Demonstrações em vídeo que o OP.GG agrega do YouTube — conteúdo da comunidade."
+          titulo={t("heroiDetalhe.guia.combosTitulo")}
+          descricao={t("heroiDetalhe.guia.combosDescricao")}
         >
           <div className="flex flex-col gap-space-xs">
             {guia.combos.map((combo, i) => (
@@ -340,7 +346,7 @@ function AbaGuia({ guia, nome }: { guia: GuiaPersonagem; nome: string }) {
 }
 
 /** A aba "Desempenho": o agregado geral e o recorte por mapa/rota. */
-function AbaDesempenho({ dados }: { dados: DetalhePersonagem }) {
+function AbaDesempenho({ dados, t }: { dados: DetalhePersonagem; t: TFunction }) {
   const { geral, perfil, por_mapa: porMapa } = dados;
   const ic = geral ? intervaloWilson(geral.vitorias, geral.partidas) : null;
 
@@ -349,6 +355,7 @@ function AbaDesempenho({ dados }: { dados: DetalhePersonagem }) {
 
   // O recorte não é "mapa" em todo jogo: Valorant é por mapa, LoL por rota.
   const recorte = dados.jogo === "leagueoflegends" ? "rota" : "mapa";
+  const recorteRotulo = t(`heroiDetalhe.recorte.${recorte}`);
 
   return (
     <div className="flex flex-col gap-space-lg">
@@ -356,25 +363,25 @@ function AbaDesempenho({ dados }: { dados: DetalhePersonagem }) {
       {geral && geral.partidas > 0 ? (
         <section className="grid grid-cols-1 gap-space-base md:grid-cols-2 xl:grid-cols-4">
           <KpiHud
-            etiqueta="Winrate"
-            canto="GERAL"
+            etiqueta={t("heroiDetalhe.desempenho.winrate")}
+            canto={t("heroiDetalhe.desempenho.geral")}
             valor={fmtPercentual(geral.winrate)}
             rotulo={
               ic
-                ? `IC 95%: ${fmtDecimal(ic.minimo * 100, 1)}–${fmtDecimal(
-                    ic.maximo * 100,
-                    1,
-                  )}%`
-                : "sem intervalo"
+                ? t("heroiDetalhe.desempenho.icLabel", {
+                    min: fmtDecimal(ic.minimo * 100, 1),
+                    max: fmtDecimal(ic.maximo * 100, 1),
+                  })
+                : t("heroiDetalhe.desempenho.semIntervalo")
             }
             acento="secundaria"
-            notaVariacao={`${fmtNumero(geral.partidas)} partidas`}
+            notaVariacao={t("heroiDetalhe.desempenho.partidas", { n: fmtNumero(geral.partidas) })}
           />
           {perfil.metricas.slice(0, 3).map((m, i) => (
             <KpiHud
               key={m.chave}
               etiqueta={m.rotulo}
-              canto={m.unidade === "%" ? "TAXA" : "MÉDIA"}
+              canto={m.unidade === "%" ? t("heroiDetalhe.desempenho.taxa") : t("heroiDetalhe.desempenho.media")}
               valor={fmtMetrica(geral.metricas[m.chave], m)}
               rotulo={m.descricao}
               acento={i === 0 ? "primaria" : "terciaria"}
@@ -382,9 +389,9 @@ function AbaDesempenho({ dados }: { dados: DetalhePersonagem }) {
           ))}
         </section>
       ) : (
-        <Painel icone="query_stats" titulo="Sem estatística">
+        <Painel icone="query_stats" titulo={t("heroiDetalhe.desempenho.semEstatisticaTitulo")}>
           <p className="font-body-md text-body-md text-on-surface-variant">
-            Nenhuma fonte publicou número de desempenho para {dados.nome} ainda.
+            {t("heroiDetalhe.desempenho.semEstatisticaCorpo", { nome: dados.nome })}
           </p>
         </Painel>
       )}
@@ -393,38 +400,40 @@ function AbaDesempenho({ dados }: { dados: DetalhePersonagem }) {
       {porMapa.length > 0 && (
         <Painel
           icone="map"
-          titulo={`Desempenho por ${recorte}`}
-          descricao={`${perfil.nota_fonte} A média geral acima esconde a variação entre ${recorte}s.`}
-          meta={<Selo>{porMapa.length} {recorte}s</Selo>}
+          titulo={t("heroiDetalhe.desempenho.desempenhoPor", { recorte: recorteRotulo })}
+          descricao={`${perfil.nota_fonte} ${t("heroiDetalhe.desempenho.descricaoVariacao", { recorte: recorteRotulo })}`}
+          meta={<Selo>{t("heroiDetalhe.desempenho.metaRecorte", { n: porMapa.length, recorte: recorteRotulo })}</Selo>}
         >
           {melhorMapa && piorMapa && melhorMapa.mapa !== piorMapa.mapa && (
             <div className="flex flex-wrap gap-space-lg">
               <Numero
-                rotulo={`Melhor ${recorte}`}
+                rotulo={t("heroiDetalhe.desempenho.melhorRecorte", { recorte: recorteRotulo })}
                 valor={
                   <span style={{ color: PALETA_POLOS.positivo }}>
                     {melhorMapa.mapa} · {fmtPercentual(melhorMapa.winrate)}
                   </span>
                 }
-                titulo={`${fmtNumero(melhorMapa.partidas)} partidas`}
+                titulo={t("heroiDetalhe.desempenho.partidas", { n: fmtNumero(melhorMapa.partidas) })}
               />
               <Numero
-                rotulo={`Pior ${recorte}`}
+                rotulo={t("heroiDetalhe.desempenho.piorRecorte", { recorte: recorteRotulo })}
                 valor={
                   <span style={{ color: PALETA_POLOS.negativo }}>
                     {piorMapa.mapa} · {fmtPercentual(piorMapa.winrate)}
                   </span>
                 }
-                titulo={`${fmtNumero(piorMapa.partidas)} partidas`}
+                titulo={t("heroiDetalhe.desempenho.partidas", { n: fmtNumero(piorMapa.partidas) })}
               />
               <Numero
-                rotulo="Amplitude"
-                valor={`${fmtDecimal(melhorMapa.winrate - piorMapa.winrate, 1)} pp`}
-                titulo={`diferença entre ${recorte === "rota" ? "a melhor e a pior rota" : "o melhor e o pior mapa"}`}
+                rotulo={t("heroiDetalhe.desempenho.amplitude")}
+                valor={t("heroiDetalhe.desempenho.amplitudePp", {
+                  pp: fmtDecimal(melhorMapa.winrate - piorMapa.winrate, 1),
+                })}
+                titulo={t(`heroiDetalhe.desempenho.amplitudeTooltip.${recorte}`)}
               />
             </div>
           )}
-          <TabelaMapas linhas={porMapa} metricas={perfil.metricas} recorte={recorte} />
+          <TabelaMapas linhas={porMapa} metricas={perfil.metricas} recorte={recorte} t={t} />
         </Painel>
       )}
 
@@ -432,10 +441,10 @@ function AbaDesempenho({ dados }: { dados: DetalhePersonagem }) {
       {dados.habilidades.length > 0 && (
         <Painel
           icone="bolt"
-          titulo="Habilidades"
+          titulo={t("heroiDetalhe.habilidades.titulo")}
           descricao={
             dados.habilidades.some((h) => h.video)
-              ? "Clipe e texto oficiais da Riot."
+              ? t("heroiDetalhe.habilidades.descricaoComVideo")
               : undefined
           }
         >
@@ -495,7 +504,7 @@ function AbaDesempenho({ dados }: { dados: DetalhePersonagem }) {
   );
 }
 
-function Ficha({ dados }: { dados: DetalhePersonagem }) {
+function Ficha({ dados, t }: { dados: DetalhePersonagem; t: TFunction }) {
   const { perfil } = dados;
   const [aba, setAba] = useState<"desempenho" | "guia">("desempenho");
   const temGuia = dados.guia !== null;
@@ -544,7 +553,7 @@ function Ficha({ dados }: { dados: DetalhePersonagem }) {
               className="flex w-fit items-center gap-space-xxs font-title-code text-title-code text-outline transition-colors hover:text-primary"
             >
               <Icone nome="arrow_back" className="text-[16px]" />
-              voltar aos {perfil.substantivo_plural}
+              {t("heroiDetalhe.voltarAos", { plural: perfil.substantivo_plural })}
             </Link>
           </div>
         </div>
@@ -558,8 +567,8 @@ function Ficha({ dados }: { dados: DetalhePersonagem }) {
           >
             {(
               [
-                ["desempenho", "Desempenho"],
-                ["guia", "Guia"],
+                ["desempenho", t("heroiDetalhe.abas.desempenho")],
+                ["guia", t("heroiDetalhe.abas.guia")],
               ] as const
             ).map(([chave, rotulo]) => (
               <button
@@ -578,26 +587,27 @@ function Ficha({ dados }: { dados: DetalhePersonagem }) {
             ))}
           </div>
           {aba === "desempenho" ? (
-            <AbaDesempenho dados={dados} />
+            <AbaDesempenho dados={dados} t={t} />
           ) : (
-            <AbaGuia guia={dados.guia!} nome={dados.nome} />
+            <AbaGuia guia={dados.guia!} nome={dados.nome} t={t} />
           )}
         </>
       ) : (
-        <AbaDesempenho dados={dados} />
+        <AbaDesempenho dados={dados} t={t} />
       )}
     </div>
   );
 }
 
 export function HeroiDetalhePagina() {
+  const { t } = useTranslation();
   const { idPersonagem } = useParams();
   const id = Number(idPersonagem);
   const detalhe = useDetalhePersonagem(id);
 
   return (
     <Consulta estado={detalhe} altura={320}>
-      {(dados) => <Ficha dados={dados} />}
+      {(dados) => <Ficha dados={dados} t={t} />}
     </Consulta>
   );
 }

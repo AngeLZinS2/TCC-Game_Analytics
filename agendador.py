@@ -102,7 +102,11 @@ def _apps_monitorados() -> list[int]:
 
 
 def _coletar_steam(settings: Settings, storage: RawStorage) -> CollectionResult:
-    from services.collectors.steam_collector import SteamCollector, top_mais_jogados
+    from services.collectors.steam_collector import (
+        SteamCollector,
+        apps_com_preco_alterado,
+        top_mais_jogados,
+    )
 
     monitorados = _apps_monitorados()
 
@@ -118,11 +122,22 @@ def _coletar_steam(settings: Settings, storage: RawStorage) -> CollectionResult:
         descobertos = [app for app in do_ranking if app not in ja_conhecidos]
         monitorados = monitorados + descobertos
 
+    # Fila de preco alterado (Fase 35): apps cujo `price_change_number` mudou
+    # desde o ultimo sync do catalogo completo. Persistida no Postgres, nao em
+    # memoria - sobrevive a restart. Some aos ja monitorados como o ranking
+    # acima; `load_steam.py` desmarca cada um depois de reprocessar.
+    ja_conhecidos = set(monitorados)
+    com_preco_alterado = [
+        app for app in apps_com_preco_alterado() if app not in ja_conhecidos
+    ]
+    monitorados = monitorados + com_preco_alterado
+
     logger.info(
         "apps monitorados",
         extra={
             "quantidade": len(monitorados) or "semente",
             "novos_do_ranking": len(descobertos),
+            "preco_alterado": len(com_preco_alterado),
         },
     )
 
@@ -131,6 +146,22 @@ def _coletar_steam(settings: Settings, storage: RawStorage) -> CollectionResult:
     coletor = SteamCollector(
         raw_storage=storage, app_ids=monitorados or None, settings=settings
     )
+    try:
+        return coletor.run(carregar=True)
+    finally:
+        coletor.close()
+
+
+def _coletar_steam_catalogo(settings: Settings, storage: RawStorage) -> CollectionResult:
+    """Indice do catalogo completo + sync incremental de preco (Fase 35).
+
+    Cada execucao processa so `steam_sync_pages_per_run` pagina(s) do
+    `GetAppList` (checkpoint em `steam_sincronizacao`) e retorna - nunca o
+    catalogo inteiro de uma vez. Ver `services/collectors/steam_catalogo.py`.
+    """
+    from services.collectors.steam_catalogo import SteamCatalogoCollector
+
+    coletor = SteamCatalogoCollector(raw_storage=storage, settings=settings)
     try:
         return coletor.run(carregar=True)
     finally:
@@ -700,6 +731,16 @@ def montar_tarefas(settings: Settings) -> list[Tarefa]:
             intervalo_segundos=settings.agendador_steam_online_minutos * 60,
             executar=_coletar_steam_online,
         ),
+    ]
+    if settings.steam_api_key:
+        tarefas.append(
+            Tarefa(
+                nome="steam_catalogo",
+                intervalo_segundos=settings.agendador_steam_catalogo_minutos * 60,
+                executar=_coletar_steam_catalogo,
+            )
+        )
+    tarefas += [
         Tarefa(
             nome="opendota",
             intervalo_segundos=settings.agendador_opendota_minutos * 60,

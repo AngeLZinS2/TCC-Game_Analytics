@@ -50,6 +50,13 @@ def verificar_token_firebase(
             algorithms=["RS256"],
             audience=project_id,
             issuer=f"https://securetoken.google.com/{project_id}",
+            # Tolerancia pro `iat`/`exp`: sem isso, um relogio do container
+            # alguns segundos atras do relogio real (comum em VM do Docker
+            # Desktop/WSL2 apos o host dormir) rejeita como "ImmatureSignatureError:
+            # not yet valid" um token que acabou de ser emitido - visto ao vivo
+            # num login por GitHub aqui (Fase 35). 60s cobre esse desvio sem abrir
+            # janela real pra forjar token (ainda precisa da assinatura do Google).
+            leeway=60,
         )
     except Exception as exc:  # noqa: BLE001 - qualquer falha de verificacao vira 401
         raise TokenInvalido(f"{type(exc).__name__}: {exc}") from exc

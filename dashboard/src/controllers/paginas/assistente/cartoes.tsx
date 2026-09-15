@@ -8,6 +8,7 @@
 
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 
 import type { BlocoContexto, JogoAoVivo, JogoRecomendado } from "@models/api/tipos";
 import { Icone, Selo } from "@views/componentes/base";
@@ -24,8 +25,9 @@ import { descreverFonte } from "./fontes";
  * (lido uma vez, e que muda). Sem a marca, os dois chegariam iguais a quem lê.
  */
 export function BlocoDeContexto({ bloco }: { bloco: BlocoContexto }) {
+  const { t } = useTranslation();
   const [aberto, setAberto] = useState(false);
-  const fonte = descreverFonte(bloco.fonte);
+  const fonte = descreverFonte(bloco.fonte, t);
   const externa = !fonte.interna;
 
   return (
@@ -54,7 +56,7 @@ export function BlocoDeContexto({ bloco }: { bloco: BlocoContexto }) {
         </span>
         <span className="flex items-center gap-space-xs">
           <span className="font-label-caps text-label-caps uppercase text-outline">
-            {bloco.conteudo.split("\n").length} linhas
+            {t("assistente.cartoes.linhas", { n: bloco.conteudo.split("\n").length })}
           </span>
           <Icone
             nome={aberto ? "expand_less" : "expand_more"}
@@ -82,6 +84,7 @@ export function BlocoDeContexto({ bloco }: { bloco: BlocoContexto }) {
  * um jogo que o texto livre "pareceu" estar recomendando.
  */
 export function CartaoJogoRecomendado({ jogo }: { jogo: JogoRecomendado }) {
+  const { t } = useTranslation();
   return (
     <Link
       to={`/steam/${jogo.app_id}`}
@@ -121,7 +124,7 @@ export function CartaoJogoRecomendado({ jogo }: { jogo: JogoRecomendado }) {
           {jogo.nota_avaliacoes !== null && (
             <span
               className="flex items-center gap-space-xxs text-tertiary"
-              title="Avaliações positivas"
+              title={t("jogoSteam.kpis.avaliacoesPositivas")}
             >
               <Icone nome="thumb_up" className="text-[14px]" />
               {fmtPercentual(jogo.nota_avaliacoes)}
@@ -129,13 +132,13 @@ export function CartaoJogoRecomendado({ jogo }: { jogo: JogoRecomendado }) {
           )}
           <span
             className="flex items-center gap-space-xxs text-on-surface-variant"
-            title="Jogadores simultâneos agora"
+            title={t("assistente.cartoes.jogadoresSimultaneosAgora")}
           >
             <Icone nome="groups" className="text-[14px]" />
             {fmtNumero(jogo.jogadores_simultaneos)}
           </span>
           <span className="text-primary-container">
-            {jogo.gratuito ? "Gratuito" : fmtMoeda(jogo.preco, jogo.moeda)}
+            {jogo.gratuito ? t("jogoSteam.gratuito") : fmtMoeda(jogo.preco, jogo.moeda)}
           </span>
         </div>
       </div>
@@ -154,6 +157,7 @@ export function CartaoJogoRecomendado({ jogo }: { jogo: JogoRecomendado }) {
  * de interpretar o texto do modelo - mesmo motivo de `CartaoJogoRecomendado`.
  */
 export function CartaoJogoAoVivo({ jogo }: { jogo: JogoAoVivo }) {
+  const { t } = useTranslation();
   const ofertas = jogo.ofertas;
   const maisBarata = ofertas[0];
 
@@ -207,7 +211,9 @@ export function CartaoJogoAoVivo({ jogo }: { jogo: JogoAoVivo }) {
                 : "bg-surface-container-highest text-outline"
             }`}
           >
-            {jogo.no_nosso_banco ? "no nosso catálogo" : "consultado agora, fora do catálogo"}
+            {jogo.no_nosso_banco
+              ? t("assistente.cartoes.noNossoCatalogo")
+              : t("assistente.cartoes.consultadoAgoraFora")}
           </span>
         </div>
 
@@ -222,22 +228,22 @@ export function CartaoJogoAoVivo({ jogo }: { jogo: JogoAoVivo }) {
         <div className="grid grid-cols-1 gap-space-sm rounded-lg bg-surface-container p-space-base sm:grid-cols-2">
           <div>
             <div className="font-label-caps text-label-caps uppercase tracking-widest text-outline">
-              Preço na Steam
+              {t("assistente.cartoes.precoNaSteam")}
             </div>
             <div className="mt-space-xxs font-headline-kpi text-headline-kpi leading-none text-on-surface">
-              {jogo.gratuito ? "Gratuito" : fmtMoeda(jogo.preco_atual, jogo.moeda)}
+              {jogo.gratuito ? t("jogoSteam.gratuito") : fmtMoeda(jogo.preco_atual, jogo.moeda)}
             </div>
           </div>
           {maisBarata && (
             <div>
               <div className="font-label-caps text-label-caps uppercase tracking-widest text-outline">
-                Melhor preço agora
+                {t("assistente.cartoes.melhorPrecoAgora")}
               </div>
               <div className="mt-space-xxs font-headline-kpi text-headline-kpi leading-none text-tertiary-container">
                 {fmtMoeda(maisBarata.preco, maisBarata.moeda)}
               </div>
               <div className="font-title-code text-title-code text-on-surface-variant">
-                na {maisBarata.loja}
+                {t("assistente.cartoes.naLoja", { loja: maisBarata.loja }).trim()}
               </div>
             </div>
           )}
@@ -248,8 +254,8 @@ export function CartaoJogoAoVivo({ jogo }: { jogo: JogoAoVivo }) {
             <table className="w-full border-collapse text-left">
               <thead>
                 <tr className="bg-surface-container font-label-caps text-label-caps uppercase tracking-wider text-outline">
-                  <th className="px-space-md py-space-xs">Loja</th>
-                  <th className="px-space-md py-space-xs text-right">Preço</th>
+                  <th className="px-space-md py-space-xs">{t("assistente.cartoes.colLoja")}</th>
+                  <th className="px-space-md py-space-xs text-right">{t("assistente.cartoes.colPreco")}</th>
                   <th className="px-space-md py-space-xs" />
                 </tr>
               </thead>
@@ -260,7 +266,7 @@ export function CartaoJogoAoVivo({ jogo }: { jogo: JogoAoVivo }) {
                       {o.loja}
                       {o.melhor && (
                         <span className="ml-space-xs rounded bg-tertiary/10 px-space-xxs py-[1px] font-badge-status text-badge-status uppercase text-tertiary">
-                          melhor
+                          {t("assistente.cartoes.melhor")}
                         </span>
                       )}
                     </td>
@@ -275,7 +281,7 @@ export function CartaoJogoAoVivo({ jogo }: { jogo: JogoAoVivo }) {
                           rel="noreferrer"
                           className="inline-flex items-center gap-space-xxs font-title-code text-title-code text-primary hover:underline"
                         >
-                          abrir <Icone nome="open_in_new" className="text-[13px]" />
+                          {t("assistente.cartoes.abrir")} <Icone nome="open_in_new" className="text-[13px]" />
                         </a>
                       )}
                     </td>
@@ -288,13 +294,15 @@ export function CartaoJogoAoVivo({ jogo }: { jogo: JogoAoVivo }) {
 
         {jogo.menor_historico && (
           <p className="font-body-sm text-body-sm text-on-surface-variant">
-            Já custou{" "}
+            {t("assistente.cartoes.jaCustouPrefixo")}{" "}
             <strong className="text-tertiary-container">
               {fmtMoeda(jogo.menor_historico.preco, jogo.menor_historico.moeda)}
             </strong>
-            {jogo.menor_historico.loja && ` na ${jogo.menor_historico.loja}`}
-            {jogo.menor_historico.data && ` (${fmtData(jogo.menor_historico.data)})`} — o menor
-            preço já registrado (IsThereAnyDeal).
+            {jogo.menor_historico.loja &&
+              t("assistente.cartoes.naLoja", { loja: jogo.menor_historico.loja })}
+            {jogo.menor_historico.data &&
+              t("assistente.cartoes.comData", { data: fmtData(jogo.menor_historico.data) })}
+            {t("assistente.cartoes.sufixoFinal")}
           </p>
         )}
 
@@ -304,7 +312,7 @@ export function CartaoJogoAoVivo({ jogo }: { jogo: JogoAoVivo }) {
               to={`/steam/${jogo.app_id}`}
               className="inline-flex items-center gap-space-xxs font-title-code text-title-code text-primary hover:underline"
             >
-              Ver ficha completa <Icone nome="arrow_forward" className="text-[14px]" />
+              {t("assistente.cartoes.verFichaCompleta")} <Icone nome="arrow_forward" className="text-[14px]" />
             </Link>
           )}
           <a
@@ -313,7 +321,7 @@ export function CartaoJogoAoVivo({ jogo }: { jogo: JogoAoVivo }) {
             rel="noreferrer"
             className="inline-flex items-center gap-space-xxs font-title-code text-title-code text-on-surface-variant hover:text-primary hover:underline"
           >
-            Página na Steam <Icone nome="open_in_new" className="text-[13px]" />
+            {t("assistente.cartoes.paginaNaSteam")} <Icone nome="open_in_new" className="text-[13px]" />
           </a>
         </div>
       </div>

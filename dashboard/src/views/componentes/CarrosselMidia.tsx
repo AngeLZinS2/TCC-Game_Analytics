@@ -23,6 +23,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Hls from "hls.js";
+import { useTranslation } from "react-i18next";
 
 import type { MidiaJogo } from "@models/api/tipos";
 import { Icone } from "./base";
@@ -129,6 +130,7 @@ export function CarrosselMidia({
   midias: MidiaJogo[];
   className?: string;
 }) {
+  const { t } = useTranslation();
   const [indice, setIndice] = useState(0);
   const [mudo, setMudo] = useState(true);
   const [progresso, setProgresso] = useState(0);
@@ -186,7 +188,7 @@ export function CarrosselMidia({
           <button
             type="button"
             onClick={() => setMudo((m) => !m)}
-            aria-label={mudo ? "Ativar som" : "Desativar som"}
+            aria-label={mudo ? t("comum.carrosselMidia.ativarSom") : t("comum.carrosselMidia.desativarSom")}
             className="absolute right-space-sm top-space-sm flex h-7 w-7 items-center justify-center rounded bg-black/60 text-on-surface backdrop-blur-sm transition-colors hover:text-primary"
           >
             <Icone nome={mudo ? "volume_off" : "volume_up"} className="text-[15px]" />
@@ -202,7 +204,7 @@ export function CarrosselMidia({
                 key={midia.url}
                 type="button"
                 onClick={() => setIndice(i)}
-                aria-label={`Ir para a mídia ${i + 1} de ${midias.length}`}
+                aria-label={t("comum.carrosselMidia.irParaMidia", { n: i + 1, total: midias.length })}
                 aria-current={i === indice}
                 className={`h-1 rounded-full transition-all ${
                   i === indice ? "w-5 bg-primary" : "w-1 bg-on-surface/40 hover:bg-on-surface/70"

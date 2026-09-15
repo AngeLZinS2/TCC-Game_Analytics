@@ -7,6 +7,8 @@
  */
 
 import { useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 
 import { useJogadores, useSaude } from "@models/api/consultas";
 import { usePaginacaoLocal } from "@models/hooks/paginacao";
@@ -29,10 +31,10 @@ import { fmtDecimal, fmtNumero, fmtPercentual } from "@util/formatos";
 
 /** As abas de ordenacao rapida da toolbar da tabela. */
 const ORDENACOES = [
-  { valor: "partidas", rotulo: "Volume", icone: "insights" },
-  { valor: "kda", rotulo: "KDA", icone: "swords" },
-  { valor: "winrate", rotulo: "Winrate", icone: "trending_up" },
-  { valor: "gpm", rotulo: "GPM", icone: "payments" },
+  { valor: "partidas", chave: "volume", icone: "insights" },
+  { valor: "kda", chave: "kda", icone: "swords" },
+  { valor: "winrate", chave: "winrate", icone: "trending_up" },
+  { valor: "gpm", chave: "gpm", icone: "payments" },
 ] as const;
 
 type Ordenacao = (typeof ORDENACOES)[number]["valor"];
@@ -105,10 +107,12 @@ function CartaoMvp({
   jogador,
   posicao,
   jogo,
+  t,
 }: {
   jogador: ResumoJogador;
   posicao: number;
   jogo: string;
+  t: TFunction;
 }) {
   return (
     <div className="relative flex flex-col gap-space-md overflow-hidden rounded bg-surface-container-low p-space-base shadow-xl">
@@ -139,8 +143,10 @@ function CartaoMvp({
               {nomeDe(jogador)}
             </span>
             <span className="font-body-sm text-body-sm text-outline">
-              {fmtNumero(jogador.partidas)} partidas · {fmtNumero(jogador.vitorias)}{" "}
-              vitórias
+              {t("jogadores.podio.partidasVitorias", {
+                partidas: fmtNumero(jogador.partidas),
+                vitorias: fmtNumero(jogador.vitorias),
+              })}
             </span>
           </div>
         </div>
@@ -156,7 +162,7 @@ function CartaoMvp({
       <div className="grid grid-cols-3 gap-space-xs rounded bg-surface-container-lowest/80 p-space-sm">
         <div className="flex min-w-0 flex-col">
           <span className="font-label-caps text-label-caps uppercase text-outline">
-            {jogo === "leagueoflegends" ? "Campeão" : "Herói"} assinatura
+            {jogo === "leagueoflegends" ? t("jogadores.podio.campeaoAssinatura") : t("jogadores.podio.heroiAssinatura")}
           </span>
           <span className="truncate font-title-code text-title-code text-on-surface">
             {jogador.personagem_assinatura ?? "—"}
@@ -168,7 +174,7 @@ function CartaoMvp({
 
         <div className="flex flex-col">
           <span className="font-label-caps text-label-caps uppercase text-outline">
-            KDA médio
+            {t("jogadores.podio.kdaMedio")}
           </span>
           <span className="font-title-code text-title-code text-tertiary">
             {fmtDecimal(jogador.kda_medio, 2)}
@@ -177,7 +183,7 @@ function CartaoMvp({
 
         <div className="flex flex-col">
           <span className="font-label-caps text-label-caps uppercase text-outline">
-            Winrate
+            {t("jogadores.podio.winrate")}
           </span>
           <span className="font-title-code text-title-code text-primary">
             {fmtPercentual(jogador.winrate)}
@@ -189,6 +195,7 @@ function CartaoMvp({
 }
 
 export function JogadoresPagina() {
+  const { t } = useTranslation();
   const { jogo } = useJogoAtual();
   // LoL traz elenco (foto/rota/time) e o "GPM" na verdade é ouro por jogo — o
   // feed não dá duração de jogo confiável.
@@ -232,7 +239,7 @@ export function JogadoresPagina() {
         <div className="flex flex-col gap-space-xs">
           <div className="flex flex-wrap items-center gap-space-sm">
             <h1 className="font-headline-lg text-headline-lg uppercase tracking-wide text-on-surface">
-              Jogadores
+              {t("jogadores.cabecalho.titulo")}
             </h1>
             <div className="inline-flex items-center gap-space-xs rounded bg-surface-container-high px-space-sm py-space-xxs shadow-inner">
               <span className="relative flex h-2.5 w-2.5">
@@ -253,25 +260,25 @@ export function JogadoresPagina() {
                   online ? "text-tertiary" : "text-error"
                 }`}
               >
-                {online ? "Ao vivo" : "Sem contato"}
+                {online ? t("jogadores.cabecalho.aoVivo") : t("jogadores.cabecalho.semContato")}
               </span>
             </div>
             <span className="hidden font-label-caps text-label-caps uppercase tracking-wider text-outline sm:inline">
-              Player Analytics // Deck 04
+              {t("jogadores.cabecalho.deck")}
             </span>
           </div>
 
           <p className="font-body-sm text-body-sm text-on-surface-variant">
             {ehLol
-              ? "Cada linha agrega os stats por jogo (K/D/A, ouro, CS) das partidas da cena que foram coletadas — o feed oficial guarda ~2 semanas, então o histórico cresce com o tempo."
-              : "Cada linha agrega o fato por jogador. Partidas em que a API anonimiza o participante geram fato sem jogador — o KDA continua analisável, mas elas não aparecem aqui."}
+              ? t("jogadores.cabecalho.descricaoLol")
+              : t("jogadores.cabecalho.descricaoOutros")}
           </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-space-sm">
           <label className={LABEL_CAMPO}>
             <span className="font-label-caps text-label-caps uppercase tracking-widest text-outline">
-              {ehLol ? "Mín. jogos" : "Mín. partidas"}
+              {ehLol ? t("jogadores.cabecalho.minJogos") : t("jogadores.cabecalho.minPartidas")}
             </span>
             <select
               value={minPartidas}
@@ -280,7 +287,7 @@ export function JogadoresPagina() {
             >
               {(ehLol ? [0, 1, 3, 5, 10] : [1, 3, 5, 10]).map((valor) => (
                 <option key={valor} value={valor}>
-                  {valor === 0 ? "Todos" : valor}
+                  {valor === 0 ? t("jogadores.cabecalho.todos") : valor}
                 </option>
               ))}
             </select>
@@ -291,7 +298,7 @@ export function JogadoresPagina() {
             aoClicar={() => jogadores.refetch()}
             desabilitado={jogadores.isFetching}
           >
-            {jogadores.isFetching ? "Atualizando…" : "Atualizar"}
+            {jogadores.isFetching ? t("jogadores.cabecalho.atualizando") : t("jogadores.cabecalho.atualizar")}
           </Botao>
         </div>
       </section>
@@ -307,15 +314,15 @@ export function JogadoresPagina() {
             type="search"
             value={busca}
             onChange={(evento) => setBusca(evento.target.value)}
-            placeholder="Buscar jogador pelo apelido…"
-            aria-label="Buscar jogador"
+            placeholder={t("jogadores.controles.buscarPlaceholder")}
+            aria-label={t("jogadores.controles.buscarAria")}
             className="w-full rounded bg-surface-container-lowest py-space-sm pl-10 pr-space-sm font-title-code text-title-code text-on-surface shadow-inner placeholder:text-outline focus:bg-surface-container focus:outline-none"
           />
         </div>
       </section>
 
       {/* ==================== QUATRO KPIS ==================== */}
-      <Consulta estado={jogadores} altura={160} vazio="Nenhum jogador atinge esse mínimo.">
+      <Consulta estado={jogadores} altura={160} vazio={t("jogadores.vazioMinimo")}>
         {(lista: ResumoJogador[]) => {
           const comKda = lista.filter((j) => j.kda_medio !== null);
           const kdaMedio = comKda.length
@@ -327,27 +334,27 @@ export function JogadoresPagina() {
           return (
             <section className="grid grid-cols-1 gap-space-base md:grid-cols-2 xl:grid-cols-4">
               <KpiHud
-                etiqueta="Jogadores no recorte"
-                canto={minPartidas === 0 ? "ELENCO TODO" : `MÍN. ${minPartidas}`}
+                etiqueta={t("jogadores.kpis.jogadoresNoRecorte")}
+                canto={minPartidas === 0 ? t("jogadores.kpis.elencoTodo") : t("jogadores.kpis.min", { n: minPartidas })}
                 valor={fmtNumero(lista.length)}
                 valorNumerico={lista.length}
                 formatarValor={fmtNumero}
-                rotulo="Identificados na dimensão"
+                rotulo={t("jogadores.kpis.identificadosNaDimensao")}
                 acento="primaria"
-                notaVariacao={`${fmtNumero(participacoes)} participações`}
+                notaVariacao={t("jogadores.kpis.participacoes", { n: fmtNumero(participacoes) })}
               >
                 <Segmentos acesos={lista.length ? 6 : 0} acento="primaria" />
               </KpiHud>
 
               <KpiHud
-                etiqueta="KDA médio do grupo"
-                canto="MÉDIA"
+                etiqueta={t("jogadores.kpis.kdaMedioDoGrupo")}
+                canto={t("jogadores.kpis.media")}
                 valor={kdaMedio === null ? "—" : fmtDecimal(kdaMedio, 2)}
                 valorNumerico={kdaMedio}
                 formatarValor={(v) => fmtDecimal(v, 2)}
-                rotulo="(kills + assists) / deaths"
+                rotulo={t("jogadores.kpis.kdaFormula")}
                 acento="secundaria"
-                notaVariacao={`${comKda.length} com KDA calculável`}
+                notaVariacao={t("jogadores.kpis.comKdaCalculavel", { n: comKda.length })}
               >
                 <Sparkline
                   valores={[...lista]
@@ -359,12 +366,12 @@ export function JogadoresPagina() {
               </KpiHud>
 
               <KpiHud
-                etiqueta="Maior winrate"
-                canto="TOPO"
+                etiqueta={t("jogadores.kpis.maiorWinrate")}
+                canto={t("jogadores.kpis.topo")}
                 valor={melhorWinrate ? fmtPercentual(melhorWinrate.winrate) : "—"}
                 valorNumerico={melhorWinrate?.winrate ?? null}
                 formatarValor={(v) => fmtPercentual(v)}
-                rotulo={melhorWinrate ? nomeDe(melhorWinrate) : "sem dados"}
+                rotulo={melhorWinrate ? nomeDe(melhorWinrate) : t("jogadores.kpis.semDados")}
                 acento="terciaria"
               >
                 <div className="mt-space-md">
@@ -377,8 +384,8 @@ export function JogadoresPagina() {
               </KpiHud>
 
               <KpiHud
-                etiqueta={ehLol ? "Campeões assinatura" : "Heróis assinatura"}
-                canto="DIVERSIDADE"
+                etiqueta={ehLol ? t("jogadores.kpis.campeoesAssinatura") : t("jogadores.kpis.heroisAssinatura")}
+                canto={t("jogadores.kpis.diversidade")}
                 valor={fmtNumero(
                   new Set(
                     lista.map((j) => j.personagem_assinatura).filter(Boolean),
@@ -390,9 +397,9 @@ export function JogadoresPagina() {
                   ).size
                 }
                 formatarValor={fmtNumero}
-                rotulo={`${ehLol ? "Campeões" : "Heróis"} distintos como principal`}
+                rotulo={ehLol ? t("jogadores.kpis.campeoesDistintos") : t("jogadores.kpis.heroisDistintos")}
                 acento="primaria"
-                notaVariacao="entre os jogadores do recorte"
+                notaVariacao={t("jogadores.kpis.entrePresentesNoRecorte")}
               />
             </section>
           );
@@ -403,9 +410,11 @@ export function JogadoresPagina() {
       {podio.length > 0 && (
         <Painel
           icone="military_tech"
-          titulo={`Destaques por ${ORDENACOES.find((o) => o.valor === ordenacao)?.rotulo}`}
-          descricao="Os três primeiros da ordenação escolhida abaixo."
-          meta={<Selo cor="primario">Top 3</Selo>}
+          titulo={t("jogadores.podio.destaquesPor", {
+            ordenacao: t(`jogadores.ordenacoes.${ORDENACOES.find((o) => o.valor === ordenacao)?.chave}`),
+          })}
+          descricao={t("jogadores.podio.descricao")}
+          meta={<Selo cor="primario">{t("jogadores.podio.top3")}</Selo>}
         >
           <div className="grid grid-cols-1 gap-space-base lg:grid-cols-3">
             {podio.map((jogador, indice) => (
@@ -414,6 +423,7 @@ export function JogadoresPagina() {
                 jogador={jogador}
                 posicao={indice}
                 jogo={jogo}
+                t={t}
               />
             ))}
           </div>
@@ -423,8 +433,8 @@ export function JogadoresPagina() {
       {/* ==================== TABELA ==================== */}
       <Painel
         icone="table_rows"
-        titulo="Ranking de jogadores"
-        descricao="A mesma agregação do pódio, com todas as colunas."
+        titulo={t("jogadores.tabela.titulo")}
+        descricao={t("jogadores.tabela.descricao")}
         meta={
           <div className="flex flex-wrap items-center gap-space-xs">
             {ORDENACOES.map((opcao) => (
@@ -434,34 +444,34 @@ export function JogadoresPagina() {
                 icone={opcao.icone}
                 aoClicar={() => setOrdenacao(opcao.valor)}
               >
-                {opcao.rotulo}
+                {t(`jogadores.ordenacoes.${opcao.chave}`)}
               </Pilula>
             ))}
           </div>
         }
       >
-        <Consulta estado={jogadores} vazio="Nenhum jogador atinge esse mínimo.">
+        <Consulta estado={jogadores} vazio={t("jogadores.vazioMinimo")}>
           {() =>
             pag.fatia.length === 0 ? (
               <p className="rounded bg-surface-container px-space-base py-space-md font-body-md text-body-md text-on-surface-variant">
-                Nenhum jogador bate com a busca.
+                {t("jogadores.tabela.vazioBusca")}
               </p>
             ) : (
               <div className="rolagem-discreta overflow-x-auto rounded-lg bg-surface-container-lowest">
                 <table className="w-full border-collapse text-left">
                   <thead>
                     <tr className="bg-surface-container font-label-caps text-label-caps uppercase tracking-wider text-outline">
-                      <th className="px-space-md py-space-sm">#</th>
-                      <th className="px-space-md py-space-sm">Jogador</th>
+                      <th className="px-space-md py-space-sm">{t("jogadores.tabela.colNumero")}</th>
+                      <th className="px-space-md py-space-sm">{t("jogadores.tabela.colJogador")}</th>
                       <th className="px-space-md py-space-sm">
-                        {ehLol ? "Campeão assinatura" : "Herói assinatura"}
+                        {ehLol ? t("jogadores.tabela.colCampeaoAssinatura") : t("jogadores.tabela.colHeroiAssinatura")}
                       </th>
-                      <th className="px-space-md py-space-sm text-right">Partidas</th>
-                      <th className="px-space-md py-space-sm text-right">Vitórias</th>
-                      <th className="px-space-md py-space-sm">Winrate</th>
-                      <th className="px-space-md py-space-sm text-right">KDA</th>
+                      <th className="px-space-md py-space-sm text-right">{t("jogadores.tabela.colPartidas")}</th>
+                      <th className="px-space-md py-space-sm text-right">{t("jogadores.tabela.colVitorias")}</th>
+                      <th className="px-space-md py-space-sm">{t("jogadores.tabela.colWinrate")}</th>
+                      <th className="px-space-md py-space-sm text-right">{t("jogadores.tabela.colKda")}</th>
                       <th className="px-space-md py-space-sm text-right">
-                        {ehLol ? "Ouro/jogo" : "GPM"}
+                        {ehLol ? t("jogadores.tabela.colOuroPorJogo") : t("jogadores.tabela.colGpm")}
                       </th>
                     </tr>
                   </thead>
@@ -570,7 +580,7 @@ export function JogadoresPagina() {
           opcoesPorPagina={[5, 15, 25, 50]}
           aoMudarPagina={pag.setPagina}
           aoMudarPorPagina={pag.setPorPagina}
-          resumo={<>{fmtNumero(ordenados.length)} jogadores no recorte</>}
+          resumo={t("jogadores.tabela.paginacaoResumo", { n: fmtNumero(ordenados.length) })}
         />
       </Painel>
     </>

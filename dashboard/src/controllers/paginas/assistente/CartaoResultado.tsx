@@ -9,6 +9,8 @@
  * Sem serie, este cartao nao aparece. Nao existe versao "aproximada" dele.
  */
 
+import { useTranslation } from "react-i18next";
+
 import type { SerieAssistente } from "@models/api/tipos";
 import { Icone } from "@views/componentes/base";
 import { useContagem, useEntrarNaTela } from "@models/hooks/animacao";
@@ -26,6 +28,7 @@ export function CartaoResultado({
   serie: SerieAssistente;
   pergunta: string;
 }) {
+  const { t } = useTranslation();
   const [lider, ...demais] = serie.itens;
   if (!lider) return null;
 
@@ -34,7 +37,7 @@ export function CartaoResultado({
   return (
     <div className="flex flex-col gap-space-base">
       <div className="flex items-center gap-space-xs font-label-caps text-label-caps uppercase tracking-widest text-primary">
-        <span aria-hidden>✦</span> Resultado
+        <span aria-hidden>✦</span> {t("assistente.resultado.resultado")}
       </div>
 
       {/* A pergunta acima do numero: sem ela, "94,1%" sozinho nao diz de que. */}
@@ -66,7 +69,9 @@ export function CartaoResultado({
 
       <p className="flex items-center gap-space-xs border-t border-outline-variant/20 pt-space-sm font-badge-status text-badge-status uppercase tracking-wider text-outline">
         <Icone nome="database" className="text-[14px]" />
-        {serie.itens.length} {serie.itens.length === 1 ? "item" : "itens"} · {serie.titulo}
+        {serie.itens.length}{" "}
+        {serie.itens.length === 1 ? t("assistente.resultado.item") : t("assistente.resultado.itens")} ·{" "}
+        {serie.titulo}
       </p>
     </div>
   );

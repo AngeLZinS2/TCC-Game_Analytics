@@ -29,6 +29,7 @@ from controllers.routers import (
     ranking_oficial,
     sentimento,
     steam,
+    steam_ofertas,
     telemetria,
     usuario,
     xbox,
@@ -64,6 +65,7 @@ app.add_middleware(
 
 app.include_router(meta.router)
 app.include_router(steam.router)
+app.include_router(steam_ofertas.router)
 app.include_router(catalogo.router)
 app.include_router(xbox.router)
 app.include_router(dota.router)

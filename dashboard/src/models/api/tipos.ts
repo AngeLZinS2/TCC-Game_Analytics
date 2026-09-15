@@ -180,6 +180,28 @@ export interface MenorPrecoHistorico {
   data: string | null;
 }
 
+/**
+ * A promoção ABERTA agora na própria Steam (não ITAD) — Fase 35.
+ *
+ * Distinta de `OfertaLoja`/`MenorPrecoHistorico` acima, que são cross-loja
+ * via ITAD. Vem de uma transição real de desconto observada naquele jogo,
+ * nunca inferida de agregado de catálogo.
+ */
+export interface PromocaoAtivaSteam {
+  preco_original: Decimal;
+  preco_final: Decimal;
+  desconto_percentual: number;
+  moeda: string;
+  iniciada_em: string;
+}
+
+/** Um ponto do histórico de preço primeiro-partido da Steam — Fase 35. */
+export interface PontoHistoricoPrecoSteam {
+  registrado_em: string;
+  preco_final: Decimal;
+  desconto_percentual: number;
+}
+
 export interface DetalheJogoSteam {
   jogo: JogoSteam;
   ficha: FichaJogoSteam;
@@ -188,6 +210,23 @@ export interface DetalheJogoSteam {
   ofertas: OfertaLoja[];
   menor_preco_historico: MenorPrecoHistorico | null;
   serie: PontoSerie[];
+  /** Preço primeiro-partido da Steam (Fase 35). `null` sem promoção ativa. */
+  promocao_ativa: PromocaoAtivaSteam | null;
+  /** Histórico de preço SÓ da Steam — `menor_preco_historico` acima continua cross-loja. */
+  historico_preco_steam: PontoHistoricoPrecoSteam[];
+}
+
+/** Uma linha de `GET /api/steam/ofertas` — Fase 35. */
+export interface OfertaSteam {
+  app_id: number;
+  nome: string;
+  imagem_header: string | null;
+  preco_original: Decimal;
+  preco_final: Decimal;
+  desconto_percentual: number;
+  moeda: string;
+  pais: string;
+  iniciada_em: string;
 }
 
 export interface AgregadoGenero {
@@ -1176,11 +1215,6 @@ export interface RankingOficial {
 
 // --- Painel admin (Fase 30) ---
 
-export interface TokenAdmin {
-  token: string;
-  expira_em: string;
-}
-
 export interface PontoAcessoDia {
   dia: string;
   acessos: number;
@@ -1226,6 +1260,21 @@ export interface TabelaBanco {
 export interface SaudeBanco {
   tamanho_texto: string;
   tabelas: TabelaBanco[];
+}
+
+export interface StatusAdmin {
+  admin: boolean;
+}
+
+/** Só o que não fere a LGPD: nome e data de criação, sem e-mail nem uid. */
+export interface ContaResumo {
+  nome_exibicao: string | null;
+  criado_em: string;
+}
+
+export interface ListaContasAdmin {
+  total: number;
+  contas: ContaResumo[];
 }
 
 export interface PerfilUsuario {

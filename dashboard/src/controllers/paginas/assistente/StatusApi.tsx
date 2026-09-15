@@ -8,12 +8,15 @@
  * limitado agora" em vez de parecer bug nosso.
  */
 
+import { useTranslation } from "react-i18next";
+
 import { useSaudeAssistente } from "@models/api/consultas";
 import { Icone } from "@views/componentes/base";
 import { PALETA_POLOS, TOKENS } from "@views/tema";
 import { fmtRelativo } from "@util/formatos";
 
 export function StatusApiAssistente() {
+  const { t } = useTranslation();
   const saude = useSaudeAssistente();
   const dados = saude.data;
 
@@ -31,12 +34,12 @@ export function StatusApiAssistente() {
         : PALETA_POLOS.negativo;
 
   const rotulo = semHistorico
-    ? "Ainda sem chamadas nesta sessão"
+    ? t("assistente.statusApi.semChamadas")
     : dados.rate_limited_recente
-      ? "Rate-limited pelo provedor"
+      ? t("assistente.statusApi.rateLimited")
       : dados.ultima_chamada_sucesso
-        ? "Operando normalmente"
-        : "Com falhas recentes";
+        ? t("assistente.statusApi.operandoNormalmente")
+        : t("assistente.statusApi.comFalhas");
 
   return (
     <div className="flex flex-col gap-space-xs rounded-xl bg-surface-container-low/60 p-space-base">
@@ -48,7 +51,7 @@ export function StatusApiAssistente() {
             aria-hidden
           />
           <span className="font-label-caps text-label-caps uppercase tracking-widest text-on-surface">
-            Status da API
+            {t("assistente.statusApi.titulo")}
           </span>
           <span className="font-body-sm text-body-sm text-on-surface-variant">
             · {rotulo}
@@ -60,11 +63,14 @@ export function StatusApiAssistente() {
             className="font-badge-status text-badge-status uppercase tracking-wide text-outline"
             title={
               dados.ultima_chamada_em
-                ? `última chamada: ${fmtRelativo(dados.ultima_chamada_em)}`
+                ? t("assistente.statusApi.ultimaChamada", { tempo: fmtRelativo(dados.ultima_chamada_em) })
                 : undefined
             }
           >
-            {dados.sucessos_recente}/{dados.total_recente} ok · últimas chamadas
+            {t("assistente.statusApi.okDeTotal", {
+              sucessos: dados.sucessos_recente,
+              total: dados.total_recente,
+            })}
           </span>
         )}
       </div>
@@ -74,7 +80,18 @@ export function StatusApiAssistente() {
           {dados.chamadas.map((chamada, i) => (
             <span
               key={i}
-              title={`${chamada.sucesso ? "ok" : chamada.rate_limited ? "rate-limited (429)" : `erro${chamada.status_http ? ` ${chamada.status_http}` : ""}`} · ${fmtRelativo(chamada.quando)} · ${chamada.duracao_ms} ms`}
+              title={`${
+                chamada.sucesso
+                  ? t("assistente.statusApi.tooltipOk")
+                  : chamada.rate_limited
+                    ? t("assistente.statusApi.tooltipRateLimited")
+                    : chamada.status_http
+                      ? t("assistente.statusApi.tooltipErroComStatus", { status: chamada.status_http })
+                      : t("assistente.statusApi.tooltipErro")
+              }${t("assistente.statusApi.tooltipDetalhe", {
+                tempo: fmtRelativo(chamada.quando),
+                duracao: chamada.duracao_ms,
+              })}`}
               className="h-3 w-1.5 rounded-full"
               style={{
                 backgroundColor: chamada.sucesso
@@ -90,9 +107,7 @@ export function StatusApiAssistente() {
       {dados.rate_limited_recente && (
         <p className="flex items-start gap-space-xs font-body-sm text-body-sm text-on-surface-variant">
           <Icone nome="info" className="mt-[2px] text-[15px] text-primary" />
-          O modelo grátis do OpenRouter tem cota compartilhada entre todo
-          mundo que usa a chave sem crédito (50 perguntas/dia, 20/min). Tente
-          de novo em instantes.
+          {t("assistente.statusApi.rodapeRateLimited")}
         </p>
       )}
     </div>

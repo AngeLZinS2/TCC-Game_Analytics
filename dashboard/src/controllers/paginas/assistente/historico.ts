@@ -14,6 +14,7 @@
  */
 
 import { useCallback } from "react";
+import type { TFunction } from "i18next";
 
 import {
   useAvaliarPerguntaAssistente,
@@ -56,25 +57,27 @@ export function useHistoricoAssistente() {
 }
 
 /** O rotulo do grupo de uma entrada: "Hoje", "Ontem" ou a data. */
-export function grupoDoDia(iso: string): string {
+export function grupoDoDia(iso: string, t: TFunction, idioma: string): string {
   const data = new Date(iso);
   const hoje = new Date();
   const ontem = new Date();
   ontem.setDate(hoje.getDate() - 1);
 
   const mesmoDia = (a: Date, b: Date) => a.toDateString() === b.toDateString();
-  if (mesmoDia(data, hoje)) return "Hoje";
-  if (mesmoDia(data, ontem)) return "Ontem";
-  return data.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" });
+  if (mesmoDia(data, hoje)) return t("assistente.historico.hoje");
+  if (mesmoDia(data, ontem)) return t("assistente.historico.ontem");
+  return data.toLocaleDateString(idioma, { day: "2-digit", month: "short" });
 }
 
 /** Agrupa preservando a ordem (mais recente primeiro) que a lista ja tem. */
 export function agruparPorDia(
   entradas: EntradaHistorico[],
+  t: TFunction,
+  idioma: string,
 ): { dia: string; itens: EntradaHistorico[] }[] {
   const grupos: { dia: string; itens: EntradaHistorico[] }[] = [];
   for (const entrada of entradas) {
-    const dia = grupoDoDia(entrada.em);
+    const dia = grupoDoDia(entrada.em, t, idioma);
     const ultimo = grupos[grupos.length - 1];
     if (ultimo && ultimo.dia === dia) ultimo.itens.push(entrada);
     else grupos.push({ dia, itens: [entrada] });

@@ -12,9 +12,12 @@
  */
 
 import { NavLink, useLocation } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 
-import { useJogosDisponiveis } from "@models/api/consultas";
+import { useJogosDisponiveis, useSouAdmin } from "@models/api/consultas";
+import { useUsuario } from "@models/conta/contexto";
 import { Icone } from "@views/componentes/base";
+import { SeletorIdioma } from "@views/componentes/SeletorIdioma";
 import { corDoJogo } from "@views/tema";
 import { NAVEGACAO } from "./navegacao";
 
@@ -33,8 +36,11 @@ function marcadorAtivo(ativo: boolean) {
 }
 
 export function TrilhoLateral() {
+  const { t } = useTranslation();
   const { pathname } = useLocation();
   const jogos = useJogosDisponiveis();
+  const { usuario } = useUsuario();
+  const souAdmin = useSouAdmin();
 
   const lista = (jogos.data ?? [])
     .filter((j) => j.partidas > 0 || j.equipes > 0 || j.agenda > 0)
@@ -59,11 +65,11 @@ export function TrilhoLateral() {
             return (
               <div key="esports">
                 <span className="mt-space-sm block px-space-sm pb-space-xxs font-label-caps text-label-caps uppercase tracking-widest text-outline">
-                  {item.rotulo}
+                  {t(`nav.itens.${item.chave}`)}
                 </span>
                 {lista.length === 0 && (
                   <span className="block px-space-sm py-space-xs font-body-sm text-body-sm text-outline">
-                    Nada coletado ainda.
+                    {t("comum.nadaColetadoAinda")}
                   </span>
                 )}
                 {lista.map((jogo) => {
@@ -90,11 +96,11 @@ export function TrilhoLateral() {
                     className={`${ITEM} ${INATIVO} pl-space-base font-body-sm text-outline`}
                   >
                     <span className="w-4 shrink-0" aria-hidden />
-                    ver visão geral
+                    {t("nav.verVisaoGeral")}
                   </NavLink>
                 )}
                 <span className="mt-space-sm block px-space-sm pb-space-xxs font-label-caps text-label-caps uppercase tracking-widest text-outline">
-                  Mais
+                  {t("nav.mais")}
                 </span>
               </div>
             );
@@ -103,22 +109,55 @@ export function TrilhoLateral() {
           if (item.rota === null) {
             return (
               <span
-                key={item.rotulo}
+                key={item.chave}
                 className={`${ITEM} cursor-not-allowed text-outline/50`}
                 aria-disabled
               >
                 <Icone nome={item.icone} className="text-[19px]" />
-                <span className="truncate">{item.rotulo}</span>
+                <span className="truncate">{t(`nav.itens.${item.chave}`)}</span>
                 <span className="ml-auto rounded bg-surface-container px-space-xxs py-[1px] font-badge-status text-badge-status text-outline">
-                  em breve
+                  {t("comum.emBreve")}
                 </span>
               </span>
             );
           }
 
+          // "Perfil" é o mesmo link de sempre, mas logado ele vira a
+          // identidade da conta (foto + nome) em vez de ícone genérico +
+          // rótulo — sem duplicar em outro lugar da barra.
+          if (item.rota === "/perfil" && usuario) {
+            return (
+              <NavLink
+                key={item.chave}
+                to={item.rota}
+                className={({ isActive }) => `${ITEM} ${isActive ? ATIVO : INATIVO}`}
+              >
+                {({ isActive }) => (
+                  <>
+                    {marcadorAtivo(isActive)}
+                    {usuario.photoURL ? (
+                      <img
+                        src={usuario.photoURL}
+                        alt=""
+                        className="h-6 w-6 shrink-0 rounded-full object-cover"
+                      />
+                    ) : (
+                      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary-container/20 font-label-caps text-label-caps text-primary">
+                        {(usuario.displayName ?? usuario.email ?? "?").charAt(0).toUpperCase()}
+                      </span>
+                    )}
+                    <span className="min-w-0 flex-1 truncate">
+                      {usuario.displayName ?? usuario.email?.split("@")[0] ?? t("nav.itens.perfil")}
+                    </span>
+                  </>
+                )}
+              </NavLink>
+            );
+          }
+
           return (
             <NavLink
-              key={item.rotulo}
+              key={item.chave}
               to={item.rota}
               end={item.rota === "/painel"}
               className={({ isActive }) => `${ITEM} ${isActive ? ATIVO : INATIVO}`}
@@ -127,7 +166,7 @@ export function TrilhoLateral() {
                 <>
                   {marcadorAtivo(isActive)}
                   <Icone nome={item.icone} className="text-[19px]" />
-                  <span className="truncate">{item.rotulo}</span>
+                  <span className="truncate">{t(`nav.itens.${item.chave}`)}</span>
                   {item.selo && (
                     <span className="ml-auto rounded bg-surface-container-high px-space-xxs py-[1px] font-badge-status text-badge-status text-primary">
                       {item.selo}
@@ -139,6 +178,25 @@ export function TrilhoLateral() {
           );
         })}
 
+        {/* Painel Admin — não é um item de `NAVEGACAO`: só existe pra conta
+            do dono do site (`ADMIN_FIREBASE_UIDS` no backend). Ninguém mais
+            vê este link, nem logado; quem tentar `/admin` na unha esbarra no
+            403 do backend do mesmo jeito. */}
+        {souAdmin.data?.admin && (
+          <NavLink
+            to="/admin"
+            className={({ isActive }) => `${ITEM} ${isActive ? ATIVO : INATIVO}`}
+          >
+            {({ isActive }) => (
+              <>
+                {marcadorAtivo(isActive)}
+                <Icone nome="admin_panel_settings" className="text-[19px]" />
+                <span className="truncate">{t("nav.painelAdmin")}</span>
+              </>
+            )}
+          </NavLink>
+        )}
+
         {/* Sai da SPA: `/mobile.html` é página estática (Vite `public/`). Por
             isso `<a>` de verdade, não `<NavLink>`. */}
         <a
@@ -146,9 +204,16 @@ export function TrilhoLateral() {
           className={`${ITEM} ${INATIVO} mt-space-sm border-t border-outline-variant/25 pt-space-md`}
         >
           <Icone nome="install_mobile" className="text-[19px]" />
-          <span className="truncate">APK Mobile</span>
+          <span className="truncate">{t("nav.apkMobile")}</span>
           <Icone nome="arrow_outward" className="ml-auto text-[15px] opacity-50" />
         </a>
+
+        <div className="flex items-center justify-between px-space-sm pt-space-xs">
+          <span className="font-label-caps text-label-caps uppercase tracking-widest text-outline">
+            {t("idioma.nome")}
+          </span>
+          <SeletorIdioma />
+        </div>
       </nav>
     </aside>
   );

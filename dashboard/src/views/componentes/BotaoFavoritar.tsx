@@ -8,6 +8,7 @@
  */
 
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 
 import { useUsuario } from "@models/conta/contexto";
 import { Icone } from "./base";
@@ -21,7 +22,7 @@ export function BotaoFavoritar({
   favoritado,
   aoAlternar,
   ocupado = false,
-  rotulo = "Favoritar",
+  rotulo,
   tamanho = "md",
 }: {
   favoritado: boolean;
@@ -30,9 +31,11 @@ export function BotaoFavoritar({
   rotulo?: string;
   tamanho?: keyof typeof TAMANHOS;
 }) {
+  const { t } = useTranslation();
   const { usuario } = useUsuario();
   const navegar = useNavigate();
   const medidas = TAMANHOS[tamanho];
+  const rotuloExibido = rotulo ?? t("comum.favoritar.favoritar");
 
   function clicar() {
     if (!usuario) {
@@ -47,7 +50,13 @@ export function BotaoFavoritar({
       type="button"
       onClick={clicar}
       disabled={ocupado}
-      title={usuario ? (favoritado ? "Remover dos favoritos" : rotulo) : "Entre para favoritar"}
+      title={
+        usuario
+          ? favoritado
+            ? t("comum.favoritar.removerDosFavoritos")
+            : rotuloExibido
+          : t("comum.favoritar.entreParaFavoritar")
+      }
       aria-pressed={favoritado}
       className={`inline-flex shrink-0 items-center justify-center rounded-full transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${medidas.caixa} ${
         favoritado

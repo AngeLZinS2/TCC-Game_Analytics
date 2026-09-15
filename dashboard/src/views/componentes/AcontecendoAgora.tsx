@@ -13,6 +13,7 @@
 
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 
 import { useDestaquesHome } from "@models/api/consultas";
 import type { ConfrontoAoVivo, DestaqueConfronto } from "@models/api/tipos";
@@ -77,6 +78,7 @@ function CartaoAoVivo({
   c: ConfrontoAoVivo;
   aoSelecionar: () => void;
 }) {
+  const { t } = useTranslation();
   return (
     <div
       role="button"
@@ -96,7 +98,7 @@ function CartaoAoVivo({
         {c.ao_vivo ? (
           <span className="flex items-center gap-space-xxs font-badge-status text-badge-status uppercase tracking-widest text-error">
             <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-error" aria-hidden />
-            ao vivo
+            {t("modalConfrontoDetalhe.status.aoVivo")}
           </span>
         ) : (
           <span
@@ -132,6 +134,7 @@ function CartaoAoVivo({
 }
 
 export function AcontecendoAgora() {
+  const { t } = useTranslation();
   const { data } = useDestaquesHome();
   const [aberto, setAberto] = useState<string | null>(null);
   const itens = data?.ao_vivo ?? [];
@@ -144,10 +147,12 @@ export function AcontecendoAgora() {
       <div className="flex items-center justify-between gap-space-sm">
         <h2 className="flex items-center gap-space-xs font-headline-sm text-headline-sm uppercase tracking-wide text-on-surface">
           <Icone nome="sensors" className="text-[20px] text-primary" />
-          Acontecendo agora
+          {t("comum.acontecendoAgora.titulo")}
         </h2>
         <Selo cor={nVivos > 0 ? "negativo" : "primario"}>
-          {nVivos > 0 ? `${nVivos} ao vivo` : `${itens.length} marcados`}
+          {nVivos > 0
+            ? t("comum.acontecendoAgora.aoVivoCount", { n: nVivos })
+            : t("comum.acontecendoAgora.marcados", { n: itens.length })}
         </Selo>
       </div>
       <div className="grid grid-cols-1 gap-space-sm sm:grid-cols-2 xl:grid-cols-3">
@@ -171,6 +176,7 @@ function DestaqueCard({
   c: DestaqueConfronto;
   aoAbrirPartida: () => void;
 }) {
+  const { t } = useTranslation();
   const favoritoA = c.probabilidade_a >= 0.5;
   const pctA = Math.round(c.probabilidade_a * 100);
 
@@ -182,14 +188,14 @@ function DestaqueCard({
             <span style={{ color: TOKENS.modelo }}>
               <Icone nome="speed" className="text-[20px]" />
             </span>
-            Destaque do dia
+            {t("comum.acontecendoAgora.destaqueDoDia")}
           </h2>
           <span
             className="inline-flex items-center gap-space-xxs rounded px-space-xs py-space-xxs font-badge-status text-badge-status uppercase tracking-wider"
             style={{ color: TOKENS.modelo, background: `${TOKENS.modelo}14` }}
           >
             <Icone nome="bolt" className="text-[13px]" />
-            previsão
+            {t("comum.acontecendoAgora.previsaoBadge")}
           </span>
         </div>
         <Velocimetro
@@ -243,7 +249,7 @@ function DestaqueCard({
             </span>
           )}
           <span className="tabular-nums" title={fmtDataHora(c.inicio_previsto)}>
-            {c.ao_vivo ? "ao vivo" : fmtQuando(c.inicio_previsto)}
+            {c.ao_vivo ? t("modalConfrontoDetalhe.status.aoVivo") : fmtQuando(c.inicio_previsto)}
           </span>
           <CanaisTransmissao streams={c.streams} />
           <button
@@ -251,13 +257,13 @@ function DestaqueCard({
             onClick={aoAbrirPartida}
             className="inline-flex items-center gap-space-xxs text-primary hover:text-primary-fixed"
           >
-            <Icone nome="open_in_full" className="text-[13px]" /> ver partida
+            <Icone nome="open_in_full" className="text-[13px]" /> {t("comum.acontecendoAgora.verPartida")}
           </button>
           <Link
             to={`/esports/${c.jogo}/previsao`}
             className="ml-auto inline-flex items-center gap-space-xxs text-primary hover:text-primary-fixed"
           >
-            abrir análise <Icone nome="arrow_forward" className="text-[14px]" />
+            {t("comum.acontecendoAgora.abrirAnalise")} <Icone nome="arrow_forward" className="text-[14px]" />
           </Link>
         </div>
       </div>

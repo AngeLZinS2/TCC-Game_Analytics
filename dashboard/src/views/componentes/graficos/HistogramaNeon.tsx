@@ -7,6 +7,8 @@
  * grafico existe para dizer, em vez de duplicar o comprimento em cor.
  */
 
+import { useTranslation } from "react-i18next";
+
 import { useEntrarNaTela } from "@models/hooks/animacao";
 
 export interface FaixaHistograma {
@@ -25,10 +27,11 @@ export function HistogramaNeon({
   rodapeEsquerda?: React.ReactNode;
   rodapeDireita?: React.ReactNode;
 }) {
+  const { t } = useTranslation();
   if (faixas.length === 0) {
     return (
       <p className="flex h-48 items-center justify-center font-body-sm text-body-sm text-outline">
-        Nenhuma partida no recorte.
+        {t("comum.histogramaNeon.semPartidas")}
       </p>
     );
   }
@@ -68,7 +71,7 @@ export function HistogramaNeon({
                     className="h-1.5 w-1.5 animate-ping rounded-full bg-on-primary-container"
                     aria-hidden
                   />
-                  {percentual(faixa.valor)} MODAL
+                  {percentual(faixa.valor)} {t("comum.histogramaNeon.modal")}
                 </div>
               )}
 

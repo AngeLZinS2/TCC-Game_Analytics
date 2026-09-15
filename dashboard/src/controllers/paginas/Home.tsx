@@ -18,6 +18,7 @@
 
 import { useMemo, useState, type MouseEvent, type ReactNode } from "react";
 import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 
 import { useDestaquesHome, useMaisJogadosSteam, useVisaoGeral } from "@models/api/consultas";
 import { useContagem, useVisivel } from "@models/hooks/animacao";
@@ -44,45 +45,16 @@ function aoDestiltarCartao(evento: MouseEvent<HTMLElement>) {
 
 interface Pilar {
   icone: string;
-  titulo: string;
-  descricao: string;
+  chave: "catalogo" | "esports" | "modelos" | "assistente";
   destino: string;
   cor: "primary" | "secondary" | "tertiary";
 }
 
 const PILARES: Pilar[] = [
-  {
-    icone: "sports_esports",
-    titulo: "Catálogo Steam & Xbox",
-    descricao:
-      "Preço, desconto, jogadores simultâneos e gênero — consultado ao vivo na loja quando o jogo nem está no nosso banco ainda.",
-    destino: "/catalogo/steam",
-    cor: "primary",
-  },
-  {
-    icone: "emoji_events",
-    titulo: "E-Sports ao vivo",
-    descricao:
-      "Agenda, resultado e ranking oficial de Dota 2, CS, Valorant, LoL e mais — direto das fontes que cada cenário publica.",
-    destino: "/esports",
-    cor: "tertiary",
-  },
-  {
-    icone: "model_training",
-    titulo: "Modelos treinados aqui",
-    descricao:
-      "Sentimento de review e previsão de confronto, validados contra dado real — com a taxa base à mostra, não escondida atrás de uma porcentagem bonita.",
-    destino: "/recomendacoes",
-    cor: "secondary",
-  },
-  {
-    icone: "smart_toy",
-    titulo: "Assistente de IA",
-    descricao:
-      "Pergunta em português, resposta com o contexto exato que a sustentou — todo número citado dá pra conferir contra a fonte.",
-    destino: "/assistente",
-    cor: "primary",
-  },
+  { icone: "sports_esports", chave: "catalogo", destino: "/catalogo/steam", cor: "primary" },
+  { icone: "emoji_events", chave: "esports", destino: "/esports", cor: "tertiary" },
+  { icone: "model_training", chave: "modelos", destino: "/recomendacoes", cor: "secondary" },
+  { icone: "smart_toy", chave: "assistente", destino: "/assistente", cor: "primary" },
 ];
 
 const CORES_PILAR: Record<Pilar["cor"], { texto: string; anel: string; glow: string }> = {
@@ -156,6 +128,7 @@ function Secao({
 const TAMANHO_PAREDE = 10;
 
 export function HomePagina() {
+  const { t } = useTranslation();
   const heroRef = useParalaxeMouse<HTMLDivElement>();
   const geral = useVisaoGeral();
   // Pool maior que o exibido: alguns app_ids não têm o `capsule_231x87.jpg`
@@ -209,25 +182,23 @@ export function HomePagina() {
             <img
               src="/logo-completo.png"
               alt="PlayDB"
-              className="h-20 w-auto drop-shadow-[0_0_44px_rgba(90,140,255,0.35)] sm:h-24"
+              className="h-28 w-auto drop-shadow-[0_0_44px_rgba(90,140,255,0.35)] sm:h-36"
             />
 
             <span className="inline-flex items-center gap-space-xs rounded-full border border-outline-variant/40 bg-surface-container-lowest/80 px-space-md py-space-xs font-title-code text-title-code uppercase tracking-widest text-on-surface-variant backdrop-blur-sm">
               <span className="h-2 w-2 animate-pulse rounded-full bg-tertiary" aria-hidden />
-              instrumento de dados de jogos
+              {t("home.eyebrow")}
             </span>
 
             <h1 className="text-balance font-display-hero text-[clamp(2.5rem,1.5rem+5vw,4.75rem)] font-bold leading-[1.05] tracking-tight text-on-surface">
-              Dados de jogos e esports,{" "}
+              {t("home.titulo1")}{" "}
               <span className="bg-gradient-to-r from-primary via-primary-fixed to-tertiary bg-clip-text text-transparent">
-                direto da fonte.
+                {t("home.tituloDestaque")}
               </span>
             </h1>
 
             <p className="max-w-2xl text-balance font-body-lg text-body-lg text-on-surface-variant">
-              PlayDB coleta a Steam, a Xbox e o cenário profissional de esports, treina os
-              próprios modelos de sentimento e previsão, e mostra a origem de cada número —
-              nada aqui é estimado sem dizer que é.
+              {t("home.descricao")}
             </p>
 
             <div className="mt-space-sm flex flex-wrap items-center justify-center gap-space-sm">
@@ -235,7 +206,7 @@ export function HomePagina() {
                 to="/painel"
                 className="group inline-flex items-center gap-space-xs rounded bg-primary-container px-space-lg py-space-sm font-title-code text-title-code text-on-primary shadow-[0_0_32px_-8px_rgba(90,140,255,0.7)] transition-all hover:brightness-110"
               >
-                Entrar no painel
+                {t("home.ctaEntrarPainel")}
                 <Icone
                   nome="arrow_forward"
                   className="text-[18px] transition-transform group-hover:translate-x-1"
@@ -246,7 +217,7 @@ export function HomePagina() {
                 className="inline-flex items-center gap-space-xs rounded border border-outline-variant/50 px-space-lg py-space-sm font-title-code text-title-code text-on-surface-variant transition-colors hover:border-outline hover:text-on-surface"
               >
                 <Icone nome="smart_toy" className="text-[18px]" />
-                Falar com o Assistente
+                {t("home.ctaFalarAssistente")}
               </Link>
             </div>
           </div>
@@ -260,19 +231,19 @@ export function HomePagina() {
                 "translate3d(calc(var(--mx, 0) * -20px), calc(var(--my, 0) * -14px), 0)",
             }}
           >
-            <Estatistica valor={jogosSteam} rotulo="Jogos monitorados" />
-            <Estatistica valor={partidas} rotulo="Partidas coletadas" />
-            <Estatistica valor={jogadores} rotulo="Jogadores mapeados" />
-            <Estatistica valor={naSteamAgora} rotulo="Na Steam agora" />
+            <Estatistica valor={jogosSteam} rotulo={t("home.estatisticas.jogosMonitorados")} />
+            <Estatistica valor={partidas} rotulo={t("home.estatisticas.partidasColetadas")} />
+            <Estatistica valor={jogadores} rotulo={t("home.estatisticas.jogadoresMapeados")} />
+            <Estatistica valor={naSteamAgora} rotulo={t("home.estatisticas.naSteamAgora")} />
           </div>
         </div>
 
         <a
           href="#cobertura"
           className="dica-rolar relative z-10 mb-space-lg flex flex-col items-center gap-space-xxs self-center rounded-full border border-outline-variant/40 bg-surface-container-lowest/80 px-space-md py-space-xs font-label-caps text-label-caps uppercase tracking-widest text-on-surface-variant backdrop-blur-sm transition-colors hover:border-outline hover:text-on-surface"
-          aria-label="Rolar para ver mais"
+          aria-label={t("home.rolarAriaLabel")}
         >
-          <span>role pra ver mais</span>
+          <span>{t("home.rolarParaVerMais")}</span>
           <Icone nome="expand_more" className="text-[20px] text-primary" />
         </a>
       </div>
@@ -299,7 +270,7 @@ export function HomePagina() {
                   <span className="text-outline">vs</span>
                   <span className="text-on-surface">{c.equipe_b_nome}</span>
                   <span className="text-outline">
-                    {c.ao_vivo ? "· ao vivo agora" : `· ${fmtQuando(c.inicio_previsto)}`}
+                    {c.ao_vivo ? `· ${t("home.aoVivoAgora")}` : `· ${fmtQuando(c.inicio_previsto)}`}
                   </span>
                 </span>
               ))}
@@ -311,10 +282,12 @@ export function HomePagina() {
       {/* ==================== PILARES ==================== */}
       <Secao
         id="cobertura"
-        eyebrow="O que o site cobre"
+        eyebrow={t("home.pilares.eyebrow")}
         titulo={
           <>
-            Quatro frentes, <span className="text-primary">uma fonte só</span> de verdade.
+            {t("home.pilares.tituloPrefixo")}
+            <span className="text-primary">{t("home.pilares.tituloDestaque")}</span>
+            {t("home.pilares.tituloSufixo")}
           </>
         }
       >
@@ -323,7 +296,7 @@ export function HomePagina() {
             const cor = CORES_PILAR[pilar.cor];
             return (
               <Link
-                key={pilar.titulo}
+                key={pilar.chave}
                 to={pilar.destino}
                 onMouseMove={aoTiltarCartao}
                 onMouseLeave={aoDestiltarCartao}
@@ -337,13 +310,13 @@ export function HomePagina() {
                 <div className="relative flex flex-col gap-space-sm">
                   <Icone nome={pilar.icone} className={`text-[28px] ${cor.texto}`} />
                   <h3 className="font-headline-md text-headline-md font-semibold text-on-surface">
-                    {pilar.titulo}
+                    {t(`home.pilares.${pilar.chave}.titulo`)}
                   </h3>
                   <p className="font-body-md text-body-md text-on-surface-variant">
-                    {pilar.descricao}
+                    {t(`home.pilares.${pilar.chave}.descricao`)}
                   </p>
                   <span className={`mt-space-xs inline-flex items-center gap-space-xxs font-title-code text-title-code ${cor.texto}`}>
-                    Explorar
+                    {t("home.pilares.explorar")}
                     <Icone
                       nome="arrow_forward"
                       className="text-[16px] transition-transform group-hover:translate-x-1"
@@ -358,10 +331,12 @@ export function HomePagina() {
 
       {/* ==================== PAREDE DE CAPAS (PROVA REAL) ==================== */}
       <Secao
-        eyebrow="Não é maquete"
+        eyebrow={t("home.provaReal.eyebrow")}
         titulo={
           <>
-            O catálogo <span className="text-tertiary">vivo</span>, agora — direto da Valve.
+            {t("home.provaReal.tituloPrefixo")}
+            <span className="text-tertiary">{t("home.provaReal.tituloDestaque")}</span>
+            {t("home.provaReal.tituloSufixo")}
           </>
         }
         className="overflow-visible"
@@ -400,7 +375,7 @@ export function HomePagina() {
                       {jogo.nome ?? `App ${jogo.app_id}`}
                     </span>
                     <span className="font-title-code text-body-sm tabular-nums text-tertiary">
-                      {fmtNumero(jogo.jogadores_agora)} jogando
+                      {t("home.provaReal.jogando", { contagem: fmtNumero(jogo.jogadores_agora) })}
                     </span>
                   </div>
                 </div>
@@ -409,7 +384,7 @@ export function HomePagina() {
           </div>
         ) : (
           <p className="text-center font-body-md text-body-md text-outline">
-            Consultando a Steam agora — a parede aparece assim que a resposta chegar.
+            {t("home.provaReal.aguardando")}
           </p>
         )}
       </Secao>
@@ -418,18 +393,18 @@ export function HomePagina() {
       <div className="border-t border-outline-variant/25 bg-surface-container-lowest/60">
         <div className="mx-auto flex w-full max-w-4xl flex-col items-center gap-space-base px-space-base py-space-3xl text-center sm:px-space-lg">
           <h2 className="font-display-hero text-[clamp(1.5rem,1rem+2.2vw,2.5rem)] font-bold leading-tight text-on-surface">
-            O painel está rodando. <span className="text-primary">Agora mesmo.</span>
+            {t("home.chamadaFinal.titulo1")}{" "}
+            <span className="text-primary">{t("home.chamadaFinal.tituloDestaque")}</span>
           </h2>
           <p className="max-w-xl font-body-lg text-body-lg text-on-surface-variant">
-            Sem cadastro pra olhar os dados — só pra favoritar jogo, salvar time e usar o
-            Assistente de IA com a sua própria chave.
+            {t("home.chamadaFinal.descricao")}
           </p>
           <div className="flex flex-wrap items-center justify-center gap-space-sm">
             <Link
               to="/painel"
               className="group inline-flex items-center gap-space-xs rounded bg-primary-container px-space-lg py-space-sm font-title-code text-title-code text-on-primary transition-all hover:brightness-110"
             >
-              Entrar no painel
+              {t("home.ctaEntrarPainel")}
               <Icone
                 nome="arrow_forward"
                 className="text-[18px] transition-transform group-hover:translate-x-1"
@@ -442,11 +417,11 @@ export function HomePagina() {
               className="inline-flex items-center gap-space-xs rounded border border-outline-variant/50 px-space-lg py-space-sm font-title-code text-title-code text-on-surface-variant transition-colors hover:border-outline hover:text-on-surface"
             >
               <Icone nome="menu_book" className="text-[18px]" />
-              Documentação da API
+              {t("home.chamadaFinal.documentacao")}
             </a>
           </div>
           <p className="mt-space-lg font-label-caps text-label-caps uppercase tracking-widest text-outline">
-            PlayDB · projeto de TCC · coleta própria, sem mock
+            {t("home.chamadaFinal.rodape")}
           </p>
         </div>
       </div>

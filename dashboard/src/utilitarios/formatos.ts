@@ -1,17 +1,8 @@
 /** Formatadores de exibicao. Todos aceitam nulo e devolvem um travessao. */
 
-const VAZIO = "—"; // travessao: "nao coletado", diferente de zero
+import i18n from "@i18n/index";
 
-const numero = new Intl.NumberFormat("pt-BR");
-const numeroCurto = new Intl.NumberFormat("pt-BR", {
-  notation: "compact",
-  maximumFractionDigits: 1,
-});
-const dataHora = new Intl.DateTimeFormat("pt-BR", {
-  dateStyle: "short",
-  timeStyle: "short",
-});
-const dataCurta = new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "short" });
+const VAZIO = "—"; // travessao: "nao coletado", diferente de zero
 
 /**
  * Converte o texto ISO da API em Date.
@@ -36,18 +27,25 @@ export function paraNumero(valor: number | string | null | undefined): number | 
 
 export function fmtNumero(valor: number | string | null | undefined): string {
   const n = paraNumero(valor);
-  return n === null ? VAZIO : numero.format(n);
+  return n === null ? VAZIO : new Intl.NumberFormat(i18n.language).format(n);
 }
 
 /** Para eixos e KPIs: 536.314 vira "536,3 mil". */
 export function fmtCurto(valor: number | string | null | undefined): string {
   const n = paraNumero(valor);
-  return n === null ? VAZIO : numeroCurto.format(n);
+  return n === null
+    ? VAZIO
+    : new Intl.NumberFormat(i18n.language, {
+        notation: "compact",
+        maximumFractionDigits: 1,
+      }).format(n);
 }
 
 export function fmtDecimal(valor: number | string | null | undefined, casas = 1): string {
   const n = paraNumero(valor);
-  return n === null ? VAZIO : n.toLocaleString("pt-BR", { minimumFractionDigits: casas, maximumFractionDigits: casas });
+  return n === null
+    ? VAZIO
+    : n.toLocaleString(i18n.language, { minimumFractionDigits: casas, maximumFractionDigits: casas });
 }
 
 export function fmtPercentual(valor: number | string | null | undefined, casas = 1): string {
@@ -61,23 +59,29 @@ export function fmtMoeda(
 ): string {
   const n = paraNumero(valor);
   if (n === null) return VAZIO;
-  if (n === 0) return "Gratuito";
-  return n.toLocaleString("pt-BR", {
+  if (n === 0) return i18n.t("jogoSteam.gratuito");
+  return n.toLocaleString(i18n.language, {
     style: "currency",
     currency: moeda ?? "BRL",
   });
 }
 
 export function fmtDataHora(iso: string | null | undefined): string {
-  return iso ? dataHora.format(paraData(iso)) : VAZIO;
+  if (!iso) return VAZIO;
+  return new Intl.DateTimeFormat(i18n.language, { dateStyle: "short", timeStyle: "short" }).format(
+    paraData(iso),
+  );
 }
 
 export function fmtDataCurta(iso: string | null | undefined): string {
-  return iso ? dataCurta.format(paraData(iso)) : VAZIO;
+  if (!iso) return VAZIO;
+  return new Intl.DateTimeFormat(i18n.language, { day: "2-digit", month: "short" }).format(
+    paraData(iso),
+  );
 }
 
 export function fmtData(iso: string | null | undefined): string {
-  return iso ? paraData(iso).toLocaleDateString("pt-BR") : VAZIO;
+  return iso ? paraData(iso).toLocaleDateString(i18n.language) : VAZIO;
 }
 
 /** Segundos -> "38min 12s"; a duracao de partida nunca chega a horas por aqui. */
@@ -102,15 +106,20 @@ export function fmtRelativo(iso: string | null | undefined): string {
   if (!iso) return VAZIO;
 
   const segundos = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
-  const escalas: [limite: number, divisor: number, sufixo: string][] = [
-    [60, 1, "seg"],
-    [3600, 60, "min"],
-    [86400, 3600, "h"],
-    [2592000, 86400, "d"],
+  const escalas: [limite: number, divisor: number, chave: string][] = [
+    [60, 1, "comum.tempo.seg"],
+    [3600, 60, "comum.tempo.min"],
+    [86400, 3600, "comum.tempo.h"],
+    [2592000, 86400, "comum.tempo.d"],
   ];
 
-  for (const [limite, divisor, sufixo] of escalas) {
-    if (segundos < limite) return `Há ${Math.floor(segundos / divisor)} ${sufixo}`;
+  for (const [limite, divisor, chave] of escalas) {
+    if (segundos < limite) {
+      return i18n.t("comum.tempo.haCapitalizado", {
+        n: Math.floor(segundos / divisor),
+        unidade: i18n.t(chave),
+      });
+    }
   }
   return fmtData(iso);
 }
@@ -124,17 +133,20 @@ export function fmtQuando(iso: string | null | undefined): string {
   if (!iso) return VAZIO;
   const delta = (new Date(iso).getTime() - Date.now()) / 1000;
   const abs = Math.abs(delta);
-  if (abs < 60) return "agora";
+  if (abs < 60) return i18n.t("comum.tempo.agora");
 
-  const escalas: [limite: number, divisor: number, sufixo: string][] = [
-    [3600, 60, "min"],
-    [86400, 3600, "h"],
-    [2592000, 86400, "d"],
+  const escalas: [limite: number, divisor: number, chave: string][] = [
+    [3600, 60, "comum.tempo.min"],
+    [86400, 3600, "comum.tempo.h"],
+    [2592000, 86400, "comum.tempo.d"],
   ];
-  for (const [limite, divisor, sufixo] of escalas) {
+  for (const [limite, divisor, chave] of escalas) {
     if (abs < limite) {
       const n = Math.round(abs / divisor);
-      return delta > 0 ? `em ${n} ${sufixo}` : `há ${n} ${sufixo}`;
+      const unidade = i18n.t(chave);
+      return delta > 0
+        ? i18n.t("comum.tempo.em", { n, unidade })
+        : i18n.t("comum.tempo.haMinusculo", { n, unidade });
     }
   }
   return fmtData(iso);
@@ -143,9 +155,10 @@ export function fmtQuando(iso: string | null | undefined): string {
 /**
  * Classificacao da Steam traduzida e classificada em polaridade.
  *
- * A Steam devolve o rotulo em ingles ("Very Positive"); a tela inteira e em
- * portugues. A polaridade e o que decide a cor do chip - e ela sai do rotulo,
- * nao da nota numerica, porque e o rotulo que o usuario da Steam reconhece.
+ * A Steam devolve o rotulo em ingles ("Very Positive"); a tela mostra o nome
+ * traduzido no idioma ativo. A polaridade e o que decide a cor do chip - e ela
+ * sai do rotulo, nao da nota numerica, porque e o rotulo que o usuario da
+ * Steam reconhece.
  */
 export function classificacaoSteam(
   bruta: string | null | undefined,
@@ -153,21 +166,21 @@ export function classificacaoSteam(
   if (!bruta) return null;
 
   const mapa: Record<string, [string, "positiva" | "neutra" | "negativa"]> = {
-    "overwhelmingly positive": ["Extremamente Positivas", "positiva"],
-    "very positive": ["Muito Positivas", "positiva"],
-    positive: ["Positivas", "positiva"],
-    "mostly positive": ["Majoritariamente Positivas", "positiva"],
-    mixed: ["Neutras", "neutra"],
-    "mostly negative": ["Majoritariamente Negativas", "negativa"],
-    negative: ["Negativas", "negativa"],
-    "very negative": ["Muito Negativas", "negativa"],
-    "overwhelmingly negative": ["Extremamente Negativas", "negativa"],
+    "overwhelmingly positive": ["comum.classificacaoSteam.extremamentePositivas", "positiva"],
+    "very positive": ["comum.classificacaoSteam.muitoPositivas", "positiva"],
+    positive: ["comum.classificacaoSteam.positivas", "positiva"],
+    "mostly positive": ["comum.classificacaoSteam.majoritariamentePositivas", "positiva"],
+    mixed: ["comum.classificacaoSteam.neutras", "neutra"],
+    "mostly negative": ["comum.classificacaoSteam.majoritariamenteNegativas", "negativa"],
+    negative: ["comum.classificacaoSteam.negativas", "negativa"],
+    "very negative": ["comum.classificacaoSteam.muitoNegativas", "negativa"],
+    "overwhelmingly negative": ["comum.classificacaoSteam.extremamenteNegativas", "negativa"],
   };
 
   const achado = mapa[bruta.trim().toLowerCase()];
   // Rotulo desconhecido passa direto, sem cor: inventar polaridade seria pior
   // que nao ter nenhuma.
   return achado
-    ? { texto: achado[0], polaridade: achado[1] }
+    ? { texto: i18n.t(achado[0]), polaridade: achado[1] }
     : { texto: bruta, polaridade: "neutra" };
 }

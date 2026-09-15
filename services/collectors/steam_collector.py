@@ -113,6 +113,31 @@ def carregar_apps_semente(caminho: Path = ARQUIVO_SEMENTE) -> list[int]:
     return [int(item["app_id"]) for item in dados["apps"]]
 
 
+def apps_com_preco_alterado(limite: int = 0) -> list[int]:
+    """App_ids com `price_change_number` mudado desde o ultimo sync (Fase 35).
+
+    Le a fila persistida no Postgres (`dim_app_steam_nome.pendente_atualizacao_preco`,
+    marcada pelo passo incremental de `steam_catalogo.py`) - nenhuma fila em
+    memoria/Redis. A tarefa `steam` une esta lista ao criterio de selecao que
+    ja tem (top-jogados ∪ ja-no-banco ∪ semente); o flag so e zerado depois que
+    `load_steam.py` reprocessa o `appdetails` daquele app_id com sucesso.
+    """
+    from sqlalchemy import select
+
+    from models.models import DimAppSteamNome
+    from models.session import session_scope
+
+    with session_scope() as sessao:
+        consulta = (
+            select(DimAppSteamNome.app_id)
+            .where(DimAppSteamNome.pendente_atualizacao_preco.is_(True))
+            .order_by(DimAppSteamNome.app_id)
+        )
+        if limite:
+            consulta = consulta.limit(limite)
+        return [row[0] for row in sessao.execute(consulta)]
+
+
 class SteamCollector(BaseCollector[ResultadoSteam]):
     fonte = FONTE
 

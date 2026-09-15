@@ -1,30 +1,30 @@
-"""Painel admin - login por senha + estatisticas do site.
+"""Painel admin - login por conta (Firebase) + estatisticas do site.
 
-Sem sistema de contas (isso vem depois, antes do painel ir pra VPS de
-verdade): uma senha so, guardada em `ADMIN_SENHA` no `.env`, nunca no
-codigo. O login devolve um token assinado (HMAC com a propria senha) com
-validade curta (`admin_token_horas`) - toda outra rota daqui exige esse
-token no header `Authorization: Bearer <token>` via `exigir_admin`.
+Reusa a mesma conta do resto do site (`usuario.exigir_usuario` - Google,
+GitHub ou e-mail/senha via Firebase Auth): nao ha login separado. Acesso ao
+painel e uma questao de autorizacao, nao autenticacao - o uid da conta
+logada precisa estar em `ADMIN_FIREBASE_UIDS` (`.env`), uma lista de contas
+liberadas, nunca uma senha propria.
 
-Sem `ADMIN_SENHA` configurada, o painel inteiro responde 503 - mesmo padrao
-do assistente sem `OPENROUTER_API_KEY`: a ausencia da chave e o proprio
-"desligado", sem precisar de outro flag.
+Sem `ADMIN_FIREBASE_UIDS` configurada, o painel inteiro responde 503 - mesmo
+padrao do assistente sem `OPENROUTER_API_KEY`: a ausencia da configuracao e
+o proprio "desligado", sem precisar de outro flag. Uma conta logada mas fora
+da lista recebe 403, nao 401 - a diferenca importa pro frontend distinguir
+"precisa logar" de "logado, mas sem acesso".
 """
 
 from __future__ import annotations
 
-import hashlib
-import hmac
 import logging
-import time
 from datetime import datetime, timedelta, timezone
 
 import requests
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from config import Settings, get_settings
+from controllers.routers.usuario import UsuarioAtual, exigir_usuario
 from models.models import (
     AgendaPartida,
     DimJogador,
@@ -32,26 +32,32 @@ from models.models import (
     DimJogoSteam,
     DimJogoXbox,
     DimPartida,
+    DimUsuario,
     FatoAcessoSite,
     FatoAvaliacaoSteam,
     FatoBusca,
     FatoLolJogadorPartida,
     FatoMinutoPartida,
+    EventoSteam,
     FatoSnapshotJogoSteam,
     FatoSnapshotJogoXbox,
+    HistoricoPrecoSteam,
+    PromocaoSteam,
     RankingExterno,
     RawData,
+    SincronizacaoSteam,
 )
 from models.session import get_db
 from services.ml import telemetria_site
 from views.schemas import (
-    EntradaLoginAdmin,
+    ContaResumo,
+    ListaContasAdmin,
     MetricaSistema,
     PontoAcessoDia,
     SaudeBanco,
     SaudeSistema,
+    StatusAdmin,
     TabelaBanco,
-    TokenAdmin,
     VisaoGeralAdmin,
 )
 
@@ -65,53 +71,38 @@ router = APIRouter(prefix="/api/admin", tags=["admin"])
 # ---------------------------------------------------------------------------
 
 
-def _assinar(corpo: str, segredo: str) -> str:
-    return hmac.new(segredo.encode(), corpo.encode(), hashlib.sha256).hexdigest()
+def _uids_admin(settings: Settings) -> set[str]:
+    return {
+        uid.strip() for uid in (settings.admin_firebase_uids or "").split(",") if uid.strip()
+    }
 
 
-def _gerar_token(settings: Settings) -> tuple[str, datetime]:
-    expira_em = datetime.now(timezone.utc) + timedelta(hours=settings.admin_token_horas)
-    corpo = str(int(expira_em.timestamp()))
-    return f"{corpo}.{_assinar(corpo, settings.admin_senha)}", expira_em
+def exigir_admin(usuario: UsuarioAtual = Depends(exigir_usuario)) -> UsuarioAtual:
+    """Dependencia do FastAPI - toda rota admin usa isto.
 
-
-def _token_valido(token: str, settings: Settings) -> bool:
-    try:
-        corpo, assinatura = token.split(".", 1)
-    except ValueError:
-        return False
-    if not hmac.compare_digest(assinatura, _assinar(corpo, settings.admin_senha)):
-        return False
-    try:
-        return int(corpo) > time.time()
-    except ValueError:
-        return False
-
-
-def exigir_admin(authorization: str | None = Header(default=None)) -> None:
-    """Dependencia do FastAPI - toda rota admin (exceto `/login`) usa isto."""
-    settings = get_settings()
-    if not settings.admin_senha:
+    Empilha em cima de `exigir_usuario`: primeiro precisa de uma conta
+    logada (401 sem isso, como qualquer outra rota protegida), depois checa
+    se o uid dela esta na lista de administradores.
+    """
+    uids_admin = _uids_admin(get_settings())
+    if not uids_admin:
         raise HTTPException(
-            status_code=503, detail="painel admin nao configurado (ADMIN_SENHA)"
+            status_code=503, detail="painel admin nao configurado (ADMIN_FIREBASE_UIDS)"
         )
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="token ausente")
-    if not _token_valido(authorization.removeprefix("Bearer ").strip(), settings):
-        raise HTTPException(status_code=401, detail="token invalido ou expirado")
+    if usuario.firebase_uid not in uids_admin:
+        raise HTTPException(status_code=403, detail="conta sem acesso ao painel admin")
+    return usuario
 
 
-@router.post("/login", response_model=TokenAdmin)
-def login(entrada: EntradaLoginAdmin) -> TokenAdmin:
-    settings = get_settings()
-    if not settings.admin_senha:
-        raise HTTPException(
-            status_code=503, detail="painel admin nao configurado (ADMIN_SENHA)"
-        )
-    if not hmac.compare_digest(entrada.senha, settings.admin_senha):
-        raise HTTPException(status_code=401, detail="senha incorreta")
-    token, expira_em = _gerar_token(settings)
-    return TokenAdmin(token=token, expira_em=expira_em)
+@router.get("/eu-sou-admin", response_model=StatusAdmin)
+def eu_sou_admin(usuario: UsuarioAtual = Depends(exigir_usuario)) -> StatusAdmin:
+    """So exige login (nao `exigir_admin`) - e o proprio jeito da conta
+    descobrir se tem acesso, pra decidir se mostra o link do painel na
+    barra lateral. Uma conta sem acesso nunca ve `/admin` mencionado em
+    lugar nenhum, alem de continuar barrada no backend se tentar entrar
+    pela URL direto.
+    """
+    return StatusAdmin(admin=usuario.firebase_uid in _uids_admin(get_settings()))
 
 
 # ---------------------------------------------------------------------------
@@ -316,6 +307,10 @@ _TABELAS_PRINCIPAIS: list[tuple[str, type]] = [
     ("dim_jogo_steam", DimJogoSteam),
     ("fato_avaliacao_steam", FatoAvaliacaoSteam),
     ("fato_snapshot_jogo_steam", FatoSnapshotJogoSteam),
+    ("steam_sincronizacao", SincronizacaoSteam),
+    ("steam_historico_preco", HistoricoPrecoSteam),
+    ("steam_promocoes", PromocaoSteam),
+    ("steam_eventos", EventoSteam),
     ("dim_jogo_xbox", DimJogoXbox),
     ("fato_snapshot_jogo_xbox", FatoSnapshotJogoXbox),
     ("dim_jogo", DimJogo),
@@ -346,3 +341,29 @@ def banco(sessao: Session = Depends(get_db)) -> SaudeBanco:
     tabelas.sort(key=lambda t: t.linhas, reverse=True)
 
     return SaudeBanco(tamanho_texto=tamanho, tabelas=tabelas)
+
+
+# ---------------------------------------------------------------------------
+# Contas - quantas existem, so nome + data de criacao (LGPD: sem e-mail, sem
+# uid do Firebase - nada que identifique a pessoa fora do proprio site)
+# ---------------------------------------------------------------------------
+
+
+@router.get("/contas", response_model=ListaContasAdmin, dependencies=[Depends(exigir_admin)])
+def contas(
+    sessao: Session = Depends(get_db), limite: int = Query(default=500, ge=1, le=2000)
+) -> ListaContasAdmin:
+    total = sessao.execute(select(func.count()).select_from(DimUsuario)).scalar_one()
+
+    linhas = sessao.execute(
+        select(DimUsuario.nome_exibicao, DimUsuario.criado_em)
+        .order_by(DimUsuario.criado_em.desc())
+        .limit(limite)
+    ).all()
+
+    return ListaContasAdmin(
+        total=total,
+        contas=[
+            ContaResumo(nome_exibicao=nome, criado_em=criado_em) for nome, criado_em in linhas
+        ],
+    )

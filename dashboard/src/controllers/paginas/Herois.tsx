@@ -12,6 +12,8 @@
 
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 
 import { usePerfilEsporte, usePersonagens, useSaude } from "@models/api/consultas";
 import type { ResumoPersonagem } from "@models/api/tipos";
@@ -35,23 +37,24 @@ import { desvioConfiavel, intervaloWilson } from "@util/estatistica";
 import { fmtDecimal, fmtNumero, fmtPercentual } from "@util/formatos";
 
 /** "IC 95%: 52,2–53,2% · 35.616 partidas" — o rótulo de incerteza de um KPI. */
-function rotuloIntervalo(personagem: ResumoPersonagem): string {
+function rotuloIntervalo(personagem: ResumoPersonagem, t: TFunction): string {
   const { minimo, maximo } = intervaloWilson(
     personagem.vitorias,
     personagem.partidas,
   );
-  return (
-    `IC 95%: ${fmtDecimal(minimo * 100, 1)}–${fmtDecimal(maximo * 100, 1)}% · ` +
-    `${fmtNumero(personagem.partidas)} partidas`
-  );
+  return t("herois.icLabel", {
+    min: fmtDecimal(minimo * 100, 1),
+    max: fmtDecimal(maximo * 100, 1),
+    partidas: fmtNumero(personagem.partidas),
+  });
 }
 
 const NO_GRAFICO = 10;
 
 const ORDENACOES = [
-  { valor: "winrate", rotulo: "Winrate", icone: "trending_up" },
-  { valor: "partidas", rotulo: "Volume", icone: "insights" },
-  { valor: "kda", rotulo: "KDA", icone: "swords" },
+  { valor: "winrate", chave: "winrate", icone: "trending_up" },
+  { valor: "partidas", chave: "volume", icone: "insights" },
+  { valor: "kda", chave: "kda", icone: "swords" },
 ] as const;
 
 type Ordenacao = (typeof ORDENACOES)[number]["valor"];
@@ -87,10 +90,12 @@ function extremos(itens: ResumoPersonagem[], quantidade: number): ResumoPersonag
 function LinhaDivergente({
   heroi,
   limite,
+  t,
 }: {
   heroi: ResumoPersonagem;
   /** Maior desvio absoluto do conjunto, para a escala ser a mesma dos dois lados. */
   limite: number;
+  t: TFunction;
 }) {
   const desvio = heroi.winrate - 50;
   const positivo = desvio >= 0;
@@ -134,11 +139,13 @@ function LinhaDivergente({
   return (
     <div
       className="group flex h-8 w-full items-center"
-      title={
-        `${heroi.nome}: ${fmtPercentual(heroi.winrate)} em ` +
-        `${fmtNumero(heroi.partidas)} partidas — IC 95%: ` +
-        `${fmtDecimal(intervalo.minimo * 100, 1)}–${fmtDecimal(intervalo.maximo * 100, 1)}%`
-      }
+      title={t("herois.grafico.tooltip", {
+        nome: heroi.nome,
+        winrate: fmtPercentual(heroi.winrate),
+        partidas: fmtNumero(heroi.partidas),
+        min: fmtDecimal(intervalo.minimo * 100, 1),
+        max: fmtDecimal(intervalo.maximo * 100, 1),
+      })}
     >
       {positivo ? (
         <>
@@ -166,6 +173,7 @@ function LinhaDivergente({
 }
 
 export function HeroisPagina() {
+  const { t } = useTranslation();
   const { jogo } = useJogoAtual();
   const [minPartidas, setMinPartidas] = useState(5);
   const [ordenacao, setOrdenacao] = useState<Ordenacao>("winrate");
@@ -243,18 +251,16 @@ export function HeroisPagina() {
                   online ? "text-tertiary" : "text-error"
                 }`}
               >
-                {online ? "Meta ativa" : "Sem contato"}
+                {online ? t("herois.cabecalho.metaAtiva") : t("herois.cabecalho.semContato")}
               </span>
             </div>
             <span className="hidden font-label-caps text-label-caps uppercase tracking-wider text-outline sm:inline">
-              Meta Analytics // Deck 03
+              {t("herois.cabecalho.deck")}
             </span>
           </div>
 
           <p className="font-body-sm text-body-sm text-on-surface-variant">
-            Agregação do fato de partidas por personagem. O corte de partidas mínimas
-            existe porque um herói com duas partidas e duas vitórias tem 100% de winrate e
-            nenhum significado estatístico — sem ele, a cauda curta lidera o ranking.
+            {t("herois.cabecalho.descricao")}
           </p>
         </div>
 
@@ -263,7 +269,7 @@ export function HeroisPagina() {
           aoClicar={() => personagens.refetch()}
           desabilitado={personagens.isFetching}
         >
-          {personagens.isFetching ? "Atualizando…" : "Atualizar meta"}
+          {personagens.isFetching ? t("herois.cabecalho.atualizando") : t("herois.cabecalho.atualizarMeta")}
         </Botao>
       </section>
 
@@ -271,7 +277,7 @@ export function HeroisPagina() {
       <section className="flex flex-wrap items-center gap-space-md rounded-xl bg-surface-container-low/90 p-space-base shadow-lg">
         <label className={LABEL_CAMPO}>
           <span className="font-label-caps text-label-caps uppercase tracking-widest text-outline">
-            Mín. partidas
+            {t("herois.filtros.minPartidas")}
           </span>
           <select
             value={minPartidas}
@@ -295,8 +301,8 @@ export function HeroisPagina() {
             type="search"
             value={busca}
             onChange={(evento) => setBusca(evento.target.value)}
-            placeholder="Buscar herói…"
-            aria-label="Buscar herói"
+            placeholder={t("herois.filtros.buscarHeroiPlaceholder")}
+            aria-label={t("herois.filtros.buscarHeroiAria")}
             className="w-full rounded bg-surface-container-lowest py-space-sm pl-10 pr-space-sm font-title-code text-title-code text-on-surface shadow-inner placeholder:text-outline focus:bg-surface-container focus:outline-none"
           />
         </div>
@@ -306,7 +312,7 @@ export function HeroisPagina() {
       <Consulta
         estado={personagens}
         altura={160}
-        vazio="Nenhum herói atinge esse mínimo de partidas."
+        vazio={t("herois.vazioMinimo")}
       >
         {(lista: ResumoPersonagem[]) => {
           const acima = lista.filter((h) => h.winrate > 50).length;
@@ -324,30 +330,32 @@ export function HeroisPagina() {
             ? lista.reduce((a, b) => (b.winrate < a.winrate ? b : a))
             : null;
 
+          const plural = perfil.data?.substantivo_plural ?? "Personagens";
+
           return (
             <section className="grid grid-cols-1 gap-space-base md:grid-cols-2 xl:grid-cols-4">
               <KpiHud
-                etiqueta={`${perfil.data?.substantivo_plural ?? "Personagens"} no recorte`}
-                canto={`MÍN. ${minPartidas}`}
+                etiqueta={t("herois.kpis.noRecorte", { plural })}
+                canto={t("herois.kpis.min", { n: minPartidas })}
                 valor={fmtNumero(lista.length)}
                 valorNumerico={lista.length}
                 formatarValor={fmtNumero}
-                rotulo="Na dimensão de personagem"
+                rotulo={t("herois.kpis.naDimensao")}
                 acento="primaria"
-                notaVariacao={`${fmtNumero(escolhas)} escolhas somadas`}
+                notaVariacao={t("herois.kpis.escolhasSomadas", { n: fmtNumero(escolhas) })}
               >
                 <Segmentos acesos={lista.length ? 6 : 0} acento="primaria" />
               </KpiHud>
 
               <KpiHud
-                etiqueta="Acima dos 50%"
-                canto="POLARIDADE"
+                etiqueta={t("herois.kpis.acimaDos50")}
+                canto={t("herois.kpis.polaridade")}
                 valor={fmtNumero(acima)}
                 valorNumerico={acima}
                 formatarValor={fmtNumero}
-                rotulo={`${perfil.data?.substantivo_plural ?? "Personagens"} com mais vitórias que derrotas`}
+                rotulo={t("herois.kpis.comMaisVitoriasQueDerrotas", { plural })}
                 acento="terciaria"
-                notaVariacao={`${fmtNumero(lista.length - acima)} abaixo ou na linha`}
+                notaVariacao={t("herois.kpis.abaixoOuNaLinha", { n: fmtNumero(lista.length - acima) })}
               >
                 <div className="mt-space-md">
                   <BarraSegmentada
@@ -357,21 +365,21 @@ export function HeroisPagina() {
               </KpiHud>
 
               <KpiHud
-                etiqueta="Maior winrate"
-                canto="TOPO"
+                etiqueta={t("herois.kpis.maiorWinrate")}
+                canto={t("herois.kpis.topo")}
                 valor={maiorWr ? fmtPercentual(maiorWr.winrate) : "—"}
-                rotulo={maiorWr ? maiorWr.nome : "sem dados"}
+                rotulo={maiorWr ? maiorWr.nome : t("herois.kpis.semDados")}
                 acento="secundaria"
-                notaVariacao={maiorWr ? rotuloIntervalo(maiorWr) : undefined}
+                notaVariacao={maiorWr ? rotuloIntervalo(maiorWr, t) : undefined}
               />
 
               <KpiHud
-                etiqueta="Menor winrate"
-                canto="CAUDA"
+                etiqueta={t("herois.kpis.menorWinrate")}
+                canto={t("herois.kpis.cauda")}
                 valor={menorWr ? fmtPercentual(menorWr.winrate) : "—"}
-                rotulo={menorWr ? menorWr.nome : "sem dados"}
+                rotulo={menorWr ? menorWr.nome : t("herois.kpis.semDados")}
                 acento="primaria"
-                notaVariacao={menorWr ? rotuloIntervalo(menorWr) : undefined}
+                notaVariacao={menorWr ? rotuloIntervalo(menorWr, t) : undefined}
               />
             </section>
           );
@@ -381,28 +389,32 @@ export function HeroisPagina() {
       {/* ==================== DISTRIBUICAO DIVERGENTE ==================== */}
       <Painel
         icone="compare_arrows"
-        titulo={`Distribuição de winrate // ${
-          noGrafico.length && noGrafico.length < NO_GRAFICO ? noGrafico.length : `top ${NO_GRAFICO}`
-        } ${perfil.data?.substantivo_plural ?? "personagens"}`}
-        descricao="Distância até os 50%: à direita, mais vitórias que derrotas; à esquerda, o contrário. Só entram os que se afastam dos 50% com 95% de confiança — winrate alto em poucas partidas fica de fora."
+        titulo={t("herois.grafico.titulo", {
+          quantidade:
+            noGrafico.length && noGrafico.length < NO_GRAFICO
+              ? noGrafico.length
+              : t("herois.grafico.top", { n: NO_GRAFICO }),
+          plural: perfil.data?.substantivo_plural ?? "personagens",
+        })}
+        descricao={t("herois.grafico.descricao")}
         meta={
           <span className="font-badge-status text-badge-status tracking-widest text-outline">
-            LOC: {jogo.toUpperCase()}-META // H-01
+            {t("herois.grafico.loc", { jogo: jogo.toUpperCase() })}
           </span>
         }
       >
         <Consulta
           estado={personagens}
-          vazio={`Nenhum ${
-            perfil.data?.substantivo ?? "personagem"
-          } atinge esse mínimo de partidas.`}
+          vazio={t("herois.grafico.vazioMinimoGenerico", {
+            substantivo: perfil.data?.substantivo ?? "personagem",
+          })}
         >
           {() =>
             noGrafico.length === 0 ? (
               <p className="rounded bg-surface-container px-space-base py-space-md font-body-md text-body-md text-on-surface-variant">
                 {filtrados.length === 0
-                  ? "Nenhum personagem bate com a busca."
-                  : "Nenhum se afasta dos 50% com 95% de confiança neste recorte — as amostras são pequenas demais. Aumente o mínimo de partidas para um recorte mais estável, ou aguarde mais coleta."}
+                  ? t("herois.grafico.vazioBusca")
+                  : t("herois.grafico.vazioAmostra")}
               </p>
             ) : (
               <div className="relative w-full pt-space-lg">
@@ -412,7 +424,7 @@ export function HeroisPagina() {
                   aria-hidden
                 />
                 <div className="absolute left-1/2 top-0 z-10 -translate-x-1/2 bg-surface-container-low px-1 font-label-caps text-label-caps text-outline">
-                  50%
+                  {t("herois.grafico.eixo50")}
                 </div>
 
                 <div className="relative z-10 flex w-full flex-col justify-between gap-space-xs px-4">
@@ -421,6 +433,7 @@ export function HeroisPagina() {
                       key={heroi.id_personagem}
                       heroi={heroi}
                       limite={limite}
+                      t={t}
                     />
                   ))}
                 </div>
@@ -437,7 +450,7 @@ export function HeroisPagina() {
                 style={{ background: PALETA_POLOS.positivo }}
                 aria-hidden
               />
-              Acima de 50%
+              {t("herois.grafico.acimaDe50Legenda")}
             </span>
             <span className="inline-flex items-center gap-space-xs">
               <i
@@ -445,19 +458,19 @@ export function HeroisPagina() {
                 style={{ background: PALETA_POLOS.negativo }}
                 aria-hidden
               />
-              Abaixo de 50%
+              {t("herois.grafico.abaixoDe50Legenda")}
             </span>
           </span>
           <span className="flex items-center gap-space-base">
             {noGrafico.length < NO_GRAFICO && (
               <span>
-                <span className="text-primary">{noGrafico.length}</span> com
-                margem — os demais têm amostra curta
+                <span className="text-primary">{noGrafico.length}</span>{" "}
+                {t("herois.grafico.comMargemSufixo")}
               </span>
             )}
             <span>
-              Escala simétrica · ±
-              <span className="text-primary">{fmtDecimal(limite, 1)} pontos</span>
+              {t("herois.grafico.escalaSimetrica")}
+              <span className="text-primary">{fmtDecimal(limite, 1)} {t("herois.grafico.pontos")}</span>
             </span>
           </span>
         </div>
@@ -466,14 +479,14 @@ export function HeroisPagina() {
       {/* ==================== MATRIZ DE TELEMETRIA ==================== */}
       <Painel
         icone="table_rows"
-        titulo="Matriz de telemetria"
+        titulo={t("herois.matriz.titulo")}
         // A procedência muda com o esporte, e afirmá-la errada é o mesmo
         // defeito de rotular dado de terceiro como medição nossa: as
         // médias do Dota são nossas, as do Valorant são do OP.GG.
         descricao={
           perfil.data?.nota_fonte
-            ? `${perfil.data.nota_fonte} No recorte de filtros acima.`
-            : "Médias no recorte de filtros acima."
+            ? t("herois.matriz.descricaoComFonte", { nota: perfil.data.nota_fonte })
+            : t("herois.matriz.descricaoSemFonte")
         }
         meta={
           <div className="flex flex-wrap items-center gap-space-xs">
@@ -488,24 +501,24 @@ export function HeroisPagina() {
                 icone={opcao.icone}
                 aoClicar={() => setOrdenacao(opcao.valor)}
               >
-                {opcao.rotulo}
+                {t(`herois.ordenacoes.${opcao.chave}`)}
               </Pilula>
             ))}
           </div>
         }
       >
-        <Consulta estado={personagens} vazio="Nenhum herói atinge esse mínimo de partidas.">
+        <Consulta estado={personagens} vazio={t("herois.vazioMinimo")}>
           {() => (
             <div className="rolagem-discreta overflow-x-auto rounded-lg bg-surface-container-lowest">
               <table className="w-full border-collapse text-left">
                 <thead>
                   <tr className="bg-surface-container font-label-caps text-label-caps uppercase tracking-wider text-outline">
                     <th className="px-space-md py-space-sm">
-                      {perfil.data?.substantivo ?? "Personagem"}
+                      {perfil.data?.substantivo ?? t("herois.matriz.colPersonagem")}
                     </th>
-                    <th className="px-space-md py-space-sm text-right">Partidas</th>
-                    <th className="px-space-md py-space-sm text-right">Vitórias</th>
-                    <th className="px-space-md py-space-sm">Winrate</th>
+                    <th className="px-space-md py-space-sm text-right">{t("herois.matriz.colPartidas")}</th>
+                    <th className="px-space-md py-space-sm text-right">{t("herois.matriz.colVitorias")}</th>
+                    <th className="px-space-md py-space-sm">{t("herois.matriz.colWinrate")}</th>
                     {/*
                       As colunas vêm do perfil do esporte. Eram "KDA / K / D / A
                       / GPM / XPM" fixas — o vocabulário do Dota —, e um agente
@@ -612,11 +625,7 @@ export function HeroisPagina() {
           opcoesPorPagina={[5, 15, 25, 50]}
           aoMudarPagina={pag.setPagina}
           aoMudarPorPagina={pag.setPorPagina}
-          resumo={
-            <>
-              {fmtNumero(tabela.length)} heróis · corte de {minPartidas} partidas
-            </>
-          }
+          resumo={t("herois.matriz.paginacaoResumo", { n: fmtNumero(tabela.length), min: minPartidas })}
         />
 
         <div className="flex flex-wrap items-center justify-end gap-space-sm border-t border-outline-variant/30 pt-space-sm font-label-caps text-label-caps uppercase tracking-widest text-outline">

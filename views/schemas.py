@@ -249,6 +249,42 @@ class MenorPrecoHistorico(BaseModel):
     data: date | None
 
 
+class PromocaoAtivaSteam(BaseModel):
+    """A promocao ABERTA agora na Steam (nao ITAD) para um jogo - Fase 35.
+
+    Vem de `steam_promocoes`, transicao real de desconto observada NAQUELE
+    app - nunca inferida de agregado de catalogo.
+    """
+
+    preco_original: Decimal
+    preco_final: Decimal
+    desconto_percentual: int
+    moeda: str
+    iniciada_em: datetime
+
+
+class PontoHistoricoPrecoSteam(BaseModel):
+    """Um ponto do historico de preco primeiro-partido da Steam - Fase 35."""
+
+    registrado_em: datetime
+    preco_final: Decimal
+    desconto_percentual: int
+
+
+class OfertaSteam(BaseModel):
+    """Uma linha de `GET /api/steam/ofertas` - promocao ativa de um jogo."""
+
+    app_id: int
+    nome: str
+    imagem_header: str | None
+    preco_original: Decimal
+    preco_final: Decimal
+    desconto_percentual: int
+    moeda: str
+    pais: str
+    iniciada_em: datetime
+
+
 class DetalheJogoSteam(BaseModel):
     jogo: JogoSteam
     ficha: FichaJogoSteam
@@ -258,6 +294,12 @@ class DetalheJogoSteam(BaseModel):
     ofertas: list[OfertaLoja] = []
     menor_preco_historico: MenorPrecoHistorico | None = None
     serie: list[PontoSerie]
+    #: Preco primeiro-partido da Steam (Fase 35) - distinto do `ofertas`
+    #: cross-loja acima (ITAD). `None` quando nao ha promocao aberta agora.
+    promocao_ativa: PromocaoAtivaSteam | None = None
+    #: Historico de preco SO da Steam (nao cross-loja) - o `menor_preco_historico`
+    #: acima continua sendo o menor de TODAS as lojas, via ITAD.
+    historico_preco_steam: list[PontoHistoricoPrecoSteam] = []
 
 
 class AgregadoGenero(BaseModel):
@@ -1417,13 +1459,24 @@ class SaudeBanco(BaseModel):
     tabelas: list[TabelaBanco] = Field(default_factory=list)
 
 
-class EntradaLoginAdmin(BaseModel):
-    senha: str = Field(min_length=1, max_length=200)
+class StatusAdmin(BaseModel):
+    #: `True` quando a conta logada esta em `ADMIN_FIREBASE_UIDS` - o
+    #: frontend usa isto pra decidir se mostra o link do painel na barra
+    #: lateral, nao pra decidir se deixa entrar (isso e `exigir_admin`).
+    admin: bool
 
 
-class TokenAdmin(BaseModel):
-    token: str
-    expira_em: datetime
+class ContaResumo(BaseModel):
+    """So o que nao fere a LGPD: nome e data de criacao. Sem e-mail, sem uid
+    do Firebase, sem nada que identifique a pessoa fora do proprio site."""
+
+    nome_exibicao: str | None = None
+    criado_em: datetime
+
+
+class ListaContasAdmin(BaseModel):
+    total: int
+    contas: list[ContaResumo] = Field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------

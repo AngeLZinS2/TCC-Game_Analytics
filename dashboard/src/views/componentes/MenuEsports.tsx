@@ -14,6 +14,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Link, NavLink, useLocation } from "react-router-dom";
+import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 
 import { useJogosDisponiveis } from "@models/api/consultas";
 import type { JogoDisponivel } from "@models/api/tipos";
@@ -30,18 +32,19 @@ function temEsports(jogo: JogoDisponivel): boolean {
 }
 
 /** O que a linha de um jogo resume, na ordem em que importa. */
-function oQueTem(jogo: JogoDisponivel): string {
+function oQueTem(t: TFunction, jogo: JogoDisponivel): string {
   return [
-    jogo.partidas ? `${jogo.partidas} partidas` : null,
-    jogo.agenda ? `${jogo.agenda} na agenda` : null,
-    jogo.equipes ? `${jogo.equipes} equipes` : null,
-    jogo.personagens ? `${jogo.personagens} personagens` : null,
+    jogo.partidas ? t("nav.resumoJogo.partidas", { contagem: jogo.partidas }) : null,
+    jogo.agenda ? t("nav.resumoJogo.naAgenda", { contagem: jogo.agenda }) : null,
+    jogo.equipes ? t("nav.resumoJogo.equipes", { contagem: jogo.equipes }) : null,
+    jogo.personagens ? t("nav.resumoJogo.personagens", { contagem: jogo.personagens }) : null,
   ]
     .filter(Boolean)
     .join(" · ");
 }
 
 export function MenuEsports({ item }: { item: ItemNavegacao }) {
+  const { t } = useTranslation();
   const jogos = useJogosDisponiveis();
   const { pathname } = useLocation();
   const [aberto, setAberto] = useState(false);
@@ -98,22 +101,22 @@ export function MenuEsports({ item }: { item: ItemNavegacao }) {
         <div className="absolute left-1/2 top-full z-50 -translate-x-1/2 pt-space-xs">
           <div
             role="menu"
-            aria-label="Jogos de e-sports"
+            aria-label={t("nav.jogosDeEsports")}
             className="rolagem-discreta flex max-h-[70vh] w-64 flex-col gap-space-xxs overflow-y-auto rounded-lg border border-outline-variant/30 bg-surface-container-low p-space-xs shadow-2xl"
           >
             <span className="px-space-sm py-space-xxs font-label-caps text-label-caps uppercase tracking-widest text-outline">
-              {item.rotulo}
+              {t(`nav.itens.${item.chave}`)}
             </span>
 
             {jogos.isPending && (
               <span className="px-space-sm py-space-xs font-body-sm text-body-sm text-outline">
-                Carregando…
+                {t("comum.carregando")}
               </span>
             )}
 
             {jogos.data && lista.length === 0 && (
               <span className="px-space-sm py-space-xs font-body-sm text-body-sm text-outline">
-                Nada coletado ainda.
+                {t("comum.nadaColetadoAinda")}
               </span>
             )}
 
@@ -139,7 +142,7 @@ export function MenuEsports({ item }: { item: ItemNavegacao }) {
                     <span className="truncate">{jogo.nome}</span>
                   </span>
                   <span className="pl-[16px] font-label-caps text-label-caps text-outline">
-                    {oQueTem(jogo)}
+                    {oQueTem(t, jogo)}
                   </span>
                 </Link>
               );

@@ -16,6 +16,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import case, desc, func, nulls_last, or_, select
 from sqlalchemy.orm import Session, aliased
 
+from decimal import Decimal
+
 from views.schemas import (
     AgregadoCategoria,
     AgregadoGenero,
@@ -26,15 +28,19 @@ from views.schemas import (
     MenorPrecoHistorico,
     NoticiaSteam,
     OfertaLoja,
+    PontoHistoricoPrecoSteam,
     PontoSerie,
     PontoSerieTotal,
+    PromocaoAtivaSteam,
 )
 from models.models import (
     DimAppSteamNome,
     DimJogoSteam,
     FatoSnapshotJogoSteam,
+    HistoricoPrecoSteam,
     NoticiaJogoSteam,
     OfertaJogoSteam,
+    PromocaoSteam,
 )
 from models.session import get_db
 
@@ -497,6 +503,37 @@ def detalhar_jogo(app_id: int, sessao: Session = Depends(get_db)) -> DetalheJogo
         else None
     )
 
+    # --- Preco primeiro-partido da Steam (Fase 35) - distinto do `ofertas`/
+    # `menor_historico` acima, que sao cross-loja via ITAD e nao mudam aqui.
+    promocao = sessao.scalar(
+        select(PromocaoSteam).where(
+            PromocaoSteam.app_id == app_id, PromocaoSteam.ativa.is_(True)
+        )
+    )
+    promocao_ativa = (
+        PromocaoAtivaSteam(
+            preco_original=Decimal(promocao.preco_original) / 100,
+            preco_final=Decimal(promocao.preco_final) / 100,
+            desconto_percentual=promocao.desconto_percentual,
+            moeda=promocao.moeda,
+            iniciada_em=promocao.iniciada_em,
+        )
+        if promocao is not None
+        else None
+    )
+    historico_preco_steam = [
+        PontoHistoricoPrecoSteam(
+            registrado_em=linha.registrado_em,
+            preco_final=Decimal(linha.preco_final) / 100,
+            desconto_percentual=linha.desconto_percentual,
+        )
+        for linha in sessao.scalars(
+            select(HistoricoPrecoSteam)
+            .where(HistoricoPrecoSteam.app_id == app_id)
+            .order_by(HistoricoPrecoSteam.registrado_em)
+        )
+    ]
+
     return DetalheJogoSteam(
         jogo=_montar_jogo(
             jogo,
@@ -535,6 +572,8 @@ def detalhar_jogo(app_id: int, sessao: Session = Depends(get_db)) -> DetalheJogo
             )
             for s in snapshots
         ],
+        promocao_ativa=promocao_ativa,
+        historico_preco_steam=historico_preco_steam,
     )
 
 

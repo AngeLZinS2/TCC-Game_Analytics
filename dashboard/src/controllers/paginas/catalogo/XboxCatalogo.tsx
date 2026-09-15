@@ -14,6 +14,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 
 import { usePaginacaoLocal } from "@models/hooks/paginacao";
 import {
@@ -41,16 +42,16 @@ import { fmtDecimal, fmtMoeda, fmtNumero, paraNumero } from "@util/formatos";
 
 type Ordenacao = "game_pass" | "nome" | "preco" | "nota";
 
-const ORDENACOES: { valor: Ordenacao; rotulo: string; icone?: string }[] = [
-  { valor: "game_pass", rotulo: "Game Pass primeiro", icone: "featured_seasonal_and_gifts" },
-  { valor: "nota", rotulo: "Nota", icone: "star" },
-  { valor: "nome", rotulo: "Nome" },
-  { valor: "preco", rotulo: "Preço" },
+const ORDENACOES: { valor: Ordenacao; icone?: string }[] = [
+  { valor: "game_pass", icone: "featured_seasonal_and_gifts" },
+  { valor: "nota", icone: "star" },
+  { valor: "nome" },
+  { valor: "preco" },
 ];
 
 const MODOS_CATALOGO = [
-  { id: "tabela", icone: "table_rows", rotulo: "Tabela" },
-  { id: "cartoes", icone: "grid_view", rotulo: "Cartões" },
+  { id: "tabela", icone: "table_rows" },
+  { id: "cartoes", icone: "grid_view" },
 ] as const;
 type ModoCatalogo = (typeof MODOS_CATALOGO)[number]["id"];
 
@@ -63,6 +64,7 @@ function corDaNota(nota: number): string {
 
 /** ★ 3,8 com a contagem ao lado — ou "—" quando a loja não tem avaliação. */
 function Nota({ jogo }: { jogo: JogoXbox }) {
+  const { t } = useTranslation();
   const nota = paraNumero(jogo.nota);
   if (nota === null) return <span className="text-outline">—</span>;
   const recente = paraNumero(jogo.nota_recente);
@@ -92,7 +94,7 @@ function Nota({ jogo }: { jogo: JogoXbox }) {
           style={{
             color: tendencia === "north" ? PALETA_POLOS.positivo : PALETA_POLOS.negativo,
           }}
-          title={tendencia === "north" ? "subindo nos últimos 7 dias" : "caindo nos últimos 7 dias"}
+          title={tendencia === "north" ? t("catalogoXbox.nota.subindo") : t("catalogoXbox.nota.caindo")}
         >
           <Icone nome={tendencia} className="text-[12px]" />
         </span>
@@ -110,6 +112,7 @@ function Nota({ jogo }: { jogo: JogoXbox }) {
  * ao catálogo com um clique. Mesmo desenho da `BuscaDeJogo` da Steam.
  */
 function BuscaNaLojaXbox({ termo }: { termo: string }) {
+  const { t } = useTranslation();
   const navegar = useNavigate();
   const catalogo = useBuscaCatalogoXbox(termo);
   const coletar = useColetarJogoXbox();
@@ -132,7 +135,7 @@ function BuscaNaLojaXbox({ termo }: { termo: string }) {
     <div className="space-y-space-sm rounded-xl bg-surface-container-low/60 p-space-base">
       <div className="flex items-center gap-space-xs font-label-caps text-label-caps uppercase tracking-widest text-outline">
         <Icone nome="travel_explore" className="text-[16px] text-primary" />
-        Não achou no catálogo coletado? Resultados da Microsoft Store
+        {t("catalogoXbox.buscaNaLoja.titulo")}
       </div>
 
       {coletar.isError && <MensagemErro erro={coletar.error} />}
@@ -141,7 +144,7 @@ function BuscaNaLojaXbox({ termo }: { termo: string }) {
         <div className="h-16 animate-pulse rounded-lg bg-surface-container-high/60" />
       ) : resultados.length === 0 ? (
         <p className="font-body-sm text-body-sm text-on-surface-variant">
-          Nenhum jogo da Xbox Store bate com essa busca.
+          {t("catalogoXbox.buscaNaLoja.semResultado")}
         </p>
       ) : (
         <div className="rolagem-discreta flex gap-space-sm overflow-x-auto pb-space-xs">
@@ -172,11 +175,11 @@ function BuscaNaLojaXbox({ termo }: { termo: string }) {
               <span className="flex items-center justify-between font-badge-status text-badge-status uppercase">
                 <span className="text-primary">{candidato.preco_texto ?? "—"}</span>
                 {candidato.coletado ? (
-                  <span className="text-tertiary">já no catálogo</span>
+                  <span className="text-tertiary">{t("catalogoXbox.buscaNaLoja.jaNoCatalogo")}</span>
                 ) : coletar.isPending && coletar.variables === candidato.product_id ? (
-                  <span className="text-outline">adicionando…</span>
+                  <span className="text-outline">{t("catalogoXbox.buscaNaLoja.adicionando")}</span>
                 ) : (
-                  <span className="text-outline">+ adicionar</span>
+                  <span className="text-outline">{t("catalogoXbox.buscaNaLoja.adicionar")}</span>
                 )}
               </span>
             </button>
@@ -188,6 +191,7 @@ function BuscaNaLojaXbox({ termo }: { termo: string }) {
 }
 
 export function XboxCatalogo() {
+  const { t } = useTranslation();
   const navegar = useNavigate();
   const campoBusca = useRef<HTMLInputElement>(null);
 
@@ -222,6 +226,11 @@ export function XboxCatalogo() {
 
   const totalCatalogo = visaoGeral.data?.jogos_xbox ?? 0;
 
+  const modosCatalogo = MODOS_CATALOGO.map((modo) => ({
+    ...modo,
+    rotulo: t(`catalogoSteam.modos.${modo.id}`),
+  }));
+
   const lista = useMemo<JogoXbox[]>(() => jogos.data ?? [], [jogos.data]);
   const paginacao = usePaginacaoLocal(lista, {
     porPaginaInicial: { mobile: 5, desktop: 25 },
@@ -243,8 +252,8 @@ export function XboxCatalogo() {
               type="search"
               value={busca}
               onChange={(evento) => setBusca(evento.target.value)}
-              placeholder="Buscar jogo por título ou publicadora…"
-              aria-label="Buscar jogo"
+              placeholder={t("catalogoXbox.buscarPlaceholder")}
+              aria-label={t("catalogoXbox.buscarAriaLabel")}
               className="w-full rounded bg-surface-container-lowest py-space-sm pl-10 pr-4 font-title-code text-title-code text-on-surface shadow-inner placeholder:text-outline focus:bg-surface-container focus:outline-none"
             />
           </div>
@@ -254,10 +263,10 @@ export function XboxCatalogo() {
               que o catálogo Steam usa - a lista aberta de um `<select>`
               nativo é o navegador quem desenha, sem nada do tema escuro. */}
           <SeletorFiltro
-            rotulo="Gênero"
+            rotulo={t("catalogoSteam.genero")}
             valor={genero}
             aoEscolher={setGenero}
-            rotuloTudo={`Todos (${totalCatalogo || 0})`}
+            rotuloTudo={t("catalogoSteam.todos", { contagem: totalCatalogo || 0 })}
             opcoes={(generos.data ?? []).map((item: AgregadoGenero) => ({
               valor: item.genero,
               rotulo: `${item.genero} (${item.jogos})`,
@@ -265,10 +274,10 @@ export function XboxCatalogo() {
           />
 
           <SeletorFiltro
-            rotulo="Categoria"
+            rotulo={t("catalogoSteam.categoria")}
             valor={categoria}
             aoEscolher={setCategoria}
-            rotuloTudo="Todas"
+            rotuloTudo={t("catalogoSteam.todas")}
             buscavel
             opcoes={(categorias.data ?? []).map((item) => ({
               valor: item.categoria,
@@ -278,7 +287,7 @@ export function XboxCatalogo() {
 
           <div className="flex flex-wrap items-center gap-space-xs">
             <span className="mr-space-xs hidden font-label-caps text-label-caps uppercase text-outline sm:inline">
-              Ordenar:
+              {t("catalogoSteam.ordenar")}
             </span>
             {ORDENACOES.map((opcao) => (
               <Pilula
@@ -287,7 +296,7 @@ export function XboxCatalogo() {
                 icone={opcao.icone}
                 aoClicar={() => setOrdenacao(opcao.valor)}
               >
-                {opcao.rotulo}
+                {t(`catalogoXbox.ordenacoes.${opcao.valor}`)}
               </Pilula>
             ))}
           </div>
@@ -297,7 +306,7 @@ export function XboxCatalogo() {
       <BuscaNaLojaXbox termo={termoBuscado} />
 
       {/* ---------- KPIs (sobre a lista inteira, nunca a página) ---------- */}
-      <Consulta estado={jogos} altura={160} vazio="Catálogo do Xbox ainda não coletado.">
+      <Consulta estado={jogos} altura={160} vazio={t("catalogoXbox.vazio")}>
         {(todos: JogoXbox[]) => {
           const noGamePass = todos.filter((j) => j.no_game_pass).length;
           const pagos = todos
@@ -316,36 +325,38 @@ export function XboxCatalogo() {
           return (
             <section className="grid grid-cols-1 gap-space-base md:grid-cols-3">
               <KpiHud
-                etiqueta="XBOX_STORE // CATÁLOGO"
+                etiqueta={t("catalogoXbox.kpis.catalogo")}
                 canto={
                   genero || categoria
-                    ? `FILTRO: ${[genero, categoria].filter(Boolean).join(" + ").toUpperCase()}`
-                    : "MERCADO BR"
+                    ? t("catalogoXbox.kpis.filtro", {
+                        filtro: [genero, categoria].filter(Boolean).join(" + ").toUpperCase(),
+                      })
+                    : t("catalogoXbox.kpis.mercadoBr")
                 }
                 valor={fmtNumero(totalCatalogo || todos.length)}
                 valorNumerico={totalCatalogo || todos.length}
                 formatarValor={fmtNumero}
-                rotulo="Jogos no catálogo coletado"
+                rotulo={t("catalogoXbox.kpis.jogosNoCatalogoColetado")}
                 acento="primaria"
               />
 
               <KpiHud
-                etiqueta="NOTA MÉDIA // CATÁLOGO"
-                canto={`${fmtNumero(noGamePass)} NO GAME PASS`}
+                etiqueta={t("catalogoXbox.kpis.notaMedia")}
+                canto={t("catalogoXbox.kpis.noGamePass", { contagem: fmtNumero(noGamePass) })}
                 valor={notaMedia === null ? "—" : `★ ${fmtDecimal(notaMedia, 1)}`}
                 valorNumerico={notaMedia}
                 formatarValor={(v) => `★ ${fmtDecimal(v, 1)}`}
-                rotulo={`${fmtNumero(notas.length)} jogos avaliados na loja`}
+                rotulo={t("catalogoXbox.kpis.jogosAvaliadosNaLoja", { contagem: fmtNumero(notas.length) })}
                 acento="terciaria"
               />
 
               <KpiHud
-                etiqueta="PREÇO MÉDIO // PAGOS"
+                etiqueta={t("catalogoXbox.kpis.precoMedio")}
                 canto="BRL"
                 valor={precoMedio === null ? "—" : fmtMoeda(precoMedio, "BRL")}
                 valorNumerico={precoMedio}
                 formatarValor={(v) => fmtMoeda(v, "BRL")}
-                rotulo={`${fmtNumero(pagos.length)} jogos com preço de balcão`}
+                rotulo={t("catalogoXbox.kpis.jogosComPrecoDeBalcao", { contagem: fmtNumero(pagos.length) })}
                 acento="secundaria"
               />
             </section>
@@ -358,29 +369,29 @@ export function XboxCatalogo() {
         <div className="flex flex-col justify-between gap-space-base lg:flex-row lg:items-center">
           <h2 className="flex items-center gap-space-xs font-headline-md text-headline-md uppercase tracking-wide text-on-surface">
             <Icone nome="grid_view" className="text-[20px] text-primary-container" />
-            Catálogo da Xbox Store
+            {t("catalogoXbox.tabela.titulo")}
           </h2>
           <div className="flex flex-wrap items-center gap-space-md">
             <span className="font-title-code text-title-code text-outline">
-              Fonte: catálogo público da Microsoft · mercado BR · não-oficial
+              {t("catalogoXbox.tabela.fonte")}
             </span>
-            <SeletorModo modos={MODOS_CATALOGO} valor={modo} aoMudar={setModo} />
+            <SeletorModo modos={modosCatalogo} valor={modo} aoMudar={setModo} />
           </div>
         </div>
 
-        <Consulta estado={jogos} vazio="Catálogo do Xbox ainda não coletado.">
+        <Consulta estado={jogos} vazio={t("catalogoXbox.vazio")}>
           {() =>
             modo === "tabela" ? (
               <TabelaRolavel minLargura="52rem">
                 <table className="w-full border-collapse text-left">
                   <thead>
                     <tr className="bg-surface-container font-label-caps text-label-caps uppercase tracking-wider text-outline">
-                      <th className="px-space-md py-space-sm">Jogo</th>
-                      <th className="px-space-md py-space-sm">Gêneros</th>
-                      <th className="px-space-md py-space-sm">Game Pass</th>
-                      <th className="px-space-md py-space-sm">Nota</th>
-                      <th className="px-space-md py-space-sm">Preço</th>
-                      <th className="px-space-md py-space-sm text-right">Loja</th>
+                      <th className="px-space-md py-space-sm">{t("catalogoXbox.tabela.colunas.jogo")}</th>
+                      <th className="px-space-md py-space-sm">{t("catalogoSteam.tabela.colunas.generos")}</th>
+                      <th className="px-space-md py-space-sm">{t("catalogoXbox.tabela.colunas.gamePass")}</th>
+                      <th className="px-space-md py-space-sm">{t("catalogoXbox.tabela.colunas.nota")}</th>
+                      <th className="px-space-md py-space-sm">{t("catalogoSteam.tabela.colunas.preco")}</th>
+                      <th className="px-space-md py-space-sm text-right">{t("catalogoXbox.tabela.colunas.loja")}</th>
                     </tr>
                   </thead>
 
@@ -433,7 +444,7 @@ export function XboxCatalogo() {
                           {jogo.no_game_pass ? (
                             <span className="inline-flex items-center gap-space-xxs rounded bg-tertiary/10 px-space-sm py-space-xxs font-badge-status text-badge-status uppercase text-tertiary">
                               <Icone nome="check" className="text-[13px]" />
-                              Game Pass
+                              {t("catalogoXbox.tabela.colunas.gamePass")}
                             </span>
                           ) : (
                             <span className="text-outline">—</span>
@@ -466,7 +477,7 @@ export function XboxCatalogo() {
                               onClick={(evento) => evento.stopPropagation()}
                               className="inline-flex items-center gap-space-xxs font-title-code text-title-code text-primary hover:underline"
                             >
-                              abrir <Icone nome="open_in_new" className="text-[13px]" />
+                              {t("catalogoXbox.tabela.abrir")} <Icone nome="open_in_new" className="text-[13px]" />
                             </a>
                           ) : (
                             <span className="text-outline">—</span>
@@ -494,11 +505,10 @@ export function XboxCatalogo() {
           opcoesPorPagina={[5, 15, 25, 50]}
           aoMudarPagina={paginacao.setPagina}
           aoMudarPorPagina={paginacao.setPorPagina}
-          resumo={
-            <>
-              Exibindo {fmtNumero(paginacao.fatia.length)} de {fmtNumero(lista.length)}
-            </>
-          }
+          resumo={t("catalogoSteam.paginacao.exibindo", {
+            fatia: fmtNumero(paginacao.fatia.length),
+            total: fmtNumero(lista.length),
+          })}
         />
       </section>
     </>
