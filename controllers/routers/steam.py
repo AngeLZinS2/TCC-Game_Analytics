@@ -23,6 +23,7 @@ from views.schemas import (
     AgregadoCategoria,
     AgregadoGenero,
     DetalheJogoSteam,
+    DlcEmPromocao,
     FichaJogoSteam,
     JogoSteam,
     MaisJogadoSteam,
@@ -560,6 +561,36 @@ def detalhar_jogo(app_id: int, sessao: Session = Depends(get_db)) -> DetalheJogo
         )
     ]
 
+    # As DLCs deste jogo que estao em promocao agora. A lista de Ofertas so
+    # mostra jogo (ver `steam_ofertas.py`), entao este e o unico lugar onde a
+    # promocao de uma DLC aparece - ao lado do jogo dono dela, que e o
+    # contexto em que ela significa alguma coisa.
+    #
+    # `dlc_ids` vem do `appdetails`, entao existe so pra jogo com ficha; sem
+    # ela a lista fica vazia, sem consulta nenhuma.
+    dlc_em_promocao: list[DlcEmPromocao] = []
+    if jogo.dlc_ids:
+        dlc_em_promocao = [
+            DlcEmPromocao(
+                app_id=promocao.app_id,
+                nome=dlc.nome,
+                imagem_header=dlc.imagem_header,
+                preco_original=Decimal(promocao.preco_original) / 100,
+                preco_final=Decimal(promocao.preco_final) / 100,
+                desconto_percentual=promocao.desconto_percentual,
+                moeda=promocao.moeda,
+            )
+            for promocao, dlc in sessao.execute(
+                select(PromocaoSteam, DimJogoSteam)
+                .join(DimJogoSteam, DimJogoSteam.app_id == PromocaoSteam.app_id)
+                .where(
+                    PromocaoSteam.app_id.in_(jogo.dlc_ids),
+                    PromocaoSteam.ativa.is_(True),
+                )
+                .order_by(desc(PromocaoSteam.desconto_percentual))
+            )
+        ]
+
     return DetalheJogoSteam(
         ficha_coletada=jogo.coletado_ficha_em is not None,
         jogo=_montar_jogo(
@@ -601,6 +632,7 @@ def detalhar_jogo(app_id: int, sessao: Session = Depends(get_db)) -> DetalheJogo
         ],
         promocao_ativa=promocao_ativa,
         historico_preco_steam=historico_preco_steam,
+        dlc_em_promocao=dlc_em_promocao,
     )
 
 

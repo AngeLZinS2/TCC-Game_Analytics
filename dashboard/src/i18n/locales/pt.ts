@@ -517,6 +517,10 @@ const pt = {
   },
 
   jogoSteam: {
+    dlcs: {
+      titulo: "DLCs em promoção",
+      descricao: "Conteúdo extra deste jogo com desconto agora",
+    },
     voltar: "Voltar para o catálogo",
     favoritarJogo: "Favoritar jogo",
     gratuito: "Gratuito",
@@ -706,6 +710,7 @@ const pt = {
     todasCategorias: "Todas as categorias",
     limparPrecoMaximo: "Limpar preço máximo",
     ordenarPor: "Ordenar por",
+    ordemAlfabetica: "Ordem alfabética",
     maiorDesconto: "Maior desconto",
     menorPreco: "Menor preço",
     nenhumaOferta: "Nenhuma promoção Steam ativa agora com esse filtro.",

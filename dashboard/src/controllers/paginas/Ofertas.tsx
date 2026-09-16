@@ -58,7 +58,7 @@ export function OfertasPagina() {
   const [genero, setGenero] = useState("");
   const [categoria, setCategoria] = useState("");
   const [ordenarPor, setOrdenarPor] =
-    useState<FiltrosOfertasSteam["ordenar_por"]>("desconto_desc");
+    useState<FiltrosOfertasSteam["ordenar_por"]>("nome_asc");
   const [pagina, setPagina] = useState(1);
   const [porPagina, setPorPagina] = useState(24);
   const [modo, setModo] = useModoPersistente<Modo>("playdb:ofertas-modo", ["cartoes", "lista"], "cartoes");
@@ -120,7 +120,7 @@ export function OfertasPagina() {
     setGenero("");
     setCategoria("");
     setMostrarMais(false);
-    setOrdenarPor("desconto_desc");
+    setOrdenarPor("nome_asc");
   }
 
   function alternarFavorito(oferta: OfertaSteam) {
@@ -249,6 +249,7 @@ export function OfertasPagina() {
                 }
                 className="appearance-none rounded border border-outline-variant/40 bg-surface-container-lowest py-space-xs pl-space-sm pr-space-lg font-title-code text-title-code text-on-surface focus:outline-none"
               >
+                <option value="nome_asc">{t("ofertas.ordemAlfabetica")}</option>
                 <option value="desconto_desc">{t("ofertas.maiorDesconto")}</option>
                 <option value="preco_asc">{t("ofertas.menorPreco")}</option>
               </select>

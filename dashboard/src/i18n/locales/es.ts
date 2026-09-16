@@ -511,6 +511,10 @@ const es: Traducoes = {
   },
 
   jogoSteam: {
+    dlcs: {
+      titulo: "DLC en oferta",
+      descricao: "Contenido extra de este juego con descuento ahora",
+    },
     voltar: "Volver al catálogo",
     favoritarJogo: "Marcar juego como favorito",
     gratuito: "Gratuito",
@@ -700,6 +704,7 @@ const es: Traducoes = {
     todasCategorias: "Todas las categorías",
     limparPrecoMaximo: "Borrar precio máximo",
     ordenarPor: "Ordenar por",
+    ordemAlfabetica: "Orden alfabético",
     maiorDesconto: "Mayor descuento",
     menorPreco: "Menor precio",
     nenhumaOferta: "Ninguna promoción activa de Steam ahora con este filtro.",

@@ -229,6 +229,21 @@ export interface DetalheJogoSteam {
   promocao_ativa: PromocaoAtivaSteam | null;
   /** Histórico de preço SÓ da Steam — `menor_preco_historico` acima continua cross-loja. */
   historico_preco_steam: PontoHistoricoPrecoSteam[];
+  /** DLCs deste jogo em promoção agora. A lista de Ofertas só mostra jogo;
+   * a DLC aparece aqui, ao lado do jogo dono dela. */
+  dlc_em_promocao: DlcEmPromocao[];
+}
+
+/** Uma DLC do jogo em promoção agora — só o que dá pra oferecer sem
+ * prometer navegação que não existe (a DLC não tem página no site). */
+export interface DlcEmPromocao {
+  app_id: number;
+  nome: string;
+  imagem_header: string | null;
+  preco_original: Decimal;
+  preco_final: Decimal;
+  desconto_percentual: number;
+  moeda: string;
 }
 
 /** Uma linha de `GET /api/steam/ofertas` — Fase 35. */

@@ -20,6 +20,7 @@ import {
 } from "@models/api/consultas";
 import type {
   DetalheJogoSteam,
+  DlcEmPromocao,
   FichaJogoSteam,
   MenorPrecoHistorico,
   NoticiaSteam,
@@ -351,6 +352,9 @@ export function JogoSteamPagina() {
               menor={dados.menor_preco_historico}
               gratuito={jogo.gratuito}
             />
+
+            {/* ==================== DLCs EM PROMOCAO ==================== */}
+            <DlcsEmPromocao dlcs={dados.dlc_em_promocao} />
 
             {/* ==================== TEMPO PRA ZERAR ==================== */}
             <TempoParaZerar ficha={dados.ficha} nomeSteam={jogo.nome} />
@@ -1066,6 +1070,57 @@ function moedaBr(valor: number | string | null, moeda: string | null): string {
   } catch {
     return `${moeda ?? ""} ${n.toFixed(2)}`;
   }
+}
+
+/** DLCs deste jogo em promocao agora.
+ *
+ * A lista de Ofertas mostra so jogo - "Pack de Temporada 2026" no meio dos
+ * jogos nao ajuda ninguem a achar o que comprar. Mas a promocao da DLC vale,
+ * e aqui ela tem o contexto que faltava la: o jogo dono ao lado.
+ *
+ * So preco de promocao, como o resto do painel de preco desta tela: a DLC
+ * nao tem pagina propria no site, entao nao ha pra onde levar quem clicar -
+ * o nome, a arte e quanto custa agora e o que da pra oferecer sem prometer
+ * navegacao que nao existe.
+ */
+function DlcsEmPromocao({ dlcs }: { dlcs: DlcEmPromocao[] }) {
+  const { t } = useTranslation();
+  if (dlcs.length === 0) return null;
+
+  return (
+    <Painel
+      icone="extension"
+      titulo={t("jogoSteam.dlcs.titulo")}
+      descricao={t("jogoSteam.dlcs.descricao")}
+    >
+      <ul className="flex flex-col gap-space-xs">
+        {dlcs.map((dlc) => (
+          <li
+            key={dlc.app_id}
+            className="flex items-center gap-space-sm rounded-lg bg-surface-container-lowest px-space-sm py-space-xs"
+          >
+            {dlc.imagem_header && (
+              <img
+                src={dlc.imagem_header}
+                alt=""
+                loading="lazy"
+                className="hidden h-[34px] w-[72px] shrink-0 rounded object-cover sm:block"
+              />
+            )}
+            <span className="min-w-0 flex-1 truncate font-body-md text-body-sm text-on-surface">
+              {dlc.nome}
+            </span>
+            <span className="shrink-0 rounded bg-tertiary-container/20 px-space-xs font-title-code text-title-code text-tertiary-container">
+              -{dlc.desconto_percentual}%
+            </span>
+            <span className="shrink-0 font-title-code text-title-code tabular-nums text-on-surface">
+              {moedaBr(dlc.preco_final, dlc.moeda)}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </Painel>
+  );
 }
 
 function OndeComprar({

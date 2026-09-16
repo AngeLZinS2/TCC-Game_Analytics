@@ -12,6 +12,14 @@ UNICO (app_id no `data-ds-appid`) com desconto agora. Pacotes/bundles nesta
 busca tambem usam `data-ds-appid`, mas sem transacionar preco por app -
 descartados por nao terem o bloco de desconto no formato esperado (unico
 sinal confiavel sem pedir outro endpoint).
+
+**Tipo do app.** O fragmento HTML nao diz se a linha e jogo, DLC ou trilha
+sonora - nada no `search_result_row` distingue os tres. Quem distingue e o
+proprio buscador, pelo parametro `category1` (998 = jogo, 21 = DLC),
+conferido ao vivo em 2026-09-16: 19.963 ofertas no total, 9.428 com
+`category1=998` e 9.202 com `category1=21`. Por isso `parse_pagina` recebe
+o tipo de fora - nao e heuristica sobre o nome ("Soundtrack", "DLC"), que
+erraria em jogo chamado "DLC Quest" e em DLC sem a palavra no titulo.
 """
 
 from __future__ import annotations
@@ -33,6 +41,13 @@ def _inteiro(valor: str | None) -> int | None:
         return None
 
 
+#: Os dois tipos que a varredura cobre, no MESMO vocabulario que o
+#: `appdetails` usa em `dim_jogo_steam.tipo` - assim as duas fontes escrevem
+#: o mesmo valor e nada precisa traduzir entre elas.
+TIPO_JOGO = "game"
+TIPO_DLC = "dlc"
+
+
 @dataclass(slots=True)
 class LinhaOfertaSteam:
     app_id: int
@@ -40,6 +55,9 @@ class LinhaOfertaSteam:
     preco_final_centavos: int
     preco_original_centavos: int
     desconto_percentual: int
+    #: `TIPO_JOGO` ou `TIPO_DLC` - de qual `category1` esta linha veio, nao
+    #: uma leitura do HTML (ver a nota no topo do modulo).
+    tipo: str = TIPO_JOGO
     #: Ids das tags da Steam daquele app (`data-ds-tagids`). Vazio quando a
     #: linha nao traz o atributo. Sao o que sustenta o filtro de genero da
     #: tela de Ofertas: os apps que so existem por causa da varredura nunca
@@ -65,8 +83,12 @@ class ResultadoOfertasSteam:
         return len(self.linhas)
 
 
-def parse_pagina(results_html: str) -> list[LinhaOfertaSteam]:
-    """Uma pagina do fragmento `results_html` -> linhas validadas."""
+def parse_pagina(results_html: str, tipo: str = TIPO_JOGO) -> list[LinhaOfertaSteam]:
+    """Uma pagina do fragmento `results_html` -> linhas validadas.
+
+    `tipo` vem de quem chamou porque e o `category1` da requisicao que sabe
+    disso, nao o HTML devolvido.
+    """
     soup = BeautifulSoup(results_html, "html.parser")
     linhas: list[LinhaOfertaSteam] = []
 
@@ -108,6 +130,7 @@ def parse_pagina(results_html: str) -> list[LinhaOfertaSteam]:
                 preco_final_centavos=preco_final,
                 preco_original_centavos=preco_original,
                 desconto_percentual=desconto,
+                tipo=tipo,
                 tags=_tags(item.get("data-ds-tagids")),
             )
         )

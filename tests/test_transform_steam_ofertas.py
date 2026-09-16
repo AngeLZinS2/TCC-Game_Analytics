@@ -8,6 +8,8 @@ nunca tiveram ficha (`appdetails`) e, portanto, nao tem `generos`.
 """
 
 from services.etl.transform_steam_ofertas import (
+    TIPO_DLC,
+    TIPO_JOGO,
     parse_dicionario_tags,
     parse_pagina,
 )
@@ -89,3 +91,34 @@ def test_paginas_repetem_o_mesmo_app():
     assert [o.app_id for o in juntas] == [730, 730]
     # A ultima leitura e a que o load mantem.
     assert juntas[-1].preco_final_centavos == 1999
+
+
+def test_tipo_vem_de_quem_chamou_nao_do_html():
+    """O fragmento HTML nao distingue jogo de DLC - nada no
+    `search_result_row` diz o que o app e. Quem sabe e o `category1` da
+    requisicao (998 = jogo, 21 = DLC), entao o tipo entra por parametro.
+
+    E a razao de nao ser heuristica de nome: o MESMO HTML vira jogo ou DLC
+    dependendo so de qual varredura o trouxe."""
+    html = linha(app_id=730, nome="Counter-Strike 2")
+    (jogo,) = parse_pagina(html, tipo=TIPO_JOGO)
+    (dlc,) = parse_pagina(html, tipo=TIPO_DLC)
+    assert jogo.tipo == TIPO_JOGO
+    assert dlc.tipo == TIPO_DLC
+
+
+def test_tipo_padrao_e_jogo():
+    """Chamada sem tipo (raw gravado antes da separacao por `category1`, em
+    2026-09-16) e lida como jogo - era o que a varredura unica
+    majoritariamente trazia. Reprocessar raw antigo nao pode quebrar."""
+    (oferta,) = parse_pagina(linha())
+    assert oferta.tipo == TIPO_JOGO
+
+
+def test_nome_nao_decide_o_tipo():
+    """Fixa a premissa oposta a heuristica de nome: "DLC Quest" e um JOGO, e
+    uma DLC pode nao ter a palavra no titulo. So o `category1` decide."""
+    (jogo,) = parse_pagina(linha(nome="DLC Quest"), tipo=TIPO_JOGO)
+    assert jogo.tipo == TIPO_JOGO
+    (dlc,) = parse_pagina(linha(nome="End of Zoe"), tipo=TIPO_DLC)
+    assert dlc.tipo == TIPO_DLC

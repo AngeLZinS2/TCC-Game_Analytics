@@ -21,7 +21,18 @@ from views.schemas import OfertaSteam, PaginaOfertasSteam, TagOfertaSteam
 
 router = APIRouter(prefix="/api/steam", tags=["steam"])
 
-OrdenarOfertaPor = Literal["desconto_desc", "preco_asc"]
+OrdenarOfertaPor = Literal["nome_asc", "desconto_desc", "preco_asc"]
+
+#: A lista de Ofertas mostra JOGO, e so. A varredura tambem traz DLC
+#: (`category1=21`), porque a promocao dela importa - mas o lugar dela e a
+#: ficha do jogo dono, nao uma vitrine onde "Pack de Temporada 2026" disputa
+#: espaco com o jogo. Trilha sonora, video e software nem sao mais varridos.
+#:
+#: E `tipo == "game"` e nao `tipo != "dlc"` de proposito: mostrar so o que
+#: sabemos ser jogo e mais honesto do que mostrar tudo que ainda nao
+#: provamos ser DLC. O preco disso e que app sem `tipo` (varredura antiga,
+#: antes de 2026-09-16) fica de fora ate a proxima varredura preencher.
+TIPO_JOGO = "game"
 
 #: Os ids de tag que a Steam usa como GENERO de loja (as paginas
 #: `store.steampowered.com/genre/...`), conferidos contra o dicionario vivo
@@ -64,7 +75,7 @@ def listar_ofertas(
     moeda: str | None = Query(None, min_length=1, max_length=8),
     tag: int | None = Query(None, description="id de tag da Steam (genero/categoria)"),
     categoria: int | None = Query(None, description="id de tag de caracteristica/tema"),
-    ordenar_por: OrdenarOfertaPor = "desconto_desc",
+    ordenar_por: OrdenarOfertaPor = "nome_asc",
     limite: int = Query(24, ge=1, le=100),
     offset: int = Query(0, ge=0),
 ) -> PaginaOfertasSteam:
@@ -78,6 +89,7 @@ def listar_ofertas(
     condicoes = [
         PromocaoSteam.ativa.is_(True),
         PromocaoSteam.desconto_percentual >= desconto_minimo,
+        DimJogoSteam.tipo == TIPO_JOGO,
     ]
     if busca:
         condicoes.append(DimJogoSteam.nome.ilike(f"%{busca}%"))
@@ -108,10 +120,16 @@ def listar_ofertas(
 
     if ordenar_por == "preco_asc":
         base = base.order_by(PromocaoSteam.preco_final.asc())
-    else:
+    elif ordenar_por == "desconto_desc":
         base = base.order_by(
             desc(PromocaoSteam.desconto_percentual), PromocaoSteam.preco_final.asc()
         )
+    else:
+        # Alfabetica de verdade: `collate "C"` ordenaria por byte e jogaria
+        # todo titulo com acento ou minuscula pro fim da lista. Sem isso,
+        # "Ámbar" nao cairia perto de "Amnesia" e a ordem pareceria quebrada
+        # pra quem le em portugues.
+        base = base.order_by(func.lower(DimJogoSteam.nome).asc(), DimJogoSteam.app_id.asc())
     base = base.limit(limite).offset(offset)
 
     itens = [
@@ -150,7 +168,13 @@ def tags_das_ofertas(
         select(tag_id, func.count().label("ofertas"))
         .select_from(PromocaoSteam)
         .join(DimJogoSteam, DimJogoSteam.app_id == PromocaoSteam.app_id)
-        .where(PromocaoSteam.ativa.is_(True), DimJogoSteam.tags_steam.is_not(None))
+        .where(
+            PromocaoSteam.ativa.is_(True),
+            DimJogoSteam.tags_steam.is_not(None),
+            # Mesmo universo da listagem: um dropdown que promete 40 ofertas
+            # de "Corrida" e entrega 12 porque 28 eram DLC esta mentindo.
+            DimJogoSteam.tipo == TIPO_JOGO,
+        )
         .group_by(tag_id)
         .subquery()
     )

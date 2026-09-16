@@ -62,6 +62,7 @@ class ResumoOfertasSteam:
     promocoes_encerradas: int = 0
     tags_no_dicionario: int = 0
     apps_com_tags: int = 0
+    apps_com_tipo: int = 0
 
 
 def _upsert_ficha_minima(sessao, linhas: list[LinhaOfertaSteam]) -> int:
@@ -70,6 +71,7 @@ def _upsert_ficha_minima(sessao, linhas: list[LinhaOfertaSteam]) -> int:
         {
             "app_id": linha.app_id,
             "nome": linha.nome,
+            "tipo": linha.tipo,
             "imagem_header": _imagem_header(linha.app_id),
         }
         for linha in linhas
@@ -140,6 +142,41 @@ def _atualizar_tags_dos_apps(sessao, linhas: list[LinhaOfertaSteam]) -> int:
     return len(com_tags)
 
 
+def _atualizar_tipos(sessao, linhas: list[LinhaOfertaSteam]) -> int:
+    """Grava `tipo` (jogo/DLC) nos apps que a varredura ja conhecia.
+
+    O `_upsert_ficha_minima` acima so acerta o tipo de app NOVO: os ~19 mil
+    que a varredura anterior criou (antes da separacao por `category1`)
+    entraram com `tipo` nulo, e sem isto a tela de Ofertas - que agora so
+    mostra `tipo = 'game'` - nasceria vazia pra todos eles.
+
+    O `where` protege a ficha completa: quando o `appdetails` ja preencheu o
+    tipo, ele manda. As duas fontes concordam no vocabulario ("game"/"dlc"),
+    entao isto e desempate de procedencia, nao de valor - o `appdetails` e
+    quem olhou o app, a varredura so sabe em qual filtro ele apareceu.
+    """
+    valores = [
+        {
+            "app_id": linha.app_id,
+            "nome": linha.nome,
+            "tipo": linha.tipo,
+            "imagem_header": _imagem_header(linha.app_id),
+        }
+        for linha in linhas
+    ]
+    atualizados = 0
+    for lote in em_lotes(valores):
+        stmt = pg_insert(DimJogoSteam).values(lote)
+        stmt = stmt.on_conflict_do_update(
+            index_elements=["app_id"],
+            set_={"tipo": stmt.excluded.tipo},
+            where=DimJogoSteam.coletado_ficha_em.is_(None),
+        )
+        sessao.execute(stmt)
+        atualizados += len(lote)
+    return atualizados
+
+
 def carregar(
     linhas: list[LinhaOfertaSteam],
     completa: bool,
@@ -168,6 +205,7 @@ def carregar(
 
     with session_scope() as sessao:
         resumo.apps_novos = _upsert_ficha_minima(sessao, linhas)
+        resumo.apps_com_tipo = _atualizar_tipos(sessao, linhas)
         resumo.tags_no_dicionario = _upsert_tags(sessao, tags or {})
         resumo.apps_com_tags = _atualizar_tags_dos_apps(sessao, linhas)
 
@@ -215,6 +253,7 @@ def carregar(
             "promocoes_encerradas": resumo.promocoes_encerradas,
             "tags_no_dicionario": resumo.tags_no_dicionario,
             "apps_com_tags": resumo.apps_com_tags,
+            "apps_com_tipo": resumo.apps_com_tipo,
             "completa": completa,
         },
     )

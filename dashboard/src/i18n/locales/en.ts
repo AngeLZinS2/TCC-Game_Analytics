@@ -511,6 +511,10 @@ const en: Traducoes = {
   },
 
   jogoSteam: {
+    dlcs: {
+      titulo: "DLCs on sale",
+      descricao: "Extra content for this game discounted right now",
+    },
     voltar: "Back to catalog",
     favoritarJogo: "Favorite game",
     gratuito: "Free",
@@ -700,6 +704,7 @@ const en: Traducoes = {
     todasCategorias: "All categories",
     limparPrecoMaximo: "Clear maximum price",
     ordenarPor: "Sort by",
+    ordemAlfabetica: "Alphabetical",
     maiorDesconto: "Biggest discount",
     menorPreco: "Lowest price",
     nenhumaOferta: "No active Steam promotion right now with this filter.",

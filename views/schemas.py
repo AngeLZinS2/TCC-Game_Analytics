@@ -307,6 +307,23 @@ class OfertaSteam(BaseModel):
     iniciada_em: datetime
 
 
+class DlcEmPromocao(BaseModel):
+    """Uma DLC do jogo que esta em promocao agora.
+
+    So o essencial: a DLC nao tem pagina propria no site, entao nome, arte e
+    quanto custa agora e tudo o que da pra oferecer sem prometer navegacao
+    que nao existe.
+    """
+
+    app_id: int
+    nome: str
+    imagem_header: str | None
+    preco_original: Decimal
+    preco_final: Decimal
+    desconto_percentual: int
+    moeda: str
+
+
 class PaginaOfertasSteam(BaseModel):
     """Resposta paginada de `GET /api/steam/ofertas` (Fase 35.1 - varredura
     completa fez o catalogo de ofertas crescer de dezenas pra ~20 mil)."""
@@ -350,6 +367,11 @@ class DetalheJogoSteam(BaseModel):
     #: Historico de preco SO da Steam (nao cross-loja) - o `menor_preco_historico`
     #: acima continua sendo o menor de TODAS as lojas, via ITAD.
     historico_preco_steam: list[PontoHistoricoPrecoSteam] = []
+    #: DLCs DESTE jogo com promocao aberta agora. A lista de Ofertas so mostra
+    #: jogo; a DLC aparece aqui, ao lado do jogo dono dela. Vazia quando o
+    #: jogo nao tem DLC, quando nenhuma esta em promocao, ou quando a ficha
+    #: ainda nao trouxe `dlc_ids`.
+    dlc_em_promocao: list[DlcEmPromocao] = []
 
 
 class AgregadoGenero(BaseModel):

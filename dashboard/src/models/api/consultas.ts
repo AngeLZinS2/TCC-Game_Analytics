@@ -190,7 +190,8 @@ export interface FiltrosOfertasSteam {
   tag?: number;
   /** Id de tag de característica/tema (Um Jogador, Co-op…). */
   categoria?: number;
-  ordenar_por?: "desconto_desc" | "preco_asc";
+  /** Padrão da API: `nome_asc` (alfabética). */
+  ordenar_por?: "nome_asc" | "desconto_desc" | "preco_asc";
   limite?: number;
   offset?: number;
 }
