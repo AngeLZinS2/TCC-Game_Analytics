@@ -135,6 +135,21 @@ class Settings(BaseSettings):
         "https://github.com/ - contato no repositorio)"
     )
 
+    # --- Liquipedia API v3 (api.liquipedia.net/api) - acesso de parceiro,
+    # chave obtida via pedido formal, distinto do scraping acima. ---
+    #: Sem esta chave, os coletores da API v3 nao rodam - igual ao padrao
+    #: das outras chaves do projeto (ITAD/GROQ/STEAM).
+    liquipedia_api_v3_key: str | None = None
+    #: A documentacao da v3 NAO especifica um numero de rate limit (ao
+    #: contrario do scraping, que tem 2s/30s documentados nos termos) -
+    #: por ser acesso de parceiro, abuso e mais provavel de ser revisado por
+    #: gente do que throttled automaticamente. **Confirmado na pratica
+    #: (Fase 36): a PRIMEIRA chamada de teste com esta chave ja devolveu
+    #: 429** - o limite real e mais apertado do que o padrao anterior
+    #: (1.0s) cobria. Subido pra 5.0s ate a Liquipedia confirmar um
+    #: numero oficial; ajustavel via env sem mudar codigo.
+    liquipedia_api_v3_rate_limit_seconds: float = Field(default=5.0, gt=0)
+
     # --- Agendador de coleta ---
     #: Intervalo entre coletas da Steam, em minutos.
     #:
@@ -282,6 +297,13 @@ class Settings(BaseSettings):
     #: Sem limite documentado (nao e API oficial); 1s e conservador o
     #: bastante pra nao parecer trafego automatizado martelando o site.
     hltb_rate_limit_seconds: float = Field(default=1.0, gt=0)
+    #: Jogo marcado como "procurei e nao achei no HLTB" (`hltb_id=""`) volta
+    #: pra fila depois deste tempo. Mesmo desenho de
+    #: `itad_revalidar_vazios_dias`, e pelo mesmo motivo: o `""` definitivo
+    #: custava dado real - lancamento coletado antes de existir no HLTB nunca
+    #: teria tempo, e jogo marcado antes de uma melhoria na busca tambem nao
+    #: ("Apex Legends™" ficou sem tempo mesmo depois da limpeza de ™/®/©).
+    hltb_revalidar_vazios_dias: int = Field(default=14, ge=1)
     #: Intervalo entre rodadas de tempo pra zerar, em minutos.
     #:
     #: O dado praticamente nao muda (o tempo medio da comunidade so desloca

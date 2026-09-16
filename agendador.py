@@ -548,7 +548,11 @@ def _coletar_tempo_jogo(settings: Settings, storage: RawStorage) -> CollectionRe
     """Tempo estimado pra zerar cada jogo (HowLongToBeat)."""
     from services.collectors.hltb_collector import HltbCollector
 
-    coletor = HltbCollector(raw_storage=storage, settings=settings)
+    coletor = HltbCollector(
+        raw_storage=storage,
+        settings=settings,
+        revalidar_vazios_dias=settings.hltb_revalidar_vazios_dias,
+    )
     try:
         return coletor.run(carregar=True)
     finally:

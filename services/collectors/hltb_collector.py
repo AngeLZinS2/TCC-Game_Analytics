@@ -30,10 +30,11 @@ from __future__ import annotations
 import logging
 import time
 from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
 from typing import Any, Sequence
 
 import requests
-from sqlalchemy import select
+from sqlalchemy import and_, or_, select
 
 from services.collectors.base import BaseCollector, RawRecord
 from services.collectors.http_client import RateLimitedClient
@@ -74,28 +75,61 @@ def _normalizar_busca(nome: str) -> str:
     return " ".join(nome.translate(_SIMBOLOS_MARCA).split())
 
 
-def jogos_para_tempo(limite: int | None = None) -> list[tuple[int, str]]:
-    """`(app_id, nome)` dos jogos COM FICHA que ainda nunca foram buscados no HLTB.
+def jogos_para_tempo(
+    limite: int | None = None,
+    app_ids: Sequence[int] | None = None,
+    revalidar_vazios_dias: int | None = None,
+) -> list[tuple[int, str]]:
+    """`(app_id, nome)` dos jogos COM FICHA que precisam de busca no HLTB.
 
     Diferente do ITAD (que cacheia so o id e busca preco de novo toda
     rodada), aqui o id E os tempos saem da MESMA chamada de busca - uma vez
-    resolvido (`hltb_id` preenchido, mesmo que `""` de "nao achei") nao ha o
-    que atualizar buscando de novo. So `hltb_id IS NULL` volta a entrar.
+    ACHADO nao ha o que atualizar buscando de novo.
 
     O filtro de ficha (2026-09-16) tem o mesmo motivo do ITAD e do agendador:
     a varredura de ofertas criou ~20 mil linhas com `hltb_id` nulo, e o painel
-    "Tempo pra zerar" so aparece na ficha - que o stub nao tem. Entram quando
-    alguem coletar a ficha.
+    "Tempo pra zerar" so aparece na ficha - que o stub nao tem.
+
+    `revalidar_vazios_dias`: jogo marcado `hltb_id = ""` ("procurei e nao
+    achei") cuja ultima tentativa passou desse tempo volta pra fila. Sem isto
+    o `""` era DEFINITIVO, e custava dado real em dois casos frequentes:
+
+    * o jogo entra no HLTB depois - lancamento coletado no dia zero nunca
+      teria tempo, pra sempre;
+    * a BUSCA melhora depois. Aconteceu: a limpeza de ™/®/© (`_SIMBOLOS_MARCA`)
+      entrou depois que varios jogos ja tinham sido marcados, e "Apex
+      Legends™" ficou sem tempo mesmo passando a ser encontravel - conferido
+      ao vivo em 2026-09-16, `count=2` na busca contra `hltb_id = ""` no banco.
+
+    E o mesmo desenho que `itad_collector.jogos_para_preco` ja usava; o que
+    faltava aqui era so usar `coletado_tempo_em`, que a carga ja gravava a
+    cada tentativa.
+
+    `app_ids` restringe a esses apps, ignorando o cache - e o caminho da
+    coleta sob demanda, logo depois de a ficha entrar.
     """
-    with session_scope() as sessao:
-        consulta = (
-            select(DimJogoSteam.app_id, DimJogoSteam.nome)
-            .where(
-                DimJogoSteam.hltb_id.is_(None),
-                DimJogoSteam.com_ficha(),
-            )
-            .order_by(DimJogoSteam.app_id)
+    pendente = DimJogoSteam.hltb_id.is_(None)
+    if revalidar_vazios_dias is not None:
+        corte = datetime.now(timezone.utc) - timedelta(days=revalidar_vazios_dias)
+        pendente = or_(
+            pendente,
+            and_(
+                DimJogoSteam.hltb_id == "",
+                or_(
+                    DimJogoSteam.coletado_tempo_em.is_(None),
+                    DimJogoSteam.coletado_tempo_em < corte,
+                ),
+            ),
         )
+
+    with session_scope() as sessao:
+        consulta = select(DimJogoSteam.app_id, DimJogoSteam.nome).order_by(
+            DimJogoSteam.app_id
+        )
+        if app_ids is not None:
+            consulta = consulta.where(DimJogoSteam.app_id.in_(list(app_ids)))
+        else:
+            consulta = consulta.where(pendente, DimJogoSteam.com_ficha())
         if limite:
             consulta = consulta.limit(limite)
         return [(linha.app_id, linha.nome) for linha in sessao.execute(consulta)]
@@ -140,10 +174,14 @@ class HltbCollector(BaseCollector[ResultadoHltb]):
         raw_storage: Any,
         settings: Settings | None = None,
         limite: int | None = None,
+        app_ids: Sequence[int] | None = None,
+        revalidar_vazios_dias: int | None = None,
     ) -> None:
         super().__init__(raw_storage)
         self.settings = settings or get_settings()
         self.limite = limite
+        self.app_ids = app_ids
+        self.revalidar_vazios_dias = revalidar_vazios_dias
         self.falhas = 0
 
         self.client = RateLimitedClient(
@@ -213,7 +251,11 @@ class HltbCollector(BaseCollector[ResultadoHltb]):
             )
 
     def collect(self) -> list[RawRecord]:
-        alvos = jogos_para_tempo(self.limite)
+        alvos = jogos_para_tempo(
+            self.limite,
+            app_ids=self.app_ids,
+            revalidar_vazios_dias=self.revalidar_vazios_dias,
+        )
         if not alvos:
             logger.info("nenhum jogo pendente de tempo no hltb")
             return []

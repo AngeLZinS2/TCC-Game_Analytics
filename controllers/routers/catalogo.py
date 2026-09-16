@@ -16,15 +16,19 @@ das avaliacoes com TEXTO, e essas so existem depois de coletadas. Sem a coleta
 sob demanda, buscar um jogo novo mostraria a ficha e mais nada: nem tendencia,
 nem aspectos, nem avaliacao classificada. Por isso `/coletar`.
 
-**Preco nas outras lojas e resumo por IA.** O `/coletar` tambem dispara a
-coleta do ITAD e o resumo por IA (Groq) para esse app - senao o painel "Onde
-comprar" e o "Resumo por IA" ficariam vazios ate a rodada em lote (horas
-depois, e so quando o jogo entrasse na fila). Mas os dois rodam DEPOIS da
-resposta, em `BackgroundTasks`: medido em producao, o ITAD leva de 57 a 97
-segundos para um app (varias lojas, cada uma com seu rate limit) contra ~5
-da Steam. Mante-los na mesma requisicao fazia a tela ficar tres minutos num
-spinner por um painel acessorio, sendo que a ficha ja estava no banco desde
-o quinto segundo. Os dois seguem best-effort: falha neles nao afeta nada.
+**Preco, tempo pra zerar e resumo por IA.** O `/coletar` tambem dispara a
+coleta do ITAD, a do HowLongToBeat e o resumo por IA (Groq) para esse app -
+senao os paineis "Onde comprar", "Tempo pra zerar" e "Resumo por IA"
+ficariam vazios ate a rodada em lote - e a do HowLongToBeat roda a cada 24
+HORAS, entao quem trouxesse um jogo pela busca via a ficha inteira menos
+esse painel, por ate um dia, sem nada explicando por que.
+
+Os tres rodam DEPOIS da resposta, em `BackgroundTasks`: medido em producao,
+o ITAD leva de 57 a 97 segundos para um app (varias lojas, cada uma com seu
+rate limit) contra ~5 da Steam. Mante-los na mesma requisicao fazia a tela
+ficar tres minutos num spinner por paineis acessorios, sendo que a ficha ja
+estava no banco desde o quinto segundo. Os tres seguem best-effort: falha
+neles nao afeta nada.
 """
 
 from __future__ import annotations
@@ -79,6 +83,45 @@ def _coletar_preco_sob_demanda(app_id: int) -> None:
     except Exception as exc:  # noqa: BLE001 - preco e acessorio, nao derruba a coleta
         logger.warning(
             "coleta de preco sob demanda falhou",
+            extra={"app_id": app_id, "erro": f"{type(exc).__name__}: {exc}"},
+        )
+    finally:
+        coletor.close()
+
+
+def _coletar_tempo_sob_demanda(app_id: int) -> None:
+    """Busca o tempo pra zerar (HowLongToBeat) de um app recem-coletado.
+
+    Sem isto o painel "Tempo pra zerar" so aparecia quando a tarefa
+    `tempo_jogo` do agendador rodasse - e ela roda a cada 24 HORAS. Quem
+    acabou de trazer um jogo pela busca via a ficha inteira preenchida menos
+    esse painel, por ate um dia, sem nada explicando por que.
+
+    E uma unica busca (~1s), e vai pro `BackgroundTasks` junto com preco e
+    resumo: acessorio, nao segura a resposta.
+
+    `app_ids=[app_id]` ignora o cache do `hltb_id` de proposito - o app
+    acabou de entrar, nao ha cache que valha.
+
+    Nunca levanta: HLTB desabilitado, fora do ar ou sem resultado, a coleta
+    da Steam ja aconteceu e a resposta do `/coletar` nao muda.
+    """
+    from services.collectors.hltb_collector import HltbCollector
+    from services.etl.raw_storage import RawStorage
+
+    settings = get_settings()
+    if not settings.hltb_enabled:
+        return
+
+    storage = RawStorage(settings.raw_data_path, registrar_no_banco=True)
+    coletor = HltbCollector(
+        raw_storage=storage, settings=settings, app_ids=[app_id]
+    )
+    try:
+        coletor.run(carregar=True)
+    except Exception as exc:  # noqa: BLE001 - tempo e acessorio, nao derruba a coleta
+        logger.warning(
+            "coleta de tempo sob demanda falhou",
             extra={"app_id": app_id, "erro": f"{type(exc).__name__}: {exc}"},
         )
     finally:
@@ -270,6 +313,7 @@ def coletar(entrada: EntradaColeta, tarefas: BackgroundTasks) -> ResumoColeta:
     # lojas e resumo por IA rodam depois da resposta - sao acessorios, e o ITAD
     # sozinho leva mais de um minuto (ver a nota no topo do modulo).
     tarefas.add_task(_coletar_preco_sob_demanda, entrada.app_id)
+    tarefas.add_task(_coletar_tempo_sob_demanda, entrada.app_id)
     tarefas.add_task(_gerar_resumo_sob_demanda, entrada.app_id)
 
     return ResumoColeta(

@@ -23,7 +23,7 @@ Sem Postgres o modulo inteiro e pulado (mesmo motivo de `test_api.py`).
 from __future__ import annotations
 
 import pytest
-from sqlalchemy import select, text
+from sqlalchemy import func, select, text
 
 from models.models import DimJogoSteam
 from models.session import get_engine, session_scope
@@ -90,6 +90,66 @@ def test_a_premissa_do_teste_vale() -> None:
     parar de ter, sao eles que precisam de outro cenario, nao o codigo.
     """
     assert _stubs_no_banco(), "banco sem stub: os testes acima nao provam nada"
+
+
+# --- O "nao achei" do HLTB nao pode ser definitivo ---------------------------
+
+
+def test_hltb_revalida_o_marcador_de_nao_achado() -> None:
+    """`hltb_id = ""` volta pra fila depois da janela de revalidacao.
+
+    Sem isto o marcador era DEFINITIVO, e custava dado real em dois casos:
+    lancamento coletado antes de existir no HLTB nunca teria tempo, e jogo
+    marcado antes de uma melhoria na busca tambem nao. O segundo aconteceu:
+    "Apex Legends™" ficou sem tempo mesmo depois da limpeza de ™/®/©, apesar
+    de a busca passar a encontra-lo (`count=2`, conferido ao vivo).
+
+    Compara a fila com e sem a janela em vez de fixar um numero: o banco de
+    teste muda, a REGRA nao.
+    """
+    from services.collectors.hltb_collector import jogos_para_tempo
+
+    with session_scope() as sessao:
+        marcados = sessao.scalar(
+            select(func.count())
+            .select_from(DimJogoSteam)
+            .where(DimJogoSteam.hltb_id == "")
+        )
+    if not marcados:
+        pytest.skip("banco sem jogo marcado como 'nao achei no HLTB'")
+
+    sem_janela = {app_id for app_id, _ in jogos_para_tempo()}
+    # Janela de 0 dia: todo marcado ja venceu, entao todos voltam.
+    com_janela = {app_id for app_id, _ in jogos_para_tempo(revalidar_vazios_dias=0)}
+
+    assert com_janela > sem_janela, (
+        "a janela de revalidacao nao trouxe nenhum 'nao achei' de volta"
+    )
+    assert len(com_janela - sem_janela) == marcados
+
+
+def test_hltb_sem_janela_nao_repete_quem_ja_foi_achado() -> None:
+    """O complemento: quem TEM tempo nunca volta, com ou sem janela.
+
+    Diferente do ITAD (que rebusca preco toda rodada), aqui o id e os tempos
+    saem da mesma chamada - jogo achado nao tem o que atualizar, e rebusca-lo
+    seria trafego a toa num site que nem API oficial tem.
+    """
+    from services.collectors.hltb_collector import jogos_para_tempo
+
+    with session_scope() as sessao:
+        achados = set(
+            sessao.scalars(
+                select(DimJogoSteam.app_id).where(
+                    DimJogoSteam.hltb_id.is_not(None), DimJogoSteam.hltb_id != ""
+                )
+            )
+        )
+    if not achados:
+        pytest.skip("banco sem jogo com tempo do HLTB")
+
+    na_fila = {app_id for app_id, _ in jogos_para_tempo(revalidar_vazios_dias=0)}
+    assert na_fila & achados == set()
 
 
 # --- A regra tem UM dono ------------------------------------------------------
