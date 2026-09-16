@@ -323,7 +323,15 @@ def listar_jogos(
     ordem: Literal["asc", "desc"] = "desc",
     limite: int = Query(100, ge=1, le=500),
 ) -> list[JogoSteam]:
-    """Catalogo monitorado, cada jogo com seu snapshot mais recente."""
+    """Catalogo monitorado, cada jogo com seu snapshot mais recente.
+
+    "Monitorado" quer dizer COM FICHA coletada (`appdetails`), nao "tem linha
+    em `dim_jogo_steam`". A varredura de ofertas (Fase 35.1) povoa a dimensao
+    com ~18 mil apps que so tem nome, imagem e tags - sem genero, preco,
+    avaliacao nem telemetria. Devolve-los aqui enchia a tabela de telemetria
+    de linhas vazias e, pior, fazia a busca do catalogo "achar" o jogo e
+    portanto nunca oferecer a coleta dele.
+    """
     snap, _ = _ultimo_snapshot()
 
     ordenacoes = {
@@ -341,6 +349,7 @@ def listar_jogos(
         select(DimJogoSteam, snap, estatisticas.c.pico, estatisticas.c.anterior)
         .outerjoin(snap, snap.app_id == DimJogoSteam.app_id)
         .outerjoin(estatisticas, estatisticas.c.app_id == DimJogoSteam.app_id)
+        .where(DimJogoSteam.coletado_ficha_em.is_not(None))
     )
 
     if busca:
@@ -371,7 +380,13 @@ def listar_jogos(
 
 @router.get("/generos", response_model=list[AgregadoGenero])
 def agregar_por_genero(sessao: Session = Depends(get_db)) -> list[AgregadoGenero]:
-    """Um jogo conta em todos os seus generos - a soma passa do total de jogos."""
+    """Um jogo conta em todos os seus generos - a soma passa do total de jogos.
+
+    Conta o MESMO universo que `listar_jogos` devolve (so quem tem ficha): este
+    numero e o contador do filtro, e um filtro que promete 151 jogos e entrega
+    137 esta mentindo. A diferenca vem das linhas que a varredura de ofertas
+    criou sem ficha.
+    """
     snap, _ = _ultimo_snapshot()
     genero = func.unnest(DimJogoSteam.generos).label("genero")
 
@@ -383,6 +398,7 @@ def agregar_por_genero(sessao: Session = Depends(get_db)) -> list[AgregadoGenero
             func.avg(snap.nota_avaliacoes).label("nota"),
         )
         .outerjoin(snap, snap.app_id == DimJogoSteam.app_id)
+        .where(DimJogoSteam.coletado_ficha_em.is_not(None))
         .group_by(genero)
         .order_by(nulls_last(desc("jogadores")))
     )
@@ -413,9 +429,16 @@ def agregar_por_categoria(sessao: Session = Depends(get_db)) -> list[AgregadoCat
     # set-returning function nos dois) - por isso o unnest mora numa
     # subconsulta, e o filtro entra na consulta de fora, sobre a coluna ja
     # expandida.
-    expandido = select(
-        DimJogoSteam.app_id, func.unnest(DimJogoSteam.recursos).label("categoria")
-    ).subquery()
+    #
+    # O `where` da ficha esta aqui pelo mesmo motivo de `/generos`: o contador
+    # do filtro tem que falar do mesmo universo que a listagem devolve.
+    expandido = (
+        select(
+            DimJogoSteam.app_id, func.unnest(DimJogoSteam.recursos).label("categoria")
+        )
+        .where(DimJogoSteam.coletado_ficha_em.is_not(None))
+        .subquery()
+    )
 
     consulta = (
         select(
@@ -538,6 +561,7 @@ def detalhar_jogo(app_id: int, sessao: Session = Depends(get_db)) -> DetalheJogo
     ]
 
     return DetalheJogoSteam(
+        ficha_coletada=jogo.coletado_ficha_em is not None,
         jogo=_montar_jogo(
             jogo,
             snapshots[-1] if snapshots else None,

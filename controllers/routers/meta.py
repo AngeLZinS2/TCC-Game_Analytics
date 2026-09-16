@@ -69,6 +69,13 @@ def visao_geral(sessao: Session = Depends(get_db)) -> VisaoGeral:
     # nao pode oferecer um recorte maior do que o que foi coletado.
     historico_desde = sessao.scalar(select(func.min(FatoSnapshotJogoSteam.janela_coleta)))
 
+    # O subconjunto com ficha - o que a tela de Catalogo lista de verdade.
+    monitorados = sessao.scalar(
+        select(func.count())
+        .select_from(DimJogoSteam)
+        .where(DimJogoSteam.coletado_ficha_em.is_not(None))
+    )
+
     coletas = sessao.execute(
         select(
             RawData.fonte,
@@ -90,6 +97,7 @@ def visao_geral(sessao: Session = Depends(get_db)) -> VisaoGeral:
         steam_usuarios_em_jogo=steam_em_jogo,
         steam_usuarios_online_variacao=steam_online_variacao,
         historico_steam_desde=historico_desde,
+        jogos_steam_monitorados=int(monitorados or 0),
         partidas=contar(DimPartida),
         linhas_fato_partida=contar(FatoPartidaJogador),
         jogadores=contar(DimJogador),

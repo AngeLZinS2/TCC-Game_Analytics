@@ -44,6 +44,11 @@ class VisaoGeral(BaseModel):
     #: existe de verdade - o seletor de periodo do catalogo usa isto para nao
     #: oferecer "90 dias" quando so ha duas semanas coletadas.
     historico_steam_desde: datetime | None = None
+    #: Quantos jogos tem FICHA coletada (`appdetails`), o subconjunto de
+    #: `jogos_steam` que a tela de Catalogo de fato lista. Os dois numeros
+    #: divergem muito desde a varredura de ofertas (Fase 35.1): ela poe na
+    #: dimensao ~18 mil apps que so tem nome, imagem e tags.
+    jogos_steam_monitorados: int = 0
     partidas: int
     linhas_fato_partida: int
     jogadores: int
@@ -326,6 +331,11 @@ class TagOfertaSteam(BaseModel):
 
 
 class DetalheJogoSteam(BaseModel):
+    #: `False` quando o app existe na dimensao mas nunca teve `appdetails`
+    #: coletado - o caso dos ~18 mil que a varredura de ofertas (Fase 35.1)
+    #: cria com nome, imagem e tags. A tela usa isto para coletar sob demanda
+    #: em vez de renderizar uma ficha vazia e sem saida.
+    ficha_coletada: bool = True
     jogo: JogoSteam
     ficha: FichaJogoSteam
     noticias: list[NoticiaSteam] = []

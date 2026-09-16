@@ -32,6 +32,9 @@ export interface VisaoGeral {
   steam_usuarios_online_variacao: number | null;
   /** Janela mais antiga de telemetria — quanto histórico existe de verdade. */
   historico_steam_desde: string | null;
+  /** Jogos com ficha coletada — o subconjunto que o Catálogo lista.
+   * Difere muito de `jogos_steam` desde a varredura de ofertas. */
+  jogos_steam_monitorados: number;
   partidas: number;
   linhas_fato_partida: number;
   jogadores: number;
@@ -212,6 +215,9 @@ export interface PontoHistoricoPrecoSteam {
 }
 
 export interface DetalheJogoSteam {
+  /** `false` quando o app existe na dimensão mas nunca teve ficha coletada
+   * (os ~18 mil que a varredura de ofertas cria com nome/imagem/tags). */
+  ficha_coletada: boolean;
   jogo: JogoSteam;
   ficha: FichaJogoSteam;
   noticias: NoticiaSteam[];

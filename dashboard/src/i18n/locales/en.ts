@@ -514,6 +514,12 @@ const en: Traducoes = {
     voltar: "Back to catalog",
     favoritarJogo: "Favorite game",
     gratuito: "Free",
+    semFicha: {
+      coletando: "Fetching this game's data from Steam…",
+      explicacao:
+        "This game came in through the deals sweep, which only stores name, image and tags. The full sheet (genre, reviews, telemetry) is being collected now — the page refreshes itself when it is done.",
+      tentarDeNovo: "Try again",
+    },
     metacriticTitle: "Metacritic critic score",
     dev: "DEV:",
     pub: "PUB:",

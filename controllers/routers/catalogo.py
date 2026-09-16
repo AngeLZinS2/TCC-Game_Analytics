@@ -16,18 +16,21 @@ das avaliacoes com TEXTO, e essas so existem depois de coletadas. Sem a coleta
 sob demanda, buscar um jogo novo mostraria a ficha e mais nada: nem tendencia,
 nem aspectos, nem avaliacao classificada. Por isso `/coletar`.
 
-**Preco nas outras lojas e resumo por IA.** O `/coletar` tambem dispara, na
-mesma chamada, a coleta do ITAD e o resumo por IA (Groq) para esse app -
-senao o painel "Onde comprar" e o "Resumo por IA" ficariam vazios ate a
-rodada em lote (horas depois, e so quando o jogo entrasse na fila). Os dois
-sao best-effort: se ITAD/Groq falharem ou nao tiverem chave, a coleta da
-Steam ja esta feita e a resposta volta mesmo assim.
+**Preco nas outras lojas e resumo por IA.** O `/coletar` tambem dispara a
+coleta do ITAD e o resumo por IA (Groq) para esse app - senao o painel "Onde
+comprar" e o "Resumo por IA" ficariam vazios ate a rodada em lote (horas
+depois, e so quando o jogo entrasse na fila). Mas os dois rodam DEPOIS da
+resposta, em `BackgroundTasks`: medido em producao, o ITAD leva de 57 a 97
+segundos para um app (varias lojas, cada uma com seu rate limit) contra ~5
+da Steam. Mante-los na mesma requisicao fazia a tela ficar tres minutos num
+spinner por um painel acessorio, sendo que a ficha ja estava no banco desde
+o quinto segundo. Os dois seguem best-effort: falha neles nao afeta nada.
 """
 
 from __future__ import annotations
 
 import logging
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -142,6 +145,12 @@ def buscar_catalogo(
 
     # Uma consulta so para saber quais desses ja estao no banco, e com quantas
     # avaliacoes - N consultas dentro do laco seriam N idas ao Postgres.
+    #
+    # `coletado_ficha_em IS NOT NULL` e nao "existe linha em dim_jogo_steam":
+    # desde a varredura de ofertas (Fase 35.1) a dimensao tem ~18 mil linhas
+    # que sao so nome + imagem + tags, sem ficha nenhuma. Tratar essas como
+    # coletadas escondia o botao de coletar, e o jogo virava um beco sem
+    # saida - a busca dizia "ja tenho" e a tela do jogo abria vazia.
     coletados = {
         linha[0]: linha[1]
         for linha in sessao.execute(
@@ -149,7 +158,10 @@ def buscar_catalogo(
             .outerjoin(
                 FatoAvaliacaoSteam, FatoAvaliacaoSteam.app_id == DimJogoSteam.app_id
             )
-            .where(DimJogoSteam.app_id.in_(app_ids))
+            .where(
+                DimJogoSteam.app_id.in_(app_ids),
+                DimJogoSteam.coletado_ficha_em.is_not(None),
+            )
             .group_by(DimJogoSteam.app_id)
         )
     }
@@ -180,13 +192,13 @@ def buscar_catalogo(
 
 
 @router.post("/coletar", response_model=ResumoColeta)
-def coletar(entrada: EntradaColeta) -> ResumoColeta:
+def coletar(entrada: EntradaColeta, tarefas: BackgroundTasks) -> ResumoColeta:
     """Coleta um jogo da Steam agora, com o texto das avaliacoes.
 
-    E o unico endpoint do projeto que ESCREVE chamando uma API externa. Roda de
-    forma sincrona, e nao em fila, porque quem clicou esta esperando o resultado
-    na tela - a Steam sao ~6 segundos, + preco/resumo por IA best-effort no
-    fim (mais uns segundos cada, nunca minutos: so este app, nao um lote).
+    E o unico endpoint do projeto que ESCREVE chamando uma API externa. A parte
+    da Steam (ficha + avaliacoes) e sincrona, e nao em fila, porque quem clicou
+    esta esperando a tela: sao ~5 segundos. Preco nas outras lojas e resumo por
+    IA vao para `BackgroundTasks` - ver a nota no topo do modulo.
     """
     # Import tardio: o coletor arrasta requests, o ETL e o storage, e os outros
     # endpoints deste router nao precisam de nada disso.
@@ -229,13 +241,23 @@ def coletar(entrada: EntradaColeta) -> ResumoColeta:
             .select_from(FatoAvaliacaoSteam)
             .where(FatoAvaliacaoSteam.app_id == entrada.app_id)
         )
-        nome = sessao.scalar(
-            select(DimJogoSteam.nome).where(DimJogoSteam.app_id == entrada.app_id)
-        )
+        linha = sessao.execute(
+            select(DimJogoSteam.nome, DimJogoSteam.coletado_ficha_em).where(
+                DimJogoSteam.app_id == entrada.app_id
+            )
+        ).first()
+        nome = linha.nome if linha else None
+        ficha_em = linha.coletado_ficha_em if linha else None
 
-    if nome is None:
+    if ficha_em is None:
         # A Steam responde 200 com `success: false` para app inexistente ou
         # regionalmente indisponivel; o ETL descarta e nada e gravado.
+        #
+        # Nao basta checar o NOME: a varredura de ofertas (Fase 35.1) cria a
+        # linha em `dim_jogo_steam` so com nome/imagem/tags, sem ficha. Se o
+        # criterio fosse o nome, todo DLC/trilha sonora que veio por ali daria
+        # 200 aqui, a tela acharia que coletou e ficaria pedindo de novo pra
+        # sempre. `coletado_ficha_em` e quem sabe se a ficha existe mesmo.
         raise HTTPException(
             status_code=404,
             detail=(
@@ -244,10 +266,11 @@ def coletar(entrada: EntradaColeta) -> ResumoColeta:
             ),
         )
 
-    # O jogo entrou no banco: agora preco nas outras lojas + resumo por IA,
-    # best-effort os dois.
-    _coletar_preco_sob_demanda(entrada.app_id)
-    _gerar_resumo_sob_demanda(entrada.app_id)
+    # A ficha entrou no banco: a tela ja pode ser desenhada. Preco nas outras
+    # lojas e resumo por IA rodam depois da resposta - sao acessorios, e o ITAD
+    # sozinho leva mais de um minuto (ver a nota no topo do modulo).
+    tarefas.add_task(_coletar_preco_sob_demanda, entrada.app_id)
+    tarefas.add_task(_gerar_resumo_sob_demanda, entrada.app_id)
 
     return ResumoColeta(
         app_id=entrada.app_id,

@@ -520,6 +520,12 @@ const pt = {
     voltar: "Voltar para o catálogo",
     favoritarJogo: "Favoritar jogo",
     gratuito: "Gratuito",
+    semFicha: {
+      coletando: "Buscando os dados deste jogo na Steam…",
+      explicacao:
+        "Este jogo entrou pela varredura de ofertas, que guarda só nome, imagem e tags. A ficha completa (gênero, avaliações, telemetria) está sendo coletada agora — a página se atualiza sozinha ao terminar.",
+      tentarDeNovo: "Tentar de novo",
+    },
     metacriticTitle: "Nota da crítica no Metacritic",
     dev: "DEV:",
     pub: "PUB:",

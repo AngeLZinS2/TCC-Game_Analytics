@@ -270,8 +270,11 @@ export function PerfilPagina() {
             <div className="grid grid-cols-1 gap-space-base sm:grid-cols-2">
               <KpiHud
                 etiqueta={t("perfil.playdbAgora.catalogo")}
-                valor={visaoGeral.data ? fmtNumero(visaoGeral.data.jogos_steam + visaoGeral.data.jogos_xbox) : "—"}
-                valorNumerico={visaoGeral.data ? visaoGeral.data.jogos_steam + visaoGeral.data.jogos_xbox : null}
+                // MONITORADOS (com ficha) + Xbox. `jogos_steam` conta a
+                // dimensão inteira, que desde a varredura de ofertas inclui
+                // ~18 mil apps sem ficha - o rótulo aqui diz "monitorados".
+                valor={visaoGeral.data ? fmtNumero(visaoGeral.data.jogos_steam_monitorados + visaoGeral.data.jogos_xbox) : "—"}
+                valorNumerico={visaoGeral.data ? visaoGeral.data.jogos_steam_monitorados + visaoGeral.data.jogos_xbox : null}
                 formatarValor={fmtNumero}
                 rotulo={t("perfil.playdbAgora.jogosMonitorados")}
                 acento="primaria"

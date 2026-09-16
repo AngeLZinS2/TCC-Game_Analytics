@@ -7,11 +7,17 @@
  * de telemetria.
  */
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 
-import { useDesfavoritarJogo, useFavoritarJogo, useFavoritosJogos, useJogoSteam } from "@models/api/consultas";
+import {
+  useColetarJogo,
+  useDesfavoritarJogo,
+  useFavoritarJogo,
+  useFavoritosJogos,
+  useJogoSteam,
+} from "@models/api/consultas";
 import type {
   DetalheJogoSteam,
   FichaJogoSteam,
@@ -22,9 +28,9 @@ import type {
   PontoSerie,
   PromocaoAtivaSteam,
 } from "@models/api/tipos";
-import { Botao, Consulta, Icone, Selo } from "@views/componentes/base";
+import { Botao, Consulta, Icone, MensagemErro, Selo } from "@views/componentes/base";
 import { BotaoFavoritar } from "@views/componentes/BotaoFavoritar";
-import { CapaJogo } from "@views/componentes/CapaJogo";
+import { ArteJogo, CapaJogo } from "@views/componentes/CapaJogo";
 import { CarrosselMidia } from "@views/componentes/CarrosselMidia";
 import { AreaNeon } from "@views/componentes/graficos/AreaNeon";
 import { BarraFina, KpiHud, Painel } from "@views/componentes/hud";
@@ -64,6 +70,31 @@ export function JogoSteamPagina() {
   const favoritosJogos = useFavoritosJogos();
   const favoritar = useFavoritarJogo();
   const desfavoritar = useDesfavoritarJogo();
+  const coletar = useColetarJogo();
+
+  /*
+   * Coleta sob demanda de quem chegou aqui sem ficha.
+   *
+   * A varredura de ofertas (Fase 35.1) povoa `dim_jogo_steam` com ~18 mil
+   * apps que so tem nome, imagem e tags. Abrir um deles - clicando num
+   * cartao de Ofertas - caia numa ficha vazia e sem saida: a linha existia,
+   * entao nada no site se oferecia para busca-la. Agora a propria visita
+   * dispara a coleta, que e exatamente o que o Catalogo ja fazia ao clicar
+   * num resultado "da loja".
+   *
+   * `pedidos` guarda os app_ids ja pedidos NESTA montagem: sem isso, o
+   * `invalidateQueries` do sucesso traria `ficha_coletada` de novo por um
+   * instante e o efeito dispararia a coleta em laco.
+   */
+  const pedidos = useRef(new Set<number>());
+  const fichaFaltando = detalhe.data?.ficha_coletada === false;
+
+  useEffect(() => {
+    const id = Number(appId);
+    if (!fichaFaltando || !Number.isFinite(id) || pedidos.current.has(id)) return;
+    pedidos.current.add(id);
+    coletar.mutate(id);
+  }, [fichaFaltando, appId, coletar]);
   const favoritado = favoritosJogos.data?.some(
     (f) => f.fonte === "steam" && f.jogo_id === appId,
   );
@@ -80,6 +111,48 @@ export function JogoSteamPagina() {
       {(dados: DetalheJogoSteam) => {
         const { jogo, ficha } = dados;
         const classificacao = classificacaoSteam(jogo.classificacao_steam);
+
+        // Sem ficha: a coleta ja foi disparada no efeito acima. Renderizar a
+        // ficha vazia aqui mostraria travessao em todo campo e um grafico sem
+        // ponto - pior que dizer que o dado esta a caminho.
+        if (!dados.ficha_coletada) {
+          return (
+            <section className="flex flex-col items-center gap-space-base rounded-xl bg-surface-container-low p-space-3xl text-center shadow-2xl">
+              <ArteJogo
+                appId={jogo.app_id}
+                nome={jogo.nome}
+                imagemUrl={jogo.imagem_header}
+                className="h-28 w-full max-w-md"
+              />
+              <h1 className="font-headline-md text-headline-md font-bold text-on-surface">
+                {jogo.nome}
+              </h1>
+
+              {coletar.isError ? (
+                <>
+                  <MensagemErro erro={coletar.error} />
+                  <Botao
+                    icone="refresh"
+                    aoClicar={() => coletar.mutate(Number(appId))}
+                    desabilitado={coletar.isPending}
+                  >
+                    {t("jogoSteam.semFicha.tentarDeNovo")}
+                  </Botao>
+                </>
+              ) : (
+                <>
+                  <span className="flex items-center gap-space-xs font-body-md text-body-md text-on-surface-variant">
+                    <Icone nome="progress_activity" className="animate-spin text-[18px] text-primary" />
+                    {t("jogoSteam.semFicha.coletando")}
+                  </span>
+                  <p className="max-w-md font-body-sm text-body-sm text-outline">
+                    {t("jogoSteam.semFicha.explicacao")}
+                  </p>
+                </>
+              )}
+            </section>
+          );
+        }
 
         const pontos = serieRecortada.map((ponto: PontoSerie) => ({
           rotulo: fmtDataHora(ponto.janela_coleta),

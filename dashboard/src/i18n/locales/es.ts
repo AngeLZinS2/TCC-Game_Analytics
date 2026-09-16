@@ -514,6 +514,12 @@ const es: Traducoes = {
     voltar: "Volver al catálogo",
     favoritarJogo: "Marcar juego como favorito",
     gratuito: "Gratuito",
+    semFicha: {
+      coletando: "Buscando los datos de este juego en Steam…",
+      explicacao:
+        "Este juego entró por el barrido de ofertas, que solo guarda nombre, imagen y etiquetas. La ficha completa (género, reseñas, telemetría) se está recolectando ahora — la página se actualiza sola al terminar.",
+      tentarDeNovo: "Intentar de nuevo",
+    },
     metacriticTitle: "Puntuación de la crítica en Metacritic",
     dev: "DEV:",
     pub: "PUB:",

@@ -237,7 +237,9 @@ export function SteamPagina({ periodo }: { periodo?: number } = {}) {
     });
   }
 
-  const totalCatalogo = visaoGeral.data?.jogos_steam ?? 0;
+  // Os MONITORADOS (com ficha), nao a dimensao inteira: desde a varredura
+  // de ofertas ela tem ~18 mil apps sem ficha, que esta tela nao lista.
+  const totalCatalogo = visaoGeral.data?.jogos_steam_monitorados ?? 0;
 
   return (
     <>
