@@ -75,17 +75,25 @@ def _normalizar_busca(nome: str) -> str:
 
 
 def jogos_para_tempo(limite: int | None = None) -> list[tuple[int, str]]:
-    """`(app_id, nome)` dos jogos que ainda NUNCA foram buscados no HLTB.
+    """`(app_id, nome)` dos jogos COM FICHA que ainda nunca foram buscados no HLTB.
 
     Diferente do ITAD (que cacheia so o id e busca preco de novo toda
     rodada), aqui o id E os tempos saem da MESMA chamada de busca - uma vez
     resolvido (`hltb_id` preenchido, mesmo que `""` de "nao achei") nao ha o
     que atualizar buscando de novo. So `hltb_id IS NULL` volta a entrar.
+
+    O filtro de ficha (2026-09-16) tem o mesmo motivo do ITAD e do agendador:
+    a varredura de ofertas criou ~20 mil linhas com `hltb_id` nulo, e o painel
+    "Tempo pra zerar" so aparece na ficha - que o stub nao tem. Entram quando
+    alguem coletar a ficha.
     """
     with session_scope() as sessao:
         consulta = (
             select(DimJogoSteam.app_id, DimJogoSteam.nome)
-            .where(DimJogoSteam.hltb_id.is_(None))
+            .where(
+                DimJogoSteam.hltb_id.is_(None),
+                DimJogoSteam.coletado_ficha_em.is_not(None),
+            )
             .order_by(DimJogoSteam.app_id)
         )
         if limite:

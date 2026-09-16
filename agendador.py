@@ -77,7 +77,7 @@ class Tarefa:
 
 
 def _apps_monitorados() -> list[int]:
-    """Os app_ids que ja estao no banco.
+    """Os app_ids com FICHA no banco - nao toda linha de `dim_jogo_steam`.
 
     **Nao e a semente.** O `SteamCollector` sem `app_ids` cai na lista fixa de
     `collectors/seeds/steam_apps.json`, que faz sentido para um primeiro
@@ -90,6 +90,20 @@ def _apps_monitorados() -> list[int]:
     Monitorar quem esta no banco faz a plataforma acompanhar o que foi trazido
     para ela, em vez de uma lista decidida antes de alguem usar o produto.
 
+    **Por que o filtro de ficha (2026-09-16).** A varredura de ofertas (Fase
+    35.1) cria uma linha por oferta ativa - o banco saiu de ~90 linhas para
+    20.079. Sem o filtro, esta funcao devolvia as 20.079 e a tarefa `steam`
+    pedia `appdetails` + avaliacoes de cada uma, a ~3s por app: 16,7 HORAS
+    para uma passada de uma tarefa que roda a cada 60 minutos. Ela nunca
+    fechava um ciclo e martelava a Steam sem intervalo - medido ao vivo na
+    VPS, com o log em `posicao: 14, total: 20079`.
+
+    O stub da varredura nao precisa disto: o preco dele ja vem da propria
+    varredura, de hora em hora, e e so o que a tela de Ofertas mostra. Quem
+    precisa de `appdetails` recorrente e quem tem ficha - os jogos com pagina
+    de verdade, serie de jogadores e avaliacoes. Um stub vira monitorado no
+    momento em que alguem abre a ficha dele e a coleta sob demanda roda.
+
     Devolve vazio quando o banco esta vazio, e ai a semente e a resposta certa.
     """
     from sqlalchemy import select
@@ -98,7 +112,13 @@ def _apps_monitorados() -> list[int]:
     from models.session import session_scope
 
     with session_scope() as sessao:
-        return list(sessao.scalars(select(DimJogoSteam.app_id)))
+        return list(
+            sessao.scalars(
+                select(DimJogoSteam.app_id).where(
+                    DimJogoSteam.coletado_ficha_em.is_not(None)
+                )
+            )
+        )
 
 
 def _coletar_steam(settings: Settings, storage: RawStorage) -> CollectionResult:

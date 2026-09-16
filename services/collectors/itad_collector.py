@@ -69,6 +69,18 @@ def jogos_para_preco(
     Jogo gratuito nao entra (nao ha o que comparar). Jogo com `itad_id = ""`
     ja foi procurado e nao existe no ITAD - fica de fora ate alguem forcar.
 
+    **Jogo SEM FICHA tambem nao entra (2026-09-16).** A varredura de ofertas
+    (Fase 35.1) encheu `dim_jogo_steam` de linha com so nome/imagem/tags, e
+    `gratuito` nelas e nulo - ou seja, casavam com `nao_gratuito` e a fila
+    saltou de ~90 para ~20 mil jogos numa tarefa que roda de hora em hora.
+    O painel "Onde comprar" so existe na ficha, e o stub nao tem ficha pra
+    mostrar: consultar preco dele seria trabalho para uma tela que ninguem
+    pode abrir. Ele entra na fila assim que alguem coletar a ficha.
+
+    Quando `app_ids` e dado o filtro nao se aplica: e a coleta sob demanda,
+    que roda logo DEPOIS de a ficha entrar e antes desta consulta enxergar
+    o `coletado_ficha_em` novo.
+
     `revalidar_vazios_dias`: se dado, jogo com `itad_id = ""` cuja ultima
     tentativa (`coletado_preco_em`) passou desse tempo volta pra fila - um
     pre-venda que ainda nao estava no ITAD entra quando lanca. O `""` e falsy,
@@ -101,6 +113,8 @@ def jogos_para_preco(
         )
         if app_ids is not None:
             consulta = consulta.where(DimJogoSteam.app_id.in_(list(app_ids)))
+        else:
+            consulta = consulta.where(DimJogoSteam.coletado_ficha_em.is_not(None))
         if limite:
             consulta = consulta.limit(limite)
         return [(linha.app_id, linha.itad_id) for linha in sessao.execute(consulta)]
