@@ -73,7 +73,7 @@ def visao_geral(sessao: Session = Depends(get_db)) -> VisaoGeral:
     monitorados = sessao.scalar(
         select(func.count())
         .select_from(DimJogoSteam)
-        .where(DimJogoSteam.coletado_ficha_em.is_not(None))
+        .where(DimJogoSteam.com_ficha())
     )
 
     coletas = sessao.execute(

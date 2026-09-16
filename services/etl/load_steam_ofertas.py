@@ -170,7 +170,7 @@ def _atualizar_tipos(sessao, linhas: list[LinhaOfertaSteam]) -> int:
         stmt = stmt.on_conflict_do_update(
             index_elements=["app_id"],
             set_={"tipo": stmt.excluded.tipo},
-            where=DimJogoSteam.coletado_ficha_em.is_(None),
+            where=DimJogoSteam.sem_ficha(),
         )
         sessao.execute(stmt)
         atualizados += len(lote)

@@ -115,7 +115,7 @@ def _apps_monitorados() -> list[int]:
         return list(
             sessao.scalars(
                 select(DimJogoSteam.app_id).where(
-                    DimJogoSteam.coletado_ficha_em.is_not(None)
+                    DimJogoSteam.com_ficha()
                 )
             )
         )
@@ -1095,6 +1095,60 @@ class Parada:
         return self.evento.is_set()
 
 
+#: Fracao do intervalo a partir da qual a tarefa ja merece aviso.
+#:
+#: Uma tarefa que ocupa metade do proprio slot ainda funciona, mas nao tem
+#: folga nenhuma pra crescer - e crescer e o normal aqui, porque quase toda
+#: fila e proporcional ao tamanho do catalogo. O aviso e pra dar tempo de
+#: reagir ANTES de virar erro.
+_FRACAO_DE_AVISO = 0.5
+
+
+def _conferir_duracao(tarefa: Tarefa, segundos: float) -> None:
+    """Uma tarefa periodica tem que caber no proprio intervalo.
+
+    Parece obvio, mas ninguem estava conferindo, e o custo disso foi real: em
+    2026-09-16 a tarefa `steam` passou a pedir `appdetails` de 20.079 apps a
+    ~3s cada - 16,7 HORAS de passada, numa tarefa agendada a cada 60 minutos.
+    Ela nunca fechava um ciclo e martelava a Steam sem intervalo, e o log nao
+    dizia absolutamente nada: cada app individual era um INFO de sucesso.
+
+    O agendador ja tinha os dois numeros na mao (mede a duracao desde sempre,
+    e o intervalo esta na propria `Tarefa`) - so nunca os comparava.
+
+    E deliberadamente generico, e nao uma checagem do tamanho da fila: a
+    proxima vez que isto acontecer pode ser por outro motivo (uma API que
+    ficou lenta, um rate limit novo, uma fonte que dobrou de tamanho) e o
+    sintoma vai ser o mesmo. Nao impede o problema - impede que ele passe
+    calado, que foi o que deixou este durar.
+    """
+    intervalo = tarefa.intervalo_segundos
+    if intervalo <= 0:
+        return
+    if segundos >= intervalo:
+        logger.error(
+            "tarefa nao cabe no proprio intervalo - ela nunca fecha um ciclo "
+            "e a fonte externa fica sem pausa entre as chamadas",
+            extra={
+                "fonte": tarefa.nome,
+                "segundos": round(segundos, 2),
+                "intervalo_segundos": intervalo,
+                "vezes_o_intervalo": round(segundos / intervalo, 2),
+            },
+        )
+    elif segundos >= intervalo * _FRACAO_DE_AVISO:
+        logger.warning(
+            "tarefa ocupando boa parte do proprio intervalo - sem folga "
+            "pra crescer",
+            extra={
+                "fonte": tarefa.nome,
+                "segundos": round(segundos, 2),
+                "intervalo_segundos": intervalo,
+                "fracao_do_intervalo": round(segundos / intervalo, 2),
+            },
+        )
+
+
 def _executar(tarefa: Tarefa, settings: Settings, storage: RawStorage) -> bool:
     """Roda uma tarefa. Devolve se foi bem-sucedida.
 
@@ -1111,7 +1165,14 @@ def _executar(tarefa: Tarefa, settings: Settings, storage: RawStorage) -> bool:
             "coleta falhou",
             extra={"fonte": tarefa.nome, "erro": f"{type(exc).__name__}: {exc}"},
         )
+        # Tambem confere aqui: uma tarefa que estoura o intervalo E TERMINA
+        # EM ERRO e o pior caso dos dois, e era justamente o que ficava sem
+        # numero nenhum no log.
+        _conferir_duracao(tarefa, time.monotonic() - inicio)
         return False
+
+    duracao = time.monotonic() - inicio
+    _conferir_duracao(tarefa, duracao)
 
     tarefa.execucoes += 1
     if not resultado.sucesso:
@@ -1128,7 +1189,7 @@ def _executar(tarefa: Tarefa, settings: Settings, storage: RawStorage) -> bool:
             "fonte": tarefa.nome,
             "coletados": resultado.registros_coletados,
             "carregados": resultado.registros_carregados,
-            "segundos": round(time.monotonic() - inicio, 2),
+            "segundos": round(duracao, 2),
         },
     )
     return True

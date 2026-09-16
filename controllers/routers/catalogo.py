@@ -160,7 +160,7 @@ def buscar_catalogo(
             )
             .where(
                 DimJogoSteam.app_id.in_(app_ids),
-                DimJogoSteam.coletado_ficha_em.is_not(None),
+                DimJogoSteam.com_ficha(),
             )
             .group_by(DimJogoSteam.app_id)
         )

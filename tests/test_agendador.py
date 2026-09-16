@@ -19,6 +19,7 @@ from agendador import (
     ESPERA_APOS_FALHA_SEGUNDOS,
     Parada,
     Tarefa,
+    _conferir_duracao,
     _executar,
     montar_tarefas,
 )
@@ -485,3 +486,53 @@ def test_a_proxima_tarefa_e_a_de_menor_prazo():
 
     escolhida = min([steam, liquipedia, opendota], key=lambda t: t.proxima_em)
     assert escolhida.nome == "liquipedia"
+
+
+# --- A tarefa cabe no proprio intervalo? -------------------------------------
+#
+# O bug de 2026-09-16: a tarefa `steam` levava 16,7 horas por passada numa
+# agenda de 60 minutos, e o log nao dizia nada - cada app era um INFO de
+# sucesso. O agendador ja media a duracao e ja sabia o intervalo; so nunca
+# comparava os dois. Estes testes fixam a comparacao.
+
+
+def _tarefa_de(intervalo: float) -> Tarefa:
+    return Tarefa(nome="fake", intervalo_segundos=intervalo, executar=_ok)
+
+
+def test_estourar_o_intervalo_e_erro(caplog):
+    """O caso real: 16,7h de trabalho num slot de 1h."""
+    with caplog.at_level("ERROR"):
+        _conferir_duracao(_tarefa_de(3600), 60_000)
+    assert "nao cabe no proprio intervalo" in caplog.text
+
+
+def test_ocupar_metade_do_intervalo_ja_avisa(caplog):
+    """Ainda funciona, mas sem folga - e toda fila aqui cresce com o
+    catalogo. O aviso e pra dar tempo de reagir antes de virar erro."""
+    with caplog.at_level("WARNING"):
+        _conferir_duracao(_tarefa_de(3600), 1900)
+    assert "boa parte do proprio intervalo" in caplog.text
+
+
+def test_tarefa_folgada_nao_reclama(caplog):
+    """O caso normal depois da correcao: a coleta Steam leva ~6min de 60.
+    Se isto virasse ruido, o log deixaria de servir pra achar o problema."""
+    with caplog.at_level("WARNING"):
+        _conferir_duracao(_tarefa_de(3600), 378)
+    assert caplog.text == ""
+
+
+def test_duracao_e_conferida_mesmo_quando_a_tarefa_explode(caplog):
+    """Estourar o intervalo E falhar e o pior caso dos dois - e era
+    justamente o que nao deixava numero nenhum no log."""
+
+    def _demorada_e_quebrada(*_args):
+        raise RuntimeError("a origem caiu")
+
+    tarefa = Tarefa(
+        nome="fake", intervalo_segundos=0.0001, executar=_demorada_e_quebrada
+    )
+    with caplog.at_level("ERROR"):
+        assert _executar(tarefa, None, None) is False
+    assert "nao cabe no proprio intervalo" in caplog.text

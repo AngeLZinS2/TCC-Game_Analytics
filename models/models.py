@@ -159,9 +159,41 @@ class DimJogoSteam(Base):
     #: Tags da comunidade com contagem de votos: {"RPG": 1240, ...}.
     tags_comunidade: Mapped[dict | None] = mapped_column(JSONB)
 
+    #: Quando o `appdetails` foi coletado. **E o que separa jogo de stub.**
+    #:
+    #: A varredura de ofertas (Fase 35.1) cria uma linha aqui por oferta
+    #: ativa - ~20 mil linhas com so nome, imagem, tags e preco. "Existe
+    #: linha em `dim_jogo_steam`" deixou de significar "temos este jogo";
+    #: quem responde isso e esta coluna. Use `com_ficha()`/`sem_ficha()`
+    #: abaixo em vez de escrever o `is_not(None)` na mao.
     coletado_ficha_em: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True)
     )
+
+    @classmethod
+    def com_ficha(cls):
+        """Criterio SQL de "este app tem ficha de verdade".
+
+        Existe para ser o UNICO dono desta regra. Ela nasceu espalhada: em
+        2026-09-16 o mesmo `coletado_ficha_em IS NOT NULL` estava copiado em
+        dez consultas, e as tres que esqueceram dele (as filas de coleta do
+        agendador, do ITAD e do HowLongToBeat) puseram os ~20 mil stubs numa
+        rotina de hora em hora - 16,7 horas de trabalho por passada.
+
+        Use em qualquer consulta que devolva "os jogos":
+
+            select(...).where(DimJogoSteam.com_ficha())
+        """
+        return cls.coletado_ficha_em.is_not(None)
+
+    @classmethod
+    def sem_ficha(cls):
+        """O complemento de `com_ficha()` - so os stubs da varredura.
+
+        Bem menos usado: serve a quem escreve NO stub (a carga de ofertas,
+        que nao pode sobrescrever ficha ja coletada) e nao a quem le.
+        """
+        return cls.coletado_ficha_em.is_(None)
 
     # --- Comparacao de preco (Fase 17, IsThereAnyDeal) ------------------
     #: UUID do jogo no ITAD, achado uma vez por Steam appid e cacheado.

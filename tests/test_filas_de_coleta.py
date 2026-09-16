@@ -90,3 +90,42 @@ def test_a_premissa_do_teste_vale() -> None:
     parar de ter, sao eles que precisam de outro cenario, nao o codigo.
     """
     assert _stubs_no_banco(), "banco sem stub: os testes acima nao provam nada"
+
+
+# --- A regra tem UM dono ------------------------------------------------------
+
+
+def test_ninguem_reescreve_o_criterio_na_mao() -> None:
+    """`com_ficha()`/`sem_ficha()` sao os unicos donos da regra.
+
+    Os testes acima cobrem as tres filas que existiam quando o bug apareceu.
+    Este cobre a PROXIMA - a fila que alguem ainda vai escrever, e que nenhum
+    teste enumerado pegaria. O criterio nasceu espalhado (dez consultas com o
+    mesmo `coletado_ficha_em IS NOT NULL` copiado), e foi assim que tres
+    delas esqueceram dele.
+
+    Escrever o predicado na mao volta a permitir esquecer; usar o helper faz
+    a regra ser uma coisa so, que da pra achar e mudar num lugar.
+    """
+    import pathlib
+
+    raiz = pathlib.Path(__file__).resolve().parent.parent
+    ignorados = {"tests", "migrations", ".git", "node_modules", "dashboard"}
+    infratores = []
+
+    for arquivo in raiz.rglob("*.py"):
+        if any(parte in ignorados for parte in arquivo.parts):
+            continue
+        # O proprio model define o helper - e o unico lugar onde a coluna
+        # pode ser comparada diretamente.
+        if arquivo.name == "models.py" and arquivo.parent.name == "models":
+            continue
+        texto = arquivo.read_text(encoding="utf-8")
+        for numero, linha in enumerate(texto.splitlines(), start=1):
+            if "coletado_ficha_em.is_" in linha:
+                infratores.append(f"{arquivo.relative_to(raiz)}:{numero}")
+
+    assert infratores == [], (
+        "use DimJogoSteam.com_ficha()/sem_ficha() em vez de comparar a coluna "
+        f"direto: {infratores}"
+    )

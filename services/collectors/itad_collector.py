@@ -114,7 +114,7 @@ def jogos_para_preco(
         if app_ids is not None:
             consulta = consulta.where(DimJogoSteam.app_id.in_(list(app_ids)))
         else:
-            consulta = consulta.where(DimJogoSteam.coletado_ficha_em.is_not(None))
+            consulta = consulta.where(DimJogoSteam.com_ficha())
         if limite:
             consulta = consulta.limit(limite)
         return [(linha.app_id, linha.itad_id) for linha in sessao.execute(consulta)]

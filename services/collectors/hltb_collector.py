@@ -92,7 +92,7 @@ def jogos_para_tempo(limite: int | None = None) -> list[tuple[int, str]]:
             select(DimJogoSteam.app_id, DimJogoSteam.nome)
             .where(
                 DimJogoSteam.hltb_id.is_(None),
-                DimJogoSteam.coletado_ficha_em.is_not(None),
+                DimJogoSteam.com_ficha(),
             )
             .order_by(DimJogoSteam.app_id)
         )

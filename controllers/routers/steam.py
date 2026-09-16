@@ -350,7 +350,7 @@ def listar_jogos(
         select(DimJogoSteam, snap, estatisticas.c.pico, estatisticas.c.anterior)
         .outerjoin(snap, snap.app_id == DimJogoSteam.app_id)
         .outerjoin(estatisticas, estatisticas.c.app_id == DimJogoSteam.app_id)
-        .where(DimJogoSteam.coletado_ficha_em.is_not(None))
+        .where(DimJogoSteam.com_ficha())
     )
 
     if busca:
@@ -399,7 +399,7 @@ def agregar_por_genero(sessao: Session = Depends(get_db)) -> list[AgregadoGenero
             func.avg(snap.nota_avaliacoes).label("nota"),
         )
         .outerjoin(snap, snap.app_id == DimJogoSteam.app_id)
-        .where(DimJogoSteam.coletado_ficha_em.is_not(None))
+        .where(DimJogoSteam.com_ficha())
         .group_by(genero)
         .order_by(nulls_last(desc("jogadores")))
     )
@@ -437,7 +437,7 @@ def agregar_por_categoria(sessao: Session = Depends(get_db)) -> list[AgregadoCat
         select(
             DimJogoSteam.app_id, func.unnest(DimJogoSteam.recursos).label("categoria")
         )
-        .where(DimJogoSteam.coletado_ficha_em.is_not(None))
+        .where(DimJogoSteam.com_ficha())
         .subquery()
     )
 
