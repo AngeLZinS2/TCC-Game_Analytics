@@ -150,6 +150,14 @@ class Settings(BaseSettings):
     #: numero oficial; ajustavel via env sem mudar codigo.
     liquipedia_api_v3_rate_limit_seconds: float = Field(default=5.0, gt=0)
 
+    # --- Avisos operacionais (Telegram) ---
+    #: Sem as DUAS variaveis o canal fica desligado e `enviar()` vira no-op -
+    #: mesmo padrao das outras chaves. O bot so consegue escrever depois que
+    #: alguem manda `/start` pra ele: o Telegram nao deixa bot iniciar
+    #: conversa, e o sintoma disso e um 400 "chat not found" no log.
+    telegram_bot_token: str | None = None
+    telegram_chat_id: str | None = None
+
     # --- Agendador de coleta ---
     #: Intervalo entre coletas da Steam, em minutos.
     #:

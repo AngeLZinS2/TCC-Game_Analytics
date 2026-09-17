@@ -70,6 +70,14 @@ class Tarefa:
     proxima_em: float = 0.0
     execucoes: int = 0
     falhas: int = 0
+    #: Falhas CONSECUTIVAS - zera a cada sucesso. Separado de `falhas` (que e
+    #: o total da vida) porque o que caracteriza "quebrou" e a sequencia: uma
+    #: fonte que falha 1 em cada 20 rodadas esta saudavel, uma que falhou as
+    #: ultimas 3 seguidas nao esta.
+    falhas_seguidas: int = 0
+    #: `time.monotonic()` do ultimo sucesso. 0 = nunca teve. E o que sustenta
+    #: o "sem sucesso ha tempo demais" do resumo diario.
+    ultimo_sucesso: float = 0.0
 
     def reagendar(self, agora: float, sucesso: bool) -> None:
         espera = self.intervalo_segundos if sucesso else ESPERA_APOS_FALHA_SEGUNDOS
@@ -1140,6 +1148,23 @@ def _conferir_duracao(tarefa: Tarefa, segundos: float) -> None:
                 "vezes_o_intervalo": round(segundos / intervalo, 2),
             },
         )
+        _avisar(
+            "\n".join(
+                [
+                    "[PlayDB] tarefa nao cabe no proprio intervalo",
+                    "",
+                    f"fonte: {tarefa.nome}",
+                    f"levou {round(segundos / 60)} min para uma cadencia de "
+                    f"{round(intervalo / 60)} min",
+                    "",
+                    "Ela nunca fecha um ciclo e a fonte externa fica sem pausa.",
+                ]
+            ),
+            chave=f"estourou:{tarefa.nome}",
+            # 12h: e um problema estrutural (fila cresceu, API ficou lenta),
+            # nao um susto - repetir a cada rodada nao acrescenta nada.
+            cooldown=12 * 3600.0,
+        )
     elif segundos >= intervalo * _FRACAO_DE_AVISO:
         logger.warning(
             "tarefa ocupando boa parte do proprio intervalo - sem folga "
@@ -1160,6 +1185,33 @@ _FATOR_TRAVADA = 3.0
 
 #: De quanto em quanto tempo o vigia acorda pra conferir.
 _INTERVALO_DO_VIGIA = 60.0
+
+#: Falhas seguidas antes de avisar por Telegram.
+#:
+#: Nao e 1 de proposito: fonte externa falha sozinha o tempo todo (a
+#: Liquipedia da 429 a cada ciclo, por exemplo) e avisar na primeira faria o
+#: chat virar ruido - e chat ruidoso vira chat silenciado, que e pior que
+#: nao ter canal. Duas seguidas ja separa "a internet piscou" de "isto
+#: quebrou".
+_FALHAS_ANTES_DE_AVISAR = 2
+
+
+def _avisar(texto: str, chave: str, cooldown: float = 3600.0) -> None:
+    """Manda um aviso operacional, se o canal estiver configurado.
+
+    Import tardio e `except` largo porque avisar sobre um problema jamais
+    pode causar outro: sem Telegram configurado, ou com ele fora do ar, o
+    agendador segue exatamente igual.
+    """
+    try:
+        from services.notificacoes import telegram
+
+        telegram.enviar(texto, chave=chave, cooldown_segundos=cooldown)
+    except Exception as exc:  # noqa: BLE001 - aviso nunca derruba a coleta
+        logger.warning(
+            "falha ao despachar aviso",
+            extra={"erro": f"{type(exc).__name__}: {exc}", "chave": chave},
+        )
 
 
 class _Vigia:
@@ -1216,6 +1268,23 @@ class _Vigia:
                 "intervalo_segundos": tarefa.intervalo_segundos,
             },
         )
+        # O aviso mais importante do canal: e o unico sintoma de um problema
+        # que, sem ele, so se descobre olhando um painel por acaso - foi
+        # assim que 8 horas de travamento passaram batidas.
+        _avisar(
+            "\n".join(
+                [
+                    "[PlayDB] tarefa travada",
+                    "",
+                    f"fonte: {tarefa.nome}",
+                    f"ha {round(decorrido / 60)} min em execucao "
+                    f"(cadencia: {round(tarefa.intervalo_segundos / 60)} min)",
+                    "",
+                    "A fila do agendador esta parada atras dela.",
+                ]
+            ),
+            chave=f"travada:{tarefa.nome}",
+        )
 
     def iniciar(self, parada: "Parada") -> None:
         def laco() -> None:
@@ -1225,6 +1294,92 @@ class _Vigia:
                 self.conferir()
 
         threading.Thread(target=laco, name="vigia-agendador", daemon=True).start()
+
+
+#: De quanto em quanto tempo mandar o resumo de estado.
+_INTERVALO_DO_RESUMO = 24 * 3600.0
+
+
+def montar_resumo(tarefas: list[Tarefa]) -> str:
+    """Texto do resumo diario, a partir do que o agendador ja sabe.
+
+    De proposito NAO consulta o banco nem importa nada de `controllers/`: o
+    que o agendador conhece melhor que qualquer um e o proprio ciclo - o que
+    rodou, o que falhou, o que esta ha tempo demais sem um sucesso. Frescor
+    por fonte, que e a mesma pergunta vista do banco, ja e trabalho do painel
+    admin; duplicar a consulta aqui seria duas verdades pra manter.
+
+    O resumo existe menos pelo conteudo e mais pela CADENCIA: um canal que
+    so fala quando ha problema e indistinguivel de um canal quebrado. Uma
+    mensagem por dia prova que o caminho inteiro esta vivo.
+    """
+    agora = time.monotonic()
+
+    quebradas = [t for t in tarefas if t.falhas_seguidas >= _FALHAS_ANTES_DE_AVISAR]
+    # Sem sucesso ha mais de 3x a propria cadencia - o equivalente, visto de
+    # dentro, ao "fonte parada" do painel.
+    paradas = [
+        t
+        for t in tarefas
+        if t.ultimo_sucesso > 0
+        and (agora - t.ultimo_sucesso) > t.intervalo_segundos * _FATOR_TRAVADA
+    ]
+    nunca = [t for t in tarefas if t.ultimo_sucesso == 0 and t.execucoes > 0]
+
+    linhas = [
+        "[PlayDB] resumo de 24h",
+        "",
+        f"tarefas: {len(tarefas)}",
+        f"execucoes: {sum(t.execucoes for t in tarefas)}",
+        f"falhas: {sum(t.falhas for t in tarefas)}",
+    ]
+
+    if quebradas:
+        linhas += ["", "falhando agora:"]
+        linhas += [f"  {t.nome} ({t.falhas_seguidas}x seguidas)" for t in quebradas]
+    if paradas:
+        linhas += ["", "sem sucesso ha tempo demais:"]
+        linhas += [
+            f"  {t.nome} (ha {round((agora - t.ultimo_sucesso) / 3600)}h)"
+            for t in paradas
+        ]
+    if nunca:
+        linhas += ["", "nunca tiveram sucesso:"]
+        linhas += [f"  {t.nome}" for t in nunca]
+    if not (quebradas or paradas or nunca):
+        linhas += ["", "tudo dentro do esperado."]
+
+    return "\n".join(linhas)
+
+
+def _contar_falha(tarefa: Tarefa, erro: str) -> None:
+    """Soma a falha e avisa quando virar sequencia.
+
+    Avisar na PRIMEIRA falha seria o caminho mais curto pra tornar o canal
+    inutil: fonte externa pisca o tempo todo, e a Liquipedia deste projeto
+    falha a cada ciclo por 429 ha 13 dias. O que merece aviso e a sequencia
+    (`_FALHAS_ANTES_DE_AVISAR`), e mesmo ela com cooldown longo - uma fonte
+    quebrada nao precisa avisar de hora em hora que continua quebrada.
+    """
+    tarefa.falhas += 1
+    tarefa.falhas_seguidas += 1
+    if tarefa.falhas_seguidas < _FALHAS_ANTES_DE_AVISAR:
+        return
+
+    _avisar(
+        "\n".join(
+            [
+                "[PlayDB] coleta falhando",
+                "",
+                f"fonte: {tarefa.nome}",
+                f"{tarefa.falhas_seguidas} falhas seguidas",
+                f"ultimo erro: {erro[:200]}",
+            ]
+        ),
+        chave=f"falha:{tarefa.nome}",
+        # 6h: tempo de dar bom dia e olhar, sem repetir no meio da noite.
+        cooldown=6 * 3600.0,
+    )
 
 
 def _executar(tarefa: Tarefa, settings: Settings, storage: RawStorage) -> bool:
@@ -1238,7 +1393,8 @@ def _executar(tarefa: Tarefa, settings: Settings, storage: RawStorage) -> bool:
     try:
         resultado = tarefa.executar(settings, storage)
     except Exception as exc:  # noqa: BLE001 - isolamento entre fontes
-        tarefa.falhas += 1
+        # A contagem fica so em `_contar_falha` (chamado abaixo) - somar aqui
+        # tambem contava duas vezes a mesma falha.
         logger.exception(
             "coleta falhou",
             extra={"fonte": tarefa.nome, "erro": f"{type(exc).__name__}: {exc}"},
@@ -1247,6 +1403,7 @@ def _executar(tarefa: Tarefa, settings: Settings, storage: RawStorage) -> bool:
         # EM ERRO e o pior caso dos dois, e era justamente o que ficava sem
         # numero nenhum no log.
         _conferir_duracao(tarefa, time.monotonic() - inicio)
+        _contar_falha(tarefa, f"{type(exc).__name__}: {exc}")
         return False
 
     duracao = time.monotonic() - inicio
@@ -1254,12 +1411,15 @@ def _executar(tarefa: Tarefa, settings: Settings, storage: RawStorage) -> bool:
 
     tarefa.execucoes += 1
     if not resultado.sucesso:
-        tarefa.falhas += 1
         logger.warning(
             "coleta nao concluida",
             extra={"fonte": tarefa.nome, "erro": resultado.erro},
         )
+        _contar_falha(tarefa, resultado.erro or "sem detalhe")
         return False
+
+    tarefa.falhas_seguidas = 0
+    tarefa.ultimo_sucesso = time.monotonic()
 
     logger.info(
         "coleta concluida",
@@ -1317,7 +1477,16 @@ def rodar(parada: Parada | None = None) -> int:
         },
     )
 
+    # Primeiro resumo so daqui a 24h: mandar um na subida faria cada deploy
+    # virar mensagem, e deploy nao e evento operacional.
+    proximo_resumo = time.monotonic() + _INTERVALO_DO_RESUMO
+
     while not parada.parando:
+        if time.monotonic() >= proximo_resumo:
+            proximo_resumo = time.monotonic() + _INTERVALO_DO_RESUMO
+            # Sem chave: o resumo e raro por natureza, nao precisa cooldown.
+            _avisar(montar_resumo(tarefas), chave=None)
+
         proxima = min(tarefas, key=lambda t: t.proxima_em)
         espera = proxima.proxima_em - time.monotonic()
 
