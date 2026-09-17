@@ -1105,7 +1105,12 @@ export function RecomendacoesReviewsPagina() {
                       >
                         {fmtPercentual(jogo.percentual_positivo, 0)}
                       </span>
-                      <span className="w-12 shrink-0 text-right font-label-caps text-label-caps text-outline">
+                      {/* Mesmo defeito do painel de tags em `JogoSteam`: a
+                          coluna era `w-12` (48px) e `fmtNumero` devolve o
+                          numero CHEIO - "12.345.678" mede 80px nesta fonte.
+                          Jogo com milhoes de avaliacoes tinha o total cortado,
+                          sem reticencias. */}
+                      <span className="w-20 shrink-0 text-right font-label-caps text-label-caps text-outline">
                         {fmtNumero(jogo.avaliacoes)}
                       </span>
                     </button>

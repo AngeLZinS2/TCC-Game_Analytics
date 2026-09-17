@@ -877,7 +877,10 @@ function FichaDoJogo({ ficha, nome }: { ficha: FichaJogoSteam; nome: string }) {
           <div className="mt-space-sm space-y-space-xs">
             {ficha.tags_comunidade.slice(0, 8).map(([tag, votos]) => (
               <div key={tag} className="flex items-center gap-space-sm">
-                <span className="w-32 shrink-0 truncate font-title-code text-title-code text-on-surface-variant">
+                {/* O rotulo encolhe no celular: com `w-32` fixo (128px) a
+                    barra sobrava com 55px a 390px - estreita demais pra
+                    comunicar proporcao, que e a unica funcao dela. */}
+                <span className="w-24 shrink-0 truncate font-title-code text-title-code text-on-surface-variant sm:w-32">
                   {tag}
                 </span>
                 <div className="flex-1">
@@ -887,7 +890,13 @@ function FichaDoJogo({ ficha, nome }: { ficha: FichaJogoSteam; nome: string }) {
                     altura="h-2"
                   />
                 </div>
-                <span className="w-12 shrink-0 text-right font-title-code text-title-code text-outline">
+                {/* `w-20` e medido, nao chutado: nesta fonte (IBM Plex Mono
+                    13px) o pior caso de `fmtCurto` e "999,9 mil" = 72px. Com o
+                    `w-12` (48px) anterior, as OITO linhas cortavam o numero -
+                    "91,2 mil" precisa de 64px. E corte sem reticencias, entao
+                    a pessoa lia um numero errado sem perceber que faltava
+                    digito. */}
+                <span className="w-20 shrink-0 text-right font-title-code text-title-code text-outline">
                   {fmtCurto(votos)}
                 </span>
               </div>

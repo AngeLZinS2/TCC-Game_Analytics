@@ -241,8 +241,14 @@ export function XboxCatalogo() {
     <>
       {/* ---------- busca e ordenacao ---------- */}
       <section className="space-y-space-md">
-        <div className="flex flex-col justify-between gap-space-md lg:flex-row lg:items-center">
-          <div className="relative max-w-xl flex-1">
+        <div className="flex flex-col justify-between gap-space-md lg:flex-row lg:flex-wrap lg:items-center">
+          {/* `min-w` e o que impede a busca de ser esmagada pelos filtros a
+                direita. Com `flex-1` (base 0) e sem minimo, a 1024px ela
+                ficava com 120px - e o input tem `pl-10 pr-20` (icone +
+                atalho), ou seja 120px SO de padding: sobrava zero para o
+                texto. O `flex-wrap` na linha deixa os filtros descerem em
+                vez de continuar espremendo. */}
+            <div className="relative max-w-xl flex-1 lg:min-w-[18rem]">
             <Icone
               nome="manage_search"
               className="absolute left-space-sm top-1/2 -translate-y-1/2 text-[20px] text-primary-container"

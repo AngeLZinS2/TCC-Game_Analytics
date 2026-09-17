@@ -211,6 +211,26 @@ export function KpiHud({
   const valorExibido =
     contagem !== null && formatarValor ? formatarValor(contagem) : valor;
 
+  /**
+   * Numero comprido encolhe a fonte em vez de ser cortado.
+   *
+   * `text-headline-kpi` chega a 36px, e nessa altura "3.110.670" (9 chars)
+   * pede 198px num cartao que oferece 173 — medido em `/catalogo` a 1024px,
+   * onde o total aparecia truncado SEM reticencias. Num KPI o numero é o
+   * conteudo: perder um digito em silencio é pior do que exibi-lo menor.
+   *
+   * O criterio é o comprimento do texto já formatado, entao vale para
+   * qualquer separador de milhar (o `pt-BR` usa ponto, o `en-US` virgula) e
+   * nao depende de medir nada em tempo de execucao.
+   */
+  const comprimento = typeof valorExibido === "string" ? valorExibido.length : 0;
+  const tamanhoValor =
+    comprimento >= 11
+      ? "text-headline-sm"
+      : comprimento >= 9
+        ? "text-headline-lg"
+        : "text-headline-kpi";
+
   return (
     <div className="group relative overflow-hidden rounded-xl bg-surface-container-low p-space-base shadow-lg transition-all hover:bg-surface-container">
       <div
@@ -231,7 +251,7 @@ export function KpiHud({
       <div className="mt-space-md flex items-baseline justify-between gap-space-sm">
         <div className="flex min-w-0 flex-col">
           <span
-            className={`font-headline-kpi text-headline-kpi tracking-tight tabular-nums ${cor.texto}`}
+            className={`font-headline-kpi ${tamanhoValor} tracking-tight tabular-nums ${cor.texto}`}
           >
             {valorExibido}
           </span>
