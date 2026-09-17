@@ -15,6 +15,7 @@ import threading
 
 import pytest
 
+from config import get_settings
 from agendador import (
     ESPERA_APOS_FALHA_SEGUNDOS,
     Parada,
@@ -167,6 +168,7 @@ def test_intervalos_vem_da_configuracao():
         itad_api_key = "chave-de-teste"
         groq_api_key = "chave-groq-teste"
         pandascore_api_key = None
+        liquipedia_enabled = True
         hltb_enabled = True
         xbox_enabled = True
 
@@ -235,6 +237,7 @@ def test_tarefa_de_preco_so_entra_com_chave_do_itad():
         itad_api_key = None
         groq_api_key = None
         pandascore_api_key = None
+        liquipedia_enabled = True
         hltb_enabled = True
         xbox_enabled = False
         agendador_xbox_minutos = 360
@@ -275,6 +278,7 @@ def test_tarefa_de_resumo_reviews_so_entra_com_chave_do_groq():
         itad_api_key = None
         groq_api_key = None
         pandascore_api_key = None
+        liquipedia_enabled = True
         hltb_enabled = True
         xbox_enabled = False
         agendador_xbox_minutos = 360
@@ -315,6 +319,7 @@ def test_tarefa_de_tempo_jogo_nao_entra_quando_desabilitada():
         itad_api_key = None
         groq_api_key = None
         pandascore_api_key = None
+        liquipedia_enabled = True
         hltb_enabled = False
         xbox_enabled = False
         agendador_xbox_minutos = 360
@@ -356,6 +361,7 @@ def test_tarefa_de_xbox_nao_entra_quando_desabilitada():
         itad_api_key = None
         groq_api_key = None
         pandascore_api_key = None
+        liquipedia_enabled = True
         hltb_enabled = True
         xbox_enabled = False
 
@@ -401,6 +407,7 @@ def test_tarefa_de_catalogo_steam_so_entra_com_chave(monkeypatch):
         itad_api_key = None
         groq_api_key = None
         pandascore_api_key = None
+        liquipedia_enabled = True
         hltb_enabled = True
         xbox_enabled = False
 
@@ -448,6 +455,7 @@ def test_pandascore_troca_o_hltv_quando_ha_chave():
         itad_api_key = None
         groq_api_key = None
         pandascore_api_key = "chave-de-teste"
+        liquipedia_enabled = True
         hltb_enabled = True
         xbox_enabled = False
         agendador_xbox_minutos = 360
@@ -604,3 +612,32 @@ def test_vigia_calado_sem_tarefa_em_execucao(caplog):
     with caplog.at_level("ERROR"):
         vigia.conferir()
     assert caplog.text == ""
+
+
+# --- Scraping da Liquipedia pode ser desligado --------------------------------
+
+
+def _nomes(desligada: bool) -> set[str]:
+    settings = get_settings().model_copy(update={"liquipedia_enabled": not desligada})
+    return {t.nome for t in montar_tarefas(settings)}
+
+
+def test_liquipedia_ligada_agenda_as_quatro_tarefas():
+    assert {"liquipedia", "equipes", "brackets", "owcs"} <= _nomes(desligada=False)
+
+
+def test_liquipedia_desligada_tira_as_quatro():
+    """As quatro saem JUNTAS porque falham juntas: a trava de 429 da
+    Liquipedia e por IP, entao bloquear uma bloqueia todas. Medido em
+    producao (2026-09-17): 65 falhas numa hora entre as quatro, com o `owcs`
+    em 136 seguidas."""
+    nomes = _nomes(desligada=True)
+    assert {"liquipedia", "equipes", "brackets", "owcs"} & nomes == set()
+
+
+def test_desligar_liquipedia_nao_afeta_as_outras_fontes():
+    """O resto do agendador nao pode ir junto - as fontes que cobrem o mesmo
+    dominio (PandaScore, vlr, Valve) seguem valendo."""
+    ligada, desligada = _nomes(desligada=False), _nomes(desligada=True)
+    perdidas = ligada - desligada
+    assert perdidas == {"liquipedia", "equipes", "brackets", "owcs"}

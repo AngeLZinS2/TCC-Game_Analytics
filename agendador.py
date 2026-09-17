@@ -890,21 +890,6 @@ def montar_tarefas(settings: Settings) -> list[Tarefa]:
             executar=_coletar_opendota,
         ),
         Tarefa(
-            nome="liquipedia",
-            intervalo_segundos=settings.agendador_liquipedia_minutos * 60,
-            executar=_coletar_liquipedia,
-        ),
-        Tarefa(
-            nome="equipes",
-            intervalo_segundos=settings.agendador_equipes_minutos * 60,
-            executar=_coletar_equipes,
-        ),
-        Tarefa(
-            nome="brackets",
-            intervalo_segundos=settings.agendador_brackets_minutos * 60,
-            executar=_coletar_brackets,
-        ),
-        Tarefa(
             nome="ranking",
             intervalo_segundos=settings.agendador_ranking_minutos * 60,
             executar=_coletar_ranking,
@@ -926,6 +911,27 @@ def montar_tarefas(settings: Settings) -> list[Tarefa]:
                 executar=_coletar_resumo_reviews,
             )
         )
+    # Scraping da Liquipedia - as quatro juntas, porque falham juntas: a
+    # trava de 429 e por IP, entao bloquear uma bloqueia todas.
+    if settings.liquipedia_enabled:
+        tarefas += [
+            Tarefa(
+                nome="liquipedia",
+                intervalo_segundos=settings.agendador_liquipedia_minutos * 60,
+                executar=_coletar_liquipedia,
+            ),
+            Tarefa(
+                nome="equipes",
+                intervalo_segundos=settings.agendador_equipes_minutos * 60,
+                executar=_coletar_equipes,
+            ),
+            Tarefa(
+                nome="brackets",
+                intervalo_segundos=settings.agendador_brackets_minutos * 60,
+                executar=_coletar_brackets,
+            ),
+        ]
+
     if settings.hltb_enabled:
         tarefas.append(
             Tarefa(
@@ -1007,13 +1013,16 @@ def montar_tarefas(settings: Settings) -> list[Tarefa]:
             executar=_coletar_ubi_r6,
         )
     )
-    tarefas.append(
-        Tarefa(
-            nome="owcs",
-            intervalo_segundos=settings.agendador_owcs_minutos * 60,
-            executar=_coletar_owcs,
+    # `owcs` tambem raspa a Liquipedia (wiki de Overwatch) - mesmo bloqueio,
+    # mesma flag.
+    if settings.liquipedia_enabled:
+        tarefas.append(
+            Tarefa(
+                nome="owcs",
+                intervalo_segundos=settings.agendador_owcs_minutos * 60,
+                executar=_coletar_owcs,
+            )
         )
-    )
     tarefas.append(
         Tarefa(
             nome="rlcs",

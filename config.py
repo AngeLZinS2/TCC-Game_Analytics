@@ -298,6 +298,21 @@ class Settings(BaseSettings):
     #: catalogada no ITAD semanas depois do cadastro na Steam.
     itad_revalidar_vazios_dias: int = Field(default=14, ge=1)
 
+    # --- Scraping da Liquipedia ---
+    #: Liga/desliga TODAS as tarefas que raspam a Liquipedia: `liquipedia`
+    #: (ticker de agenda), `equipes`, `brackets` e `owcs`.
+    #:
+    #: Existe porque a Liquipedia bloqueia por 429 com facilidade e o
+    #: circuit breaker so evita martelar - nao faz a coleta voltar. Medido em
+    #: producao (2026-09-17): `owcs` acumulou 136 falhas seguidas, e as
+    #: quatro tarefas juntas falharam 65 vezes numa hora, cada uma gastando
+    #: uma vez na fila do agendador pra receber o mesmo erro.
+    #:
+    #: Desligar e a resposta certa enquanto nao houver acesso estavel: as
+    #: fontes que essas tarefas alimentam (agenda, equipes, rankings) ja tem
+    #: cobertura por PandaScore, vlr.gg e Valve.
+    liquipedia_enabled: bool = True
+
     # --- Tempo pra zerar (HowLongToBeat) ---
     #: Sem API oficial nem chave - da pra desligar aqui se um dia o endpoint
     #: nao-oficial parar de responder direito, sem mexer em codigo.
