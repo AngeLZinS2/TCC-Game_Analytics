@@ -1268,6 +1268,13 @@ export interface PontoAcessoDia {
   dia: string;
   acessos: number;
   visitantes_unicos: number;
+  buscas: number;
+}
+
+/** Um termo do ranking de busca, com a contagem (a API antes só mandava o nome). */
+export interface TermoBuscado {
+  termo: string;
+  buscas: number;
 }
 
 export interface VisaoGeralAdmin {
@@ -1281,8 +1288,16 @@ export interface VisaoGeralAdmin {
   buscas_hoje: number;
   buscas_mes: number;
   buscas_ano: number;
+  /** Ontem fechado — a única base de comparação que o banco sustenta hoje.
+   * A tela só mostra variação quando ontem teve movimento. */
+  acessos_ontem: number;
+  visitantes_unicos_ontem: number;
+  buscas_ontem: number;
+  /** Dias distintos de acesso no banco — o seletor de período não pode
+   * oferecer "90 dias" quando existem 3. */
+  historico_dias: number;
   serie_acessos: PontoAcessoDia[];
-  termos_mais_buscados: string[];
+  termos_mais_buscados: TermoBuscado[];
 }
 
 export interface MetricaSistema {
@@ -1299,6 +1314,48 @@ export interface SaudeSistema {
   carga_1min: number | null;
   carga_5min: number | null;
   carga_15min: number | null;
+  /** `null` quando a fonte não sabe informar — a tela mostra "não
+   * disponível", nunca um número inventado. */
+  uptime_segundos: number | null;
+}
+
+/** Uma fonte de coleta e quando ela entregou dado pela última vez.
+ *
+ * É o substituto honesto de "latência" no painel: o projeto não mede tempo
+ * de resposta de API em lugar nenhum. O que existe de verdade é frescor. */
+export interface ServicoColeta {
+  fonte: string;
+  ultima_coleta: string | null;
+  minutos_desde: number | null;
+  intervalo_minutos: number | null;
+  /** "ok" | "atrasado" | "parado" | "sem_cadencia" */
+  status: string;
+  payloads: number;
+}
+
+export interface SaudeServicos {
+  servicos: ServicoColeta[];
+  /** Medida nesta requisição (`SELECT 1`) — a única latência real do painel. */
+  banco_latencia_ms: number | null;
+  fontes_paradas: number;
+  fontes_atrasadas: number;
+  fontes_total: number;
+}
+
+/** Evento real do sistema, derivado do que já está gravado (coletas, contas,
+ * sincronização) — não há tabela de log, e nada aqui é sintético. */
+export interface EventoAtividade {
+  /** "coleta" | "conta" | "sincronizacao" */
+  tipo: string;
+  titulo: string;
+  detalhe: string | null;
+  quando: string;
+  /** "ok" | "atencao" | "erro" */
+  nivel: string;
+}
+
+export interface ListaAtividade {
+  eventos: EventoAtividade[];
 }
 
 export interface TabelaBanco {

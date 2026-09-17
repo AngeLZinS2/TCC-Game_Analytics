@@ -1464,6 +1464,21 @@ class PontoAcessoDia(BaseModel):
     dia: date
     acessos: int
     visitantes_unicos: int
+    #: Buscas do mesmo dia - o grafico do painel sobrepoe as tres series, e
+    #: sem isto a de buscas era a unica sem dado por dia.
+    buscas: int = 0
+
+
+class TermoBuscado(BaseModel):
+    """Um termo no ranking de busca, COM a contagem.
+
+    A contagem sempre existiu (a consulta ordena por ela); so nao era
+    devolvida, e a tela mostrava uma lista sem numero - impossivel saber se
+    o primeiro colocado teve 400 buscas ou 4.
+    """
+
+    termo: str
+    buscas: int
 
 
 class VisaoGeralAdmin(BaseModel):
@@ -1483,12 +1498,25 @@ class VisaoGeralAdmin(BaseModel):
     buscas_mes: int
     buscas_ano: int
 
+    #: ONTEM ATE A MESMA HORA - nao o dia fechado. Comparar um dia em curso
+    #: com um dia inteiro daria -85% toda manha, e quem lesse aprenderia a
+    #: ignorar a variacao. O painel so mostra o percentual quando este numero
+    #: e maior que zero: "+100%" contra uma janela vazia nao informa nada.
+    acessos_ontem: int = 0
+    visitantes_unicos_ontem: int = 0
+    buscas_ontem: int = 0
+
+    #: Quantos dias DISTINTOS de acesso existem no banco. O seletor de
+    #: periodo da tela usa isto pra nao oferecer "90 dias" quando ha 3 - o
+    #: mesmo cuidado que o seletor do Catalogo ja tem.
+    historico_dias: int = 0
+
     #: Ultimos 30 dias, mais antigo primeiro - o grafico da tela.
     serie_acessos: list[PontoAcessoDia] = Field(default_factory=list)
 
     #: Termos mais buscados nos ultimos 30 dias (bonus - mostra o que o
     #: publico esta procurando e nao acha, se aparecer "coletado=false" junto).
-    termos_mais_buscados: list[str] = Field(default_factory=list)
+    termos_mais_buscados: list[TermoBuscado] = Field(default_factory=list)
 
 
 class MetricaSistema(BaseModel):
@@ -1519,6 +1547,10 @@ class SaudeSistema(BaseModel):
     carga_1min: float | None = None
     carga_5min: float | None = None
     carga_15min: float | None = None
+    #: Ha quanto tempo a maquina esta de pe. `None` quando a fonte nao
+    #: sabe informar - o painel mostra "nao disponivel", nunca um numero
+    #: inventado.
+    uptime_segundos: float | None = None
 
 
 class TabelaBanco(BaseModel):
@@ -1529,6 +1561,81 @@ class TabelaBanco(BaseModel):
 class SaudeBanco(BaseModel):
     tamanho_texto: str
     tabelas: list[TabelaBanco] = Field(default_factory=list)
+
+
+class ServicoColeta(BaseModel):
+    """Uma FONTE de coleta, com quando ela entregou dado pela ultima vez.
+
+    Este e o substituto honesto de "latencia" no painel: o projeto nao mede
+    tempo de resposta de API em lugar nenhum, entao inventar um numero de ms
+    seria mentira. O que o banco sabe de verdade e FRESCOR - `raw_data` grava
+    `fonte` + `coletado_em` a cada payload, com indice para isso.
+
+    `status` compara o frescor com a cadencia configurada da tarefa que
+    alimenta a fonte:
+
+    * `ok`        - dentro da cadencia (com folga de tolerancia);
+    * `atrasado`  - passou da cadencia, mas ainda pode ser uma rodada lenta;
+    * `parado`    - varias cadencias sem nada, provavelmente quebrado;
+    * `sem_cadencia` - a fonte existe mas nao esta ligada a nenhuma tarefa
+      agendada (ex.: `hltv`, aposentado pelo PandaScore). Nao e erro - e
+      "nao ha o que esperar", e a tela nao pinta alarme nisso.
+    """
+
+    fonte: str
+    ultima_coleta: datetime | None = None
+    minutos_desde: float | None = None
+    #: Cadencia da tarefa que alimenta a fonte, em minutos. `None` = a fonte
+    #: nao tem tarefa agendada conhecida.
+    intervalo_minutos: int | None = None
+    status: str
+    payloads: int = 0
+
+
+class SaudeServicos(BaseModel):
+    """Estado dos servicos internos - o que da pra afirmar sem inventar."""
+
+    servicos: list[ServicoColeta] = Field(default_factory=list)
+    #: Tempo de um `SELECT 1` medido AGORA. E a unica latencia real do
+    #: painel: ela e medida na hora, nao lida de um historico que nao existe.
+    banco_latencia_ms: float | None = None
+    #: Quantas fontes estao fora da propria cadencia, e quantas existem.
+    #:
+    #: Sao CONTAGENS, e nao um booleano "o agendador esta rodando": a API
+    #: nao tem como saber se o container do agendador esta de pe, e tentar
+    #: inferir isso dava respostas erradas nos dois sentidos - uma tarefa
+    #: semanal que rodou ontem parece saudavel com o agendador parado ha
+    #: horas, e uma coleta sob demanda disparada por alguem na tela parece
+    #: agendador vivo. A leitura ("varias fontes paradas ao mesmo tempo
+    #: costuma ser o agendador, nao as APIs") e da tela, sobre numeros que
+    #: sao verdade.
+    fontes_paradas: int = 0
+    fontes_atrasadas: int = 0
+    fontes_total: int = 0
+
+
+class EventoAtividade(BaseModel):
+    """Um evento real do sistema, para o feed de atividade.
+
+    Nao ha tabela de log neste projeto. Em vez de inventar eventos, este
+    feed e DERIVADO do que ja esta gravado: a ultima coleta de cada fonte
+    (`raw_data`), contas criadas (`dim_usuario.criado_em`) e as transicoes
+    de sincronizacao da Steam (`steam_sincronizacao`). Tudo que aparece aqui
+    aconteceu de fato e tem carimbo de tempo proprio.
+    """
+
+    #: "coleta" | "conta" | "sincronizacao"
+    tipo: str
+    titulo: str
+    detalhe: str | None = None
+    quando: datetime
+    #: "ok" | "atencao" | "erro" - so muda com dado real (sync com falhas,
+    #: fonte parada), nunca por estetica.
+    nivel: str = "ok"
+
+
+class ListaAtividade(BaseModel):
+    eventos: list[EventoAtividade] = Field(default_factory=list)
 
 
 class StatusAdmin(BaseModel):

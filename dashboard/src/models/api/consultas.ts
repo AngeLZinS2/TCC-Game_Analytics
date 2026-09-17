@@ -49,6 +49,8 @@ import type {
   VisaoGeralAdmin,
   SaudeSistema,
   SaudeBanco,
+  SaudeServicos,
+  ListaAtividade,
   SaudeCatalogoSteam,
   StatusAdmin,
   ListaContasAdmin,
@@ -1026,6 +1028,38 @@ export function useCatalogoSteamAdmin() {
         await cabecalhoAuthUsuario(),
       ),
     enabled: !!usuario,
+    retry: false,
+  });
+}
+
+/** Frescor por fonte de coleta + latência do banco medida na hora.
+ *
+ * Reconsulta a cada 30s: é o painel que responde "algum serviço parou?", e
+ * 30s é a cadência em que uma fonte pode realmente mudar de estado — as
+ * tarefas mais rápidas do agendador rodam a cada 5 min. Consultar mais
+ * rápido não traria informação nova, só carga. */
+export function useServicosAdmin() {
+  const { usuario } = useUsuario();
+  return useQuery({
+    queryKey: ["admin", "servicos"],
+    queryFn: async () =>
+      buscar<SaudeServicos>("/api/admin/servicos", undefined, await cabecalhoAuthUsuario()),
+    enabled: !!usuario,
+    refetchInterval: 30000,
+    retry: false,
+  });
+}
+
+/** Eventos recentes do sistema — derivados de dado real (ver o router).
+ * Mesma cadência do painel de serviços, pelas mesmas razões. */
+export function useAtividadeAdmin() {
+  const { usuario } = useUsuario();
+  return useQuery({
+    queryKey: ["admin", "atividade"],
+    queryFn: async () =>
+      buscar<ListaAtividade>("/api/admin/atividade", undefined, await cabecalhoAuthUsuario()),
+    enabled: !!usuario,
+    refetchInterval: 30000,
     retry: false,
   });
 }
