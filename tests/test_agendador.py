@@ -536,3 +536,71 @@ def test_duracao_e_conferida_mesmo_quando_a_tarefa_explode(caplog):
     with caplog.at_level("ERROR"):
         assert _executar(tarefa, None, None) is False
     assert "nao cabe no proprio intervalo" in caplog.text
+
+
+# --- Vigia de tarefa travada --------------------------------------------------
+#
+# `_conferir_duracao` so mede tarefa que TERMINA, e por isso nao viu o pior
+# caso real: 8 horas parado em `hrtimer_nanosleep` (429 do ITAD com
+# `Retry-After` longo), CPU em 0% e nenhuma linha de log. Estes testes fixam
+# o vigia que passa a gritar nesse caso.
+
+
+def test_vigia_avisa_quando_a_tarefa_passa_do_limite(caplog, monkeypatch):
+    from agendador import _FATOR_TRAVADA, _Vigia
+
+    vigia = _Vigia()
+    tarefa = Tarefa(nome="itad", intervalo_segundos=60.0, executar=_ok)
+
+    relogio = {"agora": 1000.0}
+    monkeypatch.setattr("agendador.time.monotonic", lambda: relogio["agora"])
+
+    vigia.entrando(tarefa)
+    # Ainda dentro do limite: silencio.
+    relogio["agora"] += 60.0 * _FATOR_TRAVADA - 1
+    with caplog.at_level("ERROR"):
+        vigia.conferir()
+    assert caplog.text == ""
+
+    relogio["agora"] += 2
+    with caplog.at_level("ERROR"):
+        vigia.conferir()
+    assert "possivelmente travada" in caplog.text
+    # O nome da tarefa vai em `extra=`, que o `caplog.text` nao renderiza -
+    # e o campo estruturado que o log JSON de producao publica.
+    assert caplog.records[-1].fonte == "itad"
+    assert caplog.records[-1].segundos >= 180
+
+
+def test_vigia_avisa_uma_vez_so_por_execucao(caplog, monkeypatch):
+    """O vigia acorda de minuto em minuto; sem isto, uma tarefa travada por
+    8h encheria o log com 480 linhas iguais e esconderia o resto."""
+    from agendador import _Vigia
+
+    vigia = _Vigia()
+    relogio = {"agora": 1000.0}
+    monkeypatch.setattr("agendador.time.monotonic", lambda: relogio["agora"])
+
+    vigia.entrando(Tarefa(nome="itad", intervalo_segundos=60.0, executar=_ok))
+    relogio["agora"] += 10_000
+
+    with caplog.at_level("ERROR"):
+        vigia.conferir()
+        vigia.conferir()
+        vigia.conferir()
+    assert caplog.text.count("possivelmente travada") == 1
+
+
+def test_vigia_calado_sem_tarefa_em_execucao(caplog):
+    from agendador import _Vigia
+
+    vigia = _Vigia()
+    with caplog.at_level("ERROR"):
+        vigia.conferir()
+    assert caplog.text == ""
+
+    vigia.entrando(Tarefa(nome="x", intervalo_segundos=60.0, executar=_ok))
+    vigia.saindo()
+    with caplog.at_level("ERROR"):
+        vigia.conferir()
+    assert caplog.text == ""

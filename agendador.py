@@ -1153,6 +1153,80 @@ def _conferir_duracao(tarefa: Tarefa, segundos: float) -> None:
         )
 
 
+#: Quantas vezes o proprio intervalo uma tarefa pode rodar antes de o vigia
+#: considera-la travada. Tres e folgado de proposito: uma rodada lenta ja e
+#: avisada por `_conferir_duracao`; o vigia e pra travamento mesmo.
+_FATOR_TRAVADA = 3.0
+
+#: De quanto em quanto tempo o vigia acorda pra conferir.
+_INTERVALO_DO_VIGIA = 60.0
+
+
+class _Vigia:
+    """Avisa quando uma tarefa fica presa DENTRO da execucao.
+
+    `_conferir_duracao` so mede tarefa que TERMINA - e por isso nao viu o
+    pior caso real deste projeto: em 2026-09-16 o agendador local ficou 8
+    HORAS parado em `hrtimer_nanosleep`, com CPU em 0% e sem uma linha de
+    log, porque o ITAD devolveu 429 com `Retry-After` longo e o urllib3
+    dormiu a espera inteira dentro da requisicao (ver `_RetryComTeto` em
+    `http_client.py`, que corrige a causa). Como as ~35 tarefas rodam em
+    serie numa thread so, steam_online, vlr e lolesports envelheceram um dia
+    inteiro sem ninguem perceber.
+
+    Esta classe nao mata a tarefa - matar thread em Python nao e seguro, e
+    a causa raiz ja foi corrigida. Ela garante que a PROXIMA vez apareca no
+    log em minutos, e nao seja descoberta por acaso olhando um painel.
+    """
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self._tarefa: Tarefa | None = None
+        self._inicio = 0.0
+        self._avisada = False
+
+    def entrando(self, tarefa: Tarefa) -> None:
+        with self._lock:
+            self._tarefa = tarefa
+            self._inicio = time.monotonic()
+            self._avisada = False
+
+    def saindo(self) -> None:
+        with self._lock:
+            self._tarefa = None
+
+    def conferir(self) -> None:
+        """Um ciclo do vigia. Separado de `iniciar` pra ser testavel."""
+        with self._lock:
+            tarefa = self._tarefa
+            if tarefa is None or self._avisada:
+                return
+            decorrido = time.monotonic() - self._inicio
+            limite = tarefa.intervalo_segundos * _FATOR_TRAVADA
+            if decorrido < limite:
+                return
+            self._avisada = True  # uma vez por execucao, nao a cada minuto
+
+        logger.error(
+            "tarefa possivelmente travada - segue em execucao e esta "
+            "segurando a fila inteira do agendador",
+            extra={
+                "fonte": tarefa.nome,
+                "segundos": round(decorrido),
+                "intervalo_segundos": tarefa.intervalo_segundos,
+            },
+        )
+
+    def iniciar(self, parada: "Parada") -> None:
+        def laco() -> None:
+            while not parada.parando:
+                if parada.dormir(_INTERVALO_DO_VIGIA):
+                    return
+                self.conferir()
+
+        threading.Thread(target=laco, name="vigia-agendador", daemon=True).start()
+
+
 def _executar(tarefa: Tarefa, settings: Settings, storage: RawStorage) -> bool:
     """Roda uma tarefa. Devolve se foi bem-sucedida.
 
@@ -1232,6 +1306,9 @@ def rodar(parada: Parada | None = None) -> int:
             agora + tarefa.intervalo_segundos
         )
 
+    vigia = _Vigia()
+    vigia.iniciar(parada)
+
     logger.info(
         "agendador iniciado",
         extra={
@@ -1249,7 +1326,11 @@ def rodar(parada: Parada | None = None) -> int:
         if parada.parando:
             break
 
-        sucesso = _executar(proxima, settings, storage)
+        vigia.entrando(proxima)
+        try:
+            sucesso = _executar(proxima, settings, storage)
+        finally:
+            vigia.saindo()
         proxima.reagendar(time.monotonic(), sucesso)
 
     logger.info(

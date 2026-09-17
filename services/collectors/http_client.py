@@ -17,6 +17,50 @@ from urllib3.util.retry import Retry
 
 logger = logging.getLogger(__name__)
 
+#: Teto para o `Retry-After` que o servidor pede (segundos).
+#:
+#: Existe porque o agendador roda as ~35 tarefas em SERIE, numa thread so:
+#: um `sleep` dentro de uma requisicao nao atrasa aquela coleta, atrasa
+#: TODAS as outras. Falhar rapido e deixar a tarefa ser reagendada
+#: (`ESPERA_APOS_FALHA_SEGUNDOS`) custa uma rodada; dormir custa o dia.
+#:
+#: Dois minutos ainda absorve o 429 curto de quem so quer que a gente
+#: desacelere - que era o motivo de `respect_retry_after_header` existir.
+ESPERA_MAXIMA_SEGUNDOS = 120.0
+
+
+class _RetryComTeto(Retry):
+    """`Retry` que obedece o `Retry-After`, mas com limite.
+
+    **O bug que isto conserta (2026-09-16).** `backoff_max` (120s por padrao)
+    limita so o backoff EXPONENCIAL - o `Retry-After` do servidor passa
+    intacto. Medido na versao instalada (urllib3 2.7.0):
+
+        Retry(...).get_retry_after(resposta_com_retry_after_3600)  ->  3600.0
+
+    Com `total=5`, um servidor pedindo 1 hora prende o cliente por ate CINCO.
+    Foi exatamente o que aconteceu: o ITAD (atras da Cloudflare) devolveu 429
+    com espera longa, e o agendador ficou 8 horas em `hrtimer_nanosleep` -
+    CPU em 0%, sem log nenhum - enquanto steam_online, vlr, lolesports e
+    todas as outras fontes envelheciam sem ninguem coletar.
+
+    O teto NAO derruba o respeito ao servidor: a espera continua sendo
+    honrada ate o limite, e acima dele a tentativa falha e a tarefa volta pra
+    fila em vez de segurar a fila inteira.
+    """
+
+    def get_retry_after(self, response):  # type: ignore[override]
+        espera = super().get_retry_after(response)
+        if espera is None:
+            return None
+        if espera > ESPERA_MAXIMA_SEGUNDOS:
+            logger.warning(
+                "Retry-After acima do teto - falhando rapido em vez de dormir",
+                extra={"pedido_segundos": espera, "teto_segundos": ESPERA_MAXIMA_SEGUNDOS},
+            )
+            return ESPERA_MAXIMA_SEGUNDOS
+        return espera
+
 
 class RespostaInvalidaError(RuntimeError):
     """A requisicao terminou, mas o corpo nao e o JSON esperado."""
@@ -48,8 +92,9 @@ class RateLimitedClient:
         self._ultima_chamada = 0.0
 
         # backoff_factor=1 -> esperas de 1s, 2s, 4s, 8s... entre tentativas.
-        # respect_retry_after_header faz o 429 da Steam ser obedecido.
-        retry = Retry(
+        # respect_retry_after_header faz o 429 da Steam ser obedecido - com
+        # teto, via `_RetryComTeto` (ver a nota de bug na classe).
+        retry = _RetryComTeto(
             total=max_retries,
             connect=max_retries,
             read=max_retries,
